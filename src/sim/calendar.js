@@ -479,6 +479,7 @@ function ensureSlices(state, data) {
       state.vehicleStats[v.id] = { ...emptyStats(), flights: v.history?.flights || 0, failures: v.history?.failures || 0, standDownWeeks: v.standDownWeeks ?? 12 };
     }
   }
+  certSlice(state); // old saves (v0.2/v0.3): no crew certification yet
   if (!Array.isArray(state.calendar)) state.calendar = [];
   const have = new Set(state.calendar.map((c) => c.id));
   for (const item of itemsOf(data)) {
@@ -539,6 +540,7 @@ export function tick(state, data, ctx) {
     }
   }
   backgroundLaunches(state, data, ctx);
+  certTick(state, data, ctx);
   rivalOps(state, data, ctx);
   rivalProgramPrestige(state, data);
   periodicSummaries(state, data);
@@ -1450,6 +1452,303 @@ function periodicSummaries(state, data) {
   }
 }
 
+// ---------------------------------------------------------------- crew certification (human-rating)
+// vehicles.json `crewRated` is the state on day one; a vehicle can earn it in play (state.crewCert, owner: catalog):
+//   rated:    {[vehicleId]: {turn, by, source: 'program'|'calendar'}}  — effective for everyone who can buy the vehicle
+//   programs: {[vehicleId]: {vehicleId, sponsor, customer, startedTurn, readyTurn, weeks, costM, phase: 'work'|'flights'|'demo',
+//              demoTurn, demoMissionId, demoAttempts, paused}}
+// Steps: engineering + review (weeks, paid at the start) → N successful flights of the vehicle (any operator, background
+// included) and the reliability floor → one uncrewed demo flight (player: a 'cert' mission flown on Launch Day; AI: quickOutcome).
+// A calendar item named in crewCert.calendarGrant (Starship: the HLS uncrewed landing) certifies the vehicle on the real schedule.
+// One program per vehicle. The operator pays the base price; a customer pays customerCostMult and needs the operator's agreement.
+
+const CERT_DEFAULTS = {
+  customerCostMult: 1.5, customerWeeksMult: 1.15, minTrust: 0, maxTension: 1, prestige: 10, demoDestination: 'leo', demoPayloadT: 8,
+  demoRetryWeeks: 10, aiPeriod: 13, aiChance: 0.35, aiReserveShare: 0.15,
+};
+const CREWED_GOALS = /^(crewed_|lunar_south_pole_crewed|lunar_base|national_station|commercial_station)/;
+const CERT_PHASE_LABELS = { work: 'Engenharia e revisão', flights: 'Acumulando voos', demo: 'Voo de demonstração' };
+
+export function certRules(data) {
+  return { ...CERT_DEFAULTS, ...(data?.vehicles?.crewCertRules || {}) };
+}
+
+function certSlice(state) {
+  if (!state.crewCert || typeof state.crewCert !== 'object') state.crewCert = { rated: {}, programs: {} };
+  if (!state.crewCert.rated || typeof state.crewCert.rated !== 'object') state.crewCert.rated = {};
+  if (!state.crewCert.programs || typeof state.crewCert.programs !== 'object') state.crewCert.programs = {};
+  return state.crewCert;
+}
+
+/** Effective crew rating: the data flag OR a certification earned in play. The ONE place that answers "can people fly on it?". */
+export function isCrewRated(state, data, vehicleOrId) {
+  const v = typeof vehicleOrId === 'string' ? vehicleById(data, vehicleOrId) || { id: vehicleOrId } : vehicleOrId;
+  if (!v) return false;
+  return !!v.crewRated || !!state?.crewCert?.rated?.[v.id];
+}
+
+/** Successful flights of a vehicle so far (real history + every flight in the campaign). */
+export function successfulFlights(state, data, vehicleId) {
+  const v = vehicleById(data, vehicleId);
+  const st = state?.vehicleStats?.[vehicleId];
+  const f = st ? st.flights || 0 : v?.history?.flights || 0;
+  const x = st ? st.failures || 0 : v?.history?.failures || 0;
+  return Math.max(0, f - x);
+}
+
+function certCost(state, data, v, customer, actorId) {
+  const r = certRules(data);
+  const cc = v.crewCert || {};
+  const tech = clamp(techBonusFor(state, data, actorId, 'crewCert'), -0.5, 0); // research may make it cheaper/faster
+  const costM = Math.round((cc.costM || 0) * (customer ? r.customerCostMult : 1) * (1 + tech));
+  const weeks = Math.max(4, Math.round((cc.weeks || 52) * (customer ? r.customerWeeksMult : 1) * (1 + tech)));
+  return { costM, weeks };
+}
+
+/** Can `actorId` start (or resume) the certification of a vehicle? → {ok, error?, costM, weeks, customer, resume?} (pure). */
+export function canStartCert(state, data, vehicleId, actorId) {
+  const v = vehicleById(data, vehicleId);
+  if (!v) return { ok: false, error: 'Veículo desconhecido.' };
+  const cc = v.crewCert;
+  if (isCrewRated(state, data, v)) return { ok: false, error: `${v.name} já é certificado para tripulação.` };
+  if (!cc || cc.feasible === false) return { ok: false, error: cc?.reason || 'A operadora não oferece certificação tripulada para este foguete.' };
+  const customer = v.operator !== actorId;
+  const { costM, weeks } = certCost(state, data, v, customer, actorId);
+  const prog = state?.crewCert?.programs?.[vehicleId];
+  if (prog) {
+    if (prog.sponsor === actorId && prog.paused) return { ok: true, resume: true, costM: 0, weeks: 0, customer: prog.customer };
+    return { ok: false, error: prog.sponsor === actorId ? 'Programa já em andamento.' : `${actorName(state, data, prog.sponsor)} já está certificando o ${v.name}.` };
+  }
+  const turn = state?.turn ?? 0;
+  if (!inCatalogAt(state, data, v, turn)) return { ok: false, error: `${v.name} ainda não está em serviço.`, costM, weeks, customer };
+  const acc = accessFor(state, data, actorId, v);
+  if (!acc.ok) return { ok: false, error: `${acc.reason}.`, costM, weeks, customer };
+  if (customer) {
+    if (cc.customer === false) return { ok: false, error: `Só a operadora pode certificar o ${v.name}.`, costM, weeks, customer };
+    const r = certRules(data);
+    const ctrl = state?.actors?.[v.operator] ? v.operator : v.tensionActor;
+    if (ctrl && ctrl !== actorId) {
+      if (tensionBetween(state, actorId, ctrl) > r.maxTension) return { ok: false, error: `${actorName(state, data, ctrl)} não fecha contrato com a tensão atual.`, costM, weeks, customer };
+      if (state?.actors?.[v.operator]) {
+        const trust = state?.relations?.[relKey(actorId, v.operator)]?.trust ?? 0;
+        if (trust < r.minTrust) return { ok: false, error: `${actorName(state, data, v.operator)} não aceita o contrato: confiança baixa (${Math.round(trust)}).`, costM, weeks, customer };
+      }
+    }
+  }
+  if (turn + weeks >= endTurnOf(state, data)) return { ok: false, error: 'Não termina antes do fim da campanha.', costM, weeks, customer };
+  return { ok: true, costM, weeks, customer };
+}
+
+/** Start (or resume) a program. Payment is the caller's job (missions for the player, certTick for the AI). */
+export function startCertProgram(state, data, vehicleId, actorId) {
+  const chk = canStartCert(state, data, vehicleId, actorId);
+  if (!chk.ok) return chk;
+  const cs = certSlice(state);
+  const v = vehicleById(data, vehicleId);
+  if (chk.resume) {
+    cs.programs[vehicleId].paused = false;
+    return { ok: true, resumed: true, program: cs.programs[vehicleId], costM: 0 };
+  }
+  const prog = {
+    vehicleId, sponsor: actorId, customer: !!chk.customer, startedTurn: state.turn, readyTurn: state.turn + chk.weeks, weeks: chk.weeks,
+    costM: chk.costM, phase: 'work', demoTurn: null, demoMissionId: null, demoAttempts: 0, paused: false,
+  };
+  cs.programs[vehicleId] = prog;
+  addNews(state, {
+    headline: `${actorName(state, data, actorId)} inicia a certificação tripulada do ${v.name}`,
+    body: `${chk.customer ? `Contrato com ${v.provider || actorName(state, data, v.operator)}. ` : ''}Revisão de engenharia, ${v.crewCert.flights} voos bem-sucedidos e um voo de demonstração sem tripulação.`,
+    tags: ['catalog', 'crewCert'], actors: [actorId, v.operator].filter((x, i, a) => x && a.indexOf(x) === i), importance: 2, icon: '🧑‍🚀',
+  });
+  return { ok: true, program: prog, costM: chk.costM, weeks: chk.weeks };
+}
+
+/** Certify a vehicle (program done or calendar milestone). Clears its program. */
+export function grantCrewRating(state, data, vehicleId, { by = null, source = 'program' } = {}) {
+  const v = vehicleById(data, vehicleId);
+  if (!v || isCrewRated(state, data, v)) return false;
+  const cs = certSlice(state);
+  const who = by || v.operator;
+  cs.rated[vehicleId] = { turn: state.turn, by: who, source };
+  delete cs.programs[vehicleId];
+  const r = certRules(data);
+  if (state.actors?.[who]) {
+    changeActor(state, who, 'prestige', r.prestige);
+    changeActor(state, who, 'reputation', 2);
+  }
+  addNews(state, {
+    headline: `${v.name} é certificado para levar tripulação`,
+    body: source === 'calendar' ? 'O voo de demonstração do programa oficial convenceu os revisores.' : `Programa de ${actorName(state, data, who)} concluído: quem compra o ${v.name} já pode pôr gente a bordo.`,
+    tags: ['catalog', 'crewCert'], actors: [who, v.operator].filter((x, i, a) => x && a.indexOf(x) === i), importance: 3, icon: '🧑‍🚀',
+  });
+  emitSignal(state, 'vehicle/crewRated', { vehicleId, actorId: who, source });
+  return true;
+}
+
+/** Player demo mission created by missions.js: link it to the program. */
+export function linkCertDemo(state, vehicleId, missionId) {
+  const p = state?.crewCert?.programs?.[vehicleId];
+  if (!p) return false;
+  p.demoMissionId = missionId;
+  p.paused = false;
+  return true;
+}
+
+/** The player cancelled the demo mission: the program waits (resume with 'vehicle/certify', no new fee). */
+export function pauseCert(state, vehicleId, missionId = null) {
+  const p = state?.crewCert?.programs?.[vehicleId];
+  if (!p || p.sponsor !== state?.playerId) return false;
+  if (missionId && p.demoMissionId && p.demoMissionId !== missionId) return false; // an orphan demo, not this program's
+  p.paused = true;
+  p.pausedTurn = state.turn ?? 0;
+  p.demoMissionId = null;
+  return true;
+}
+
+/** Result of a demo flight (player mission ascent or AI quick roll). */
+export function certDemoResult(state, data, vehicleId, success, missionId = null) {
+  const p = state?.crewCert?.programs?.[vehicleId];
+  if (!p || p.phase !== 'demo') return false;
+  if (missionId && p.demoMissionId && p.demoMissionId !== missionId) return false;
+  if (success) return grantCrewRating(state, data, vehicleId, { by: p.sponsor, source: 'program' });
+  const v = vehicleById(data, vehicleId);
+  p.demoAttempts = (p.demoAttempts || 0) + 1;
+  p.demoMissionId = null;
+  p.demoTurn = state.turn + Math.max(certRules(data).demoRetryWeeks, v?.standDownWeeks ?? 0);
+  addNews(state, {
+    headline: `Demonstração do ${v?.name || vehicleId} falha: certificação tripulada adiada`,
+    body: 'Os revisores pedem a investigação e um novo voo sem tripulação.', tags: ['catalog', 'crewCert'], actors: [p.sponsor], importance: 2, icon: '💥',
+  });
+  return false;
+}
+
+/** Everything the UI needs about one vehicle's crew certification for `actorId` (pure). */
+export function certStatus(state, data, vehicleId, actorId = state?.playerId) {
+  const v = vehicleById(data, vehicleId);
+  if (!v) return null;
+  const cc = v.crewCert || null;
+  const rated = isCrewRated(state, data, v);
+  const r = certRules(data);
+  const out = {
+    vehicleId, name: v.name, rated, ratedBy: state?.crewCert?.rated?.[vehicleId] || null, native: !!v.crewRated,
+    feasible: rated || !!(cc && cc.feasible !== false),
+    reason: cc?.feasible === false ? cc.reason || null : (!cc && !rated ? 'A operadora não oferece certificação tripulada.' : null),
+    note: cc?.note || null, program: null, start: null, grant: null,
+  };
+  if (rated || !out.feasible) return out;
+  const rel = vehicleReliability(state, data, vehicleId);
+  const ok = successfulFlights(state, data, vehicleId);
+  out.flightsNeeded = cc.flights || 0;
+  out.flightsOk = ok;
+  out.minReliability = cc.minReliability ?? 0;
+  out.reliability = rel.mean;
+  out.demoDestination = r.demoDestination;
+  out.start = canStartCert(state, data, vehicleId, actorId);
+  if (cc.calendarGrant) {
+    const item = calendarItem(data, cc.calendarGrant);
+    const inst = calendarInstance(state, cc.calendarGrant);
+    if (item && inst && !['cancelled', 'failed'].includes(inst.status)) {
+      out.grant = { calendarId: item.id, name: item.name, owner: item.owner, ownerName: actorName(state, data, item.owner), when: fmt(state, data, inst.currentTurn), status: inst.status };
+    }
+  }
+  const p = state?.crewCert?.programs?.[vehicleId];
+  if (p) {
+    const turn = state?.turn ?? 0;
+    const work = clamp((turn - p.startedTurn) / Math.max(1, p.weeks), 0, 1);
+    const fl = out.flightsNeeded ? clamp(ok / out.flightsNeeded, 0, 1) : 1;
+    // reliability: share of the gap closed from a 70% baseline (a shaky rocket does not start half-way there)
+    const rl = out.minReliability ? clamp((rel.mean - 0.7) / Math.max(0.01, out.minReliability - 0.7), 0, 1) : 1;
+    out.program = {
+      ...p, sponsorName: actorName(state, data, p.sponsor), mine: p.sponsor === actorId,
+      phaseLabel: p.paused ? 'Pausado' : CERT_PHASE_LABELS[p.phase] || p.phase,
+      progress: Math.round(100 * (0.5 * work + 0.2 * fl + 0.2 * rl + (p.phase === 'demo' ? 0.1 : 0))) / 100,
+      readyText: fmt(state, data, p.readyTurn), workDone: work >= 1, flightsDone: ok >= out.flightsNeeded, reliabilityDone: rel.mean >= out.minReliability,
+    };
+  }
+  return out;
+}
+
+function certReady(state, data, v) {
+  const cc = v.crewCert || {};
+  return successfulFlights(state, data, v.id) >= (cc.flights || 0) && vehicleReliability(state, data, v.id).mean >= (cc.minReliability ?? 0);
+}
+
+/**
+ * A program whose demo is never flown would block the vehicle forever (one program per vehicle): once in the demo phase
+ * (or paused), it expires after crewCertRules.demoExpiryWeeks unless the demo mission is actually on the schedule/flying.
+ */
+function certExpired(state, r, p, turn) {
+  const limit = Number.isFinite(r.demoExpiryWeeks) ? r.demoExpiryWeeks : 52;
+  if (limit <= 0) return false;
+  if (!p.paused && p.phase !== 'demo') return false;
+  const since = p.paused ? (p.pausedTurn ?? p.demoSince ?? p.demoTurn ?? p.readyTurn) : (p.demoSince ?? p.demoTurn ?? p.readyTurn);
+  if (!Number.isFinite(since) || turn < since + limit) return false;
+  if (!p.paused && p.demoMissionId) {
+    const m = (state.missions || []).find((x) => x.id === p.demoMissionId);
+    if (m && ['scheduled', 'launch', 'transit', 'arrival'].includes(m.status)) return false; // it is flying: let it finish
+  }
+  return true;
+}
+
+function certTick(state, data, ctx) {
+  const cs = certSlice(state);
+  const turn = state.turn;
+  const r = certRules(data);
+  const pid = state.playerId;
+  // calendar milestones that certify a vehicle on the real schedule (Starship after the HLS uncrewed landing)
+  for (const v of vehiclesOf(data)) {
+    const cal = v.crewCert?.calendarGrant;
+    if (!cal || isCrewRated(state, data, v)) continue;
+    const inst = calendarInstance(state, cal);
+    if (inst && DONE.includes(inst.status)) grantCrewRating(state, data, v.id, { by: calendarItem(data, cal)?.owner || v.operator, source: 'calendar' });
+  }
+  for (const p of Object.values(cs.programs)) {
+    const v = vehicleById(data, p.vehicleId);
+    if (!v) { delete cs.programs[p.vehicleId]; continue; }
+    if (p.phase === 'work' && turn >= p.readyTurn) p.phase = 'flights';
+    if (p.phase === 'flights' && certReady(state, data, v)) {
+      p.phase = 'demo';
+      p.demoSince = turn;
+      p.demoTurn = p.sponsor === pid ? turn : turn + (ctx?.rng ? ctx.rng(`cert:demo:${v.id}`).int(4, 10) : 6);
+      if (p.sponsor === pid) {
+        addNews(state, {
+          headline: `${v.name} pronto para o voo de demonstração sem tripulação`,
+          body: 'A missão de demonstração está em Missões › Programa: agende e voe para concluir a certificação.',
+          tags: ['catalog', 'crewCert'], actors: [pid], importance: 2, icon: '🧑‍🚀',
+        });
+      }
+    }
+    if (certExpired(state, r, p, turn)) {
+      delete cs.programs[p.vehicleId];
+      addNews(state, {
+        headline: `Certificação tripulada do ${v.name} é encerrada sem o voo de demonstração`,
+        body: `${actorName(state, data, p.sponsor)} não voou a demonstração em ${r.demoExpiryWeeks ?? 52} semanas. O programa foi arquivado e o investimento, perdido; o ${v.name} fica livre para outra certificação.`,
+        tags: ['catalog', 'crewCert'], actors: [p.sponsor, v.operator].filter((x, i, a) => x && a.indexOf(x) === i), importance: 2, icon: '🗄️',
+      });
+      continue;
+    }
+    if (p.phase === 'demo' && p.sponsor !== pid && !p.paused && turn >= (p.demoTurn ?? turn) && !isGrounded(state, v.id)) {
+      const rng = ctx?.rng ? ctx.rng(`cert:fly:${v.id}:${p.demoAttempts || 0}`) : makeRng(hash32(state.seed, turn, 'cert', v.id));
+      const ok = rng.chance(clamp(vehicleSuccessP(state, data, v.id, p.sponsor), 0.3, 0.995));
+      recordFlight(state, v.id, ok);
+      certDemoResult(state, data, v.id, ok);
+    }
+  }
+  // AI operators pursue a rating when their goals need people in space (data: crewCert.ai)
+  if ((turn + 7) % Math.max(1, r.aiPeriod) !== 0) return;
+  for (const v of vehiclesOf(data)) {
+    const cc = v.crewCert;
+    const a = state.actors?.[v.operator];
+    if (!cc?.ai || cc.feasible === false || !a || v.operator === pid || cs.programs[v.id] || isCrewRated(state, data, v)) continue;
+    if (!(a.ai?.goals || []).some((g) => CREWED_GOALS.test(g))) continue;
+    const chk = canStartCert(state, data, v.id, v.operator);
+    if (!chk.ok || (a.cash || 0) - chk.costM < (a.budget || 0) * r.aiReserveShare) continue;
+    const rng = ctx?.rng ? ctx.rng(`cert:ai:${v.id}`) : makeRng(hash32(state.seed, turn, 'certai', v.id));
+    if (!rng.chance(r.aiChance * (0.5 + (a.ai?.aggression ?? 0.5)))) continue;
+    const res = startCertProgram(state, data, v.id, v.operator);
+    if (res.ok) changeActor(state, v.operator, 'cash', -chk.costM);
+  }
+}
+
 // ---------------------------------------------------------------- views / queries
 
 function vehicleCard(state, data, v, actorId) {
@@ -1470,6 +1769,8 @@ function vehicleCard(state, data, v, actorId) {
     grounded: isGrounded(state, v.id),
     groundedUntil: isGrounded(state, v.id) ? st.groundedUntil : null,
     truthLabel: TRUTH_LABELS[v.truthLayer] || v.truthLayer,
+    crewRated: isCrewRated(state, data, v),
+    crewCert: certStatus(state, data, v.id, actorId),
   };
 }
 
@@ -1537,6 +1838,13 @@ export const queries = {
   'catalog/vehicle': (state, data, id, actorId) => {
     const v = vehicleById(data, id);
     return v ? vehicleCard(state, data, v, actorId ?? state?.playerId) : null;
+  },
+  // crew certification of one vehicle for an actor (default: the player), and the fleet view (every in-service vehicle the actor can buy)
+  'catalog/crewCert': (state, data, vehicleId, actorId) => certStatus(state, data, vehicleId, actorId ?? state?.playerId),
+  'catalog/fleet': (state, data, actorId) => {
+    const id = actorId ?? state?.playerId;
+    return vehiclesOf(data).filter((v) => !v.retired && inCatalogAt(state, data, v, state?.turn ?? 0))
+      .map((v) => vehicleCard(state, data, v, id));
   },
   'catalog/spacecraft': (state, data, actorId) => spacecraftOf(data).map((s) => spacecraftCard(state, data, s, actorId ?? state?.playerId)),
   'catalog/destinations': (state, data) => destinationsOf(data).map((d) => destinationCard(state, data, d)),

@@ -90,31 +90,36 @@ button.ls-pill { min-height: 32px; cursor: pointer; }
 .ls-overlay[data-view="prelaunch"] .ls-track { display: none; }
 
 /* ---------- stage (canvas + overlays) */
-.ls-stage { position: relative; flex: 1 1 auto; min-height: 180px; overflow: hidden; }
+.ls-stage { position: relative; flex: 1 1 auto; min-height: 180px; overflow: hidden; background: #04060c; }
 .ls-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: filter 0.6s ease, transform 0.8s ease; }
 .ls-overlay[data-view="prelaunch"] .ls-stage { flex: 0 0 22%; min-height: 110px; }
 .ls-overlay[data-view="result"] .ls-stage { flex: 0 0 26%; min-height: 130px; }
-.ls-overlay[data-view="climax"] .ls-canvas { filter: saturate(0.4) brightness(0.55); transform: scale(1.08); }
+.ls-overlay[data-view="climax"] .ls-canvas { filter: saturate(0.55) brightness(0.62) contrast(1.08); transform: scale(1.06); }
 .ls-overlay.ls-hush .ls-canvas { filter: saturate(0.6) brightness(0.8); }
 
 .ls-hud {
   position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; gap: 8px;
   padding: 8px 10px; pointer-events: none; font-variant-numeric: tabular-nums;
 }
-.ls-tele { display: grid; gap: 2px; background: rgba(11, 16, 32, 0.62); border: 1px solid var(--ls-line); border-radius: 8px; padding: 6px 9px; font-weight: 700; font-size: 0.95em; }
+/* broadcast-style telemetry: thin glass panels so the flight stays the star */
+.ls-tele { display: grid; gap: 2px; background: rgba(6, 9, 16, 0.42); border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 6px; padding: 5px 9px; font-weight: 650; font-size: 0.92em; letter-spacing: 0.02em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .ls-tele small, .ls-bars small { display: block; font-size: 0.6em; letter-spacing: 0.14em; color: var(--ls-muted); font-weight: 600; }
-.ls-bars { width: 42%; max-width: 190px; display: grid; gap: 5px; background: rgba(11, 16, 32, 0.62); border: 1px solid var(--ls-line); border-radius: 8px; padding: 6px 9px; }
+.ls-bars { width: 42%; max-width: 190px; display: grid; gap: 5px; background: rgba(6, 9, 16, 0.42); border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 6px; padding: 6px 9px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .ls-meter { position: relative; }
 .ls-meter i { display: block; height: 7px; border-radius: 4px; background: var(--ls-teal); transition: width 0.12s linear; box-shadow: 0 0 0 1px rgba(243, 233, 210, 0.12); }
 .ls-meter.m-nerv i { background: repeating-linear-gradient(45deg, var(--ls-warn) 0 6px, var(--ls-accent) 6px 12px); }
 .ls-cp b { color: var(--ls-accent); margin-right: 2px; }
 .ls-cp span { color: var(--ls-muted); }
 .ls-overlay[data-view="climax"] .ls-hud { opacity: 0.25; transition: opacity 0.8s; }
+/* countdown: the pad window sits right under the telemetry; keep the cards compact and see-through */
+.ls-overlay[data-view="countdown"] .ls-hud, .ls-overlay[data-view="prelaunch"] .ls-hud { padding: 5px 8px; opacity: 0.88; }
+.ls-overlay[data-view="countdown"] .ls-tele, .ls-overlay[data-view="countdown"] .ls-bars { background: rgba(6, 9, 16, 0.3); font-size: 0.82em; padding: 3px 7px; }
 
 .ls-count {
   position: absolute; left: 0; right: 0; bottom: 8%; text-align: center; pointer-events: none;
   font-size: calc(2.6em); font-weight: 900; letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
-  text-shadow: 0 3px 0 var(--ls-accent), 0 0 18px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 0 22px rgba(255, 150, 70, 0.35);
+  color: #f6f1e6;
 }
 .ls-count:empty { display: none; }
 .ls-count small { display: block; font-size: 0.28em; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ls-fg); text-shadow: none; font-weight: 700; }

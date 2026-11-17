@@ -46,6 +46,7 @@ function fin(state) {
   f.year = f.year || emptyYear(state);
   f.rivals = f.rivals || {};
   f.history = f.history || [];
+  if (!f.programs || typeof f.programs !== 'object') f.programs = {};
   if (!Number.isFinite(f.debtWeeks)) f.debtWeeks = 0;
   return f;
 }
@@ -56,7 +57,7 @@ export function init(state, data, ctx) {
     if (!Number.isFinite(a.cash)) a.cash = (a.budget || 0) * 0.25;
     if (!Number.isFinite(a.fixedCostShare)) a.fixedCostShare = DEFAULT_FIXED_SHARE;
   }
-  state.finance = { ledger: [], year: emptyYear(state), lastYear: null, debtWeeks: 0, history: [], rivals: {}, lastFundsTurn: null };
+  state.finance = { ledger: [], year: emptyYear(state), lastYear: null, debtWeeks: 0, history: [], rivals: {}, lastFundsTurn: null, programs: {} };
 }
 
 export function creditLine(state, actorId) {
@@ -112,6 +113,23 @@ function charge(state, actorId, amount, category, note) {
   changeActor(state, actorId, 'cash', -amount);
   record(state, actorId, -amount, category, note);
 }
+
+// Headline variants: picked by a counter (year, streak), so the same line never shows twice in a row.
+const pickV = (list, i) => list[((i % list.length) + list.length) % list.length];
+const YEAR_HEADLINES = [
+  (y, inc, out) => `Balanço de ${y}: entrou ${inc}, saiu ${out}`,
+  (y, inc, out, net) => (net >= 0 ? `Contas de ${y} fecham no azul: ${out} gastos de ${inc}` : `Contas de ${y} fecham no vermelho: ${out} gastos, ${inc} de receita`),
+  (y, inc, out) => `Fechamento de ${y}: ${out} investidos, ${inc} recebidos`,
+  (y, inc, out, net) => `${y} em números: saldo de ${fmtMoney(net)}`,
+];
+const RED_HEADLINES = ['Caixa da agência no vermelho', 'Tesouro cobre o rombo, por enquanto', 'Conta da agência fica negativa', 'Saldo negativo acende alerta no governo'];
+const DEBT_HEADLINES = [
+  (w) => `Dívida prolongada derruba o apoio à agência (${w} semanas)`,
+  (w) => `${w} semanas no vermelho: Parlamento fala em intervenção`,
+  (w) => `Rombo de ${w} semanas corrói a confiança na agência`,
+  (w) => `Imprensa conta ${w} semanas de caixa negativo e pede cabeças`,
+];
+const OUT_OF_RED = ['Agência sai do vermelho', 'Caixa volta ao azul', 'Fim do rombo: contas positivas de novo'];
 
 const sumSpent = (spent) => Object.values(spent || {}).reduce((s, v) => s + v, 0);
 
@@ -170,7 +188,7 @@ function closeYear(state) {
       : `Verba de ${last.year + 1} mantida em ${fmtMoney(last.budget)}.`;
     const tone = last.net >= 0 ? 'Ano fechado no azul.' : last.endCash < 0 ? 'Ano fechado no vermelho, e o caixa está negativo.' : 'Gastamos mais do que entrou.';
     addNews(state, {
-      headline: `Balanço de ${last.year}: entrou ${fmtMoney(last.income)}, saiu ${fmtMoney(last.totalSpent)}`,
+      headline: pickV(YEAR_HEADLINES, last.year - (state.startYear ?? 2026))(last.year, fmtMoney(last.income), fmtMoney(last.totalSpent), last.net),
       body: `${tone} Maiores gastos: ${parts || 'nenhum'}. Caixa: ${fmtMoney(last.endCash)}. ${budgetLine}${returned > 0 ? (player(state)?.kind === 'company' ? ` Os investidores receberam ${fmtMoney(returned)} do caixa parado.` : ` O tesouro recolheu ${fmtMoney(returned)} de verba parada.`) : ''}`,
       tags: ['budget', 'year'],
       actors: [state.playerId],
@@ -180,14 +198,113 @@ function closeYear(state) {
   }
 }
 
-function aiWeek(state, a) {
-  // AI actors pour surplus cash into their programs (abstract spending) and keep a reserve.
-  const reserve = (a.budget || 0) * 0.2;
-  if ((a.cash || 0) <= reserve) return;
-  const s = ((a.cash || 0) - reserve) * 0.06;
+// ---------- AI calendar programs ----------
+// The player pays for the calendar programs it flies (missions.js: hardware minus the program's own appropriation);
+// AI owners now pay for theirs too. Each program's bill (vehicle + spacecraft hardware × launches, minus the funded
+// share) accrues linearly over the `buildWeeks` before its current launch date and is paid from cash, never below
+// the reserve: what cannot be paid stays owed and is paid when cash allows (slips pause the accrual, a reflight is a
+// new bill). Tuning: data/actors.json "finance.programs". Slice: state.finance.programs {`${calendarId}#${attempt}`: paid}.
+const PROGRAM_DEFAULTS = {
+  buildWeeks: 104,        // the bill accrues over the two years before launch
+  agencyFundedShare: 0.35, // same appropriation share the player gets (missions.js calendarDraft)
+  companyFundedShare: 0.2,
+  clientFundedShare: 0.85, // a company flying for a paying customer (Vast, Axiom) fronts little of its own money
+  partnerShare: 0.12,      // each partner pays this share (max 2 partners)
+  costScale: 1,
+  reserveShare: 0.08,      // cash below this share of the yearly budget is never used for programs
+  maxWeeklyShare: 0.25,    // at most this share of the spare cash goes to programs in one week
+};
+function programTuning(data) {
+  return { ...PROGRAM_DEFAULTS, ...(data?.actors?.finance?.programs || {}) };
+}
+const costOf = (list, id) => (id && list?.[id]?.costM) || 0;
+
+/** Total bill an AI owner pays for one attempt of a calendar program (US$ mi). Pure. */
+export function programBill(state, data, item, tun = programTuning(data)) {
+  if (!item) return 0;
+  const owner = state.actors?.[item.owner];
+  const idx = data?.index || {};
+  const hw = costOf(idx.vehicles, item.vehicleId) * Math.max(1, item.launches || 1)
+    + costOf(idx.spacecraft, item.spacecraftId) + costOf(idx.spacecraft, item.secondarySpacecraftId);
+  const company = owner?.kind === 'company';
+  let funded = item.fundedShare ?? (company ? (item.client ? tun.clientFundedShare : tun.companyFundedShare) : tun.agencyFundedShare);
+  funded += tun.partnerShare * Math.min(2, (item.partners || []).length);
+  return Math.round(hw * tun.costScale * clamp(1 - funded, 0.05, 1));
+}
+
+/** What `actorId` still has to put into its calendar programs: {owedNow, upcoming} (US$ mi). */
+export function programLoad(state, data, actorId) {
+  const tun = programTuning(data);
+  const f = fin(state);
+  let owedNow = 0;
+  let upcoming = 0;
+  for (const inst of state.calendar || []) {
+    const item = data?.index?.calendar?.[inst.id];
+    if (!item || item.owner !== actorId || inst.status === 'player') continue;
+    const key = `${inst.id}#${inst.attempts || 0}`;
+    const bill = programBill(state, data, item, tun);
+    const paid = f.programs[key] || 0;
+    if (inst.status === 'planned') {
+      const lead = (inst.currentTurn ?? inst.plannedTurn ?? 0) - (state.turn || 0);
+      owedNow += Math.max(0, bill * clamp(1 - lead / tun.buildWeeks, 0, 1) - paid);
+      upcoming += Math.max(0, bill - paid);
+    } else if (paid > 0 && paid < bill) {
+      owedNow += bill - paid;
+      upcoming += bill - paid;
+    }
+  }
+  return { owedNow, upcoming };
+}
+
+function payPrograms(state, data, a) {
+  const tun = programTuning(data);
+  const f = fin(state);
+  let spare = Math.max(0, (a.cash || 0) - (a.budget || 0) * tun.reserveShare) * tun.maxWeeklyShare;
+  const live = new Set();
+  let paidNow = 0;
+  for (const inst of state.calendar || []) {
+    const item = data?.index?.calendar?.[inst.id];
+    if (!item || item.owner !== a.id || inst.status === 'player') continue;
+    const key = `${inst.id}#${inst.attempts || 0}`;
+    const paid = f.programs[key];
+    const bill = programBill(state, data, item, tun);
+    let target;
+    if (inst.status === 'planned') {
+      const lead = (inst.currentTurn ?? inst.plannedTurn ?? 0) - (state.turn || 0);
+      target = bill * clamp(1 - lead / tun.buildWeeks, 0, 1);
+    } else if (paid != null && paid < bill && inst.status !== 'cancelled') {
+      target = bill; // launched with money still owed: the contractors still get paid
+    } else continue;
+    live.add(key);
+    const due = target - (paid || 0);
+    if (due <= 0.5) { if (paid == null) f.programs[key] = 0; continue; }
+    const put = Math.round(Math.min(due, spare) * 10) / 10;
+    f.programs[key] = Math.round(((paid || 0) + put) * 10) / 10;
+    spare -= put;
+    paidNow += put;
+  }
+  if (paidNow > 0) {
+    charge(state, a.id, paidNow, 'missions', 'Programas do calendário');
+    const r = f.rivals[a.id] || (f.rivals[a.id] = { income: 0, spent: 0 });
+    r.programs = Math.round(((r.programs || 0) + paidNow) * 10) / 10;
+  }
+  return live;
+}
+
+function aiWeek(state, data, a) {
+  // 1) calendar programs are real bills; 2) the rest of the surplus goes into abstract programs/R&D, keeping the
+  // reserve plus the discretionary fund the agency is saving for its own missions (calendar.js rivalOps) and the
+  // next quarter of program bills
+  const live = payPrograms(state, data, a);
+  const tun = programTuning(data);
+  const keepFund = Math.min(state.rivalOps?.fund?.[a.id] || 0, (a.budget || 0) * (tun.keepFundShare ?? 0.4));
+  const reserve = (a.budget || 0) * 0.2 + keepFund;
+  if ((a.cash || 0) <= reserve) return live;
+  const s = ((a.cash || 0) - reserve) * (tun.abstractRate ?? 0.06);
   const bold = clamp((a.ai?.aggression ?? 0.5) * 0.5 + 0.35, 0.2, 0.8);
   spend(state, a.id, s * bold, 'missions', 'Programas');
   spend(state, a.id, s * (1 - bold), 'research', 'P&D');
+  return live;
 }
 
 function debtWeek(state) {
@@ -197,15 +314,19 @@ function debtWeek(state) {
   if ((me.cash || 0) < 0) {
     f.debtWeeks += 1;
     // 8 weeks of hysteresis: a cash line hovering around zero does not flip the headline every week
-    if (f.debtWeeks === 1 && state.turn - (f.redNewsTurn ?? -99) >= 8) {
+    if (f.debtWeeks === 1 && state.turn - (f.redNewsTurn ?? -99) >= 13) {
       f.redNewsTurn = state.turn;
-      addNews(state, { headline: 'Caixa da agência no vermelho', body: 'O tesouro cobre por enquanto, mas o governo está de olho.', tags: ['budget'], actors: [state.playerId], importance: 2, icon: 'budget' });
+      f.redCount = (f.redCount || 0) + 1;
+      addNews(state, { headline: pickV(RED_HEADLINES, f.redCount - 1), body: 'O tesouro cobre por enquanto, mas o governo está de olho.', tags: ['budget'], actors: [state.playerId], importance: 2, icon: 'budget' });
     }
     if (f.debtWeeks >= DEBT_GRACE) {
       const cut = 1 + Math.floor((f.debtWeeks - DEBT_GRACE) / 6);
       changeActor(state, state.playerId, 'support', -cut);
-      if (f.debtWeeks === DEBT_GRACE || f.debtWeeks % 12 === 0) {
-        addNews(state, { headline: `Dívida prolongada derruba o apoio à agência (${f.debtWeeks} semanas)`, body: 'Parlamentares pedem cortes e a imprensa fala em descontrole.', tags: ['budget', 'politics'], actors: [state.playerId], importance: 3, icon: 'budget' });
+      // first warning, then every 16 weeks of the same streak (and never twice within 16 weeks across streaks)
+      if ((f.debtWeeks === DEBT_GRACE || (f.debtWeeks - DEBT_GRACE) % 16 === 0) && state.turn - (f.debtNewsTurn ?? -99) >= 16) {
+        f.debtNewsTurn = state.turn;
+        f.debtCount = (f.debtCount || 0) + 1;
+        addNews(state, { headline: pickV(DEBT_HEADLINES, f.debtCount - 1)(f.debtWeeks), body: 'Parlamentares pedem cortes e a imprensa fala em descontrole.', tags: ['budget', 'politics'], actors: [state.playerId], importance: 3, icon: 'budget' });
       }
     }
     if (f.debtWeeks >= FIRE_AFTER && (me.support ?? 0) <= 0 && !state.gameOver) {
@@ -214,7 +335,11 @@ function debtWeek(state) {
       log(state, 'budget: game over (fired)');
     }
   } else if (f.debtWeeks > 0) {
-    if (f.debtWeeks >= DEBT_GRACE && state.turn - (f.redNewsTurn ?? -99) >= 8) addNews(state, { headline: 'Agência sai do vermelho', body: 'O caixa voltou a ficar positivo.', tags: ['budget'], actors: [state.playerId], importance: 1, icon: 'budget' });
+    if (f.debtWeeks >= DEBT_GRACE && state.turn - (f.redNewsTurn ?? -99) >= 8 && state.turn - (f.outNewsTurn ?? -99) >= 26) {
+      f.outNewsTurn = state.turn;
+      f.outCount = (f.outCount || 0) + 1;
+      addNews(state, { headline: pickV(OUT_OF_RED, f.outCount - 1), body: 'O caixa voltou a ficar positivo.', tags: ['budget'], actors: [state.playerId], importance: 1, icon: 'budget' });
+    }
     f.debtWeeks = 0;
   }
 }
@@ -223,13 +348,17 @@ export function tick(state, data, ctx) {
   fin(state);
   // year rollover (politics already adjusted actor.budget earlier in this tick)
   if (state.turn > 0 && state.turn % WEEKS === 0) closeYear(state);
+  const live = new Set();
   for (const a of Object.values(state.actors || {})) {
     if (!a || !a.id) continue;
     const budget = Math.max(0, a.budget || 0);
     earn(state, a.id, budget / WEEKS, 'grants', a.kind === 'company' ? 'Receita semanal' : 'Verba semanal');
     charge(state, a.id, (budget * clamp(a.fixedCostShare ?? DEFAULT_FIXED_SHARE, 0, 1)) / WEEKS, 'facilities', 'Custos fixos (folha e instalações)');
-    if (a.id !== state.playerId) aiWeek(state, a);
+    if (a.id !== state.playerId) for (const k of aiWeek(state, data, a)) live.add(k);
   }
+  // forget the bills of programs that flew, got cancelled or changed hands (keeps the slice small)
+  const f = fin(state);
+  for (const k of Object.keys(f.programs)) if (!live.has(k)) delete f.programs[k];
   if (state.turn % 13 === 12) companyPayout(state);
   debtWeek(state);
 }

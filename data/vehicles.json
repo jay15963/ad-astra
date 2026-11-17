@@ -1,6 +1,8 @@
 {
   "_comment": "Catálogo de lançadores. Meses em base 1 (1 = janeiro). history = voos orbitais reais até o fim de 2025. capacity em toneladas (0 = não alcança). access: open (mercado, menos embargo/tensão >= 3), bloc (operador, bloco e parceiros de tratado), own (só o operador). tensionActor = ator cuja tensão governa o acesso quando o operador não é um ator do jogo. backgroundPerYear = voos comerciais/de rotina simulados em agregado (sem contar os itens do calendário).",
   "monthBase": 1,
+  "_crewCertComment": "crewCert = programa de certificação tripulada (human-rating). flights = voos bem-sucedidos do foguete (histórico + fundo + calendário + jogador) exigidos; minReliability = confiabilidade média mínima; costM/weeks = engenharia e revisão (o voo de demonstração não tripulado é pago à parte); calendarGrant = item do calendário cujo sucesso certifica o foguete no cronograma real; ai = a operadora (IA) busca a certificação quando as metas pedem; feasible false + reason = a operadora não oferece. crewCertRules: regras gerais (demoExpiryWeeks = semanas que um programa pode ficar na fase de demonstração ou pausado sem voar antes de ser arquivado; cliente paga customerCostMult e precisa do acordo da operadora).",
+  "crewCertRules": { "customerCostMult": 1.5, "customerWeeksMult": 1.15, "minTrust": 0, "maxTension": 1, "prestige": 10, "demoDestination": "leo", "demoPayloadT": 8, "demoRetryWeeks": 10, "demoExpiryWeeks": 52, "aiPeriod": 13, "aiChance": 0.35, "aiReserveShare": 0.15 },
   "vehicles": [
     {
       "id": "falcon9", "name": "Falcon 9", "operator": "spacex", "provider": "SpaceX", "country": "EUA", "class": "medium",
@@ -18,6 +20,7 @@
       "history": { "flights": 11, "failures": 0, "firstFlight": 2018 },
       "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 10,
       "capacity": { "leo": 57, "gto": 18, "tli": 15, "mars": 16, "outer": 3.5 },
+      "crewCert": {"feasible": true, "flights": 14, "costM": 1600, "weeks": 130, "minReliability": 0.95, "note": "A SpaceX nunca pediu: exigiria requalificar os três núcleos e integrar o escape da Dragon. Possível, mas caro e lento."},
       "notes": "Três núcleos de Falcon 9. Lançou a Europa Clipper e a Psyche; escolhido para Dragonfly, Gateway e Griffin."
     },
     {
@@ -28,6 +31,7 @@
       "history": { "flights": 11, "failures": 5, "firstFlight": 2023 },
       "estimatedReliability": 0.86, "historyWeight": 0.4, "backgroundKind": "test", "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 6,
       "capacity": { "leo": 100, "gto": 21, "tli": 30, "mars": 25, "outer": 5 },
+      "crewCert": {"feasible": true, "flights": 20, "costM": 1400, "weeks": 104, "minReliability": 0.88, "ai": false, "calendarGrant": "starship_hls_demo", "note": "Sem torre de escape: a NASA exige o pouso lunar de demonstração da HLS e dezenas de voos antes de pôr gente a bordo."},
       "notes": "Totalmente reutilizável, ainda em testes. Capacidade além da órbita baixa depende de reabastecimento em órbita com vários voos-tanque."
     },
     {
@@ -56,6 +60,7 @@
       "history": { "flights": 2, "failures": 0, "firstFlight": 2025 },
       "estimatedReliability": 0.9, "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 14,
       "capacity": { "leo": 45, "gto": 13, "tli": 9, "mars": 6, "outer": 2 },
+      "crewCert": {"feasible": true, "flights": 10, "costM": 900, "weeks": 104, "minReliability": 0.93, "ai": true, "note": "A Blue Origin projetou o New Glenn pensando em gente desde o início; falta o histórico de voos e uma cápsula."},
       "notes": "Primeiro estágio reutilizável que pousa no mar. Estreou em 2025 e lançou a ESCAPADE; leva o Blue Moon."
     },
     {
@@ -65,6 +70,7 @@
       "history": { "flights": 4, "failures": 0, "firstFlight": 2024 },
       "estimatedReliability": 0.94, "reusable": false, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 16,
       "capacity": { "leo": 27, "gto": 14, "tli": 12, "mars": 9, "outer": 3 },
+      "crewCert": {"feasible": true, "flights": 8, "costM": 650, "weeks": 78, "minReliability": 0.93, "note": "Herdeiro do Atlas V: a Starliner deve migrar para ele. A ULA certifica sob contrato com a NASA."},
       "notes": "Sucessor do Atlas V, com motores BE-4. Foco em cargas militares e no Dream Chaser."
     },
     {
@@ -83,6 +89,7 @@
       "history": { "flights": 79, "failures": 4, "firstFlight": 2017 },
       "reusable": false, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 8,
       "capacity": { "leo": 0.3, "gto": 0, "tli": 0.04, "mars": 0, "outer": 0 },
+      "crewCert": {"feasible": false, "reason": "Pequeno demais para levar uma cápsula tripulada."},
       "notes": "Pequeno e frequente. Já mandou a CAPSTONE para a órbita lunar."
     },
     {
@@ -93,6 +100,7 @@
       "history": { "flights": 0, "failures": 0 },
       "estimatedReliability": 0.86, "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 14,
       "capacity": { "leo": 13, "gto": 1.5, "tli": 1.5, "mars": 1.2, "outer": 0 },
+      "crewCert": {"feasible": false, "reason": "A Rocket Lab não oferece versão tripulada do Neutron."},
       "notes": "Médio reutilizável da Rocket Lab. A estreia escorregou de 2024 para 2026."
     },
     {
@@ -102,6 +110,7 @@
       "history": { "flights": 6, "failures": 0, "firstFlight": 2024 },
       "estimatedReliability": 0.94, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 18,
       "capacity": { "leo": 21.6, "gto": 11.5, "tli": 8.6, "mars": 6, "outer": 2 },
+      "crewCert": {"feasible": true, "flights": 14, "costM": 2400, "weeks": 182, "minReliability": 0.95, "note": "A Europa discute voo tripulado próprio há anos; certificar o Ariane 6 exigiria um programa novo e longo."},
       "notes": "Acesso autônomo da Europa ao espaço. Cadência subindo devagar; a versão de quatro boosters leva cargas pesadas."
     },
     {
@@ -111,6 +120,7 @@
       "history": { "flights": 117, "failures": 2, "firstFlight": 1996 },
       "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 18,
       "capacity": { "leo": 21, "gto": 10.5, "tli": 7, "mars": 6.6, "outer": 2 },
+      "crewCert": {"feasible": false, "reason": "Aposentado em 2023."},
       "notes": "Aposentado em julho de 2023, depois de 117 voos. Histórico: lançou BepiColombo e JUICE, que ainda estão a caminho. Não pode ser contratado para missões novas."
     },
     {
@@ -120,6 +130,7 @@
       "history": { "flights": 6, "failures": 1, "firstFlight": 2022 },
       "estimatedReliability": 0.9, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 30,
       "capacity": { "leo": 3.3, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "crewCert": {"feasible": false, "reason": "Pequeno demais para levar uma cápsula tripulada."},
       "notes": "Lançador leve europeu. Voltou a voar em dez/2024 depois da falha de 2022. Levará o Space Rider."
     },
     {
@@ -129,6 +140,7 @@
       "history": { "flights": 7, "failures": 2, "firstFlight": 2023 },
       "estimatedReliability": 0.92, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 24,
       "capacity": { "leo": 15, "gto": 6.5, "tli": 4.5, "mars": 4.2, "outer": 0.5 },
+      "crewCert": {"feasible": true, "flights": 14, "costM": 1500, "weeks": 156, "minReliability": 0.94, "note": "A JAXA estuda voo tripulado, sem programa aprovado. Duas falhas no histórico pesam na revisão."},
       "notes": "Sucessor do H-IIA. Falhou na estreia (2023) e no voo F8 (dez/2025). Leva a HTV-X e a sonda MMX."
     },
     {
@@ -147,6 +159,7 @@
       "history": { "flights": 63, "failures": 3, "firstFlight": 1993 },
       "reusable": false, "crewRated": false, "access": "open", "embargo": ["cnsa"], "standDownWeeks": 20,
       "capacity": { "leo": 3.8, "gto": 1.4, "tli": 1.3, "mars": 1.3, "outer": 0 },
+      "crewCert": {"feasible": false, "reason": "Pequeno demais para levar uma cápsula tripulada."},
       "notes": "Barato e versátil: lançou a Mangalyaan e a Chandrayaan-1. Falhou em maio de 2025 (C61)."
     },
     {
@@ -156,6 +169,7 @@
       "history": { "flights": 18, "failures": 1, "firstFlight": 2016 },
       "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 30,
       "capacity": { "leo": 25, "gto": 14, "tli": 8.2, "mars": 5, "outer": 3 },
+      "crewCert": {"feasible": false, "reason": "A CNSA leva gente no Longa Marcha 2F e no 10; o 5 fica para cargas pesadas."},
       "notes": "Pesado chinês: Tianwen-1, Chang'e-5 e -6, módulos da Tiangong. Leva Chang'e-7 e -8 e as Tianwen-3 e -4."
     },
     {
@@ -165,6 +179,7 @@
       "history": { "flights": 26, "failures": 1, "firstFlight": 2016 },
       "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 20,
       "capacity": { "leo": 14, "gto": 7, "tli": 0, "mars": 0, "outer": 0 },
+      "crewCert": {"feasible": false, "reason": "Lançador de carga (Tianzhou): a CNSA não planeja versão tripulada."},
       "notes": "Abastece a Tiangong com os cargueiros Tianzhou."
     },
     {
@@ -174,6 +189,7 @@
       "history": { "flights": 112, "failures": 3, "firstFlight": 1996 },
       "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 16,
       "capacity": { "leo": 11.5, "gto": 5.5, "tli": 3.8, "mars": 0, "outer": 0 },
+      "crewCert": {"feasible": false, "reason": "Combustível tóxico e estágios que caem em terra: nunca será tripulado."},
       "notes": "Cavalo de batalha para órbita geoestacionária. Lançou Chang'e-3 e -4."
     },
     {
@@ -211,6 +227,7 @@
       "history": { "flights": 1, "failures": 0, "firstFlight": 2025 },
       "estimatedReliability": 0.85, "reusable": true, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 16,
       "capacity": { "leo": 18, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "crewCert": {"feasible": false, "reason": "A LandSpace não oferece versão tripulada."},
       "notes": "Metano e aço inoxidável: a resposta privada chinesa ao Falcon 9. Chegou à órbita na estreia em dez/2025."
     },
     {
@@ -229,6 +246,7 @@
       "history": { "flights": 4, "failures": 1, "firstFlight": 2014 },
       "estimatedReliability": 0.86, "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["esa", "jaxa", "nasa", "spacex", "blueorigin"], "standDownWeeks": 30,
       "capacity": { "leo": 24.5, "gto": 5.4, "tli": 5, "mars": 3, "outer": 0 },
+      "crewCert": {"feasible": true, "flights": 6, "costM": 700, "weeks": 104, "minReliability": 0.9, "ai": true, "note": "A Roscosmos prepara a variante Angara-A5P para a nave Orel, a partir do novo cosmódromo de Vostochny."},
       "notes": "Pesado russo, em produção lenta. Escolhido para os módulos da estação ROS e a Luna-27."
     }
   ]

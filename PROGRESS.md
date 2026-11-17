@@ -1,8 +1,9 @@
 # PROGRESS — Ad Astra (web)
 
 ## Estado (nov/2026)
-- Versão 0.3.0 (build 2026.11.17-2): rivais ativos e corrida equilibrada, chance mostrada = chance real, blocos e fronteiras vivos,
-  árvore de pesquisa em retrato, mapa encaixado acima dos chips. (0.2.0: Sistema Solar, mapa espacial, grafo de pesquisa, mapa-múndi, SW.)
+- Versão 0.4.0: certificação tripulada de foguetes durante o jogo, rotações tripuladas dos rivais (mortes no alvo), programas da IA
+  custam caixa, manchetes variadas, PWA instalável e ajustes para celular intermediário. (0.3.0: rivais ativos, chance mostrada =
+  chance real, blocos vivos; 0.2.0: Sistema Solar, mapa espacial, grafo de pesquisa, mapa-múndi, SW.) Detalhes em "v0.4.0" abaixo.
 - Corte vertical "Corrida Lunar 2026–2030" jogável de ponta a ponta no navegador: novo jogo, briefings, montagem de missão em 3 passos,
   agendamento, Dia de Lançamento (subida e chegada), trânsito, pesquisa, equipe, diplomacia, Tabela da Era, salvar/continuar.
 - 9 módulos de simulação + UI integrados. Contratos e desvios aceitos documentados em `ARCHITECTURE.md` ("Integração").
@@ -126,24 +127,73 @@ Métricas finais:
   mudanças de controle e 3,6 de status; cartas 74 por campanha, 83 distintas (rival_first 3,0× é a mais repetida).
   `sim-diplomacy 1 5 --seeds=10`: 1,8 mudanças de bloco de países por semente, 3,7 rupturas de tratado por semente.
 
-## Pendências (por prioridade)
-1. Mortes de tripulação em ~10% das campanhas (alvo 15–35%): os rivais voam ~5,7 tripulados por campanha, quase todos na LEO.
-   Decisão de design pendente: modelar rotações na LEO como voos de fundo que sorteiam `crew.backgroundCrewLoss`, ou aceitar ~10–13%.
-2. A corrida depende de quem pousa gente na Lua primeiro (CNSA × NASA oscila entre 50/50 e 60/40). Programas do calendário não custam
-   caixa à IA, mas o jogador paga os seus (NASA jogadora rank 1,8 × IA 1,5): decidir se a IA deve pagar os próprios programas.
-3. Distância 1º→3º ~40% (alvo 25%): sem a ciência planetária de SpaceX/Blue Origin, as agências médias não fecharam a distância.
-   JAXA ~1 "primeiro" por campanha, Roscosmos ~0,5.
-4. Mudanças de bloco de agências raras (~0,1 por campanha; países ~2,2). Deliberado, por plausibilidade.
-5. Manchetes repetidas: "Balanço de AAAA" (anual, 3,8×), "X rompe contrato e paga multa" (~1,5× por ator), rival_first (3×).
-6. Briefing de programa pode ser aceito quando o hardware só fica pronto no último turno (ex.: `starship_mars_cargo`): a missão fica
-   em planejamento para sempre. Não oferecer ou avisar.
-7. UI: linha do tempo do mapa-múndi desenha `bloc_join/bloc_leave` como marca genérica; Missões/Painel ainda não usam `lateText` nem
-   um chip de `estimate.pCrewLoss`. Árvore só refaz o layout ao redesenhar a aba (girar o celular). Nível Externo em 320×640 pode
-   cortar Netuno. Nada disso foi verificado no navegador nesta rodada.
-8. Griffin-1 sem status real de nov/2026 confirmado. Primeira visita (antes do SW) depende do cache HTTP do GitHub Pages (max-age=600).
-9. A estimativa de semanas na pesquisa (~16) difere do prazo sorteado (18).
-10. Bots: o bot do `sim-campaign` às vezes agenda missão própria para depois do último turno, e como SpaceX tenta tripulados sem
-    comandante livre ("Escolha o comandante", 14× numa semente). Inofensivo, só ferramenta.
+## v0.4.0 — certificação tripulada, rivais que pagam e perdem gente (nov/2026)
+O que mudou:
+- **Certificação tripulada** (calendar.js `state.crewCert`, missions.js `vehicle/certify`, vehicles.json `crewCert`/`crewCertRules`):
+  foguete sem certificação pode ser certificado em jogo: engenharia (meses) → voos bem-sucedidos + confiabilidade mínima → voo de
+  demonstração sem tripulação (missão `source: 'cert'` na LEO). Cliente paga 1,5× e precisa do acordo da operadora. Starship também
+  é certificada pelo cronograma real (sucesso do pouso de demonstração do HLS). IA operadora persegue New Glenn e Angara.
+  Um único leitor: `calendar.isCrewRated` (validação, montagem, risco, catálogo). Saves antigos ganham fatia vazia.
+  - **Como liberar uma nave para missão tripulada:** Missões › Montar › (alvo tripulado) → embaixo do foguete cinza, "Como liberar"
+    mostra o que falta (carga, margem de combustível, certificação) e o botão "Certificar"; ou Missões › Frota.
+  - Programa parado na demonstração (ou pausado) por `demoExpiryWeeks` (52) sem voar é arquivado sem reembolso e libera o
+    foguete: antes um cliente podia bloquear para sempre a certificação de um rival (achado com semente 5, NASA × New Glenn).
+    A demo órfã é cancelada sem custo; uma demo agendada/voando nunca é cortada.
+  - Montagem: foguetes cinza ordenados por "dá para liberar" (margem menor resolve / certificação que você pode iniciar) e pela
+    falta de carga; ajuda recolhida em "Por quê?" (aberta só nos liberáveis); calcula a margem que faz caber ("Com margem de
+    combustível de 0% ele leva 28,1 t: cabe") com botão "Usar margem 0%"; foguete fraco demais diz "certificar não resolve" em
+    vez de oferecer o programa; botão e confirmação mostram o caixa antes/depois e avisam quando o pagamento deixa a agência no
+    vermelho.
+- **Mortes de tripulação** (crew.js `state.rivalCrew`, crew.json `rivalCrewFlights`): rotações tripuladas de fundo dos rivais
+  (Crew Dragon, Soyuz, Shenzhou 2/ano; Starliner, Gaganyaan, Mengzhou 1/ano após o voo real que as libera), com nomes fictícios,
+  efeitos em apoio/reputação/prestígio, 52 semanas em solo e condolências (uma rodada por tragédia).
+- **Programas da IA custam caixa** (budget.js `state.finance.programs`, actors.json `finance.programs`): conta acumulada nas 104
+  semanas antes do voo, menos a parte financiada; paga só do caixa acima da reserva; crédito a parceiros de programa conjunto
+  (diplomacy.js `partnerCredit`, inclusive para o jogador).
+- **Manchetes**: balanço anual em 4 versões, caixa no vermelho/dívida/saída do vermelho com variantes e intervalos, rival_first com
+  `{milestone}` e intervalo de 52 semanas.
+- **PWA/desempenho**: manifest instalável (ícones 192/512 + maskable, iOS), cartão "Instalar" em Ajustes, pré-carga de dados e
+  `modulepreload`, `data-perf="lite"` para celulares com ≤ 4 núcleos ou ≤ 3 GB.
+
+Métricas finais:
+- Testes 316/317 na última medição: todos os de simulação/UI passam (inclui `crew-cert`, `crew-cert-fixes`, `balance-rivals`, `sw-pwa`); a falha
+  restante é `launch-render`, em reescrita pelo trabalho do visual do Dia de Lançamento (import de `textures.js`
+  ainda incompleto no momento da medição). Smoke `node tools/smoke.mjs 4` → 20/20 ok.
+- Corrida (`sim-campaign 6`, 30 campanhas): vitórias cnsa 47% / nasa 40% / spacex 13% (antes 53/47/0); distância 1º→3º 33%
+  (antes 40%; 7/30 com top-3 dentro de 25%). Prestígio da IA: ESA 317, JAXA 240, Roscosmos 165 (antes 271/195/77). Rank do bot
+  jogador: SpaceX 1,5 · NASA 1,7 · CNSA 1,8 · ESA 3,3 · ISRO 6,5.
+- Mortes de tripulação (`sim-crew 8`, 40 campanhas): 25% das campanhas (jogador 5%, rivais 20%; esperado ~28%; alvo 15–35%);
+  ~31 rotações de fundo por campanha; perda por voo: jogador 0,72%, rivais 0,55%.
+- Certificação: SpaceX jogadora tem a Starship certificada pelo calendário ~turno 96–105; New Glenn (Blue Origin) certificada nas
+  campanhas de teste da SpaceX; com a NASA jogadora a Starship pode não ser certificada (demo do HLS atrasa/falha).
+
+## Roteiro (plano de 10 turnos do GDD, adaptado para web)
+- Turnos 1–9: feitos (fundação e dados, núcleo de simulação, calendário vivo, diplomacia, política e guerras, interface mobile,
+  Dia de Lançamento, mapa e operações, eventos/equipe/legados).
+- **Turno 10 (atual): backend, balanceamento e teste fechado.** Feito: balanceamento em lote (v0.3.0); certificação tripulada de
+  veículos, mortes de tripulação no alvo, custos dos programas da IA, variedade de manchetes, PWA instalável e otimização para
+  celular intermediário (v0.4.0). Falta: polimento visual do Dia de Lançamento (em andamento), telemetria/replays locais e, se
+  aprovado, Supabase (login, saves na nuvem, ligas semanais).
+- Depois do turno 10 o corte vertical "Corrida Lunar" fecha; as outras eras do GDD entram como expansões de conteúdo.
+
+## Pendências (por prioridade, atualizado na v0.4.0)
+Feitos na v0.4.0 (eram 1, 2, 3 e quase todo o 6 da lista da v0.3.0): certificação tripulada ✓; mortes de tripulação 25% das
+campanhas (alvo 15–35%) ✓; programas do calendário custam caixa à IA ✓ (vitórias cnsa 47 / nasa 40 / spacex 13); manchetes de
+balanço, caixa/dívida e rival_first com variantes ✓; PWA instalável e modo "lite" para celular intermediário ✓.
+1. Visual do Dia de Lançamento com cara genérica: foguetes, naves, planetas, solo e animações (subida, separação, pouso) precisam
+   de texturas e formas realistas por veículo. (Em andamento em outro trabalho.)
+2. Certificação: com a NASA jogadora a Starship pode nunca ser certificada (demo do HLS rival atrasa/falha) — o caminho que sobra é
+   o programa como cliente (1,5×). IA só certifica como operadora (`crewCert.ai`: New Glenn, Angara); nenhum cliente da IA inicia
+   programa. O nó de pesquisa que daria o bônus `crewCert` (mais barato/rápido) ainda não existe em `tech.json`. Bots de
+   `smoke`/`sim-campaign` nunca usam `vehicle/certify` (o lado do jogador só é coberto pelos testes).
+3. Distância 1º→3º 33% (alvo 25%); JAXA ~1 "primeiro" por campanha, Roscosmos ~0,8.
+4. Manchete "X rompe contrato e paga multa" (missions.js) ainda sem variantes.
+5. Mudanças de bloco de agências raras (~0,1/campanha; países ~2,2) — deliberado.
+6. Não verificado no navegador: losangos de mudança de bloco numa partida avançada; chip de risco à tripulação na tela de lançamento;
+   o novo "Por quê?/Como liberar" recolhível e o aviso de caixa da certificação (cobertos só por testes de funções puras).
+7. Griffin-1 sem status real de nov/2026 confirmado. Primeira visita antes do SW depende do cache do GitHub Pages (max-age=600).
+8. Estimativa de semanas na pesquisa (~16) difere do prazo sorteado (18).
+9. Bots de ferramenta: SpaceX bot tenta tripulados sem comandante livre (inofensivo).
 
 ## Decisões
 - Plataforma: navegador (mobile-first, retrato), GitHub Pages, sem build step, JS puro em ES modules; testes com `node --test`.

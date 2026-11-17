@@ -1,9 +1,9 @@
 // Settings / accessibility screen + app version (so players know the phone has the latest build).
 import { h, card, button, segmented, toast, confirmDialog, sectionTitle } from './components.js';
 
-export const APP_VERSION = '0.3.0';          // keep in sync with package.json "version"
+export const APP_VERSION = '0.4.0';          // keep in sync with package.json "version"
 export const BUILD_DATE = '2026-11-17';      // bump on every deploy
-export const BUILD = '2026.11.17-2';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
+export const BUILD = '2026.11.17-3';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
 
 /** Apply settings to the document (text scale, motion, colorblind palette). */
 export function applySettings(settings) {
@@ -67,6 +67,9 @@ export function render(container, store, { onExit, onQuit } = {}) {
           rerender();
         }, { cls: 'iv-time' }))),
 
+    sectionTitle('Instalar'),
+    installCard(),
+
     sectionTitle('Jogo salvo'),
     card({},
       h('p', { class: 'muted small' }, 'O jogo salva sozinho a cada ação. Fechar o app nunca muda o resultado de um lançamento.'),
@@ -97,6 +100,76 @@ export function render(container, store, { onExit, onQuit } = {}) {
   }
 }
 
+// ------------------------------------------------------------------ install (PWA)
+
+// Chrome/Edge/Brave/Samsung fire beforeinstallprompt once the manifest + worker qualify; keep it for the button.
+const install = { prompt: null, installed: false, redraw: null };
+try {
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault(); // no mini-infobar: the player installs from Ajustes
+      install.prompt = e;
+      install.redraw?.();
+    });
+    window.addEventListener('appinstalled', () => {
+      install.prompt = null;
+      install.installed = true;
+      install.redraw?.();
+    });
+  }
+} catch { /* not in a browser */ }
+
+/** Where the game is running: 'standalone' (installed app), 'ios' (Safari on iPhone/iPad), 'android', 'other'. */
+export function installContext(nav = globalThis.navigator, mm = globalThis.matchMedia) {
+  try {
+    const standalone = nav?.standalone === true || !!mm?.('(display-mode: standalone)')?.matches || !!mm?.('(display-mode: fullscreen)')?.matches;
+    if (standalone) return 'standalone';
+    const ua = String(nav?.userAgent || '');
+    // iPadOS 13+ reports itself as a Mac with touch
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (nav?.maxTouchPoints || 0) > 1)) return 'ios';
+    if (/Android/.test(ua)) return 'android';
+  } catch { /* */ }
+  return 'other';
+}
+
+/** "Instalar app" card: native prompt when the browser offers one, otherwise step-by-step instructions. */
+function installCard() {
+  const body = h('div', { class: 'install-body' });
+  const draw = () => {
+    body.innerHTML = '';
+    const ctx = installContext();
+    if (install.installed || ctx === 'standalone') {
+      body.append(h('p', { class: 'small' }, '✓ Ad Astra já está instalado neste aparelho. Ele abre em tela cheia e funciona sem internet depois da primeira visita.'));
+      return;
+    }
+    body.append(h('p', { class: 'muted small' }, 'Instale o jogo como um app: ícone na tela inicial, tela cheia sem barra do navegador e jogo offline. O save continua o mesmo.'));
+    if (install.prompt) {
+      body.append(h('div', { class: 'btn-col' }, button('Instalar app', async () => {
+        const ev = install.prompt;
+        if (!ev) return;
+        install.prompt = null; // a prompt can be shown only once
+        try {
+          await ev.prompt();
+          const choice = await ev.userChoice;
+          if (choice?.outcome === 'accepted') { install.installed = true; toast('Ad Astra instalado. Procure o ícone na tela inicial.', 'good'); }
+        } catch (e) { toast(`Não foi possível instalar: ${e?.message || e}`, 'bad'); }
+        draw();
+      }, { kind: 'primary', icon: '⇩' })));
+      return;
+    }
+    const steps = ctx === 'ios'
+      ? ['Abra este jogo no Safari.', 'Toque em Compartilhar (o quadrado com a seta para cima).', 'Escolha "Adicionar à Tela de Início" e toque em Adicionar.']
+      : ctx === 'android'
+      ? ['Abra o menu do navegador (⋮ no Chrome, ≡ no Brave).', 'Toque em "Instalar app" ou "Adicionar à tela inicial".', 'Confirme. O ícone do Ad Astra aparece junto dos seus apps.']
+      : ['No Chrome ou Edge, use o ícone de instalar na barra de endereço ou o menu ⋮ › "Instalar Ad Astra".', 'No celular, abra o jogo no Chrome (Android) ou no Safari (iPhone) e adicione à tela inicial.'];
+    body.append(h('ol', { class: 'install-steps small', style: { paddingLeft: '1.3em', margin: '6px 0 0', lineHeight: '1.5' } }, steps.map((t) => h('li', null, t))));
+  };
+  draw();
+  // one Ajustes screen at a time: the latest card is the one that redraws when the browser offers/installs
+  install.redraw = () => { if (body.isConnected) draw(); };
+  return card({ cls: 'install' }, body);
+}
+
 /** One line about the offline/update worker; filled in asynchronously. */
 function swStatusLine() {
   const el = h('div', { class: 'muted small sw-status' }, 'Atualização automática: verificando…');
@@ -106,7 +179,7 @@ function swStatusLine() {
     sw.getRegistration().then((reg) => {
       el.textContent = !reg ? 'Atualização automática: desligada neste navegador (recarregue para pegar a versão nova).'
         : reg.active
-        ? 'Atualização automática ativa: cada arquivo é conferido com o servidor; sem rede, usa a última cópia.'
+        ? 'Atualização automática ativa: cada arquivo é conferido com o servidor; sem rede, o jogo abre com a cópia guardada.'
         : 'Atualização automática: ainda instalando (ativa na próxima abertura).';
     }).catch(() => { el.textContent = 'Atualização automática: indisponível.'; });
   } catch { el.textContent = 'Atualização automática: indisponível.'; }

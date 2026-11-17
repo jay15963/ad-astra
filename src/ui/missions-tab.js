@@ -70,7 +70,7 @@ export function render(container, store) {
   const st = store.state;
   const route = attempt(() => store.ui?.route?.(), { sub: '' }) || { sub: '' };
   const sub = route.sub || '';
-  if (sub === 'nova' || sub === 'contratos' || sub === 'lista') ui.seg = sub;
+  if (sub === 'nova' || sub === 'contratos' || sub === 'lista' || sub === 'frota') ui.seg = sub;
   else if (sub.startsWith('m/')) ui.seg = 'lista';
   // the map hands a destination over (store.ui.pendingDestination): preselect it once, then forget it
   if (store.ui && store.ui.pendingDestination) {
@@ -91,11 +91,13 @@ export function render(container, store) {
       { id: 'lista', label: 'Programa' },
       { id: 'nova', label: 'Montar' },
       { id: 'contratos', label: 'Contratos', badge: offers.length || null },
+      { id: 'frota', label: 'Frota' },
     ], ui.seg, go));
   container.appendChild(root);
 
   if (ui.seg === 'nova') root.appendChild(safePanel(() => builder(store, rerender), 'A montagem de missões ainda está em construção.'));
   else if (ui.seg === 'contratos') root.appendChild(safePanel(() => contractsView(store, contracts, offers, go), 'Contratos indisponíveis por enquanto.'));
+  else if (ui.seg === 'frota') root.appendChild(safePanel(() => fleetView(store, rerender), 'A frota não pôde ser exibida.'));
   else root.appendChild(safePanel(() => listView(store, go), 'A lista de missões não pôde ser exibida.'));
 
   // deep link from the dashboard: #missoes/m/<id> opens the mission sheet once
@@ -176,7 +178,7 @@ function missionCard(store, m) {
     m.launchTurn != null && !m.result ? chip(`🗓 ${fmtMonth(m.launchTurn, st.startYear)} · ${fmtIn(m.launchTurn, st.turn)}`, 'muted') : null,
     m.estimate && !m.result ? chip(`Chance ${fmtBand(m.estimate.low, m.estimate.high)}`, 'info') : null,
     !m.result && crewRiskOf(m.estimate) != null ? chip(crewRiskText(crewRiskOf(m.estimate)), 'warn', { class: 'ms-crewrisk-chip' }) : null,
-    m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : null,
+    m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : m.source === 'cert' ? chip('certificação', 'info') : null,
     m.paid === false && m.status === 'planning' ? chip('não paga', 'warn') : null,
     m.stranded && m.status === 'planning' ? chip('sem data antes do fim', 'bad') : null,
     Number.isFinite(m.readyTurn) && m.readyTurn > st.turn && !m.result ? chip(`hardware pronto em ${fmtMonth(m.readyTurn, st.startYear)}`, 'warn') : null),
@@ -224,6 +226,7 @@ export function openMission(store, missionId) {
         m.launchTurn != null ? chip(`🗓 ${fmtDate(m.launchTurn, st.startYear)}`, 'muted') : null,
         m.cost != null ? chip(fmtMoney(m.cost), 'muted') : null),
       m.source === 'calendar' ? h('p', { class: 'tiny muted' }, 'Programa do calendário real: destino, tipo e tripulação já estão definidos.') : null,
+      m.source === 'cert' ? h('p', { class: 'tiny muted' }, 'Voo de demonstração sem tripulação: se chegar à órbita, o foguete fica certificado para levar gente.') : null,
       calText ? h('p', { class: 'tiny muted' }, calText) : null,
       h('div', { class: 'kv' },
         kv('Destino', dest?.name || m.destination || '—'),
@@ -545,7 +548,9 @@ function step2(store, d, opts, set) {
   const idx = store.data?.index || {};
   const dest = idx.destinations?.[d.destination];
   const capKey = dest?.capacityKey;
-  const vehicles = opts.vehicles.slice().sort((a, b) => (b.ok - a.ok) || (a.costM || 0) - (b.costM || 0));
+  // usable first; then the blocked ones the player can actually unlock (thinner margin, certification), nearest first
+  const vehicles = opts.vehicles.slice().sort((a, b) => (b.ok - a.ok) || (!a.ok && !b.ok ? vehicleFixRank(a, d) - vehicleFixRank(b, d)
+    || (Number(a.capacityShortT) || 0) - (Number(b.capacityShortT) || 0) : 0) || (a.costM || 0) - (b.costM || 0));
   const roster = rosterOf(store);
   const fds = Array.isArray(opts.crew?.flightDirector) ? opts.crew.flightDirector : roster.filter((c) => c.role === 'flight_director');
   const astros = Array.isArray(opts.crew?.astronauts) && opts.crew.astronauts.length ? opts.crew.astronauts : roster.filter((c) => c.role === 'astronaut');
@@ -559,7 +564,7 @@ function step2(store, d, opts, set) {
       const cap = v.effectiveCapacityT ?? v.capacityT ?? (capKey ? v.capacity?.[capKey] : null);
       const rel = v.reliability || v.rel;
       const flights = rel?.flights ?? v.history?.flights ?? v.flights;
-      return h('button', {
+      const cardEl = h('button', {
         class: ['veh-card', d.vehicleId === v.id && 'selected', !v.ok && 'disabled'], type: 'button', disabled: !v.ok,
         onclick: () => (d.spacecraftId && flightBlock(store, d.spacecraftId, v.id)
           ? (ui.noCraft = false, set({ vehicleId: v.id, spacecraftId: null, secondarySpacecraftId: null }))
@@ -577,6 +582,8 @@ function step2(store, d, opts, set) {
         !v.ok && v.reason ? h('div', { class: 'tiny warn-text' }, v.reason) : null),
       rel?.low != null ? chip(fmtBand(rel.low, rel.high), 'info') : v.estimatedReliability ? chip(`~${fmtPct(v.estimatedReliability)}`, 'muted') : null,
       v.truthLayer && v.truthLayer !== 'fato' ? chip(TRUTH_LABELS[v.truthLayer] || v.truthLayer, 'muted') : null);
+      const help = !v.ok ? vehicleHelp(store, v, d, () => set({}), set) : null;
+      return help ? h('div', { class: 'veh-wrap' }, cardEl, help) : cardEl;
     })) : emptyState('Nenhum veículo disponível para este alvo agora.', '🛑'),
 
     sectionTitle('Espaçonave'),
@@ -603,6 +610,174 @@ function step2(store, d, opts, set) {
     h('div', { class: 'field' }, h('span', { class: 'small' }, 'Margem de combustível'),
       segmented(MARGINS.map((m) => ({ id: m, label: fmtPct(m) })), d.config.fuelMargin, (v) => set({ config: { ...d.config, fuelMargin: v } }))),
     h('p', { class: 'tiny muted' }, 'Mais margem = menos carga, mais segurança. Agressiva encurta prazos e aumenta o risco.'));
+}
+
+// ------------------------------------------------------------------ crew certification + capacity help
+
+const pctTxt = (x) => `${Math.round((Number(x) || 0) * 100)}%`;
+const tTxt = (x) => String(Math.round((Number(x) || 0) * 10) / 10).replace('.', ',');
+
+/**
+ * Plain-language explanation of "Capacidade < carga" (pure: exported for tests). v = draftOptions vehicle entry.
+ * Returns null when the vehicle carries the payload.
+ */
+export function capacityHelpText(v, { destName = 'o alvo', margin = 0.1, farTarget = false } = {}) {
+  const short = Number(v?.capacityShortT) || 0;
+  if (!(short > 0)) return null;
+  const head = `Faltam ${tTxt(short)} t: a carga (nave + módulos) pesa ${tTxt(v.payloadT)} t e o ${v.name || v.id} leva só ${tTxt(v.effectiveCapacityT)} t até ${destName} com margem de ${pctTxt(margin)}. `;
+  const fit = v.marginFit;
+  if (fit && fit.margin < margin) return `${head}Com margem de combustível de ${pctTxt(fit.margin)} ele leva ${tTxt(fit.capacityT)} t: cabe (com um pouco mais de risco).`;
+  const tips = ['um foguete mais pesado', 'uma nave ou módulo mais leve'];
+  if (margin > 0) tips.push('menos margem de combustível (mas nem com 0% cabe)');
+  return `${head}Tente ${tips.join(', ')}.${farTarget ? ' Para a Lua e além, cargas grandes pedem um superpesado ou reabastecimento em órbita.' : ''}`;
+}
+
+/**
+ * How close a greyed-out vehicle is to being usable (pure: exported for tests). Lower = show first.
+ * 0 = fixable now (thinner margin and/or a certification the player can start or already runs), 1 = waits on
+ * someone else (rival program, calendar milestone, access), 2 = cannot be certified, 3 = too weak for the payload.
+ */
+export function vehicleFixRank(v, d = {}) {
+  const short = Number(v?.capacityShortT) || 0;
+  if (short > 0 && !v?.marginFit) return 3;
+  const needsCert = d.type === 'crewed' && v?.crewRated === false;
+  const cs = v?.crewCert;
+  if (!needsCert || !cs || cs.rated) return short > 0 ? 0 : 1;
+  if (!cs.feasible) return 2;
+  if (cs.start?.ok || cs.program?.mine) return 0;
+  return 1;
+}
+
+/** One-line summary of a vehicle's crew-certification path (pure: exported for tests). cs = catalog/crewCert view. */
+export function certSummaryText(cs, money = (m) => `US$ ${Math.round(m)} mi`) {
+  if (!cs) return null;
+  if (cs.rated) return cs.native ? 'Certificado para tripulação.' : 'Certificado para tripulação durante a campanha.';
+  if (!cs.feasible) return `Indisponível: ${cs.reason || 'a operadora não oferece versão tripulada.'}`;
+  const p = cs.program;
+  if (p) {
+    const who = p.mine ? 'Sua certificação' : `Certificação de ${p.sponsorName}`;
+    return `${who} em andamento: ${p.phaseLabel} (${pctTxt(p.progress)}).`;
+  }
+  const s = cs.start || {};
+  const months = Math.max(1, Math.round((s.weeks || 0) / 4.33));
+  const cost = s.costM != null ? `, ${money(s.costM)}` : '';
+  return `Certificar: ${cs.flightsNeeded} voos bem-sucedidos (tem ${cs.flightsOk}) + demo não tripulado${cost}, ~${months} meses${s.customer ? ' (contrato com a operadora)' : ''}.`;
+}
+
+function certChecklist(cs) {
+  const p = cs.program;
+  const row = (done, text) => h('li', { class: done ? 'ok' : '' }, `${done ? '✓' : '○'} ${text}`);
+  return h('ul', { class: 'cert-steps tiny' },
+    p ? row(p.workDone, `Engenharia e revisão${p.workDone ? '' : ` até ${p.readyText}`}`) : row(false, `Engenharia e revisão (~${Math.max(1, Math.round((cs.start?.weeks || 0) / 4.33))} meses)`),
+    row(cs.flightsOk >= cs.flightsNeeded, `Voos bem-sucedidos: ${cs.flightsOk}/${cs.flightsNeeded} (contam os de qualquer cliente)`),
+    row(cs.reliability >= cs.minReliability, `Confiabilidade: ${pctTxt(cs.reliability)} de ${pctTxt(cs.minReliability)}`),
+    row(false, p?.phase === 'demo' ? `Voo de demonstração sem tripulação${p.demoAttempts ? ` (${p.demoAttempts} falha${p.demoAttempts > 1 ? 's' : ''})` : ''}: em Missões › Programa` : 'Voo de demonstração sem tripulação (pago à parte)'));
+}
+
+/** Cash before/after paying for a certification (pure: exported for tests). */
+export function certCashCheck(cash, costM) {
+  const before = Number(cash) || 0;
+  const after = before - (Number(costM) || 0);
+  return { before, after, short: after < 0, shortBy: after < 0 ? -after : 0 };
+}
+
+const playerCash = (store) => store.state?.actors?.[store.state?.playerId]?.cash ?? 0;
+
+async function startCert(store, cs, after) {
+  const s = cs.start || {};
+  if (!s.ok) { toast(s.error || 'Não dá para certificar agora.', 'warn'); return; }
+  if (!s.resume) {
+    const cc = certCashCheck(playerCash(store), s.costM);
+    const money = cc.short
+      ? ` ⚠ Você tem ${fmtMoney(cc.before)} em caixa: pagar deixa a agência ${fmtMoney(cc.shortBy)} no vermelho (linha de crédito, com juros e desgaste político).`
+      : ` Caixa: ${fmtMoney(cc.before)} → ${fmtMoney(cc.after)} depois de pagar.`;
+    const ok = await confirmDialog(
+      `Certificar o ${cs.name} para tripulação? Custa ${fmtMoney(s.costM)} agora e leva ~${Math.round((s.weeks || 0) / 4.33)} meses de engenharia. Depois faltam ${Math.max(0, cs.flightsNeeded - cs.flightsOk)} voos bem-sucedidos do foguete e um voo de demonstração sem tripulação.${money}`,
+      { okLabel: cc.short ? `Pagar no vermelho (${fmtMoney(s.costM)})` : `Certificar (${fmtMoney(s.costM)})`, cancelLabel: 'Agora não', title: 'Certificação tripulada' });
+    if (!ok) return;
+  }
+  const r = store.dispatch({ type: 'vehicle/certify', vehicleId: cs.vehicleId });
+  if (r?.ok) toast(r.resumed ? 'Demonstração retomada: veja Missões › Programa.' : `Certificação do ${cs.name} iniciada.`, 'ok');
+  else toast(r?.error || 'Não foi possível iniciar a certificação.', 'warn');
+  after?.();
+}
+
+/** The crew-certification block for one vehicle (builder help and fleet view). */
+function certBlock(store, cs, after) {
+  if (!cs || cs.rated) return null;
+  if (!cs.feasible) return h('div', { class: 'cert-box muted' }, h('div', { class: 'tiny' }, certSummaryText(cs, fmtMoney)));
+  const p = cs.program;
+  const cc = !p && cs.start?.ok ? certCashCheck(playerCash(store), cs.start.costM) : null;
+  return h('div', { class: 'cert-box' },
+    h('div', { class: 'tiny cert-title' }, certSummaryText(cs, fmtMoney)),
+    p ? bar(Math.round((p.progress || 0) * 100), { kind: 'info', label: 'Progresso da certificação' }) : null,
+    certChecklist(cs),
+    cs.grant ? h('div', { class: 'tiny muted' }, `Ou no cronograma real: o sucesso de "${cs.grant.name}" (${cs.grant.ownerName}, previsto ${cs.grant.when}) certifica o ${cs.name}.`) : null,
+    cs.note ? h('div', { class: 'tiny muted' }, cs.note) : null,
+    p ? (p.mine && p.paused ? button('Retomar demonstração', () => startCert(store, cs, after), { small: true }) : null)
+      : cs.start?.ok ? [
+        cc?.short ? h('div', { class: 'tiny warn-text' }, `⚠ Caixa ${fmtMoney(cc.before)}: pagar agora deixa a agência ${fmtMoney(cc.shortBy)} no vermelho.`) : null,
+        button(`Certificar · ${fmtMoney(cs.start.costM)}`, () => startCert(store, cs, after), { small: true, kind: cc?.short ? 'ghost' : 'primary' }),
+      ]
+        : h('div', { class: 'tiny warn-text' }, cs.start?.error || 'Não dá para certificar agora.'));
+}
+
+/**
+ * Under a greyed-out vehicle in the builder: why it cannot fly this mission and how to fix it. Collapsed behind
+ * "Por quê?" (open by default only for vehicles the player can unlock now), so the list stays short on a phone.
+ */
+function vehicleHelp(store, v, d, after, set) {
+  const dest = store.data?.index?.destinations?.[d.destination];
+  const margin = d.config?.fuelMargin ?? 0.1;
+  const capText = capacityHelpText(v, { destName: dest?.name || 'o alvo', margin, farTarget: !!dest && dest.capacityKey !== 'leo' && dest.capacityKey !== 'gto' });
+  const needsCert = d.type === 'crewed' && v.crewRated === false;
+  const cs = needsCert ? (v.crewCert || attempt(() => store.tryQuery('catalog/crewCert', null, v.id), null)) : null;
+  if (!capText && !cs) return null;
+  const tooWeak = (Number(v.capacityShortT) || 0) > 0 && !v.marginFit;
+  const fit = v.marginFit && v.marginFit.margin < margin ? v.marginFit : null;
+  const rank = vehicleFixRank({ ...v, crewCert: cs }, d);
+  ui.vehHelpOpen = ui.vehHelpOpen || {};
+  const open = ui.vehHelpOpen[v.id] ?? rank === 0;
+  const body = [
+    capText ? h('div', { class: 'tiny' }, `⚖ ${capText}`) : null,
+    fit && set ? button(`Usar margem ${pctTxt(fit.margin)}`, () => set({ config: { ...d.config, fuelMargin: fit.margin } }), { small: true, kind: cs ? 'ghost' : 'primary' }) : null,
+    // certification never fixes a payload the rocket cannot lift: say so instead of offering a billion-dollar program
+    cs && tooWeak ? h('div', { class: 'tiny muted' }, `🧑‍🚀 Também não é certificado para tripulação, mas certificar não resolve: mesmo certificado, o ${v.name || v.id} não leva esta carga.`)
+      : cs ? certBlock(store, cs, after) : null,
+  ];
+  return h('details', { class: 'veh-help', open, ontoggle: (e) => { ui.vehHelpOpen[v.id] = e.currentTarget.open; } },
+    h('summary', { class: 'tiny veh-help-sum' }, rank === 0 ? 'Como liberar' : 'Por quê?'),
+    h('div', { class: 'veh-help-body' }, body));
+}
+
+/** Missões › Frota: every launcher you can buy now, what it carries and whether people can fly on it. */
+function fleetView(store, rerender) {
+  const st = store.state;
+  const list = store.tryQuery('catalog/fleet', null, st.playerId);
+  if (!Array.isArray(list) || !list.length) return emptyState('O catálogo de lançadores ainda não carregou.', '🚀');
+  const rows = list.slice().sort((a, b) => (b.available - a.available) || (b.crewRated - a.crewRated) || ((b.capacity?.leo || 0) - (a.capacity?.leo || 0)));
+  const mine = rows.filter((v) => v.crewCert?.program?.mine);
+  return h('div', { class: 'fleet' },
+    h('p', { class: 'small muted' }, 'Foguetes em serviço. Para levar gente, o foguete precisa de certificação tripulada: voos bem-sucedidos, confiabilidade mínima e um voo de demonstração sem tripulação.'),
+    mine.length ? sectionTitle('Suas certificações') : null,
+    ...mine.map((v) => card({ title: v.name, subtitle: v.provider || v.operator }, certBlock(store, v.crewCert, rerender))),
+    sectionTitle('Catálogo'),
+    h('div', { class: 'fleet-list' }, rows.map((v) => {
+      const op = st.actors?.[v.operator] || { id: v.operator };
+      const cs = v.crewCert;
+      const crewChip = v.crewRated ? chip('🧑‍🚀 Tripulado', 'good') : cs?.program ? chip(`Certificando ${pctTxt(cs.program.progress)}`, 'info') : cs?.feasible ? chip('Certificável', 'muted') : chip('Só carga', 'muted');
+      const rel = v.reliability;
+      return h('div', { class: ['fleet-card', !v.available && 'disabled'] },
+        h('div', { class: 'fleet-top' },
+          raw(emblemSVG(op, { size: 28 }), 'veh-emblem'),
+          h('div', { class: 'veh-text' },
+            h('div', { class: 'veh-name' }, v.name),
+            h('div', { class: 'tiny muted' }, [v.provider || v.operator, v.costM != null ? fmtMoney(v.costM) : null, v.reusable ? 'reutilizável' : null].filter(Boolean).join(' · '))),
+          crewChip),
+        h('div', { class: 'tiny' }, `LEO ${tTxt(v.capacity?.leo)} t · Lua ${tTxt(v.capacity?.tli)} t · Marte ${tTxt(v.capacity?.mars)} t${rel?.mean != null ? ` · confiabilidade ${pctTxt(rel.mean)}` : ''}${rel?.flights != null ? ` · ${rel.flights} voos` : ''}`),
+        !v.available ? h('div', { class: 'tiny warn-text' }, v.access?.reason || 'Indisponível para a agência agora.') : null,
+        v.available && !v.crewRated && !cs?.program?.mine ? certBlock(store, cs, rerender) : null);
+    })));
 }
 
 /** Crewed landing with a capsule that needs a separate lander (Orion + HLS/Blue Moon): pick the lander. */

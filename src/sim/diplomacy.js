@@ -1,7 +1,7 @@
 // Diplomacy: actors, relations, blocs, treaties, proposals, utility-based AI and the Tabela da Era.
 // No script: every alliance is born, cools and breaks from state (trust, dependence, rivalry, tension,
 // budget pressure, goals and culture). Pure JS, deterministic (ctx.rng / rngFor only), JSON state.
-import { clamp, relKey, nextId, addNews, pushDecision, emitSignal, changeActor, log } from '../core/helpers.js';
+import { clamp, relKey, nextId, addNews, pushDecision, emitSignal, changeActor, log, firstValue, milestoneShare } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
 import * as politics from './politics.js';
 
@@ -499,6 +499,7 @@ function readSignals(state, data, rng) {
       switch (s.type) {
         case 'mission/resolved': onMissionResolved(state, data, s); break;
         case 'crew/died': onCrewDied(state, data, s, rng); break;
+        case 'crew/rivalLost': onCrewDied(state, data, s, rng); break;
         case 'first': onFirst(state, data, s, rng); break;
         case 'tension/changed': onTension(state, data, s); break;
         case 'election': onElection(state, data, s, rng); break;
@@ -516,6 +517,10 @@ function onMissionResolved(state, data, s) {
   const a = s.actorId;
   if (!state.actors[a]) return;
   const ok = s.outcome === 'total' || s.outcome === 'partial';
+  if (ok) {
+    const pc = partnerCredit(data);
+    creditPartners(state, data, s, (cal) => pc.share * pc.perImportance * (cal.importance || 1) * (s.crewed ? pc.crewedMult : 1) * (s.outcome === 'total' ? 1 : 0.45));
+  }
   const cat = s.outcome === 'catastrophic';
   const cal = s.calendarId ? data.index?.calendar?.[s.calendarId] : null;
   const joint = new Set((cal?.partners || []).filter((p) => state.actors[p] && p !== a));
@@ -532,9 +537,40 @@ function onMissionResolved(state, data, s) {
   }
 }
 
+/**
+ * Partners of a calendar program (ESA's service module on Orion, JAXA's rover on LUPEX) share the credit of a
+ * success: each gets a slice of the program's prestige (importance-based) and, for a first, a slice of its value.
+ * Tuning: data/actors.json "partnerCredit". The owner keeps all of its own points.
+ */
+function partnerCredit(data) {
+  return { share: 0.25, crewedMult: 1.5, perImportance: 6, firstShare: 0.15, ...(A(data).partnerCredit || {}) };
+}
+function creditPartners(state, data, s, amountOf) {
+  const cal = s.calendarId ? data.index?.calendar?.[s.calendarId] : null;
+  if (!cal) return;
+  for (const b of [...new Set(cal.partners || [])].sort()) {
+    if (b === s.actorId || !state.actors[b]) continue;
+    const pts = Math.round(amountOf(cal));
+    if (pts <= 0) continue;
+    changeActor(state, b, 'prestige', pts);
+    if (isPlayer(state, b)) {
+      addNews(state, {
+        headline: txt(data, null, 'partnerCredit', null, { a: short(state, b), program: cal.name, pts }) || `${short(state, b)} divide os louros de ${cal.name} (+${pts} de prestígio)`,
+        tags: ['diplomacia'], actors: [b, s.actorId], importance: 1, icon: '🤝',
+      });
+    }
+  }
+}
+
 function onCrewDied(state, data, s, rng) {
   const a = state.crew?.[s.crewId]?.actorId || s.actorId;
   if (!state.actors[a]) return;
+  // one tragedy, one round of condolences: crew/died comes once per person lost, in the same week
+  const mem = memoryOf(state, a);
+  const key = `${s.missionId ?? s.flightId ?? ''}@${s.turn ?? state.turn}`;
+  if (mem.lastLossKey === key || (mem.lastLossTurn != null && state.turn - mem.lastLossTurn < 2)) return;
+  mem.lastLossKey = key;
+  mem.lastLossTurn = state.turn;
   let sent = false;
   for (const b of sortedIds(state)) {
     if (b === a) continue;
@@ -555,6 +591,10 @@ function onFirst(state, data, s, rng) {
   const a = s.actorId, m = s.milestoneId;
   if (!state.actors[a] || !m) return;
   const base = String(m).split(':')[0];
+  {
+    const pc = partnerCredit(data);
+    creditPartners(state, data, s, (cal) => pc.firstShare * firstValue(state, m, (30 + 10 * (cal.importance || 1)) * milestoneShare(data, m)));
+  }
   for (const b of sortedIds(state)) {
     if (b === a) continue;
     const wanted = goalsOf(state, b).includes(m) || goalsOf(state, b).includes(base);

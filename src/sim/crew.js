@@ -623,8 +623,155 @@ export function pickCrew(state, rng, filter = () => true) {
 
 // ---------- weekly tick ----------
 
+// ---------- rival crewed flights in the background ----------
+// Routine crewed flights of the rivals (ISS / Tiangong rotations, operational flights of new capsules) that are not
+// calendar items: each one rolls the loss of its crew with a per-flight risk by vehicle maturity, plus aborts that
+// the escape system survives. Losses make news, cost support/reputation/prestige and ground the vehicle.
+// Tuning and texts: data/crew.json config.rivalCrewFlights. Slice: state.rivalCrew = {flown, standDown, losses, aborts, flights}.
+const rcfg = (data) => ccfg(data).rivalCrewFlights || {};
+
+function isFlightTurn(state, def, t) {
+  const sy = state.startYear ?? 2026;
+  const year = sy + Math.floor(t / 52);
+  if (year < (def.fromYear ?? sy) || year > (def.toYear ?? 9999)) return false;
+  const per = Math.max(0.1, def.perYear || 1);
+  const w0 = def.week ?? 0;
+  const k = (x) => Math.floor(((x - w0) * per) / 52);
+  return t >= w0 && (t === w0 || k(t) > k(t - 1));
+}
+
+function rivalSlice(state, data) {
+  if (!state.rivalCrew || typeof state.rivalCrew !== 'object') {
+    // old save (or first tick): count the flights already behind us so the numbering stays right
+    const flown = {};
+    for (const def of rcfg(data).flights || []) {
+      let n = 0;
+      for (let t = 0; t < (state.turn || 0); t++) if (isFlightTurn(state, def, t)) n++;
+      flown[def.id] = n;
+    }
+    state.rivalCrew = { flown, standDown: {}, losses: [], aborts: 0, flights: 0 };
+  }
+  const r = state.rivalCrew;
+  if (!r.flown || typeof r.flown !== 'object') r.flown = {};
+  if (!r.standDown || typeof r.standDown !== 'object') r.standDown = {};
+  if (!Array.isArray(r.losses)) r.losses = [];
+  return r;
+}
+
+/** Chance of losing the crew on the next flight of a background crewed vehicle (pure). */
+export function rotationRisk(data, def, flown = 0) {
+  const C = rcfg(data);
+  const r = (def?.risk ?? 0.005) * Math.pow(C.decay ?? 0.85, Math.max(0, flown));
+  return clamp(Math.max(def?.riskMin ?? 0, r), 0, 1);
+}
+
+function rivalFlightReady(state, def) {
+  const involved = [def.owner, def.operator].filter(Boolean);
+  if (involved.includes(state.playerId) || !state.actors?.[def.owner]) return false;
+  if (def.requireCalendar) {
+    const inst = (state.calendar || []).find((c) => c.id === def.requireCalendar);
+    if (!inst || !['success', 'partial'].includes(inst.status)) return false;
+  }
+  if (def.requireFirst && state.firsts?.[def.requireFirst]?.actorId !== def.owner) return false;
+  // open war (tension 4) grounds routine flights of the agencies involved
+  for (const [k, v] of Object.entries(state.tension || {})) if (v >= 4 && k.split('|').includes(def.owner)) return false;
+  return true;
+}
+
+function fillT(tpl, vars) {
+  return String(tpl || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
+}
+function pickT(data, rng, key, vars) {
+  const list = rcfg(data).texts?.[key];
+  return list?.length ? fillT(rng.pick(list), vars) : '';
+}
+function joinNames(list) {
+  return list.length <= 1 ? list.join('') : `${list.slice(0, -1).join(', ')} e ${list[list.length - 1]}`;
+}
+
+/** Fictional names for an abstract rival crew (never a real astronaut: forbiddenNames). */
+function rivalCrewNames(state, data, rng, owner, n, partner) {
+  const C = crewData(data);
+  const forbidden = new Set((C.forbiddenNames || []).map((x) => String(x).toLowerCase()));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const culture = cultureOf(data, i === n - 1 && partner ? partner : owner);
+    for (let tries = 0; tries < 8; tries++) {
+      const first = rng.pick(C.firstNames?.[culture] || ['Alex']);
+      const last = rng.pick(C.lastNames?.[culture] || ['Silva']);
+      const name = (C.surnameFirst || []).includes(culture) ? `${last} ${first}` : `${first} ${last}`;
+      if (!forbidden.has(name.toLowerCase()) && !out.includes(name)) { out.push(name); break; }
+    }
+  }
+  return out;
+}
+
+function rivalCrewFlights(state, data, ctx) {
+  const C = rcfg(data);
+  const defs = C.flights || [];
+  if (!defs.length) return;
+  const R = rivalSlice(state, data);
+  const t = state.turn || 0;
+  for (const def of defs) {
+    if (!isFlightTurn(state, def, t)) continue;
+    if ((R.standDown[def.id] ?? -1) > t) continue; // grounded after an accident: this rotation slips
+    if (!rivalFlightReady(state, def)) continue;
+    const rng = ctx.rng(`rivalCrew:${def.id}`);
+    const flown = R.flown[def.id] || 0;
+    R.flown[def.id] = flown + 1;
+    R.flights = (R.flights || 0) + 1;
+    const partners = (def.partners || []).filter((x) => x !== state.playerId && x !== def.owner && state.actors?.[x]);
+    const partner = partners.length && rng.chance(def.partnerChance ?? 0) ? rng.pick(partners) : null;
+    const n = def.crew || 3;
+    const vars = {
+      label: fillT(def.label || def.name, { n: (def.startN ?? 1) + flown }), vehicle: def.name || def.id,
+      owner: actorName(state, def.owner), partner: partner ? actorName(state, partner) : '', station: def.station || 'a órbita',
+      crew: n, crewWord: n > 1 ? 'tripulantes' : 'tripulante', lost: n > 1 ? 'morrem' : 'morre', safe: n > 1 ? 'estão salvos' : 'está salvo',
+    };
+    const actors = [def.owner, def.operator, partner].filter(Boolean);
+    const risk = rotationRisk(data, def, flown);
+    const roll = rng.range(0, 1);
+    if (roll < risk) {
+      const names = rivalCrewNames(state, data, rng, def.owner, n, partner);
+      changeActor(state, def.owner, 'support', -10);
+      changeActor(state, def.owner, 'reputation', -6);
+      changeActor(state, def.owner, 'prestige', -(C.lossPrestige ?? 12));
+      if (def.operator && state.actors?.[def.operator]) { changeActor(state, def.operator, 'support', -5); changeActor(state, def.operator, 'reputation', -4); }
+      if (partner) changeActor(state, partner, 'support', -3);
+      R.standDown[def.id] = t + (C.standDownWeeks ?? 52);
+      R.losses.push({ turn: t, flightId: def.id, label: vars.label, owner: def.owner, operator: def.operator || null, partner, n, names });
+      if (R.losses.length > 30) R.losses.splice(0, R.losses.length - 30);
+      if (state.stats) state.stats['crew.rivalDeaths'] = (state.stats['crew.rivalDeaths'] || 0) + n;
+      addNews(state, { headline: pickT(data, rng, 'loss', vars), body: pickT(data, rng, 'lossBody', { ...vars, names: joinNames(names) }), tags: ['crew', 'rival', 'tragedy'], actors, importance: 3, icon: '🕯️' });
+      emitSignal(state, 'crew/rivalLost', { actorId: def.owner, operator: def.operator || null, partner, flightId: def.id, n });
+      // the whole astronaut corps feels it, ours included
+      for (const p of playerPeople(state)) if (p.role === 'astronaut' && onPayroll(p)) p.morale = r1(clamp(p.morale - 2, 0, 100));
+      continue;
+    }
+    if (roll < risk * (1 + (C.abortShare ?? 1.2))) {
+      R.aborts = (R.aborts || 0) + 1;
+      R.standDown[def.id] = t + (C.abortStandDownWeeks ?? 20);
+      changeActor(state, def.owner, 'support', -2);
+      changeActor(state, def.owner, 'reputation', -1);
+      addNews(state, { headline: pickT(data, rng, 'abort', vars), body: pickT(data, rng, 'abortBody', vars), tags: ['crew', 'rival'], actors, importance: 2, icon: '🪂' });
+      continue;
+    }
+    changeActor(state, def.owner, 'prestige', def.prestige ?? 1);
+    changeActor(state, def.owner, 'support', 0.3);
+    const pp = def.partnerPrestige ?? C.partnerPrestige ?? 3;
+    if (partner && pp > 0) {
+      changeActor(state, partner, 'prestige', pp);
+      addNews(state, { headline: pickT(data, rng, 'partner', vars), body: pickT(data, rng, 'partnerBody', vars), tags: ['crew', 'rival'], actors, importance: 1, icon: '🧑‍🚀' });
+    }
+    if (def.announceFirst && flown === 0) {
+      addNews(state, { headline: pickT(data, rng, 'first', vars), body: pickT(data, rng, 'firstBody', vars), tags: ['crew', 'rival'], actors, importance: 2, icon: '🚀' });
+    }
+  }
+}
+
 export function tick(state, data, ctx) {
   ensure(state);
+  rivalCrewFlights(state, data, ctx);
   const C = ccfg(data);
   const people = playerPeople(state);
 
@@ -866,6 +1013,7 @@ export const queries = {
     .map((p) => view(state, data, p)),
   'crew/candidates': (state, data) => currentCandidates(state, data).map((c) => ({ ...view(state, data, c), available: true, signingM: c.signingM, expiresTurn: c.expiresTurn })),
   'crew/memorial': (state) => (state.memorial || []).slice().reverse(),
+  'crew/rivalLosses': (state) => (state.rivalCrew?.losses || []).slice().reverse(),
   'crew/person': (state, data, id) => {
     const p = state.crew?.[id];
     if (p) return view(state, data, p);

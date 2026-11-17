@@ -50,7 +50,7 @@
     },
     {
       "id": "roscosmos", "name": "Roscosmos (Rússia)", "short": "Roscosmos", "kind": "agency", "country": "Rússia", "launchPolicy": "domestic", "flag": "🇷🇺", "color": "#CC79A7",
-      "bloc": "ilrs", "budget": 2200, "fixedCostShare": 0.6, "support": 55, "reputation": 45, "culture": 5, "prestige": 0,
+      "bloc": "ilrs", "budget": 2200, "fixedCostShare": 0.5, "support": 55, "reputation": 45, "culture": 5, "prestige": 0,
       "style": "Isolada, orgulhosa",
       "description": "Planeja a estação ROS e as sondas Luna. Aliada da China no ILRS e cada vez mais isolada do Ocidente.",
       "capabilities": { "crewed": true, "launchSites": ["Baikonur", "Vostochny", "Plesetsk"] },
@@ -58,7 +58,7 @@
     },
     {
       "id": "jaxa", "name": "JAXA (Japão)", "short": "JAXA", "kind": "agency", "country": "Japão", "flag": "🇯🇵", "color": "#F0E442",
-      "bloc": "artemis_accords", "budget": 1500, "fixedCostShare": 0.5, "support": 60, "reputation": 74, "culture": -45, "prestige": 0,
+      "bloc": "artemis_accords", "budget": 1500, "fixedCostShare": 0.45, "support": 60, "reputation": 74, "culture": -45, "prestige": 0,
       "style": "Preciso e discreto",
       "description": "Parceira do programa lunar americano (rover pressurizado em troca de astronautas na Lua) e do LUPEX com a Índia.",
       "capabilities": { "crewed": false, "launchSites": ["Tanegashima", "Uchinoura"] },
@@ -228,6 +228,11 @@
     }
   ],
 
+  "partnerCredit": { "_doc": "Parceiros de um programa do calendário dividem os louros do sucesso (diplomacy.js): share × perImportance × importância (× crewedMult se tripulado) de prestígio, e firstShare do valor de um primeiro. O dono não perde nada.", "share": 0.25, "crewedMult": 1.5, "perImportance": 6, "firstShare": 0.15 },
+  "finance": {
+    "_doc": "Contas das IAs (budget.js). programs: os programas do calendário de cada IA custam caixa como os do jogador (hardware × lançamentos, menos a verba própria do programa e a parte dos parceiros), acumulando nas buildWeeks antes do lançamento; o que não cabe no caixa acima da reserva fica devendo. keepFundShare: parte do orçamento anual que a IA guarda para as próprias missões (fundo de calendar.js rivalOps) antes do gasto abstrato; abstractRate: fração semanal do excedente que vira gasto abstrato (programas menores e P&D).",
+    "programs": { "buildWeeks": 104, "agencyFundedShare": 0.35, "companyFundedShare": 0.2, "clientFundedShare": 0.85, "partnerShare": 0.12, "costScale": 1, "reserveShare": 0.08, "maxWeeklyShare": 0.25, "keepFundShare": 0.6, "abstractRate": 0.06 }
+  },
   "programs": [
     { "id": "lunar_crewed", "name": "pouso tripulado na Lua", "milestone": "crewed_lunar_landing", "needsCrewed": true, "appeal": 6 },
     { "id": "lunar_science", "name": "ciência no polo sul lunar", "milestone": "lunar_south_pole_landing", "needsCrewed": false, "appeal": 5 },
@@ -286,6 +291,7 @@
   ],
 
   "texts": {
+    "partnerCredit": ["{a} divide os louros de {program} (+{pts} de prestígio)", "Parceria em {program} rende {pts} de prestígio para {a}"],
     "signed": {
       "mission_partnership": ["{a} e {b} assinam parceria em {program}.", "{a} e {b} unem forças em {program}.", "Aperto de mãos: {a} e {b} lançam programa conjunto de {program}."],
       "cost_sharing": ["{a} e {b} vão dividir custos de missões conjuntas ({share} de desconto).", "Orçamento curto aproxima {a} e {b}: custos divididos."],

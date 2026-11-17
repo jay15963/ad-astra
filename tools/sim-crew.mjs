@@ -1,11 +1,11 @@
 // Crew mortality across full campaigns (player + AI). Runs the campaign bot of tools/sim-campaign.mjs and counts
 // crewed flights and crew losses of every actor: the player's (state.memorial, one event per mission) and the
-// rivals' (calendar items flown with crew that ended catastrophic).
+// rivals' (calendar items flown with crew that ended catastrophic, plus the background rotations of crew.js: state.rivalCrew).
 // Usage: node tools/sim-crew.mjs [seeds=4] [actor=all] [--verbose]
 import { loadDataNode } from '../src/core/data.js';
 import { runCampaign } from './sim-campaign.mjs';
 import { formatTurn } from '../src/core/time.js';
-import { backgroundCrewLoss } from '../src/sim/crew.js';
+import { backgroundCrewLoss, rotationRisk } from '../src/sim/crew.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -52,7 +52,17 @@ export function crewEvents(state) {
       if (h.lostCrew) events.push({ actorId: item.owner, turn: h.turn, name: item.name, dest: item.destination, n: item.crewSize || null, player: false });
     }
   }
-  return { events, playerCrewed, rivalCrewed, rivalSafe, playerSafe };
+  // rivals: background crewed rotations (ISS/Tiangong, operational capsules) rolled by crew.js
+  let rotations = 0;
+  const defs = data.crew?.config?.rivalCrewFlights?.flights || [];
+  for (const def of defs) {
+    const n = state.rivalCrew?.flown?.[def.id] || 0;
+    rotations += n;
+    for (let i = 0; i < n; i++) rivalSafe *= 1 - rotationRisk(data, def, i);
+  }
+  for (const l of state.rivalCrew?.losses || []) events.push({ actorId: l.owner, turn: l.turn, name: l.label, dest: 'leo', n: l.n, player: false, rotation: true });
+  rivalCrewed += rotations;
+  return { events, playerCrewed, rivalCrewed, rivalSafe, playerSafe, rotations };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -67,12 +77,14 @@ if (isMain) {
   let re = 0;
   const byActor = {};
   let whatIf = 0;
+  let rot = 0;
   for (const playerId of actors) {
     for (let s = 1; s <= nSeeds; s++) {
       const seed = s * 104729;
       let res;
       try { res = runCampaign(playerId, seed); } catch (e) { console.error(`FAIL ${playerId} seed=${seed}: ${e.message}`); process.exitCode = 1; continue; }
-      const { events, playerCrewed, rivalCrewed, rivalSafe } = crewEvents(res.state);
+      const { events, playerCrewed, rivalCrewed, rivalSafe, rotations } = crewEvents(res.state);
+      rot += rotations;
 
 
       campaigns++;
@@ -94,8 +106,8 @@ if (isMain) {
   }
   const f = (x) => `${Math.round((x / (campaigns || 1)) * 100)}%`;
   console.log(`\n${campaigns} campanhas · com alguma perda de tripulação: ${f(withDeath)} (jogador ${f(withPlayerDeath)}, rivais ${f(withRivalDeath)})`);
-  console.log(`voos tripulados por campanha: jogador ${(pc / (campaigns || 1)).toFixed(1)}, rivais ${(rc / (campaigns || 1)).toFixed(1)}`);
+  console.log(`voos tripulados por campanha: jogador ${(pc / (campaigns || 1)).toFixed(1)}, rivais ${(rc / (campaigns || 1)).toFixed(1)} (rotações de fundo ${(rot / (campaigns || 1)).toFixed(1)})`);
   console.log(`perda por voo tripulado: jogador ${pc ? ((pe / pc) * 100).toFixed(2) : '-'}%, rivais ${rc ? ((re / rc) * 100).toFixed(2) : '-'}%`);
-  console.log(`esperado (crew.backgroundCrewLoss nas falhas tripuladas dos rivais, sem o sorteio): ~${f(whatIf)} das campanhas com perda`);
+  console.log(`esperado (backgroundCrewLoss nas falhas tripuladas + rotationRisk nas rotações dos rivais, sem o sorteio): ~${f(whatIf)} das campanhas com perda`);
   console.log(`perdas por ator: ${Object.entries(byActor).map(([k, v]) => `${k}=${v}`).join(' ') || '-'}`);
 }

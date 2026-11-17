@@ -24,13 +24,16 @@ const SEGS = [
   { id: 'tratados', label: 'Tratados' },
   { id: 'tabela', label: 'Tabela' },
 ];
-const ui = { seg: 'noticias', newsFilter: 'all', newsLimit: 30 };
+const ui = { seg: 'noticias', newsFilter: 'all', newsLimit: 30 }; // newsLimit: items shown (grows with "Ver mais")
 
 export function render(container, store) {
   const route = attempt(() => store.ui?.route?.(), { sub: '' }) || { sub: '' };
   if (SEGS.some((s) => s.id === route.sub)) ui.seg = route.sub;
-  const rerender = () => { container.innerHTML = ''; render(container, store); };
-  const go = (seg) => { ui.seg = seg; store.ui?.navigate ? store.ui.navigate('mundo', seg) : rerender(); };
+  const go = (seg) => {
+    ui.seg = seg;
+    if (store.ui?.navigate) store.ui.navigate('mundo', seg);
+    else { try { mapCleanup?.(); } catch { /* */ } container.innerHTML = ''; render(container, store); }
+  };
   const st = store.state;
   const dipl = (st.decisions || []).filter((d) => /^(diplomacy|politics)/.test(String(d.kind)));
   let mapCleanup = null;
@@ -42,7 +45,7 @@ export function render(container, store) {
   if (ui.seg === 'atores') root.append(safePanel(() => actorsView(store, dipl), 'Os atores ainda não chegaram ao mundo.'));
   else if (ui.seg === 'tratados') root.append(safePanel(() => treatiesView(store), 'Tratados e blocos em construção.'));
   else if (ui.seg === 'tabela') root.append(safePanel(() => leagueView(store), 'A Tabela da Era ainda está sendo apurada.'));
-  else root.append(safePanel(() => newsView(store, rerender), 'O noticiário está fora do ar.'));
+  else root.append(safePanel(() => newsView(store), 'O noticiário está fora do ar.'));
   return () => { try { mapCleanup?.(); } catch { /* */ } };
 }
 
@@ -119,7 +122,13 @@ function tensionChip(store) {
 
 // ------------------------------------------------------------------ news
 
-function newsView(store, rerender) {
+const NEWS_PAGE = 30;
+
+/**
+ * News feed. Filters and "Ver mais" redraw only this panel (the world map above keeps running); items after
+ * the first screenful use content-visibility so a long feed costs no layout until it is scrolled into view.
+ */
+function newsView(store) {
   const st = store.state;
   const all = st.news || [];
   const filters = [
@@ -127,27 +136,51 @@ function newsView(store, rerender) {
     { id: 'big', label: 'Importantes' },
     { id: 'me', label: 'Minha agência' },
   ];
-  const list = all.filter((n) => ui.newsFilter === 'all' ? true : ui.newsFilter === 'big' ? n.importance >= 2 : (n.actors || []).includes(st.playerId));
-  const out = h('div', null,
-    h('div', { class: 'chip-scroll' }, filters.map((f) => chip(f.label, ui.newsFilter === f.id ? 'accent' : '', { onclick: () => { ui.newsFilter = f.id; ui.newsLimit = 30; rerender(); } }))));
-  if (!list.length) { out.append(emptyState('Nenhuma notícia por aqui ainda. O mundo se move a cada semana.', '📰')); return out; }
-  let lastTurn = null;
-  const feed = h('div', { class: 'news-feed' });
-  for (const n of list.slice(0, ui.newsLimit)) {
-    if (n.turn !== lastTurn) { feed.append(h('div', { class: 'news-date' }, fmtDate(n.turn, st.startYear))); lastTurn = n.turn; }
-    const actors = (n.actors || []).map((id) => st.actors?.[id]).filter(Boolean);
-    feed.append(h('article', { class: ['news-item', `imp-${n.importance || 1}`] },
-      h('div', { class: 'news-head' },
-        h('span', { class: 'news-icon', 'aria-hidden': 'true' }, newsIcon(n)),
-        h('h3', { class: 'news-headline' }, n.headline)),
-      n.body ? h('p', { class: 'news-body small' }, n.body) : null,
-      actors.length || n.tags?.length ? h('div', { class: 'chips' },
-        actors.map((a) => chip(`${a.flag || ''} ${a.short || a.name}`.trim(), 'muted')),
-        [...new Set((n.tags || []).map((t) => TAG_LABELS[t]).filter(Boolean))].slice(0, 3).map((t) => chip(`#${t}`, 'muted'))) : null));
-  }
-  out.append(feed);
-  if (list.length > ui.newsLimit) out.append(button('Ver mais', () => { ui.newsLimit += 30; rerender(); }, { kind: 'ghost' }));
+  const out = h('div', { class: 'news-view' });
+  const draw = () => {
+    out.innerHTML = '';
+    const list = all.filter((n) => ui.newsFilter === 'all' ? true : ui.newsFilter === 'big' ? n.importance >= 2 : (n.actors || []).includes(st.playerId));
+    out.append(h('div', { class: 'chip-scroll' }, filters.map((f) => chip(f.label, ui.newsFilter === f.id ? 'accent' : '', {
+      onclick: () => { if (ui.newsFilter === f.id) return; ui.newsFilter = f.id; ui.newsLimit = NEWS_PAGE; draw(); },
+    }))));
+    if (!list.length) { out.append(emptyState('Nenhuma notícia por aqui ainda. O mundo se move a cada semana.', '📰')); return; }
+    const feed = h('div', { class: 'news-feed' });
+    out.append(feed);
+    let shown = 0;
+    let lastTurn = null;
+    const more = h('div', { class: 'news-more' });
+    const appendUpTo = (limit) => {
+      for (; shown < Math.min(limit, list.length); shown++) {
+        const n = list[shown];
+        if (n.turn !== lastTurn) { feed.append(h('div', { class: 'news-date' }, fmtDate(n.turn, st.startYear))); lastTurn = n.turn; }
+        feed.append(newsItem(st, n, shown >= 8));
+      }
+      more.innerHTML = '';
+      if (list.length > shown) {
+        more.append(button(`Ver mais (${list.length - shown})`, () => { ui.newsLimit = shown + NEWS_PAGE; appendUpTo(ui.newsLimit); }, { kind: 'ghost' }));
+      }
+    };
+    appendUpTo(ui.newsLimit);
+    out.append(more);
+  };
+  draw();
   return out;
+}
+
+function newsItem(st, n, offscreen) {
+  const actors = (n.actors || []).map((id) => st.actors?.[id]).filter(Boolean);
+  return h('article', {
+    class: ['news-item', `imp-${n.importance || 1}`],
+    // below the first screenful: skip layout/paint until scrolled near (no-op where unsupported)
+    style: offscreen ? { contentVisibility: 'auto', containIntrinsicSize: 'auto 110px' } : null,
+  },
+  h('div', { class: 'news-head' },
+    h('span', { class: 'news-icon', 'aria-hidden': 'true' }, newsIcon(n)),
+    h('h3', { class: 'news-headline' }, n.headline)),
+  n.body ? h('p', { class: 'news-body small' }, n.body) : null,
+  actors.length || n.tags?.length ? h('div', { class: 'chips' },
+    actors.map((a) => chip(`${a.flag || ''} ${a.short || a.name}`.trim(), 'muted')),
+    [...new Set((n.tags || []).map((t) => TAG_LABELS[t]).filter(Boolean))].slice(0, 3).map((t) => chip(`#${t}`, 'muted'))) : null);
 }
 
 // ------------------------------------------------------------------ actors

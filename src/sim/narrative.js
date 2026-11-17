@@ -28,7 +28,7 @@ const OP_CHANCE = 1;            // missions already rolls its own weekly chance 
 const OP_MAX_PER_MISSION = 2;
 const JOURNAL_CAP = 120;
 
-export const PLACEHOLDERS = ['actor', 'person', 'mission', 'rival', 'year', 'country', 'bloc', 'zone'];
+export const PLACEHOLDERS = ['actor', 'person', 'mission', 'rival', 'year', 'country', 'bloc', 'zone', 'milestone'];
 // No-repeat rules (besides each event's cooldownWeeks and the weight decay):
 // - per-campaign cap: event.maxCount, default DEFAULT_MAX_COUNT[mode] for events that are not 'once';
 // - shared window: events with the same event.group wait data.events.groups[group] weeks (default GROUP_COOLDOWN)
@@ -332,7 +332,7 @@ export function renderText(state, data, text, context = {}) {
       case 'person': return personName(state, context.person) || 'alguém da equipe';
       case 'mission': return missionName(state, data, context.mission) || 'a missão';
       case 'year': return String((state.startYear || 2026) + Math.floor((state.turn || 0) / 52));
-      case 'milestone': return milestoneLabel(data, context.milestone);
+      case 'milestone': return context.milestone ? milestoneLabel(data, context.milestone) : 'um marco da corrida';
       case 'country': return context.country || 'um país vizinho';
       case 'bloc': return context.bloc || 'o bloco';
       case 'zone': return context.zone || 'a região disputada';

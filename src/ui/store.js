@@ -224,6 +224,8 @@ export function createStore(data, { storage } = {}) {
     if (!store.state) return;
     const m = metricsOf(store.state);
     const last = store.metrics[store.metrics.length - 1];
+    // most actions (launch steps, UI clicks) change none of these: skip the localStorage write
+    if (last && last.turn === m.turn && Object.keys(m).every((k) => last[k] === m[k])) return;
     if (last && last.turn === m.turn) store.metrics[store.metrics.length - 1] = m;
     else store.metrics.push(m);
     if (store.metrics.length > 40) store.metrics.splice(0, store.metrics.length - 40);

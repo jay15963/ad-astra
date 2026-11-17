@@ -1,0 +1,5209 @@
+{
+  "_doc": "Art data for the Launch Day renderer (src/ui/launch-render). Presentation only, never read by the sim. Units: metres, y up from the base plane (exit plane of the lowest nozzle). Part y = bottom of the part's structure; engines hang below it by engines.bellLen. Boosters at x != 0 (side view); depth -1 = behind the core (drawn darker, partly hidden). Payload parts (craft.onStack) are relative to vehicle.payloadTop. See src/ui/launch-render/README.md §5.2. Parts may define segs: [{len,d,dTop,mat,tint,nose,shape,lattice,vents,tiles,cells,band,segments,ribs,soot}] bottom→top (interstages and booster nose cones are segments of the stage that carries them, so they fall with it). Optional decoration: soot, frost, frostZones [[y0,y1] m from part base], raceway, gridFins (true|\"fixed\"), legs, legLen, fins, strakes, canards, flaps, tiles, skew (Soyuz boosters lean on the core), depth (1 = in front of the core), marks [{type: text|flag|band|stripe|logo|window|patch, y (m from part base), h, s (−1..1 across), text, color, vertical, size, country, logo}].",
+  "version": 2,
+  "vehicles": {
+    "falcon9": {
+      "name": "Falcon 9",
+      "family": "falcon",
+      "site": "canaveral",
+      "tower": "fss",
+      "reuse": "droneship",
+      "heightM": 70,
+      "diameterM": 3.66,
+      "payloadTop": 56.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 1.2,
+          "len": 46.5,
+          "d": 3.66,
+          "mat": "white_paint",
+          "soot": 0.62,
+          "frost": 0.55,
+          "frostZones": [
+            [
+              25.5,
+              39.5
+            ]
+          ],
+          "raceway": 0.55,
+          "racewayTo": 40,
+          "segs": [
+            {
+              "len": 40,
+              "d": 3.66
+            },
+            {
+              "len": 6.5,
+              "d": 3.66,
+              "mat": "carbon_black",
+              "soot": 0.15
+            }
+          ],
+          "engines": {
+            "n": 9,
+            "prop": "kerolox",
+            "bellD": 0.92,
+            "bellLen": 1.2,
+            "layout": "octaweb"
+          },
+          "gridFins": true,
+          "gridFinFromTop": 0.9,
+          "legs": 4,
+          "legLen": 8.6,
+          "marks": [
+            {
+              "type": "text",
+              "y": 8,
+              "h": 17,
+              "text": "SPACEX",
+              "vertical": true,
+              "color": "#1b1d21",
+              "size": 1.75,
+              "s": -0.08,
+              "spacing": 0.22
+            },
+            {
+              "type": "flag",
+              "y": 36.2,
+              "h": 1.1,
+              "country": "USA",
+              "s": -0.1
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 47.7,
+          "len": 8.8,
+          "d": 3.66,
+          "mat": "white_paint",
+          "frost": 0.4,
+          "frostZones": [
+            [
+              0.3,
+              4.6
+            ]
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 3.3,
+            "bellLen": 5.2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 56.5,
+        "len": 13.1,
+        "d": 5.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "falconheavy": {
+      "name": "Falcon Heavy",
+      "family": "falcon",
+      "site": "canaveral",
+      "tower": "fss",
+      "reuse": "rtls",
+      "heightM": 70,
+      "diameterM": 12.2,
+      "payloadTop": 56.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.2,
+          "len": 46.5,
+          "d": 3.66,
+          "mat": "white_paint",
+          "soot": 0.25,
+          "frost": 0.55,
+          "frostZones": [
+            [
+              25.5,
+              39.5
+            ]
+          ],
+          "raceway": 0.55,
+          "racewayTo": 40,
+          "segs": [
+            {
+              "len": 40,
+              "d": 3.66
+            },
+            {
+              "len": 6.5,
+              "d": 3.66,
+              "mat": "carbon_black"
+            }
+          ],
+          "engines": {
+            "n": 9,
+            "prop": "kerolox",
+            "bellD": 0.92,
+            "bellLen": 1.2,
+            "layout": "octaweb"
+          },
+          "gridFins": true,
+          "gridFinFromTop": 0.9,
+          "legs": 4,
+          "legLen": 8.6,
+          "marks": [
+            {
+              "type": "text",
+              "y": 8,
+              "h": 17,
+              "text": "SPACEX",
+              "vertical": true,
+              "size": 1.75,
+              "s": -0.08,
+              "spacing": 0.22
+            }
+          ]
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -3.96,
+          "y": 1.2,
+          "len": 47.5,
+          "d": 3.66,
+          "mat": "white_paint",
+          "soot": 0.7,
+          "frost": 0.55,
+          "frostZones": [
+            [
+              25.5,
+              39.5
+            ]
+          ],
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 40,
+              "d": 3.66
+            },
+            {
+              "len": 7.5,
+              "d": 3.66,
+              "dTop": 0.6,
+              "nose": "cone",
+              "mat": "carbon_black"
+            }
+          ],
+          "engines": {
+            "n": 9,
+            "prop": "kerolox",
+            "bellD": 0.92,
+            "bellLen": 1.2,
+            "layout": "octaweb"
+          },
+          "gridFins": true,
+          "gridFinFromTop": 8.4,
+          "legs": 4,
+          "legLen": 8.6,
+          "marks": [
+            {
+              "type": "text",
+              "y": 8,
+              "h": 17,
+              "text": "SPACEX",
+              "vertical": true,
+              "size": 1.75,
+              "s": -0.08,
+              "spacing": 0.22
+            }
+          ]
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 3.96,
+          "y": 1.2,
+          "len": 47.5,
+          "d": 3.66,
+          "mat": "white_paint",
+          "soot": 0.7,
+          "frost": 0.55,
+          "frostZones": [
+            [
+              25.5,
+              39.5
+            ]
+          ],
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 40,
+              "d": 3.66
+            },
+            {
+              "len": 7.5,
+              "d": 3.66,
+              "dTop": 0.6,
+              "nose": "cone",
+              "mat": "carbon_black"
+            }
+          ],
+          "engines": {
+            "n": 9,
+            "prop": "kerolox",
+            "bellD": 0.92,
+            "bellLen": 1.2,
+            "layout": "octaweb"
+          },
+          "gridFins": true,
+          "gridFinFromTop": 8.4,
+          "legs": 4,
+          "legLen": 8.6,
+          "marks": [
+            {
+              "type": "text",
+              "y": 8,
+              "h": 17,
+              "text": "SPACEX",
+              "vertical": true,
+              "size": 1.75,
+              "s": -0.08,
+              "spacing": 0.22
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 47.7,
+          "len": 8.8,
+          "d": 3.66,
+          "mat": "white_paint",
+          "frost": 0.4,
+          "frostZones": [
+            [
+              0.3,
+              4.6
+            ]
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 3.3,
+            "bellLen": 5.2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 56.5,
+        "len": 13.1,
+        "d": 5.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "starship": {
+      "name": "Starship",
+      "family": "starship",
+      "site": "starbase",
+      "tower": "mechazilla",
+      "reuse": "catch",
+      "heightM": 123,
+      "diameterM": 9,
+      "payloadTop": 72.8,
+      "crewTop": "integrated",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 1.6,
+          "len": 71.2,
+          "d": 9,
+          "mat": "stainless",
+          "soot": 0.3,
+          "frost": 0.85,
+          "frostZones": [
+            [
+              3,
+              30
+            ],
+            [
+              32,
+              66
+            ]
+          ],
+          "raceway": 0.6,
+          "racewayTo": 68,
+          "segs": [
+            {
+              "len": 2.4,
+              "d": 9,
+              "mat": "stainless",
+              "soot": 0.5
+            },
+            {
+              "len": 67,
+              "d": 9
+            },
+            {
+              "len": 1.8,
+              "d": 9,
+              "mat": "carbon_black",
+              "vents": true
+            }
+          ],
+          "engines": {
+            "n": 33,
+            "prop": "methalox",
+            "bellD": 1.3,
+            "bellLen": 1.6,
+            "layout": "ring"
+          },
+          "gridFins": "fixed",
+          "gridFinSize": 4.2,
+          "gridFinFromTop": 4.5
+        },
+        {
+          "id": "ship",
+          "role": "upper",
+          "y": 72.8,
+          "len": 50.3,
+          "d": 9,
+          "mat": "stainless",
+          "frost": 0.75,
+          "frostZones": [
+            [
+              1,
+              14
+            ],
+            [
+              15.5,
+              30
+            ]
+          ],
+          "flaps": true,
+          "tiles": true,
+          "segs": [
+            {
+              "len": 32.2,
+              "d": 9,
+              "tiles": "windward"
+            },
+            {
+              "len": 18.1,
+              "d": 9,
+              "nose": "ogive",
+              "tipD": 2.4,
+              "tiles": "windward"
+            }
+          ],
+          "engines": {
+            "n": 6,
+            "prop": "methalox",
+            "bellD": 2.3,
+            "bellLen": 3,
+            "layout": "ring",
+            "vac": true,
+            "hidden": true
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 14,
+              "h": 12,
+              "text": "STARSHIP",
+              "vertical": true,
+              "color": "#2a2c30",
+              "size": 1.6,
+              "s": 0.45,
+              "spacing": 0.3
+            }
+          ]
+        }
+      ],
+      "fairing": null
+    },
+    "sls_b1": {
+      "name": "SLS Block 1",
+      "family": "sls",
+      "site": "canaveral",
+      "tower": "ml",
+      "reuse": null,
+      "heightM": 98,
+      "diameterM": 8.4,
+      "payloadTop": 78.6,
+      "crewTop": "craft",
+      "refCraft": "orion",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 3.5,
+          "len": 69.6,
+          "d": 8.4,
+          "mat": "orange_foam",
+          "frost": 0.55,
+          "frostZones": [
+            [
+              51.5,
+              61
+            ]
+          ],
+          "raceway": 0.5,
+          "segs": [
+            {
+              "len": 3.5,
+              "d": 8.4,
+              "dTop": 8.4,
+              "mat": "orange_foam",
+              "soot": 0.25
+            },
+            {
+              "len": 43.5,
+              "d": 8.4,
+              "segments": 0
+            },
+            {
+              "len": 4.5,
+              "d": 8.4,
+              "dTop": 8.4,
+              "ribs": 48,
+              "band": "rgba(110,44,10,0.18)",
+              "bandY": 0,
+              "bandH": 1
+            },
+            {
+              "len": 9.5,
+              "d": 8.4
+            },
+            {
+              "len": 8.6,
+              "d": 8.4,
+              "dTop": 5.1,
+              "mat": "white_paint"
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "hydrolox",
+            "bellD": 2.4,
+            "bellLen": 3.5,
+            "layout": "cluster"
+          },
+          "marks": [
+            {
+              "type": "logo",
+              "logo": "meatball",
+              "y": 52,
+              "h": 4.2,
+              "s": -0.1
+            },
+            {
+              "type": "flag",
+              "y": 47.5,
+              "h": 1.8,
+              "country": "USA",
+              "s": -0.1
+            }
+          ]
+        },
+        {
+          "id": "srbL",
+          "role": "booster",
+          "x": -6.45,
+          "y": 3,
+          "len": 51,
+          "d": 3.71,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 3.2,
+              "d": 5,
+              "dTop": 3.71
+            },
+            {
+              "len": 43.8,
+              "d": 3.71,
+              "segments": 5
+            },
+            {
+              "len": 4,
+              "d": 3.71,
+              "dTop": 0.6,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 3.8,
+            "bellLen": 3,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "logo",
+              "logo": "NASA",
+              "vertical": true,
+              "y": 30,
+              "h": 9,
+              "s": 0,
+              "color": "#d6321f"
+            }
+          ]
+        },
+        {
+          "id": "srbR",
+          "role": "booster",
+          "x": 6.45,
+          "y": 3,
+          "len": 51,
+          "d": 3.71,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 3.2,
+              "d": 5,
+              "dTop": 3.71
+            },
+            {
+              "len": 43.8,
+              "d": 3.71,
+              "segments": 5
+            },
+            {
+              "len": 4,
+              "d": 3.71,
+              "dTop": 0.6,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 3.8,
+            "bellLen": 3,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "logo",
+              "logo": "NASA",
+              "vertical": true,
+              "y": 30,
+              "h": 9,
+              "s": 0,
+              "color": "#d6321f"
+            }
+          ]
+        },
+        {
+          "id": "icps",
+          "role": "upper",
+          "y": 73.1,
+          "len": 5.5,
+          "d": 5.1,
+          "mat": "white_paint",
+          "frost": 0.35,
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 1.2,
+            "bellLen": 1.8,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 78.6,
+        "len": 12,
+        "d": 5.1,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "sls_b1b": {
+      "name": "SLS Block 1B",
+      "family": "sls",
+      "site": "canaveral",
+      "tower": "ml",
+      "reuse": null,
+      "heightM": 111,
+      "diameterM": 8.4,
+      "payloadTop": 92.7,
+      "crewTop": "craft",
+      "refCraft": "orion",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 3.5,
+          "len": 61,
+          "d": 8.4,
+          "mat": "orange_foam",
+          "frost": 0.55,
+          "frostZones": [
+            [
+              40,
+              59
+            ]
+          ],
+          "raceway": 0.5,
+          "segs": [
+            {
+              "len": 3.5,
+              "d": 8.4,
+              "dTop": 8.4,
+              "mat": "orange_foam",
+              "soot": 0.25
+            },
+            {
+              "len": 57.5,
+              "d": 8.4,
+              "segments": 0
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "hydrolox",
+            "bellD": 2.4,
+            "bellLen": 3.5,
+            "layout": "cluster"
+          },
+          "marks": [
+            {
+              "type": "logo",
+              "logo": "meatball",
+              "y": 52,
+              "h": 4.2,
+              "s": -0.1
+            },
+            {
+              "type": "flag",
+              "y": 47.5,
+              "h": 1.8,
+              "country": "USA",
+              "s": -0.1
+            }
+          ]
+        },
+        {
+          "id": "srbL",
+          "role": "booster",
+          "x": -6.45,
+          "y": 3,
+          "len": 51,
+          "d": 3.71,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 3.2,
+              "d": 5,
+              "dTop": 3.71
+            },
+            {
+              "len": 43.8,
+              "d": 3.71,
+              "segments": 5
+            },
+            {
+              "len": 4,
+              "d": 3.71,
+              "dTop": 0.6,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 3.8,
+            "bellLen": 3,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "logo",
+              "logo": "NASA",
+              "vertical": true,
+              "y": 30,
+              "h": 9,
+              "s": 0,
+              "color": "#d6321f"
+            }
+          ]
+        },
+        {
+          "id": "srbR",
+          "role": "booster",
+          "x": 6.45,
+          "y": 3,
+          "len": 51,
+          "d": 3.71,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 3.2,
+              "d": 5,
+              "dTop": 3.71
+            },
+            {
+              "len": 43.8,
+              "d": 3.71,
+              "segments": 5
+            },
+            {
+              "len": 4,
+              "d": 3.71,
+              "dTop": 0.6,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 3.8,
+            "bellLen": 3,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "logo",
+              "logo": "NASA",
+              "vertical": true,
+              "y": 30,
+              "h": 9,
+              "s": 0,
+              "color": "#d6321f"
+            }
+          ]
+        },
+        {
+          "id": "eus",
+          "role": "upper",
+          "y": 64.5,
+          "len": 18.5,
+          "d": 8.4,
+          "mat": "orange_foam",
+          "frost": 0.5,
+          "engines": {
+            "n": 4,
+            "prop": "hydrolox",
+            "bellD": 1.2,
+            "bellLen": 1.8,
+            "layout": "cluster",
+            "vac": true,
+            "hidden": true
+          }
+        },
+        {
+          "id": "usa",
+          "role": "adapter",
+          "y": 83,
+          "len": 9.7,
+          "d": 8.4,
+          "dTop": 5.1,
+          "mat": "white_paint"
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 83,
+        "len": 27,
+        "d": 8.4,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "new_glenn": {
+      "name": "New Glenn",
+      "family": "new_glenn",
+      "site": "canaveral",
+      "tower": "umbilical",
+      "reuse": "droneship",
+      "heightM": 98,
+      "diameterM": 7,
+      "payloadTop": 78.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 1.6,
+          "len": 55.9,
+          "d": 7,
+          "mat": "white_paint",
+          "soot": 0.45,
+          "frost": 0.5,
+          "frostZones": [
+            [
+              24,
+              50
+            ]
+          ],
+          "strakes": true,
+          "canards": true,
+          "canardFromTop": 4.5,
+          "legs": 6,
+          "legLen": 12,
+          "raceway": 0.5,
+          "segs": [
+            {
+              "len": 2,
+              "d": 7,
+              "soot": 0.3
+            },
+            {
+              "len": 47.9,
+              "d": 7
+            },
+            {
+              "len": 6,
+              "d": 7
+            }
+          ],
+          "engines": {
+            "n": 7,
+            "prop": "methalox",
+            "bellD": 1.5,
+            "bellLen": 1.6,
+            "layout": "ring"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 12,
+              "h": 26,
+              "text": "NEW GLENN",
+              "vertical": true,
+              "color": "#1d3c78",
+              "size": 2.6,
+              "s": -0.05,
+              "spacing": 0.25
+            },
+            {
+              "type": "logo",
+              "logo": "feather",
+              "y": 42,
+              "h": 4,
+              "color": "#1d3c78"
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 57.5,
+          "len": 21,
+          "d": 7,
+          "mat": "white_paint",
+          "frost": 0.35,
+          "engines": {
+            "n": 2,
+            "prop": "hydrolox",
+            "bellD": 1.6,
+            "bellLen": 2.2,
+            "layout": "pair",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 78.5,
+        "len": 19.5,
+        "d": 7,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "marks": [
+          {
+            "type": "text",
+            "y": 4,
+            "h": 1.6,
+            "text": "BLUE ORIGIN",
+            "color": "#1d3c78",
+            "w": 5
+          }
+        ]
+      }
+    },
+    "vulcan": {
+      "name": "Vulcan Centaur",
+      "family": "vulcan",
+      "site": "canaveral",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 61.6,
+      "diameterM": 5.4,
+      "payloadTop": 45,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.5,
+          "len": 33.8,
+          "d": 5.4,
+          "mat": "orange_foam",
+          "tint": "#c97a3d",
+          "frost": 0.4,
+          "frostZones": [
+            [
+              17,
+              31
+            ]
+          ],
+          "segs": [
+            {
+              "len": 31.8,
+              "d": 5.4
+            },
+            {
+              "len": 2,
+              "d": 5.4,
+              "mat": "white_paint"
+            }
+          ],
+          "engines": {
+            "n": 2,
+            "prop": "methalox",
+            "bellD": 1.6,
+            "bellLen": 1.5,
+            "layout": "pair"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 26.5,
+              "h": 1.8,
+              "text": "ULA",
+              "color": "#123a72",
+              "w": 2.6
+            },
+            {
+              "type": "flag",
+              "y": 23.5,
+              "h": 1.2,
+              "country": "USA"
+            }
+          ]
+        },
+        {
+          "id": "gemL",
+          "role": "booster",
+          "x": -3.7,
+          "y": 1,
+          "len": 21.5,
+          "d": 1.6,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 19.5,
+              "d": 1.6
+            },
+            {
+              "len": 2,
+              "d": 1.6,
+              "dTop": 0.22400000000000003,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "gemR",
+          "role": "booster",
+          "x": 3.7,
+          "y": 1,
+          "len": 21.5,
+          "d": 1.6,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 19.5,
+              "d": 1.6
+            },
+            {
+              "len": 2,
+              "d": 1.6,
+              "dTop": 0.22400000000000003,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "centaur",
+          "role": "upper",
+          "y": 35.3,
+          "len": 9.7,
+          "d": 5.4,
+          "mat": "white_paint",
+          "frost": 0.35,
+          "engines": {
+            "n": 2,
+            "prop": "hydrolox",
+            "bellD": 1.2,
+            "bellLen": 1.8,
+            "layout": "pair",
+            "vac": true,
+            "hidden": true
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 3,
+              "h": 4,
+              "text": "VULCAN",
+              "vertical": true,
+              "color": "#123a72",
+              "size": 1
+            }
+          ]
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 45,
+        "len": 16.6,
+        "d": 5.4,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "atlas_v": {
+      "name": "Atlas V",
+      "family": "atlas",
+      "site": "canaveral",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 58,
+      "diameterM": 3.81,
+      "payloadTop": 47,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 2.5,
+          "len": 32.5,
+          "d": 3.81,
+          "mat": "bronze",
+          "segs": [
+            {
+              "len": 30,
+              "d": 3.81
+            },
+            {
+              "len": 2.5,
+              "d": 3.81,
+              "dTop": 3.05,
+              "mat": "white_paint"
+            }
+          ],
+          "engines": {
+            "n": 2,
+            "prop": "kerolox",
+            "bellD": 1.4,
+            "bellLen": 2.5,
+            "layout": "pair"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 21,
+              "h": 1.6,
+              "text": "ULA",
+              "color": "#f2f2f2",
+              "w": 2.2
+            },
+            {
+              "type": "flag",
+              "y": 24,
+              "h": 1.1,
+              "country": "USA"
+            }
+          ]
+        },
+        {
+          "id": "srbL",
+          "role": "booster",
+          "x": -2.9,
+          "y": 1,
+          "len": 19.8,
+          "d": 1.58,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 18,
+              "d": 1.58
+            },
+            {
+              "len": 1.8,
+              "d": 1.58,
+              "dTop": 0.22120000000000004,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "srbR",
+          "role": "booster",
+          "x": 2.9,
+          "y": 1,
+          "len": 19.8,
+          "d": 1.58,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 18,
+              "d": 1.58
+            },
+            {
+              "len": 1.8,
+              "d": 1.58,
+              "dTop": 0.22120000000000004,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "centaur",
+          "role": "upper",
+          "y": 35,
+          "len": 12,
+          "d": 3.05,
+          "mat": "white_paint",
+          "frost": 0.4,
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 1.2,
+            "bellLen": 1.8,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 47,
+        "len": 12,
+        "d": 4.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "electron": {
+      "name": "Electron",
+      "family": "electron",
+      "site": "mahia",
+      "tower": "none",
+      "reuse": null,
+      "heightM": 18,
+      "diameterM": 1.2,
+      "payloadTop": 15,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 0.5,
+          "len": 12,
+          "d": 1.2,
+          "mat": "carbon_black",
+          "frost": 0.25,
+          "segs": [
+            {
+              "len": 11.2,
+              "d": 1.2
+            },
+            {
+              "len": 0.8,
+              "d": 1.2
+            }
+          ],
+          "engines": {
+            "n": 9,
+            "prop": "kerolox",
+            "bellD": 0.25,
+            "bellLen": 0.5,
+            "layout": "octaweb"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 2.5,
+              "h": 7,
+              "text": "ELECTRON",
+              "vertical": true,
+              "color": "#f0f0f0",
+              "size": 0.5,
+              "spacing": 0.2
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 12.5,
+          "len": 2.5,
+          "d": 1.2,
+          "mat": "carbon_black",
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 0.6,
+            "bellLen": 0.9,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 15,
+        "len": 2.5,
+        "d": 1.2,
+        "mat": "carbon_black",
+        "nose": "ogive",
+        "sep": "fairing",
+        "noseFrac": 0.7,
+        "marks": [
+          {
+            "type": "text",
+            "y": 0.3,
+            "h": 0.25,
+            "text": "ROCKET LAB",
+            "color": "#f0f0f0",
+            "w": 1
+          }
+        ]
+      }
+    },
+    "neutron": {
+      "name": "Neutron",
+      "family": "neutron",
+      "site": "wallops",
+      "tower": "umbilical",
+      "reuse": "droneship",
+      "heightM": 42.8,
+      "diameterM": 7,
+      "payloadTop": 27.2,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 1.2,
+          "len": 26,
+          "d": 7,
+          "dTop": 5,
+          "mat": "carbon_black",
+          "soot": 0.3,
+          "frost": 0.3,
+          "legs": 4,
+          "legLen": 6,
+          "canards": true,
+          "canardFromTop": 2.5,
+          "engines": {
+            "n": 7,
+            "prop": "methalox",
+            "bellD": 1.2,
+            "bellLen": 1.2,
+            "layout": "ring"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 6,
+              "h": 12,
+              "text": "NEUTRON",
+              "vertical": true,
+              "color": "#e8e8e8",
+              "size": 1.5,
+              "spacing": 0.3
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 27.2,
+          "len": 8,
+          "d": 4,
+          "mat": "carbon_black",
+          "hiddenUntil": "staging",
+          "engines": {
+            "n": 1,
+            "prop": "methalox",
+            "bellD": 1.6,
+            "bellLen": 2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 27.2,
+        "len": 15.6,
+        "d": 5,
+        "mat": "carbon_black",
+        "nose": "ogive",
+        "sep": "staging",
+        "hippo": true
+      }
+    },
+    "ariane6": {
+      "name": "Ariane 64",
+      "family": "ariane",
+      "site": "kourou",
+      "tower": "gantry",
+      "reuse": null,
+      "heightM": 62,
+      "diameterM": 5.4,
+      "payloadTop": 37.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 2.5,
+          "len": 29,
+          "d": 5.4,
+          "mat": "white_paint",
+          "frost": 0.55,
+          "frostZones": [
+            [
+              16,
+              26.5
+            ]
+          ],
+          "segs": [
+            {
+              "len": 27.5,
+              "d": 5.4
+            },
+            {
+              "len": 1.5,
+              "d": 5.4,
+              "mat": "carbon_black"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 2.1,
+            "bellLen": 2.5,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 5,
+              "h": 13,
+              "text": "ariane 6",
+              "vertical": true,
+              "color": "#0b2a5b",
+              "size": 1.9,
+              "weight": 600,
+              "spacing": 0.05
+            }
+          ]
+        },
+        {
+          "id": "p120L",
+          "role": "booster",
+          "x": -4.6,
+          "y": 1.5,
+          "len": 15.5,
+          "d": 3.4,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 3.4
+            },
+            {
+              "len": 3.5,
+              "d": 3.4,
+              "dTop": 0.47600000000000003,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "p120R",
+          "role": "booster",
+          "x": 4.6,
+          "y": 1.5,
+          "len": 15.5,
+          "d": 3.4,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 3.4
+            },
+            {
+              "len": 3.5,
+              "d": 3.4,
+              "dTop": 0.47600000000000003,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "ulpm",
+          "role": "upper",
+          "y": 31.5,
+          "len": 6,
+          "d": 5.4,
+          "mat": "white_paint",
+          "frost": 0.45,
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 2.2,
+            "bellLen": 3,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 37.5,
+        "len": 24,
+        "d": 5.4,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "noseFrac": 0.45,
+        "marks": [
+          {
+            "type": "logo",
+            "logo": "esa",
+            "y": 8,
+            "h": 1.8
+          },
+          {
+            "type": "flag",
+            "y": 5.5,
+            "h": 1.2,
+            "country": "EUR"
+          }
+        ]
+      }
+    },
+    "ariane5": {
+      "name": "Ariane 5",
+      "family": "ariane",
+      "site": "kourou",
+      "tower": "gantry",
+      "reuse": null,
+      "heightM": 52,
+      "diameterM": 5.4,
+      "payloadTop": 37.2,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "epc",
+          "role": "stage",
+          "y": 2,
+          "len": 30.5,
+          "d": 5.4,
+          "mat": "white_paint",
+          "frost": 0.55,
+          "frostZones": [
+            [
+              20,
+              29.5
+            ]
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 2.1,
+            "bellLen": 2,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 6,
+              "h": 12,
+              "text": "ARIANE",
+              "vertical": true,
+              "color": "#0b2a5b",
+              "size": 1.8
+            },
+            {
+              "type": "flag",
+              "y": 24,
+              "h": 1.4,
+              "country": "EUR"
+            }
+          ]
+        },
+        {
+          "id": "eapL",
+          "role": "booster",
+          "x": -4.5,
+          "y": 1.5,
+          "len": 30,
+          "d": 3.05,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 26,
+              "d": 3.05
+            },
+            {
+              "len": 4,
+              "d": 3.05,
+              "dTop": 0.427,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "eapR",
+          "role": "booster",
+          "x": 4.5,
+          "y": 1.5,
+          "len": 30,
+          "d": 3.05,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 26,
+              "d": 3.05
+            },
+            {
+              "len": 4,
+              "d": 3.05,
+              "dTop": 0.427,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "esc",
+          "role": "upper",
+          "y": 32.5,
+          "len": 4.7,
+          "d": 5.4,
+          "mat": "white_paint",
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 1,
+            "bellLen": 1.5,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 37.2,
+        "len": 17,
+        "d": 5.4,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "vega_c": {
+      "name": "Vega C",
+      "family": "vega",
+      "site": "kourou",
+      "tower": "gantry",
+      "reuse": null,
+      "heightM": 35,
+      "diameterM": 3.4,
+      "payloadTop": 28.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "p120",
+          "role": "stage",
+          "y": 1.5,
+          "len": 16.5,
+          "d": 3.4,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 13.5,
+              "d": 3.4
+            },
+            {
+              "len": 3,
+              "d": 3.4,
+              "dTop": 2.3,
+              "mat": "carbon_black"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 2.2,
+            "bellLen": 1.5,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 3,
+              "h": 8,
+              "text": "VEGA",
+              "vertical": true,
+              "color": "#0b2a5b",
+              "size": 1.2
+            }
+          ]
+        },
+        {
+          "id": "z40",
+          "role": "upper",
+          "y": 18,
+          "len": 6,
+          "d": 2.3,
+          "mat": "carbon_black",
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 1.6,
+            "bellLen": 1.5,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        },
+        {
+          "id": "z9",
+          "role": "upper",
+          "y": 24,
+          "len": 3,
+          "d": 2.3,
+          "mat": "white_paint"
+        },
+        {
+          "id": "avum",
+          "role": "upper",
+          "y": 27,
+          "len": 1.5,
+          "d": 2.3,
+          "mat": "grey_paint"
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 28.5,
+        "len": 6.5,
+        "d": 3.3,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "marks": [
+          {
+            "type": "logo",
+            "logo": "esa",
+            "y": 1.2,
+            "h": 0.8
+          }
+        ]
+      }
+    },
+    "h3": {
+      "name": "H3",
+      "family": "h3",
+      "site": "tanegashima",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 63,
+      "diameterM": 5.2,
+      "payloadTop": 50,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 2,
+          "len": 39,
+          "d": 5.2,
+          "mat": "white_paint",
+          "frost": 0.55,
+          "frostZones": [
+            [
+              24,
+              37
+            ]
+          ],
+          "segs": [
+            {
+              "len": 37,
+              "d": 5.2
+            },
+            {
+              "len": 2,
+              "d": 5.2
+            }
+          ],
+          "engines": {
+            "n": 2,
+            "prop": "hydrolox",
+            "bellD": 1.8,
+            "bellLen": 2,
+            "layout": "pair"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 14,
+              "h": 9,
+              "text": "JAXA",
+              "vertical": true,
+              "color": "#0a3c8c",
+              "size": 1.8
+            },
+            {
+              "type": "flag",
+              "y": 26,
+              "h": 1.5,
+              "country": "JPN"
+            }
+          ]
+        },
+        {
+          "id": "srbL",
+          "role": "booster",
+          "x": -4.05,
+          "y": 1,
+          "len": 15.1,
+          "d": 2.5,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12.5,
+              "d": 2.5
+            },
+            {
+              "len": 2.6,
+              "d": 2.5,
+              "dTop": 0.35000000000000003,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "srbR",
+          "role": "booster",
+          "x": 4.05,
+          "y": 1,
+          "len": 15.1,
+          "d": 2.5,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12.5,
+              "d": 2.5
+            },
+            {
+              "len": 2.6,
+              "d": 2.5,
+              "dTop": 0.35000000000000003,
+              "nose": "cone"
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 41,
+          "len": 9,
+          "d": 5.2,
+          "mat": "white_paint",
+          "frost": 0.4,
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 1.2,
+            "bellLen": 1.8,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 50,
+        "len": 13,
+        "d": 5.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "marks": [
+          {
+            "type": "text",
+            "y": 3,
+            "h": 1.6,
+            "text": "H3",
+            "color": "#0a3c8c",
+            "w": 1.6
+          }
+        ]
+      }
+    },
+    "lvm3": {
+      "name": "LVM3",
+      "family": "lvm3",
+      "site": "sriharikota",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 43.5,
+      "diameterM": 4,
+      "payloadTop": 36.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "l110",
+          "role": "stage",
+          "y": 2.5,
+          "len": 20.5,
+          "d": 4,
+          "mat": "grey_paint",
+          "engines": {
+            "n": 2,
+            "prop": "hypergolic",
+            "bellD": 1,
+            "bellLen": 1.5,
+            "layout": "pair"
+          }
+        },
+        {
+          "id": "s200L",
+          "role": "booster",
+          "x": -3.8,
+          "y": 1,
+          "len": 25.5,
+          "d": 3.2,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 22,
+              "d": 3.2
+            },
+            {
+              "len": 3.5,
+              "d": 3.2,
+              "dTop": 0.44800000000000006,
+              "nose": "cone"
+            }
+          ],
+          "marks": [
+            {
+              "type": "text",
+              "y": 6,
+              "h": 8,
+              "text": "ISRO",
+              "vertical": true,
+              "color": "#e86a10",
+              "size": 1.2
+            }
+          ],
+          "segments": 0
+        },
+        {
+          "id": "s200R",
+          "role": "booster",
+          "x": 3.8,
+          "y": 1,
+          "len": 25.5,
+          "d": 3.2,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 22,
+              "d": 3.2
+            },
+            {
+              "len": 3.5,
+              "d": 3.2,
+              "dTop": 0.44800000000000006,
+              "nose": "cone"
+            }
+          ],
+          "marks": [
+            {
+              "type": "text",
+              "y": 6,
+              "h": 8,
+              "text": "ISRO",
+              "vertical": true,
+              "color": "#e86a10",
+              "size": 1.2
+            }
+          ],
+          "segments": 0
+        },
+        {
+          "id": "c25",
+          "role": "upper",
+          "y": 23,
+          "len": 13.5,
+          "d": 4,
+          "mat": "white_paint",
+          "frost": 0.45,
+          "engines": {
+            "n": 1,
+            "prop": "hydrolox",
+            "bellD": 1.4,
+            "bellLen": 2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          },
+          "marks": [
+            {
+              "type": "flag",
+              "y": 8,
+              "h": 1.2,
+              "country": "IND"
+            }
+          ]
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 36.5,
+        "len": 7,
+        "d": 5,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "noseFrac": 0.6,
+        "marks": [
+          {
+            "type": "text",
+            "y": 1,
+            "h": 1.1,
+            "text": "LVM3",
+            "color": "#0b2a5b",
+            "w": 2.2
+          }
+        ]
+      }
+    },
+    "pslv": {
+      "name": "PSLV",
+      "family": "pslv",
+      "site": "sriharikota",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 44,
+      "diameterM": 2.8,
+      "payloadTop": 37.4,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "ps1",
+          "role": "stage",
+          "y": 1,
+          "len": 20,
+          "d": 2.8,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 20,
+              "d": 2.8,
+              "segments": 5
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 2.4,
+            "bellLen": 1,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 6,
+              "h": 9,
+              "text": "ISRO",
+              "vertical": true,
+              "color": "#e86a10",
+              "size": 1
+            }
+          ]
+        },
+        {
+          "id": "psoL",
+          "role": "booster",
+          "x": -2.05,
+          "y": 0.6,
+          "len": 12.5,
+          "d": 1,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 11,
+              "d": 1
+            },
+            {
+              "len": 1.5,
+              "d": 1,
+              "dTop": 0.14,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 0.8,
+            "bellLen": 0.6,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "psoR",
+          "role": "booster",
+          "x": 2.05,
+          "y": 0.6,
+          "len": 12.5,
+          "d": 1,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 11,
+              "d": 1
+            },
+            {
+              "len": 1.5,
+              "d": 1,
+              "dTop": 0.14,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 0.8,
+            "bellLen": 0.6,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "ps2",
+          "role": "upper",
+          "y": 21,
+          "len": 12.8,
+          "d": 2.8,
+          "mat": "grey_paint",
+          "engines": {
+            "n": 1,
+            "prop": "hypergolic",
+            "bellD": 1,
+            "bellLen": 1.2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          },
+          "marks": [
+            {
+              "type": "flag",
+              "y": 8,
+              "h": 0.9,
+              "country": "IND"
+            }
+          ]
+        },
+        {
+          "id": "ps3",
+          "role": "upper",
+          "y": 33.8,
+          "len": 3.6,
+          "d": 2.8,
+          "mat": "carbon_black"
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 37.4,
+        "len": 7,
+        "d": 3.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "long_march_5": {
+      "name": "Longa Marcha 5",
+      "family": "long_march_hydrolox",
+      "site": "wenchang",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 57,
+      "diameterM": 5,
+      "payloadTop": 44.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 2,
+          "len": 32.5,
+          "d": 5,
+          "mat": "white_paint",
+          "frost": 0.65,
+          "frostZones": [
+            [
+              16,
+              30
+            ]
+          ],
+          "segs": [
+            {
+              "len": 31,
+              "d": 5
+            },
+            {
+              "len": 1.5,
+              "d": 5
+            }
+          ],
+          "engines": {
+            "n": 2,
+            "prop": "hydrolox",
+            "bellD": 1.4,
+            "bellLen": 2,
+            "layout": "pair"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 10,
+              "h": 14,
+              "text": "中国航天",
+              "vertical": true,
+              "color": "#c8102e",
+              "spacing": 0.3
+            },
+            {
+              "type": "flag",
+              "y": 27,
+              "h": 1.6,
+              "country": "CHN"
+            }
+          ]
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -4.4,
+          "y": 1.5,
+          "len": 26.5,
+          "d": 3.35,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 21,
+              "d": 3.35
+            },
+            {
+              "len": 5.5,
+              "d": 3.35,
+              "dTop": 0.4690000000000001,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.4,
+          "engines": {
+            "n": 2,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.5,
+            "layout": "pair"
+          }
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 4.4,
+          "y": 1.5,
+          "len": 26.5,
+          "d": 3.35,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 21,
+              "d": 3.35
+            },
+            {
+              "len": 5.5,
+              "d": 3.35,
+              "dTop": 0.4690000000000001,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.4,
+          "engines": {
+            "n": 2,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.5,
+            "layout": "pair"
+          }
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 34.5,
+          "len": 10,
+          "d": 5,
+          "mat": "white_paint",
+          "frost": 0.45,
+          "engines": {
+            "n": 2,
+            "prop": "hydrolox",
+            "bellD": 1,
+            "bellLen": 1.6,
+            "layout": "pair",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 44.5,
+        "len": 12.5,
+        "d": 5.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "marks": [
+          {
+            "type": "text",
+            "y": 3,
+            "h": 1.4,
+            "text": "CZ-5",
+            "color": "#c8102e",
+            "w": 2.6
+          }
+        ]
+      }
+    },
+    "long_march_7": {
+      "name": "Longa Marcha 7",
+      "family": "long_march_kerolox",
+      "site": "wenchang",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 53,
+      "diameterM": 3.35,
+      "payloadTop": 39.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.5,
+          "len": 26.5,
+          "d": 3.35,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 25,
+              "d": 3.35
+            },
+            {
+              "len": 1.5,
+              "d": 3.35
+            }
+          ],
+          "marks": [
+            {
+              "type": "text",
+              "y": 5,
+              "h": 11,
+              "text": "中国航天",
+              "vertical": true,
+              "color": "#c8102e",
+              "spacing": 0.3
+            },
+            {
+              "type": "flag",
+              "y": 21,
+              "h": 1.1,
+              "country": "CHN"
+            }
+          ],
+          "frost": 0.45,
+          "engines": {
+            "n": 2,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.5,
+            "layout": "pair"
+          }
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -2.95,
+          "y": 1,
+          "len": 25,
+          "d": 2.25,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 20,
+              "d": 2.25
+            },
+            {
+              "len": 5,
+              "d": 2.25,
+              "dTop": 0.31500000000000006,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.3,
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 2.95,
+          "y": 1,
+          "len": 25,
+          "d": 2.25,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 20,
+              "d": 2.25
+            },
+            {
+              "len": 5,
+              "d": 2.25,
+              "dTop": 0.31500000000000006,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.3,
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 28,
+          "len": 11.5,
+          "d": 3.35,
+          "mat": "white_paint",
+          "engines": {
+            "n": 4,
+            "prop": "kerolox",
+            "bellD": 0.6,
+            "bellLen": 1,
+            "layout": "cluster",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 39.5,
+        "len": 13,
+        "d": 4.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "long_march_3b": {
+      "name": "Longa Marcha 3B",
+      "family": "long_march_hypergolic",
+      "site": "xichang",
+      "tower": "gantry",
+      "reuse": null,
+      "heightM": 56.3,
+      "diameterM": 3.35,
+      "payloadTop": 47,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.5,
+          "len": 25,
+          "d": 3.35,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 23,
+              "d": 3.35
+            },
+            {
+              "len": 2,
+              "d": 3.35,
+              "lattice": true
+            }
+          ],
+          "marks": [
+            {
+              "type": "text",
+              "y": 5,
+              "h": 11,
+              "text": "中国航天",
+              "vertical": true,
+              "color": "#c8102e",
+              "spacing": 0.3
+            },
+            {
+              "type": "flag",
+              "y": 19,
+              "h": 1.1,
+              "country": "CHN"
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "hypergolic",
+            "bellD": 0.9,
+            "bellLen": 1.5,
+            "layout": "cluster"
+          }
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -2.95,
+          "y": 1,
+          "len": 15.8,
+          "d": 2.25,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12.5,
+              "d": 2.25
+            },
+            {
+              "len": 3.3,
+              "d": 2.25,
+              "dTop": 0.31500000000000006,
+              "nose": "cone"
+            }
+          ],
+          "fins": 1,
+          "engines": {
+            "n": 1,
+            "prop": "hypergolic",
+            "bellD": 0.9,
+            "bellLen": 1,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 2.95,
+          "y": 1,
+          "len": 15.8,
+          "d": 2.25,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12.5,
+              "d": 2.25
+            },
+            {
+              "len": 3.3,
+              "d": 2.25,
+              "dTop": 0.31500000000000006,
+              "nose": "cone"
+            }
+          ],
+          "fins": 1,
+          "engines": {
+            "n": 1,
+            "prop": "hypergolic",
+            "bellD": 0.9,
+            "bellLen": 1,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 26.5,
+          "len": 9.5,
+          "d": 3.35,
+          "mat": "white_paint",
+          "engines": {
+            "n": 1,
+            "prop": "hypergolic",
+            "bellD": 1.4,
+            "bellLen": 2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        },
+        {
+          "id": "s3",
+          "role": "upper",
+          "y": 36,
+          "len": 11,
+          "d": 3,
+          "mat": "white_paint",
+          "frost": 0.4,
+          "segs": [
+            {
+              "len": 1.2,
+              "d": 3.35,
+              "dTop": 3
+            },
+            {
+              "len": 9.8,
+              "d": 3
+            }
+          ]
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 47,
+        "len": 9.5,
+        "d": 4,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "long_march_2f": {
+      "name": "Longa Marcha 2F",
+      "family": "long_march_hypergolic",
+      "site": "jiuquan",
+      "tower": "gantry",
+      "reuse": null,
+      "heightM": 62,
+      "diameterM": 3.35,
+      "payloadTop": 40.7,
+      "crewTop": "craft",
+      "refCraft": "shenzhou",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.5,
+          "len": 25.7,
+          "d": 3.35,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 23.7,
+              "d": 3.35
+            },
+            {
+              "len": 2,
+              "d": 3.35,
+              "lattice": true
+            }
+          ],
+          "marks": [
+            {
+              "type": "text",
+              "y": 5,
+              "h": 11,
+              "text": "中国航天",
+              "vertical": true,
+              "color": "#c8102e",
+              "spacing": 0.3
+            },
+            {
+              "type": "flag",
+              "y": 19.7,
+              "h": 1.1,
+              "country": "CHN"
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "hypergolic",
+            "bellD": 0.9,
+            "bellLen": 1.5,
+            "layout": "cluster"
+          }
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -2.95,
+          "y": 1,
+          "len": 15.8,
+          "d": 2.25,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12.5,
+              "d": 2.25
+            },
+            {
+              "len": 3.3,
+              "d": 2.25,
+              "dTop": 0.31500000000000006,
+              "nose": "cone"
+            }
+          ],
+          "fins": 1,
+          "engines": {
+            "n": 1,
+            "prop": "hypergolic",
+            "bellD": 0.9,
+            "bellLen": 1,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 2.95,
+          "y": 1,
+          "len": 15.8,
+          "d": 2.25,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12.5,
+              "d": 2.25
+            },
+            {
+              "len": 3.3,
+              "d": 2.25,
+              "dTop": 0.31500000000000006,
+              "nose": "cone"
+            }
+          ],
+          "fins": 1,
+          "engines": {
+            "n": 1,
+            "prop": "hypergolic",
+            "bellD": 0.9,
+            "bellLen": 1,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 27.2,
+          "len": 13.5,
+          "d": 3.35,
+          "mat": "white_paint",
+          "engines": {
+            "n": 1,
+            "prop": "hypergolic",
+            "bellD": 1.4,
+            "bellLen": 2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 40.7,
+        "len": 12,
+        "d": 3.8,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "long_march_10a": {
+      "name": "Longa Marcha 10A",
+      "family": "long_march_10",
+      "site": "wenchang",
+      "tower": "umbilical",
+      "reuse": "droneship",
+      "heightM": 67,
+      "diameterM": 5,
+      "payloadTop": 53.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 1.5,
+          "len": 40,
+          "d": 5,
+          "mat": "white_paint",
+          "soot": 0.4,
+          "frost": 0.45,
+          "frostZones": [
+            [
+              18,
+              36
+            ]
+          ],
+          "gridFins": true,
+          "gridFinFromTop": 1.2,
+          "legs": 4,
+          "legLen": 10,
+          "segs": [
+            {
+              "len": 38,
+              "d": 5
+            },
+            {
+              "len": 2,
+              "d": 5
+            }
+          ],
+          "engines": {
+            "n": 7,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.5,
+            "layout": "ring"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 8,
+              "h": 14,
+              "text": "中国航天",
+              "vertical": true,
+              "color": "#c8102e",
+              "spacing": 0.3
+            },
+            {
+              "type": "flag",
+              "y": 32,
+              "h": 1.5,
+              "country": "CHN"
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 41.5,
+          "len": 12,
+          "d": 5,
+          "mat": "white_paint",
+          "frost": 0.4,
+          "engines": {
+            "n": 2,
+            "prop": "hydrolox",
+            "bellD": 1,
+            "bellLen": 1.6,
+            "layout": "pair",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 53.5,
+        "len": 13.5,
+        "d": 5.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "long_march_10": {
+      "name": "Longa Marcha 10",
+      "family": "long_march_10",
+      "site": "wenchang",
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 92,
+      "diameterM": 15.4,
+      "payloadTop": 78.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.5,
+          "len": 53,
+          "d": 5,
+          "mat": "white_paint",
+          "frost": 0.45,
+          "frostZones": [
+            [
+              24,
+              50
+            ]
+          ],
+          "segs": [
+            {
+              "len": 51,
+              "d": 5
+            },
+            {
+              "len": 2,
+              "d": 5
+            }
+          ],
+          "engines": {
+            "n": 7,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.5,
+            "layout": "ring"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 12,
+              "h": 16,
+              "text": "中国航天",
+              "vertical": true,
+              "color": "#c8102e",
+              "spacing": 0.3
+            },
+            {
+              "type": "flag",
+              "y": 44,
+              "h": 1.6,
+              "country": "CHN"
+            }
+          ]
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -5.2,
+          "y": 1.5,
+          "len": 57.5,
+          "d": 5,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 51,
+              "d": 5
+            },
+            {
+              "len": 6.5,
+              "d": 5,
+              "dTop": 0.7000000000000001,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.45,
+          "frostZones": [
+            [
+              24,
+              50
+            ]
+          ],
+          "engines": {
+            "n": 7,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.5,
+            "layout": "ring"
+          }
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 5.2,
+          "y": 1.5,
+          "len": 57.5,
+          "d": 5,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 51,
+              "d": 5
+            },
+            {
+              "len": 6.5,
+              "d": 5,
+              "dTop": 0.7000000000000001,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.45,
+          "frostZones": [
+            [
+              24,
+              50
+            ]
+          ],
+          "engines": {
+            "n": 7,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.5,
+            "layout": "ring"
+          }
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 54.5,
+          "len": 12,
+          "d": 5,
+          "mat": "white_paint",
+          "engines": {
+            "n": 2,
+            "prop": "kerolox",
+            "bellD": 1.1,
+            "bellLen": 1.6,
+            "layout": "pair",
+            "vac": true,
+            "hidden": true
+          }
+        },
+        {
+          "id": "s3",
+          "role": "upper",
+          "y": 66.5,
+          "len": 12,
+          "d": 5,
+          "mat": "white_paint",
+          "frost": 0.4
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 78.5,
+        "len": 14,
+        "d": 5.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "zhuque3": {
+      "name": "Zhuque-3",
+      "family": "zhuque",
+      "site": "jiuquan",
+      "tower": "umbilical",
+      "reuse": "rtls",
+      "heightM": 66,
+      "diameterM": 4.5,
+      "payloadTop": 56.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 1.5,
+          "len": 44,
+          "d": 4.5,
+          "mat": "stainless",
+          "soot": 0.35,
+          "frost": 0.75,
+          "frostZones": [
+            [
+              3,
+              20
+            ],
+            [
+              21.5,
+              41
+            ]
+          ],
+          "gridFins": true,
+          "gridFinFromTop": 1.1,
+          "legs": 4,
+          "legLen": 9,
+          "segs": [
+            {
+              "len": 42,
+              "d": 4.5
+            },
+            {
+              "len": 2,
+              "d": 4.5
+            }
+          ],
+          "engines": {
+            "n": 9,
+            "prop": "methalox",
+            "bellD": 0.95,
+            "bellLen": 1.5,
+            "layout": "octaweb"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 10,
+              "h": 12,
+              "text": "LANDSPACE",
+              "vertical": true,
+              "color": "#202226",
+              "size": 1.2,
+              "spacing": 0.2
+            }
+          ]
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 45.5,
+          "len": 11,
+          "d": 4.5,
+          "mat": "stainless",
+          "frost": 0.6,
+          "engines": {
+            "n": 1,
+            "prop": "methalox",
+            "bellD": 1.8,
+            "bellLen": 2.2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 56.5,
+        "len": 9.5,
+        "d": 4.5,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    },
+    "soyuz2": {
+      "name": "Soyuz-2",
+      "family": "soyuz",
+      "site": "baikonur",
+      "tower": "tulip",
+      "reuse": null,
+      "heightM": 46,
+      "diameterM": 10.3,
+      "payloadTop": 34.2,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.5,
+          "len": 27,
+          "d": 2.05,
+          "mat": "grey_paint",
+          "frost": 0.65,
+          "frostZones": [
+            [
+              6,
+              22
+            ]
+          ],
+          "segs": [
+            {
+              "len": 7,
+              "d": 2.05,
+              "dTop": 2.6,
+              "shape": "easeOut"
+            },
+            {
+              "len": 15,
+              "d": 2.6,
+              "dTop": 2.95
+            },
+            {
+              "len": 4,
+              "d": 2.95,
+              "dTop": 2.66
+            },
+            {
+              "len": 1,
+              "d": 2.66,
+              "lattice": true
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "kerolox",
+            "bellD": 0.7,
+            "bellLen": 1.5,
+            "layout": "cluster"
+          }
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -2.4,
+          "y": 1.5,
+          "len": 19.6,
+          "d": 2.68,
+          "mat": "grey_paint",
+          "frost": 0.6,
+          "frostZones": [
+            [
+              5,
+              16
+            ]
+          ],
+          "sep": "boosterSep",
+          "korolevCross": true,
+          "fins": 1,
+          "finSpan": 0.9,
+          "finH": 1.6,
+          "skew": true,
+          "struts": false,
+          "segs": [
+            {
+              "len": 2.2,
+              "d": 2.68,
+              "mat": "grey_paint",
+              "soot": 0.35
+            },
+            {
+              "len": 13.4,
+              "d": 2.68,
+              "dTop": 1.15
+            },
+            {
+              "len": 4,
+              "d": 1.15,
+              "dTop": 0.12,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "kerolox",
+            "bellD": 0.6,
+            "bellLen": 1.5,
+            "layout": "cluster"
+          }
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 2.4,
+          "y": 1.5,
+          "len": 19.6,
+          "d": 2.68,
+          "mat": "grey_paint",
+          "frost": 0.6,
+          "frostZones": [
+            [
+              5,
+              16
+            ]
+          ],
+          "sep": "boosterSep",
+          "korolevCross": true,
+          "fins": 1,
+          "finSpan": 0.9,
+          "finH": 1.6,
+          "skew": true,
+          "struts": false,
+          "segs": [
+            {
+              "len": 2.2,
+              "d": 2.68,
+              "mat": "grey_paint",
+              "soot": 0.35
+            },
+            {
+              "len": 13.4,
+              "d": 2.68,
+              "dTop": 1.15
+            },
+            {
+              "len": 4,
+              "d": 1.15,
+              "dTop": 0.12,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "kerolox",
+            "bellD": 0.6,
+            "bellLen": 1.5,
+            "layout": "cluster"
+          }
+        },
+        {
+          "id": "bF",
+          "role": "booster",
+          "x": 0,
+          "y": 1.5,
+          "len": 19.6,
+          "d": 2.68,
+          "mat": "grey_paint",
+          "frost": 0.6,
+          "frostZones": [
+            [
+              5,
+              16
+            ]
+          ],
+          "sep": "boosterSep",
+          "korolevCross": true,
+          "fins": 0,
+          "finSpan": 0.9,
+          "finH": 1.6,
+          "depth": 1,
+          "struts": false,
+          "segs": [
+            {
+              "len": 2.2,
+              "d": 2.68,
+              "mat": "grey_paint",
+              "soot": 0.35
+            },
+            {
+              "len": 13.4,
+              "d": 2.68,
+              "dTop": 1.15
+            },
+            {
+              "len": 4,
+              "d": 1.15,
+              "dTop": 0.12,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 4,
+            "prop": "kerolox",
+            "bellD": 0.6,
+            "bellLen": 1.5,
+            "layout": "cluster"
+          }
+        },
+        {
+          "id": "blockI",
+          "role": "upper",
+          "y": 28.5,
+          "len": 5.7,
+          "d": 2.66,
+          "mat": "grey_paint",
+          "frost": 0.45,
+          "segs": [
+            {
+              "len": 5.7,
+              "d": 2.66,
+              "ribs": true
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1,
+            "bellLen": 1,
+            "layout": "single",
+            "vac": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 34.2,
+        "len": 11.4,
+        "d": 3.7,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "marks": [
+          {
+            "type": "text",
+            "y": 1,
+            "h": 6,
+            "text": "РОСКОСМОС",
+            "vertical": true,
+            "color": "#1f3f8f",
+            "size": 0.55
+          },
+          {
+            "type": "flag",
+            "y": 7.5,
+            "h": 0.8,
+            "country": "RUS"
+          }
+        ]
+      }
+    },
+    "angara_a5": {
+      "name": "Angara A5",
+      "family": "angara",
+      "site": "vostochny",
+      "tower": "gantry",
+      "reuse": null,
+      "heightM": 55.4,
+      "diameterM": 8.9,
+      "payloadTop": 33.5,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "core",
+          "role": "stage",
+          "y": 1.5,
+          "len": 25.1,
+          "d": 2.9,
+          "mat": "white_paint",
+          "frost": 0.45,
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1.45,
+            "bellLen": 1.5,
+            "layout": "single"
+          },
+          "marks": [
+            {
+              "type": "text",
+              "y": 6,
+              "h": 10,
+              "text": "АНГАРА",
+              "vertical": true,
+              "color": "#1f3f8f",
+              "size": 0.9
+            },
+            {
+              "type": "flag",
+              "y": 18,
+              "h": 0.9,
+              "country": "RUS"
+            }
+          ]
+        },
+        {
+          "id": "bL",
+          "role": "booster",
+          "x": -3,
+          "y": 1.5,
+          "len": 29.1,
+          "d": 2.9,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 25.1,
+              "d": 2.9
+            },
+            {
+              "len": 4,
+              "d": 2.9,
+              "dTop": 0.406,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.45,
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1.45,
+            "bellLen": 1.5,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "bR",
+          "role": "booster",
+          "x": 3,
+          "y": 1.5,
+          "len": 29.1,
+          "d": 2.9,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 25.1,
+              "d": 2.9
+            },
+            {
+              "len": 4,
+              "d": 2.9,
+              "dTop": 0.406,
+              "nose": "cone"
+            }
+          ],
+          "frost": 0.45,
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1.45,
+            "bellLen": 1.5,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "urm2",
+          "role": "upper",
+          "y": 26.6,
+          "len": 6.9,
+          "d": 3.6,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 1.2,
+              "d": 2.9,
+              "dTop": 3.6
+            },
+            {
+              "len": 5.7,
+              "d": 3.6
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1.2,
+            "bellLen": 1.5,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 33.5,
+        "len": 22,
+        "d": 4.35,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing",
+        "noseFrac": 0.4
+      }
+    }
+  },
+  "families": {
+    "generic": {
+      "name": "Foguete",
+      "family": "generic",
+      "site": null,
+      "tower": "umbilical",
+      "reuse": null,
+      "heightM": 50,
+      "diameterM": 3.7,
+      "payloadTop": 40,
+      "crewTop": "craft",
+      "parts": [
+        {
+          "id": "s1",
+          "role": "stage",
+          "y": 1.5,
+          "len": 30,
+          "d": 3.7,
+          "mat": "white_paint",
+          "frost": 0.4,
+          "segs": [
+            {
+              "len": 28,
+              "d": 3.7
+            },
+            {
+              "len": 2,
+              "d": 3.7,
+              "mat": "carbon_black"
+            }
+          ],
+          "engines": {
+            "n": 5,
+            "prop": "kerolox",
+            "bellD": 1,
+            "bellLen": 1.5,
+            "layout": "cluster"
+          }
+        },
+        {
+          "id": "s2",
+          "role": "upper",
+          "y": 31.5,
+          "len": 8.5,
+          "d": 3.7,
+          "mat": "white_paint",
+          "engines": {
+            "n": 1,
+            "prop": "kerolox",
+            "bellD": 1.6,
+            "bellLen": 2,
+            "layout": "single",
+            "vac": true,
+            "hidden": true
+          }
+        }
+      ],
+      "fairing": {
+        "id": "fairing",
+        "role": "fairing",
+        "y": 40,
+        "len": 10,
+        "d": 4.2,
+        "mat": "white_paint",
+        "nose": "ogive",
+        "sep": "fairing"
+      }
+    }
+  },
+  "craft": {
+    "crew_dragon": {
+      "name": "Crew Dragon",
+      "template": "capsule",
+      "heightM": 4.4,
+      "widthM": 4,
+      "shieldD": 4,
+      "topD": 1.8,
+      "capH": 3.4,
+      "mat": "white_paint",
+      "ablator": "pica",
+      "windows": 4,
+      "chutes": 4,
+      "nose": "hinged",
+      "superDraco": true,
+      "sm": {
+        "type": "trunk",
+        "h": 3.7,
+        "d": 3.7,
+        "cells": "half",
+        "fins": 4
+      },
+      "onStack": [
+        {
+          "id": "trunk",
+          "role": "adapter",
+          "y": 0,
+          "len": 3.7,
+          "d": 3.7,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 3.7,
+              "d": 3.7,
+              "cells": "half"
+            }
+          ]
+        },
+        {
+          "id": "capsule",
+          "role": "payload",
+          "y": 3.7,
+          "len": 3.4,
+          "d": 3.7,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 0.26,
+              "d": 3.7,
+              "dTop": 4,
+              "mat": "ablator",
+              "shape": "easeOut"
+            },
+            {
+              "len": 2.8,
+              "d": 4,
+              "dTop": 2.1
+            },
+            {
+              "len": 0.34,
+              "d": 2.1,
+              "dTop": 1.8,
+              "shape": "ellipse"
+            }
+          ],
+          "marks": [
+            {
+              "type": "window",
+              "y": 1.9,
+              "h": 0.42,
+              "w": 0.38,
+              "n": 2,
+              "spread": 0.55
+            },
+            {
+              "type": "patch",
+              "y": 0.45,
+              "h": 0.9,
+              "w": 0.7,
+              "s": -0.72,
+              "color": "#1d1f22"
+            },
+            {
+              "type": "patch",
+              "y": 0.45,
+              "h": 0.9,
+              "w": 0.7,
+              "s": 0.72,
+              "color": "#1d1f22"
+            }
+          ]
+        },
+        {
+          "id": "nosecone",
+          "role": "nose",
+          "y": 7.1,
+          "len": 1,
+          "d": 1.8,
+          "dTop": 0.6,
+          "mat": "white_paint",
+          "nose": "blunt"
+        }
+      ]
+    },
+    "cargo_dragon": {
+      "name": "Cargo Dragon",
+      "template": "capsule",
+      "heightM": 4.4,
+      "widthM": 4,
+      "shieldD": 4,
+      "topD": 1.8,
+      "capH": 3.4,
+      "mat": "white_paint",
+      "ablator": "pica",
+      "windows": 0,
+      "chutes": 4,
+      "nose": "hinged",
+      "sm": {
+        "type": "trunk",
+        "h": 3.7,
+        "d": 3.7,
+        "cells": "half",
+        "fins": 4
+      },
+      "onStack": [
+        {
+          "id": "trunk",
+          "role": "adapter",
+          "y": 0,
+          "len": 3.7,
+          "d": 3.7,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 3.7,
+              "d": 3.7,
+              "cells": "half"
+            }
+          ]
+        },
+        {
+          "id": "capsule",
+          "role": "payload",
+          "y": 3.7,
+          "len": 3.4,
+          "d": 3.7,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 0.26,
+              "d": 3.7,
+              "dTop": 4,
+              "mat": "ablator",
+              "shape": "easeOut"
+            },
+            {
+              "len": 2.8,
+              "d": 4,
+              "dTop": 2.1
+            },
+            {
+              "len": 0.34,
+              "d": 2.1,
+              "dTop": 1.8,
+              "shape": "ellipse"
+            }
+          ],
+          "marks": [
+            {
+              "type": "patch",
+              "y": 0.45,
+              "h": 0.9,
+              "w": 0.7,
+              "s": -0.72,
+              "color": "#1d1f22"
+            },
+            {
+              "type": "patch",
+              "y": 0.45,
+              "h": 0.9,
+              "w": 0.7,
+              "s": 0.72,
+              "color": "#1d1f22"
+            }
+          ]
+        },
+        {
+          "id": "nosecone",
+          "role": "nose",
+          "y": 7.1,
+          "len": 1,
+          "d": 1.8,
+          "dTop": 0.6,
+          "mat": "white_paint",
+          "nose": "blunt"
+        }
+      ]
+    },
+    "orion": {
+      "name": "Orion",
+      "template": "capsule",
+      "heightM": 3.65,
+      "widthM": 5.02,
+      "shieldD": 5.02,
+      "topD": 1.6,
+      "capH": 3.3,
+      "mat": "silver_tile",
+      "ablator": "avcoat",
+      "windows": 4,
+      "chutes": 3,
+      "sm": {
+        "type": "esm",
+        "h": 4,
+        "d": 4.1,
+        "arrays": "xwing",
+        "arraySpanM": 19,
+        "mat": "silver_foil"
+      },
+      "onStack": [
+        {
+          "id": "osa",
+          "role": "adapter",
+          "y": 0,
+          "len": 1.5,
+          "d": 5.1,
+          "dTop": 5.1,
+          "mat": "white_paint"
+        },
+        {
+          "id": "esm",
+          "role": "payload",
+          "y": 1.5,
+          "len": 4,
+          "d": 5.1,
+          "mat": "white_paint",
+          "panels": true,
+          "seamEvery": 1.33
+        },
+        {
+          "id": "cm",
+          "role": "payload",
+          "y": 5.5,
+          "len": 3.3,
+          "d": 5.02,
+          "dTop": 1.6,
+          "mat": "silver_tile"
+        },
+        {
+          "id": "las",
+          "role": "les",
+          "y": 5.5,
+          "len": 13.5,
+          "d": 5.1,
+          "dTop": 0.9,
+          "mat": "white_paint",
+          "nose": "tower",
+          "towerLen": 7,
+          "shroudCyl": 0.25,
+          "sep": "fairing"
+        }
+      ]
+    },
+    "starliner": {
+      "name": "Starliner",
+      "template": "capsule",
+      "heightM": 3.35,
+      "widthM": 4.56,
+      "shieldD": 4.56,
+      "topD": 1.8,
+      "capH": 3,
+      "mat": "white_paint",
+      "band": "#1d3c78",
+      "ablator": "boeing",
+      "windows": 4,
+      "chutes": 3,
+      "airbags": true,
+      "sm": {
+        "type": "sm",
+        "h": 2,
+        "d": 4.56,
+        "mat": "white_paint",
+        "pods": true
+      },
+      "onStack": [
+        {
+          "id": "skirt",
+          "role": "adapter",
+          "y": 0,
+          "len": 2,
+          "d": 3.05,
+          "dTop": 4.56,
+          "mat": "white_paint"
+        },
+        {
+          "id": "sm",
+          "role": "payload",
+          "y": 2,
+          "len": 2,
+          "d": 4.56,
+          "mat": "white_paint",
+          "seamEvery": 0.5
+        },
+        {
+          "id": "cm",
+          "role": "payload",
+          "y": 4,
+          "len": 3,
+          "d": 4.56,
+          "dTop": 1.8,
+          "mat": "white_paint",
+          "segs": [
+            {
+              "len": 0.25,
+              "d": 4.3,
+              "dTop": 4.56,
+              "mat": "ablator",
+              "shape": "easeOut"
+            },
+            {
+              "len": 0.55,
+              "d": 4.56,
+              "dTop": 4.2,
+              "band": "#1d3c78",
+              "bandY": 0,
+              "bandH": 1
+            },
+            {
+              "len": 2.2,
+              "d": 4.2,
+              "dTop": 1.8
+            }
+          ],
+          "marks": [
+            {
+              "type": "window",
+              "y": 1.6,
+              "h": 0.4,
+              "w": 0.4,
+              "n": 2,
+              "spread": 0.5
+            }
+          ]
+        }
+      ]
+    },
+    "starship_hls": {
+      "name": "Starship HLS",
+      "template": "starship",
+      "heightM": 50.3,
+      "widthM": 9,
+      "mat": "stainless",
+      "topWhite": true,
+      "flaps": false,
+      "tiles": false,
+      "landingThrusters": true,
+      "legs": 4,
+      "windows": true
+    },
+    "starship_cargo": {
+      "name": "Starship (carga)",
+      "template": "starship",
+      "heightM": 50.3,
+      "widthM": 9,
+      "mat": "stainless",
+      "flaps": true,
+      "tiles": "windward",
+      "legs": 0,
+      "door": true
+    },
+    "starship_tanker": {
+      "name": "Starship tanque",
+      "template": "starship",
+      "heightM": 50.3,
+      "widthM": 9,
+      "mat": "stainless",
+      "flaps": true,
+      "tiles": "windward",
+      "legs": 0
+    },
+    "blue_moon_mk1": {
+      "name": "Blue Moon Mk1",
+      "template": "lander",
+      "heightM": 8.05,
+      "widthM": 3.08,
+      "body": "cyl",
+      "bodyW": 3.08,
+      "bodyH": 6.5,
+      "mat": "white_paint",
+      "accent": "#1d3c78",
+      "legs": 4,
+      "legSpanM": 6,
+      "engine": {
+        "prop": "hydrolox",
+        "bellD": 1.2,
+        "bellLen": 1.5
+      }
+    },
+    "blue_moon_mk2": {
+      "name": "Blue Moon Mk2",
+      "template": "lander",
+      "heightM": 16,
+      "widthM": 3.1,
+      "body": "cyl",
+      "bodyW": 3.1,
+      "bodyH": 14,
+      "mat": "white_paint",
+      "accent": "#1d3c78",
+      "legs": 4,
+      "legSpanM": 9,
+      "cabin": true,
+      "solarBand": true,
+      "engine": {
+        "prop": "hydrolox",
+        "bellD": 1.2,
+        "bellLen": 1.5
+      }
+    },
+    "nova_c": {
+      "name": "Nova-C",
+      "template": "lander",
+      "heightM": 4.3,
+      "widthM": 1.57,
+      "body": "hex",
+      "bodyW": 1.57,
+      "bodyH": 3.2,
+      "mat": "bare_aluminium",
+      "foil": "gold_foil",
+      "legs": 6,
+      "legSpanM": 3.4,
+      "solar": "sides",
+      "engine": {
+        "prop": "methalox",
+        "bellD": 0.5,
+        "bellLen": 0.6
+      }
+    },
+    "griffin": {
+      "name": "Griffin",
+      "template": "lander",
+      "heightM": 1.9,
+      "widthM": 4.5,
+      "body": "box",
+      "bodyW": 3.2,
+      "bodyH": 1.4,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 4.5,
+      "solar": "top",
+      "rover": true,
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.3,
+        "bellLen": 0.4,
+        "n": 5
+      }
+    },
+    "blue_ghost": {
+      "name": "Blue Ghost",
+      "template": "lander",
+      "heightM": 2,
+      "widthM": 3.5,
+      "body": "box",
+      "bodyW": 2.4,
+      "bodyH": 1.4,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 3.5,
+      "solar": "sides",
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.4,
+        "bellLen": 0.5
+      }
+    },
+    "lanyue": {
+      "name": "Lanyue",
+      "template": "lander",
+      "heightM": 7.5,
+      "widthM": 5,
+      "body": "box",
+      "bodyW": 3.6,
+      "bodyH": 3,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 6.5,
+      "cabin": true,
+      "cabinMat": "white_paint",
+      "propModule": true,
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 1,
+        "bellLen": 1.2
+      }
+    },
+    "change7": {
+      "name": "Chang'e-7",
+      "template": "lander",
+      "heightM": 3.6,
+      "widthM": 4.5,
+      "body": "box",
+      "bodyW": 2.6,
+      "bodyH": 1.6,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 4.5,
+      "solar": "wings",
+      "rover": true,
+      "hopper": true,
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.7,
+        "bellLen": 0.9
+      }
+    },
+    "change8": {
+      "name": "Chang'e-8",
+      "template": "lander",
+      "heightM": 3.6,
+      "widthM": 4.5,
+      "body": "box",
+      "bodyW": 2.6,
+      "bodyH": 1.6,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 4.5,
+      "solar": "wings",
+      "rover": true,
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.7,
+        "bellLen": 0.9
+      }
+    },
+    "tianwen3": {
+      "name": "Tianwen-3",
+      "template": "aeroshell",
+      "heightM": 4,
+      "widthM": 4.2,
+      "shellD": 4.2,
+      "shellMat": "ablator",
+      "backshellMat": "white_paint",
+      "inner": "generic_mars_lander",
+      "ascent": true
+    },
+    "tianwen4": {
+      "name": "Tianwen-4",
+      "template": "probe",
+      "heightM": 3.5,
+      "widthM": 16,
+      "bus": {
+        "w": 2.4,
+        "h": 2.8,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 16,
+        "panels": 4
+      },
+      "hga": {
+        "d": 2.5
+      }
+    },
+    "xuntian": {
+      "name": "Xuntian (CSST)",
+      "template": "module",
+      "heightM": 14,
+      "widthM": 3.6,
+      "len": 14,
+      "d": 3.6,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 18
+      },
+      "aperture": true
+    },
+    "tiangong_module": {
+      "name": "Módulo de expansão da Tiangong",
+      "template": "module",
+      "heightM": 18,
+      "widthM": 4.2,
+      "len": 18,
+      "d": 4.2,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 55,
+        "flexible": true
+      }
+    },
+    "gaganyaan": {
+      "name": "Gaganyaan",
+      "template": "capsule",
+      "heightM": 3.5,
+      "widthM": 3.5,
+      "shieldD": 3.5,
+      "topD": 1.2,
+      "capH": 3.5,
+      "mat": "white_paint",
+      "ablator": "isro",
+      "windows": 2,
+      "chutes": 3,
+      "sm": {
+        "type": "sm",
+        "h": 2.9,
+        "d": 3.5,
+        "mat": "white_paint",
+        "arrays": "pair",
+        "arraySpanM": 10
+      },
+      "onStack": [
+        {
+          "id": "sm",
+          "role": "payload",
+          "y": 0,
+          "len": 2.9,
+          "d": 3.5,
+          "mat": "white_paint"
+        },
+        {
+          "id": "cm",
+          "role": "payload",
+          "y": 2.9,
+          "len": 3.5,
+          "d": 3.5,
+          "dTop": 1.2,
+          "mat": "white_paint"
+        },
+        {
+          "id": "ces",
+          "role": "les",
+          "y": 2.9,
+          "len": 13,
+          "d": 4,
+          "dTop": 0.5,
+          "mat": "white_paint",
+          "nose": "tower",
+          "towerLen": 6,
+          "sep": "fairing",
+          "shroudCyl": 0.3,
+          "gridFins": true
+        }
+      ]
+    },
+    "chandrayaan4": {
+      "name": "Chandrayaan-4",
+      "template": "lander",
+      "heightM": 2.4,
+      "widthM": 3.4,
+      "body": "box",
+      "bodyW": 2.2,
+      "bodyH": 1.6,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 3.4,
+      "solar": "sides",
+      "ascent": true,
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.5,
+        "bellLen": 0.6,
+        "n": 4
+      }
+    },
+    "bas_module": {
+      "name": "BAS-1",
+      "template": "module",
+      "heightM": 8,
+      "widthM": 3.8,
+      "len": 8,
+      "d": 3.8,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 20
+      }
+    },
+    "mmx": {
+      "name": "MMX",
+      "template": "probe",
+      "heightM": 4,
+      "widthM": 20,
+      "bus": {
+        "w": 2.2,
+        "h": 3.4,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 20,
+        "panels": 3
+      },
+      "hga": {
+        "d": 1.6
+      },
+      "legs": true
+    },
+    "lupex": {
+      "name": "LUPEX",
+      "template": "rover",
+      "heightM": 1.6,
+      "widthM": 2,
+      "wheels": 4,
+      "mat": "white_paint",
+      "solar": "mast",
+      "mast": true
+    },
+    "rosalind_franklin": {
+      "name": "Rosalind Franklin",
+      "template": "rover",
+      "heightM": 2,
+      "widthM": 2.4,
+      "wheels": 6,
+      "mat": "white_paint",
+      "solar": "wings",
+      "mast": true,
+      "drill": true
+    },
+    "space_rider": {
+      "name": "Space Rider",
+      "template": "spaceplane",
+      "heightM": 2.2,
+      "widthM": 4.6,
+      "lenM": 4.6,
+      "mat": "tile_black",
+      "topMat": "white_paint",
+      "chute": "parafoil"
+    },
+    "soyuz_ms": {
+      "name": "Soyuz MS",
+      "template": "capsule_sm",
+      "heightM": 2.24,
+      "widthM": 2.17,
+      "orbital": {
+        "len": 2.98,
+        "d": 2.25,
+        "mat": "soyuz_green"
+      },
+      "descent": {
+        "len": 2.24,
+        "d": 2.17,
+        "mat": "soyuz_green"
+      },
+      "service": {
+        "len": 2.65,
+        "d": 2.72,
+        "mat": "soyuz_green"
+      },
+      "arrays": {
+        "type": "pair",
+        "spanM": 10.7
+      },
+      "chutes": 1,
+      "onStack": [
+        {
+          "id": "shroud",
+          "role": "les",
+          "y": 0,
+          "len": 11.5,
+          "d": 3,
+          "dTop": 0.5,
+          "mat": "white_paint",
+          "nose": "tower",
+          "towerLen": 6,
+          "gridFins": true,
+          "sep": "fairing",
+          "shroudCyl": 0.55
+        }
+      ]
+    },
+    "progress_ms": {
+      "name": "Progress MS",
+      "template": "capsule_sm",
+      "heightM": 7.2,
+      "widthM": 10.6,
+      "orbital": {
+        "len": 3.2,
+        "d": 2.25,
+        "mat": "soyuz_green"
+      },
+      "descent": {
+        "len": 1.3,
+        "d": 2.17,
+        "mat": "soyuz_green",
+        "tanker": true
+      },
+      "service": {
+        "len": 2.65,
+        "d": 2.72,
+        "mat": "soyuz_green"
+      },
+      "arrays": {
+        "type": "pair",
+        "spanM": 10.6
+      },
+      "cargo": true
+    },
+    "shenzhou": {
+      "name": "Shenzhou",
+      "template": "capsule_sm",
+      "heightM": 2.5,
+      "widthM": 2.5,
+      "orbital": {
+        "len": 2.8,
+        "d": 2.25,
+        "mat": "white_paint",
+        "arrays": "small"
+      },
+      "descent": {
+        "len": 2.5,
+        "d": 2.5,
+        "mat": "white_paint"
+      },
+      "service": {
+        "len": 2.94,
+        "d": 2.8,
+        "mat": "white_paint"
+      },
+      "arrays": {
+        "type": "pair4",
+        "spanM": 17
+      },
+      "chutes": 1,
+      "onStack": [
+        {
+          "id": "shroud",
+          "role": "les",
+          "y": 0,
+          "len": 21,
+          "d": 3.8,
+          "dTop": 0.6,
+          "mat": "white_paint",
+          "nose": "tower",
+          "towerLen": 8,
+          "gridFins": true,
+          "sep": "fairing",
+          "shroudCyl": 0.6
+        }
+      ]
+    },
+    "tianzhou": {
+      "name": "Tianzhou",
+      "template": "module",
+      "heightM": 10.6,
+      "widthM": 14.9,
+      "len": 10.6,
+      "d": 3.35,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 14.9
+      }
+    },
+    "mengzhou": {
+      "name": "Mengzhou",
+      "template": "capsule",
+      "heightM": 4.2,
+      "widthM": 4.5,
+      "shieldD": 4.5,
+      "topD": 1.6,
+      "capH": 4.2,
+      "mat": "white_paint",
+      "ablator": "cnsa",
+      "windows": 3,
+      "chutes": 2,
+      "airbags": true,
+      "sm": {
+        "type": "sm",
+        "h": 4.6,
+        "d": 4.5,
+        "mat": "silver_foil",
+        "arrays": "pair",
+        "arraySpanM": 14
+      },
+      "onStack": [
+        {
+          "id": "sm",
+          "role": "payload",
+          "y": 0,
+          "len": 4.6,
+          "d": 4.5,
+          "mat": "silver_foil"
+        },
+        {
+          "id": "cm",
+          "role": "payload",
+          "y": 4.6,
+          "len": 4.2,
+          "d": 4.5,
+          "dTop": 1.6,
+          "mat": "white_paint"
+        },
+        {
+          "id": "les",
+          "role": "les",
+          "y": 4.6,
+          "len": 14,
+          "d": 4.8,
+          "dTop": 0.6,
+          "mat": "white_paint",
+          "nose": "tower",
+          "towerLen": 7,
+          "sep": "fairing"
+        }
+      ]
+    },
+    "luna_orbiter": {
+      "name": "Luna-26",
+      "template": "probe",
+      "heightM": 3.5,
+      "widthM": 7,
+      "bus": {
+        "w": 2.4,
+        "h": 2.2,
+        "mat": "gold_foil",
+        "tanks": true
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 7,
+        "panels": 2
+      },
+      "hga": {
+        "d": 1
+      }
+    },
+    "luna_lander": {
+      "name": "Luna-27",
+      "template": "lander",
+      "heightM": 3.5,
+      "widthM": 3.6,
+      "body": "tanks",
+      "bodyW": 2.6,
+      "bodyH": 1.8,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 3.6,
+      "solar": "top",
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.5,
+        "bellLen": 0.6
+      }
+    },
+    "ros_module": {
+      "name": "Módulo científico da ROS",
+      "template": "module",
+      "heightM": 13,
+      "widthM": 4.1,
+      "len": 13,
+      "d": 4.1,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 20
+      }
+    },
+    "dragonfly": {
+      "name": "Dragonfly",
+      "template": "rotorcraft",
+      "heightM": 1.8,
+      "widthM": 3.9,
+      "rotors": 8,
+      "rotorD": 1.35,
+      "mat": "white_paint",
+      "rtg": true,
+      "skids": true
+    },
+    "haven1": {
+      "name": "Haven-1",
+      "template": "module",
+      "heightM": 10.1,
+      "widthM": 3.8,
+      "len": 10.1,
+      "d": 3.8,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 20
+      },
+      "window": true
+    },
+    "axiom_module": {
+      "name": "Módulo Axiom (PPTM)",
+      "template": "module",
+      "heightM": 9,
+      "widthM": 4.2,
+      "len": 9,
+      "d": 4.2,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 18
+      }
+    },
+    "starlab": {
+      "name": "Starlab",
+      "template": "module",
+      "heightM": 13,
+      "widthM": 8,
+      "len": 13,
+      "d": 8,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 40
+      }
+    },
+    "orbital_reef": {
+      "name": "Orbital Reef (núcleo)",
+      "template": "module",
+      "heightM": 20,
+      "widthM": 7,
+      "len": 20,
+      "d": 7,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 40
+      }
+    },
+    "gateway_ppe_halo": {
+      "name": "Gateway (PPE + HALO)",
+      "template": "module",
+      "heightM": 17,
+      "widthM": 3.4,
+      "len": 17,
+      "d": 3.4,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "rollout",
+        "spanM": 40
+      },
+      "ion": true
+    },
+    "usdv": {
+      "name": "Veículo de reentrada da ISS (USDV)",
+      "template": "module",
+      "heightM": 9,
+      "widthM": 3.7,
+      "len": 9,
+      "d": 3.7,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "none"
+      },
+      "thrusters": true
+    },
+    "bepicolombo": {
+      "name": "BepiColombo",
+      "template": "probe",
+      "heightM": 6.4,
+      "widthM": 30,
+      "bus": {
+        "w": 3.9,
+        "h": 6.4,
+        "mat": "silver_foil",
+        "stack": true
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 30,
+        "panels": 5
+      },
+      "hga": {
+        "d": 1
+      },
+      "ion": true
+    },
+    "hera": {
+      "name": "Hera",
+      "template": "probe",
+      "heightM": 1.7,
+      "widthM": 11.5,
+      "bus": {
+        "w": 1.6,
+        "h": 1.7,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 11.5,
+        "panels": 3
+      },
+      "hga": {
+        "d": 1.1
+      }
+    },
+    "tianwen2": {
+      "name": "Tianwen-2",
+      "template": "probe",
+      "heightM": 3,
+      "widthM": 12,
+      "bus": {
+        "w": 2.2,
+        "h": 2.6,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 12,
+        "panels": 3
+      },
+      "hga": {
+        "d": 1.2
+      },
+      "sampler": true
+    },
+    "psyche": {
+      "name": "Psyche",
+      "template": "probe",
+      "heightM": 3,
+      "widthM": 24.7,
+      "bus": {
+        "w": 2.4,
+        "h": 3,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "cross",
+        "spanM": 24.7,
+        "panels": 5
+      },
+      "hga": {
+        "d": 2
+      },
+      "ion": true
+    },
+    "osiris_apex": {
+      "name": "OSIRIS-APEX",
+      "template": "probe",
+      "heightM": 3.2,
+      "widthM": 6.2,
+      "bus": {
+        "w": 2.4,
+        "h": 3.2,
+        "mat": "white_paint"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 6.2,
+        "panels": 1
+      },
+      "hga": {
+        "d": 2
+      },
+      "arm": true
+    },
+    "lucy": {
+      "name": "Lucy",
+      "template": "probe",
+      "heightM": 3,
+      "widthM": 15,
+      "bus": {
+        "w": 2,
+        "h": 3,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "circular",
+        "spanM": 15
+      },
+      "hga": {
+        "d": 2
+      }
+    },
+    "europa_clipper": {
+      "name": "Europa Clipper",
+      "template": "probe",
+      "heightM": 6,
+      "widthM": 30.5,
+      "bus": {
+        "w": 1.5,
+        "h": 6,
+        "mat": "bare_aluminium"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 30.5,
+        "panels": 5
+      },
+      "hga": {
+        "d": 3
+      },
+      "boom": true
+    },
+    "juice": {
+      "name": "JUICE",
+      "template": "probe",
+      "heightM": 4.1,
+      "widthM": 27,
+      "bus": {
+        "w": 2.5,
+        "h": 4.1,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "cross",
+        "spanM": 27,
+        "panels": 5
+      },
+      "hga": {
+        "d": 2.5
+      },
+      "boom": true
+    },
+    "shukrayaan": {
+      "name": "Shukrayaan (Venus Orbiter Mission)",
+      "template": "probe",
+      "heightM": 2.5,
+      "widthM": 8,
+      "bus": {
+        "w": 2,
+        "h": 2.5,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 8,
+        "panels": 2
+      },
+      "hga": {
+        "d": 1.6
+      }
+    },
+    "ramses": {
+      "name": "Ramses",
+      "template": "probe",
+      "heightM": 1.6,
+      "widthM": 9,
+      "bus": {
+        "w": 1.4,
+        "h": 1.6,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 9,
+        "panels": 2
+      },
+      "hga": {
+        "d": 1
+      }
+    },
+    "davinci": {
+      "name": "DAVINCI",
+      "template": "probe",
+      "heightM": 2.6,
+      "widthM": 10,
+      "bus": {
+        "w": 2.2,
+        "h": 2.6,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 10,
+        "panels": 2
+      },
+      "hga": {
+        "d": 1.2
+      },
+      "entryProbe": {
+        "d": 1
+      }
+    },
+    "generic_sat": {
+      "name": "Satélite (genérico)",
+      "template": "probe",
+      "heightM": 3,
+      "widthM": 14,
+      "bus": {
+        "w": 2.4,
+        "h": 3,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 14,
+        "panels": 3
+      },
+      "hga": {
+        "d": 1.4
+      }
+    },
+    "generic_probe": {
+      "name": "Sonda (genérica)",
+      "template": "probe",
+      "heightM": 2.5,
+      "widthM": 10,
+      "bus": {
+        "w": 2,
+        "h": 2.5,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 10,
+        "panels": 2
+      },
+      "hga": {
+        "d": 1.6
+      }
+    },
+    "generic_lander": {
+      "name": "Lander lunar (genérico)",
+      "template": "lander",
+      "heightM": 3,
+      "widthM": 4,
+      "body": "box",
+      "bodyW": 2.4,
+      "bodyH": 1.6,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 4,
+      "solar": "top",
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.6,
+        "bellLen": 0.8
+      }
+    },
+    "generic_mars_lander": {
+      "name": "Lander marciano (genérico)",
+      "template": "lander",
+      "heightM": 1.8,
+      "widthM": 5.5,
+      "body": "deck",
+      "bodyW": 1.8,
+      "bodyH": 0.9,
+      "mat": "white_paint",
+      "foil": "gold_foil",
+      "legs": 3,
+      "legSpanM": 2.6,
+      "solar": "round",
+      "solarSpanM": 5.5,
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.25,
+        "bellLen": 0.3,
+        "n": 12
+      },
+      "aeroshell": {
+        "d": 2.65
+      }
+    },
+    "generic_cargo": {
+      "name": "Cargueiro (genérico)",
+      "template": "module",
+      "heightM": 7,
+      "widthM": 3.3,
+      "len": 7,
+      "d": 3.3,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 12
+      }
+    },
+    "generic_station_module": {
+      "name": "Módulo de estação (genérico)",
+      "template": "module",
+      "heightM": 10,
+      "widthM": 4,
+      "len": 10,
+      "d": 4,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 20
+      }
+    },
+    "generic_flyby": {
+      "name": "Sonda de sobrevoo (genérica)",
+      "template": "probe",
+      "heightM": 2.5,
+      "widthM": 4,
+      "bus": {
+        "w": 2,
+        "h": 2.5,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "rtg"
+      },
+      "hga": {
+        "d": 3
+      }
+    },
+    "generic_atmo_probe": {
+      "name": "Sonda atmosférica (genérica)",
+      "template": "aeroshell",
+      "heightM": 1.4,
+      "widthM": 1.4,
+      "shellD": 1.4,
+      "shellMat": "ablator",
+      "backshellMat": "white_paint",
+      "inner": null,
+      "carrier": "generic_probe"
+    },
+    "generic_sample_return": {
+      "name": "Coletor de amostras (genérico)",
+      "template": "lander",
+      "heightM": 3.5,
+      "widthM": 4,
+      "body": "box",
+      "bodyW": 2.4,
+      "bodyH": 1.6,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 4,
+      "solar": "wings",
+      "ascent": true,
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.6,
+        "bellLen": 0.8
+      }
+    }
+  },
+  "craftKinds": {
+    "capsule": {
+      "name": "Cápsula",
+      "template": "capsule",
+      "heightM": 7,
+      "widthM": 4,
+      "shieldD": 4,
+      "topD": 1.6,
+      "capH": 3.4,
+      "mat": "white_paint",
+      "ablator": "generic",
+      "windows": 2,
+      "chutes": 3,
+      "sm": {
+        "type": "sm",
+        "h": 3,
+        "d": 4,
+        "mat": "white_paint",
+        "arrays": "pair",
+        "arraySpanM": 12
+      },
+      "onStack": [
+        {
+          "id": "sm",
+          "role": "payload",
+          "y": 0,
+          "len": 3,
+          "d": 4,
+          "mat": "white_paint"
+        },
+        {
+          "id": "cm",
+          "role": "payload",
+          "y": 3,
+          "len": 3.4,
+          "d": 4,
+          "dTop": 1.6,
+          "mat": "white_paint"
+        },
+        {
+          "id": "les",
+          "role": "les",
+          "y": 3,
+          "len": 12,
+          "d": 4.2,
+          "dTop": 0.5,
+          "mat": "white_paint",
+          "nose": "tower",
+          "towerLen": 6,
+          "sep": "fairing"
+        }
+      ]
+    },
+    "cargo": {
+      "name": "Cargueiro",
+      "template": "module",
+      "heightM": 7,
+      "widthM": 3.3,
+      "len": 7,
+      "d": 3.3,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 12
+      }
+    },
+    "lander": {
+      "name": "Lander",
+      "template": "lander",
+      "heightM": 3,
+      "widthM": 4,
+      "body": "box",
+      "bodyW": 2.4,
+      "bodyH": 1.6,
+      "mat": "gold_foil",
+      "legs": 4,
+      "legSpanM": 4,
+      "solar": "top",
+      "engine": {
+        "prop": "hypergolic",
+        "bellD": 0.6,
+        "bellLen": 0.8
+      }
+    },
+    "probe": {
+      "name": "Sonda",
+      "template": "probe",
+      "heightM": 2.5,
+      "widthM": 10,
+      "bus": {
+        "w": 2,
+        "h": 2.5,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 10,
+        "panels": 2
+      },
+      "hga": {
+        "d": 1.6
+      }
+    },
+    "rover": {
+      "name": "Rover",
+      "template": "rover",
+      "heightM": 1.8,
+      "widthM": 2.4,
+      "wheels": 6,
+      "mat": "white_paint",
+      "solar": "wings",
+      "mast": true
+    },
+    "satellite": {
+      "name": "Satélite",
+      "template": "probe",
+      "heightM": 3,
+      "widthM": 14,
+      "bus": {
+        "w": 2.4,
+        "h": 3,
+        "mat": "gold_foil"
+      },
+      "arrays": {
+        "type": "wing",
+        "spanM": 14,
+        "panels": 3
+      },
+      "hga": {
+        "d": 1.4
+      }
+    },
+    "station_module": {
+      "name": "Módulo",
+      "template": "module",
+      "heightM": 10,
+      "widthM": 4,
+      "len": 10,
+      "d": 4,
+      "mat": "white_paint",
+      "arrays": {
+        "type": "wing",
+        "spanM": 20
+      }
+    }
+  }
+}

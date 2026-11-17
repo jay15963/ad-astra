@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ad Astra · prévia do renderizador de lançamento</title>
+  <style>
+    html, body { margin: 0; background: #05070d; color: #e9e7e1; font: 12px/1.3 system-ui, sans-serif; }
+    #wrap { position: relative; display: inline-block; }
+    canvas { display: block; }
+    #hud { position: absolute; left: 6px; bottom: 6px; padding: 4px 6px; background: rgba(0,0,0,0.55); border-radius: 4px; pointer-events: none; white-space: pre; font-variant-numeric: tabular-nums; }
+    #err { color: #ff8a7a; white-space: pre-wrap; padding: 8px; }
+    #help { max-width: 760px; padding: 8px 10px; color: #9aa3b5; }
+    #help code { color: #e9e7e1; }
+  </style>
+</head>
+<body>
+  <div id="wrap"><canvas id="cv"></canvas><div id="hud"></div></div>
+  <div id="err"></div>
+  <div id="help" hidden>
+    Parâmetros: <code>?vehicle=falcon9&amp;craft=crew_dragon&amp;body=moon&amp;scene=landing&amp;t=3.2&amp;w=375&amp;h=812</code><br />
+    scene: pad · countdown · liftoff · maxq · boostersep · staging · fairing · orbit · tli · explosion · escape · entry · chute · descent · landing · touchdown · splashdown · arrival<br />
+    gallery: vehicles · craft · bodies · terrain · sites · plumes — extras: <code>dpr=2</code> <code>reduce=1</code> <code>anim=1</code> <code>seed=N</code> <code>crewed=0|1</code> <code>site=kourou</code> <code>hud=0</code> <code>help=1</code>
+  </div>
+  <script type="module" src="./launch-preview.js"></script>
+</body>
+</html>

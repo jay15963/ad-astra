@@ -42,9 +42,11 @@ let appRoot = null;
 async function boot() {
   appRoot = document.getElementById('app') || document.body.appendChild(h('div', { id: 'app' }));
   appRoot.removeAttribute('aria-live'); // full re-renders would be too chatty for screen readers
+  markPerfTier();
   let data;
   try {
-    data = await loadData(browserReader());
+    data = await loadData(prefetchedReader());
+    perfMark('adastra:data');
   } catch (e) {
     console.error(e);
     appRoot.innerHTML = '';
@@ -74,9 +76,51 @@ async function boot() {
   // resume straight into the game if a save exists and we were mid-launch (Pilar: fechar o app não prejudica)
   const info = store.saveInfo();
   if (info?.actor && store.state == null && hasActiveLaunchInSave()) {
-    if (store.load()) { renderAll(); return; }
+    if (store.load()) { renderAll(); afterFirstPaint(); return; }
   }
   showTitle();
+  afterFirstPaint();
+}
+
+/**
+ * Reader that first takes the downloads index.html started before the module graph (window.__adastraData),
+ * then falls back to a normal fetch (old browser, failed prefetch, retry after an error).
+ */
+function prefetchedReader() {
+  const fallback = browserReader();
+  const pre = globalThis.__adastraData || null;
+  return async (name) => {
+    const p = pre?.[name];
+    if (p) {
+      delete pre[name]; // one use: a retry fetches fresh
+      try { return await p; } catch { /* fall through */ }
+    }
+    return fallback(name);
+  };
+}
+
+function perfMark(name) { try { performance.mark(name); } catch { /* */ } }
+
+/**
+ * Low-end hint for CSS and canvas code: <html data-perf="lite"> on phones with ≤ 4 cores or ≤ 3 GB, or when
+ * the browser asks to save data. Read it with document.documentElement.dataset.perf === 'lite'.
+ */
+function markPerfTier() {
+  try {
+    const n = navigator;
+    const lite = (n.hardwareConcurrency && n.hardwareConcurrency <= 4) || (n.deviceMemory && n.deviceMemory <= 3) || n.connection?.saveData;
+    document.documentElement.dataset.perf = lite ? 'lite' : 'full';
+  } catch { /* */ }
+}
+
+/** After the first screen is up: note the timing and warm the lazy Mapa module while the phone is idle. */
+function afterFirstPaint() {
+  perfMark('adastra:first-render');
+  const idle = globalThis.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+  idle(() => {
+    if (ui.mapModule !== undefined) return;
+    import('./map.js').then((m) => { if (ui.mapModule === undefined) ui.mapModule = m; }).catch(() => { /* loaded on demand */ });
+  }, { timeout: 4000 });
 }
 
 function hasActiveLaunchInSave() {
@@ -143,9 +187,8 @@ function renderAll() {
   ensureShell();
   renderHeader();
   renderTicker();
-  renderTimebar();
   renderTabbar();
-  renderView();
+  renderView(); // also redraws the time bar
   syncLaunch();
 }
 
@@ -171,6 +214,10 @@ function renderHeader() {
   const st = store.state;
   const me = st.actors?.[st.playerId] || { id: st.playerId, short: String(st.playerId || '').toUpperCase() };
   const el = ui.shell.header;
+  // the header only shows the agency and the date: skip rebuilding the emblem SVG on every action
+  const key = `${st.playerId}|${st.turn}|${me.flag || ''}|${me.short || me.name || ''}|${me.color || ''}`;
+  if (el.dataset.key === key && el.firstChild) return;
+  el.dataset.key = key;
   el.innerHTML = '';
   el.append(
     h('button', { class: 'agency', type: 'button', onclick: () => navigate('painel'), 'aria-label': 'Ir ao painel' },
@@ -205,13 +252,17 @@ function renderTabbar() {
   const badges = { painel: nDec, mundo: active === 'mundo' ? 0 : Math.min(newsBadge, 9) };
   if (active === 'mundo') ui.seenNewsTurn = st.turn;
   const el = ui.shell.tabbar;
+  const hot = nDec > 0 && st.decisions.some((d) => d.blocking);
+  const key = `${active}|${badges.painel}|${badges.mundo}|${hot}`;
+  if (el.dataset.key === key && el.firstChild) return; // same tabs, same badges: keep the buttons
+  el.dataset.key = key;
   el.innerHTML = '';
   for (const t of TABS) {
     el.appendChild(h('button', {
       class: ['tab', t.id === active && 'active'], type: 'button', 'aria-current': t.id === active ? 'page' : null,
       onclick: () => navigate(t.id),
     }, h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, t.icon), h('span', { class: 'tab-label' }, t.label),
-    badges[t.id] ? h('span', { class: ['badge', t.id === 'painel' && st.decisions.some((d) => d.blocking) && 'badge-hot'] }, String(badges[t.id])) : null));
+    badges[t.id] ? h('span', { class: ['badge', t.id === 'painel' && hot && 'badge-hot'] }, String(badges[t.id])) : null));
   }
 }
 

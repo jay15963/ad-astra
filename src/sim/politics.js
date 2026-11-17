@@ -1132,6 +1132,11 @@ function processSignals(state, data, ctx) {
       if (owner === pid) maybeHearing(state, data, s.missionId);
       const p = state.politics[owner];
       if (p?.kind === 'agency') p.offset = r3((p.offset || 0) - 0.04);
+    } else if (s.type === 'crew/rivalLost' && s.actorId) {
+      // a rival's background crewed flight lost its crew (crew.js): the government behind it wavers
+      const p = state.politics[s.actorId];
+      if (p?.kind === 'agency') p.offset = r3((p.offset || 0) - 0.04);
+      if (w.markets[s.operator]) w.markets[s.operator].sentiment = r2(clamp(w.markets[s.operator].sentiment - 8, 5, 95));
     } else if (s.type === 'first' && s.actorId) {
       const nid = nationOf(state, s.actorId);
       const p = state.politics[s.actorId];

@@ -83,6 +83,33 @@
     "deathChance": 0.85,
     "escape": { "_doc": "Chance de a tripulação sobreviver a uma falha catastrófica na cena (sistema de escape, aborto). Margem de combustível acima/abaixo de marginRef soma perMargin por ponto; estratégia soma o valor da tabela.", "beforeOrbit": 0.55, "afterOrbit": 0.25, "arrival": 0.12, "marginRef": 0.1, "perMargin": 0.8, "strategy": { "conservative": 0.05, "balanced": 0, "aggressive": -0.1 }, "min": 0.02, "max": 0.95 },
     "backgroundCrewLoss": { "_doc": "Voos tripulados resolvidos sem cena (IA, calendário): chance de perder a tripulação quando o voo falha (resultado recuperável ou catastrófico). Medido nas cenas com tools/sim-launches.mjs (mortes / falhas).", "ascent": 0.25, "orbit": 0.4, "landing": 0.55 },
+    "rivalCrewFlights": {
+      "_doc": "Voos tripulados de rotina dos rivais (rotações na ISS e na Tiangong, voos operacionais de cápsulas novas), resolvidos em segundo plano por crew.js. Cada voo sorteia perda da tripulação com risk × decay^(voos já feitos), nunca abaixo de riskMin (cápsulas maduras ~0,3–0,6% por voo; novas mais). abortShare: fração do risco que vira aborto com a tripulação salva. Voos do próprio jogador (dono ou operador) não entram. week: semana do ano do primeiro voo; perYear: voos por ano.",
+      "decay": 0.85,
+      "abortShare": 1.2,
+      "standDownWeeks": 52,
+      "abortStandDownWeeks": 20,
+      "lossPrestige": 12,
+      "partnerPrestige": 5,
+      "flights": [
+        { "id": "crew_dragon", "name": "Crew Dragon", "label": "Crew-{n}", "owner": "nasa", "operator": "spacex", "station": "a ISS", "perYear": 2, "week": 6, "startN": 12, "fromYear": 2026, "toYear": 2030, "crew": 4, "risk": 0.003, "riskMin": 0.003, "prestige": 1, "partners": ["esa", "jaxa"], "partnerChance": 0.75 },
+        { "id": "soyuz_ms", "name": "Soyuz MS", "label": "Soyuz MS-{n}", "owner": "roscosmos", "station": "a ISS", "perYear": 2, "week": 14, "startN": 29, "fromYear": 2026, "toYear": 2030, "crew": 3, "risk": 0.004, "riskMin": 0.004, "prestige": 3, "partners": ["nasa"], "partnerChance": 0.9, "partnerPrestige": 0 },
+        { "id": "shenzhou", "name": "Shenzhou", "label": "Shenzhou-{n}", "owner": "cnsa", "station": "a Tiangong", "perYear": 2, "week": 16, "startN": 23, "fromYear": 2026, "toYear": 2030, "crew": 3, "risk": 0.004, "riskMin": 0.004, "prestige": 1 },
+        { "id": "starliner", "name": "Starliner", "label": "Starliner-{n}", "owner": "nasa", "station": "a ISS", "perYear": 1, "week": 30, "startN": 1, "fromYear": 2027, "toYear": 2030, "crew": 4, "risk": 0.02, "riskMin": 0.008, "prestige": 1, "requireCalendar": "starliner1", "announceFirst": true, "partners": ["jaxa", "esa"], "partnerChance": 0.4 },
+        { "id": "gaganyaan_ops", "name": "Gaganyaan", "label": "Gaganyaan H{n}", "owner": "isro", "station": "a órbita baixa", "perYear": 1, "week": 40, "startN": 2, "fromYear": 2027, "toYear": 2030, "crew": 3, "risk": 0.02, "riskMin": 0.01, "prestige": 4, "requireFirst": "crewed_orbit_national:isro", "announceFirst": true },
+        { "id": "mengzhou_ops", "name": "Mengzhou", "label": "Mengzhou-{n}", "owner": "cnsa", "station": "a Tiangong", "perYear": 1, "week": 34, "startN": 1, "fromYear": 2027, "toYear": 2030, "crew": 3, "risk": 0.015, "riskMin": 0.006, "prestige": 2, "requireCalendar": "mengzhou_leo_test", "announceFirst": true }
+      ],
+      "texts": {
+        "loss": ["Tragédia na {label}: {crewWord} da {owner} {lost}", "{owner} perde a tripulação da {label}", "Luto no espaço: a {label} não volta", "{vehicle}: tripulação da {label} morre a caminho de {station}"],
+        "lossBody": ["{names}. A {owner} suspende os voos da {vehicle} e abre uma comissão de investigação.", "A bordo estavam {names}. Bandeiras a meio mastro e voos da {vehicle} suspensos por tempo indeterminado.", "{names} não sobreviveram. Agências do mundo todo mandam condolências; a {vehicle} fica no chão."],
+        "abort": ["Aborto na {label}: tripulação salva", "{label} aborta a subida; {crewWord} {safe}", "Susto na {label}: sistema de escape salva a tripulação"],
+        "abortBody": ["A {vehicle} fica no chão enquanto a {owner} investiga a falha.", "A cápsula pousou longe do previsto, mas todos estão bem. Investigação em curso."],
+        "first": ["{label}: primeiro voo operacional da {vehicle} com tripulação", "{owner} inaugura voos de rotina da {vehicle}"],
+        "firstBody": ["A {vehicle} leva {crew} pessoas a {station}. É o fim da fase de testes.", "Depois dos voos de teste, a {vehicle} entra na escala de rotações para {station}."],
+        "partner": ["Astronauta da {partner} voa na {label}", "{partner} tem lugar na {label}"],
+        "partnerBody": ["Assento negociado com a {owner}: experiência em órbita para a {partner}."]
+      }
+    },
     "injury": { "recoverable": 0.15, "catastrophic": 0.5, "weekly": 0.0008, "weeks": [4, 16] },
     "poach": { "loyaltyBelow": 50, "ambitionAbove": 55, "weeklyChance": 0.006, "counterRaise": 0.4, "counterLoyalty": 25, "counterBonusWeeks": 6, "walkoutLoyalty": 12 },
     "retire": { "checkEvery": 13, "age": 60, "astronautAge": 54, "chance": 0.12 },

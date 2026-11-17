@@ -13,6 +13,7 @@ export function render(container, store) {
     safePanel(() => bigNumbers(store, nav), 'Os números da agência ainda não estão disponíveis.'),
     safePanel(() => decisionQueue(store), 'A fila de decisões não pôde ser exibida.'),
     safePanel(() => activeMissions(store, nav)),
+    safePanel(() => crewCertPrograms(store, nav)),
     safePanel(() => upcoming(store, nav), 'O calendário ainda está sendo montado.'),
     safePanel(() => eraGoals(store, nav)),
     h('p', { class: 'muted small center' }, `Turno ${st.turn + 1} de ${st.endTurn + 1}`)));
@@ -207,6 +208,22 @@ function activeMissions(store, nav) {
       const dest = store.data?.index?.destinations?.[m.destination]?.name || m.destination;
       return card({ title: m.name, subtitle: `${STATUS_LABELS[m.status] || m.status} · ${dest}`, icon: TYPE_ICONS[m.type] || '🚀', onClick: () => nav('missoes', `m/${m.id}`) },
         frac != null ? bar(frac * 100, { key: `transit.${m.id}`, label: `Chegada ${fmtIn(t.arriveTurn, st.turn)}`, kind: 'accent' }) : null);
+    }));
+}
+
+/** The player's crew-certification programs (Missões › Frota has the details). */
+function crewCertPrograms(store, nav) {
+  const st = store.state;
+  const progs = Object.values(st.crewCert?.programs || {}).filter((p) => p?.sponsor === st.playerId);
+  if (!progs.length) return null;
+  return h('section', null,
+    sectionTitle('Certificação tripulada', button('Frota', () => nav('missoes', 'frota'), { kind: 'ghost', small: true })),
+    progs.map((p) => {
+      const cs = store.tryQuery?.('catalog/crewCert', null, p.vehicleId) || null;
+      const name = cs?.name || store.data?.index?.vehicles?.[p.vehicleId]?.name || p.vehicleId;
+      const prog = cs?.program;
+      return card({ title: name, subtitle: prog ? prog.phaseLabel : 'Em andamento', icon: '🧑‍🚀', onClick: () => nav('missoes', 'frota') },
+        prog ? bar(Math.round((prog.progress || 0) * 100), { key: `cert.${p.vehicleId}`, label: `Voos ${cs.flightsOk}/${cs.flightsNeeded}`, kind: 'info' }) : null);
     }));
 }
 

@@ -317,6 +317,25 @@ function traitNames(store, p) {
   return (p?.traits || []).map((t) => defs.find((d) => d.id === t)?.name || t).slice(0, 2);
 }
 
+// ---------------------------------------------------------------- the renderer (loaded on demand)
+// src/ui/launch-render is imported dynamically: a broken or missing renderer module must never take the whole
+// Launch Day scene down (the scene falls back to a plain sky until the module is there).
+let renderMod = null;
+let renderLoad = null;
+function loadRenderer() {
+  if (!renderLoad) {
+    renderLoad = import('./launch-render/index.js')
+      .then((m) => {
+        if (typeof m?.createLaunchRenderer !== 'function') throw new Error('launch-render sem createLaunchRenderer');
+        renderMod = m;
+        try { m.loadVehicleArt?.()?.catch?.(() => {}); } catch { /* art falls back to families */ }
+        return m;
+      })
+      .catch((e) => { console.error('launch-render indisponível:', e); renderLoad = null; return null; }); // next scene retries
+  }
+  return renderLoad;
+}
+
 // ---------------------------------------------------------------- the scene
 
 let activeScene = null;
@@ -331,6 +350,7 @@ export function openLaunchScene(store) {
   const key = `${al.missionId}|${al.phase || 'ascent'}`;
   if (activeScene && activeScene.alive() && activeScene.key === key) return activeScene.close;
   if (activeScene) (activeScene.forceClose || activeScene.close)();
+  loadRenderer();
   try {
     activeScene = createScene(store, key);
   } catch (e) {
@@ -533,6 +553,8 @@ function createScene(store, key) {
     S.H = Math.max(1, Math.round(r.height));
     canvas.width = Math.round(S.W * S.dpr);
     canvas.height = Math.round(S.H * S.dpr);
+    // resizing clears the canvas: repaint now so a layout change (radio lines, sheets) never flashes black
+    if (S.view && S.ready) { try { draw(0); } catch { /* next frame repaints */ } }
   }
 
   // ---------- milestone track (also the result's timeline strip)
@@ -866,7 +888,7 @@ function createScene(store, key) {
       if (sec > 0) {
         audio.beep(sec <= 3 ? 'final' : 'tick');
         if (sec <= 5) caption(`T−${sec}`, 'telemetry');
-        if (sec === 3 && phase === 'ascent') caption('Sequência de ignição.', 'radio');
+        if (sec === 3 && phase === 'ascent') { caption('Sequência de ignição.', 'radio'); fire('ignition'); }
         if (sec <= 3) vibrate(20);
       }
     }
@@ -949,6 +971,16 @@ function createScene(store, key) {
       S.clock = 0;
       S.presented = 0;
     }
+    // fresh renderer state for the flight (the countdown window used its own framing)
+    try { R.reset(); } catch (e) { renderFailed(e); }
+    S.ev = {};
+    if (phase === 'ascent') {
+      fire('ignition');
+      // resumed above the pad: liftoff happened long ago (no frost, no pad smoke)
+      if (telemetryAt(S.profile, S.clock).alt > 0.0004) S.ev.liftoff = S.t - 30;
+    } else if (resume) {
+      for (const m of (al.milestones || []).slice(0, S.presented)) if (m.status !== 'fail') visualEvents(m);
+    }
     S.engineOn = true;
     S.prevAlt = telemetryAt(S.profile, S.clock).alt;
     setMood('tense');
@@ -1024,7 +1056,8 @@ function createScene(store, key) {
     // 6) after the last milestone, hand over to the climax
     if (ended && !al.pendingIntervention) {
       S.endTimer += dtReal;
-      if (S.endTimer > (S.exploded ? 2.4 : 2.2) && !S.radioQ.length) enterClimax();
+      const touching = S.landed && S.touch && !S.touch.done; // let the craft settle on screen first
+      if (S.endTimer > (S.exploded ? 2.4 : 2.2) && !S.radioQ.length && !touching) enterClimax();
       else if (S.endTimer > 6) enterClimax();
     }
   }
@@ -1054,14 +1087,14 @@ function createScene(store, key) {
       audio.chime();
       vibrate(30);
       setMood('happy', 1.6);
-      burst(0.5);
+      visualEvents(m);
       if (/stag|separ|meco/.test(id)) separateStage();
       if (/fairing|les|coifa/.test(id)) dropFairing();
       if (/orbit/.test(id) && phase === 'ascent') { S.engineOn = false; caption('Corte dos motores. Estamos em órbita.', 'telemetry'); }
       if (/tli/.test(id)) { S.engineOn = true; S.flash = 0.5; S.flashColor = PAL.amber; }
       if (/parachute|paraq/.test(id)) S.chute = true;
       if (/powered|descent|descida/.test(id)) S.chute = false;
-      if (phase === 'arrival' && i === (al.milestones || []).length - 1) { if (arrivalKind === 'landing') touchdown(); else { S.engineOn = false; S.inOrbit = true; } }
+      if (phase === 'arrival' && i === (al.milestones || []).length - 1) { if (arrivalKind === 'landing') touchdown(); else captured(); }
     } else if (m.status === 'anomaly') {
       showStamp(label, 'ANOMALIA', 'warn');
       audio.alarm();
@@ -1069,9 +1102,10 @@ function createScene(store, key) {
       setMood('tense', 2);
       S.shake = Math.max(S.shake, 1);
       S.flash = 0.35; S.flashColor = PAL.amber;
+      visualEvents(m);
       if (/stag|separ|meco/.test(id)) separateStage();
       if (/fairing|les|coifa/.test(id)) dropFairing();
-      if (phase === 'arrival' && i === (al.milestones || []).length - 1) { if (arrivalKind === 'landing') touchdown(true); else { S.engineOn = false; S.inOrbit = true; } }
+      if (phase === 'arrival' && i === (al.milestones || []).length - 1) { if (arrivalKind === 'landing') touchdown(true); else captured(); }
     } else if (m.status === 'fail') {
       presentFailure(m, i, al);
     }
@@ -1225,6 +1259,7 @@ function createScene(store, key) {
     countEl.innerHTML = '';
     S.presented = (al.milestones || []).length;
     deriveVehicleState(al);
+    if (S.touch && !S.touch.done) { S.clock = Math.max(S.clock, S.profile.keys[S.profile.keys.length - 1]?.t ?? S.clock); visualTouchdown(); }
     const out = al.outcome || fallbackOutcome(al);
     const info = outcomeInfoFor(out);
     const good = out.level === 'total' || out.level === 'partial';
@@ -1322,8 +1357,11 @@ function createScene(store, key) {
     S.view = 'replay';
     ov.dataset.view = 'ascent';
     ov.classList.add('ls-replaying');
-    S.particles.length = 0; S.debris.length = 0;
-    S.staged = false; S.fairingOff = false; S.exploded = false; S.landed = false; S.engineOn = true; S.frozen = false; S.escaped = null; S.chute = false; S.inOrbit = false;
+    S.particles.length = 0;
+    try { R.reset(); } catch (e) { renderFailed(e); }
+    S.ev = {};
+    if (phase === 'ascent') fire('ignition');
+    S.staged = false; S.fairingOff = false; S.exploded = false; S.landed = false; S.touch = null; S.engineOn = true; S.frozen = false; S.escaped = null; S.chute = false; S.inOrbit = false;
     S.presented = 0;
     S.clock = 0;
     S.resultFx = null;
@@ -1333,55 +1371,146 @@ function createScene(store, key) {
   function updateReplay(dtReal) {
     const al = AL();
     const ms = al.milestones || [];
-    const R = S.replay;
-    if (!S.frozen) S.clock += dtReal * R.speed;
-    while (R.shown < ms.length && S.clock >= S.profile.times[R.shown]) {
-      const m = ms[R.shown];
-      S.presented = R.shown + 1;
+    const RP = S.replay;
+    if (!S.frozen) S.clock += dtReal * RP.speed;
+    while (RP.shown < ms.length && S.clock >= S.profile.times[RP.shown]) {
+      const m = ms[RP.shown];
+      S.presented = RP.shown + 1;
       const id = m.id || '';
       showStamp(m.label || id, m.status === 'ok' ? 'OK' : m.status === 'anomaly' ? 'ANOMALIA' : m.status === 'fail' ? 'FALHA' : '', m.status === 'ok' ? 'ok' : m.status === 'anomaly' ? 'warn' : 'bad');
       if (m.status !== 'fail' && /stag|separ|meco/.test(id)) separateStage();
       if (m.status !== 'fail' && /fairing|les|coifa/.test(id)) dropFairing();
       if (/orbit/.test(id) && m.status !== 'fail' && phase === 'ascent') S.engineOn = false;
-      if (phase === 'arrival' && R.shown === ms.length - 1 && m.status !== 'fail') { if (arrivalKind === 'landing') touchdown(m.status === 'anomaly'); else { S.engineOn = false; S.inOrbit = true; } }
-      if (m.status === 'fail') presentFailure(m, R.shown, al, true);
-      R.shown++;
+      if (phase === 'arrival' && RP.shown === ms.length - 1 && m.status !== 'fail') { if (arrivalKind === 'landing') touchdown(m.status === 'anomaly'); else captured(); }
+      visualEvents(m);
+      if (m.status === 'fail') presentFailure(m, RP.shown, al, true);
+      RP.shown++;
       renderTrack();
     }
-    const doneAt = (S.profile.times[ms.length - 1] ?? 0) + 2.5 * R.speed;
-    if (R.shown >= ms.length && S.clock >= doneAt || (S.frozen && (R.frozenT = (R.frozenT || 0) + dtReal) > 2.5)) {
+    const doneAt = (S.profile.times[ms.length - 1] ?? 0) + 2.5 * RP.speed;
+    if (RP.shown >= ms.length && S.clock >= doneAt || (S.frozen && (RP.frozenT = (RP.frozenT || 0) + dtReal) > 2.5)) {
       S.replay = null;
       ov.classList.remove('ls-replaying');
       enterResult(true);
     }
   }
 
-  // ================================================================ particles & effects
-  function cap() { return reduce() ? 120 : 420; }
-  function emit(p) { if (S.particles.length < cap()) S.particles.push(p); }
-  function burst(power = 1) {
-    if (reduce()) return;
-    const cx = S.W / 2;
-    const cy = S.H * 0.45;
-    for (let i = 0; i < 24 * power; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const v = 60 + Math.random() * 140;
-      emit({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.7 + Math.random() * 0.5, size: 2.5, grow: 0, color: Math.random() < 0.5 ? PAL.amber : PAL.cream, kind: 'spark', world: false });
-    }
+  // ================================================================ renderer (src/ui/launch-render)
+  // Everything on the canvas is painted by the launch renderer from a RenderState snapshot (README §3) plus
+  // milestone events (§4). The scene keeps only its HUD/DOM, the control-room chrome, flashes and result fx.
+  // R forwards to the real renderer once its module has loaded; events fired before that are kept in S.ev and
+  // reach it through rs.events (the renderer merges them), so nothing is lost.
+  let Rimpl = null;
+  const ensureR = () => {
+    if (!Rimpl && renderMod) Rimpl = renderMod.createLaunchRenderer({ seed: hashStr(key), cap: reduce() ? 150 : 600 });
+    return Rimpl;
+  };
+  const R = {
+    ready: () => !!ensureR(),
+    reset() { ensureR()?.reset(); },
+    event(name, payload) { ensureR()?.event(name, payload); },
+    update(rs) { ensureR()?.update(rs); },
+    draw(ctx, rs) { if (!ensureR()) return false; Rimpl.draw(ctx, rs); return true; },
+    drawPadWindow(ctx, rect, rs) { if (!ensureR()) return false; Rimpl.drawPadWindow(ctx, rect, rs); return true; },
+    vehicleScreenPos(rs) { return ensureR()?.vehicleScreenPos(rs) || { x: S.W / 2, y: S.H * 0.45 }; },
+  };
+  const landerId = pickLander();
+  const AIR_WORLDS = new Set(['earth', 'mars', 'titan', 'venus']);
+  S.ev = {};
+  let lastRS = null;
+  let renderErrors = 0;
+
+  /** The partner lander drawn when the mission's own craft cannot land (Orion → HLS, Mengzhou → Lanyue). */
+  function pickLander() {
+    if (phase !== 'arrival' || arrivalKind !== 'landing' || world === 'earth' || !craft || craft.kind === 'lander') return null;
+    const list = store.data?.spacecraft?.spacecraft || Object.values(dIdx.spacecraft || {});
+    const fits = list.filter((c) => c && c.kind === 'lander' && (c.destinations || []).includes(mission.destination) && (!crewed || (c.crew || 0) > 0));
+    const pick = fits.find((c) => c.operator === craft.operator) || fits.find((c) => !(c.embargo || []).includes(craft.operator)) || fits[0];
+    return pick?.id || null;
   }
+
+  function renderFailed(e) {
+    renderErrors++;
+    if (renderErrors <= 3) console.error('launch-render:', e);
+  }
+
+  /** Forward a visual event once (the renderer is idempotent too; S.ev feeds rs.events for the camera). */
+  function fire(name, payload) {
+    if (S.ev[name] != null) return;
+    S.ev[name] = S.t;
+    try { R.event(name, payload || {}); } catch (e) { renderFailed(e); }
+  }
+
+  /** Visual events implied by a resolved milestone (stage/fairing/touchdown are fired by their handlers). */
+  function visualEvents(m) {
+    const id = m?.id || '';
+    if (!m || m.status === 'fail') return;
+    if (phase === 'ascent') {
+      if (id === 'ignition') fire('ignition');
+      if (id === 'liftoff') fire('liftoff');
+      if (/maxq|max_q/.test(id)) fire('maxq', { status: m.status });
+      if (/orbit/.test(id)) fire('seco');
+      if (/tli/.test(id)) fire('tli');
+    } else {
+      if (/entry|reentry/.test(id)) fire('entry');
+      if (/parachute|paraq/.test(id)) fire('chute');
+      if (/powered|descent|descida/.test(id)) fire('powered');
+    }
+    if (m.status === 'anomaly') { try { R.event('anomaly', { severity: 0.6 }); } catch (e) { renderFailed(e); } }
+  }
+
+  function sceneMode() {
+    if (S.view === 'countdown') return 'pad';
+    if (phase === 'arrival') return arrivalKind === 'landing' ? 'descent' : 'orbit';
+    return 'ascent';
+  }
+
+  /** RenderState snapshot (README §3). Only presents scene state: never reads or changes the sim. */
+  function buildRS(dt, over = {}) {
+    const al = AL();
+    const mode = over.mode || sceneMode();
+    const tele = telemetryAt(S.profile, S.clock);
+    const lastT = S.profile.times[S.profile.times.length - 1] || 1;
+    const descentWorld = phase === 'arrival' ? world : 'earth';
+    const landed = visLanded(tele.alt);
+    let engineOn = (!!S.engineOn || (!!S.landed && !landed && !S.inOrbit)) && !S.exploded;
+    let chute = !!S.chute;
+    if (mode === 'pad') engineOn = phase === 'ascent' && S.cd <= 3;
+    else if (mode === 'descent') {
+      if (descentWorld === 'earth') {
+        engineOn = false;
+        // a capsule coming home has no parachute milestone: the mains open a few seconds after re-entry
+        chute = S.ev.entry != null && S.t - S.ev.entry > 3.5 && !landed;
+      } else if (AIR_WORLDS.has(descentWorld)) engineOn = engineOn && S.ev.powered != null && !chute;
+      engineOn = engineOn && !landed;
+    }
+    return {
+      view: { W: S.W, H: S.H }, t: S.t, dt, reduce: reduce(), seed: hashStr(key), mode, phase,
+      tele: { altKm: mode === 'pad' ? 0 : tele.alt, velKms: mode === 'pad' ? 0 : tele.vel, met: metAt(S.profile, S.clock) },
+      clock: S.clock, progress: Math.max(0, Math.min(1, S.clock / lastT)), cd: mode === 'pad' ? S.cd : null,
+      vehicleId: mission.vehicleId || null, craftId: mission.spacecraftId || null, landerId, crewed,
+      bodyId: body, world: descentWorld, siteId: null,
+      weather: { risk: toPct(al?.weather?.risk) ?? 15, label: al?.weather?.label || '' },
+      flags: {
+        engineOn, staged: !!S.staged, fairingOff: !!S.fairingOff, exploded: !!S.exploded, escaped: !!S.escaped,
+        landed, chute, inOrbit: !!S.inOrbit, hold: !!al?.pendingHold,
+      },
+      events: S.ev,
+      ...over,
+    };
+  }
+
   function separateStage() {
     if (S.staged) return;
     S.staged = true;
     audio.thump();
-    S.shake = Math.max(S.shake, 0.7);
-    if (phase === 'ascent') S.debris.push({ kind: 'stage', oy: 0, x: 0, y: 0, vx: -12, vy: 40, rot: 0, vr: -0.5, life: 0 });
+    S.shake = Math.max(S.shake, 0.4);
+    if (phase === 'ascent') fire('staging', { status: 'ok' });
   }
   function dropFairing() {
     if (S.fairingOff) return;
     S.fairingOff = true;
-    if (phase !== 'ascent') return;
-    S.debris.push({ kind: 'fairL', oy: S.staged ? -58 : -176, x: 0, y: 0, vx: -50, vy: 20, rot: 0, vr: -1.4, life: 0 });
-    S.debris.push({ kind: 'fairR', oy: S.staged ? -58 : -176, x: 0, y: 0, vx: 50, vy: 20, rot: 0, vr: 1.4, life: 0 });
+    if (phase === 'ascent') fire('fairing');
   }
   function explode(quiet = false) {
     if (S.exploded && !quiet) return;
@@ -1389,589 +1518,286 @@ function createScene(store, key) {
     S.engineOn = false;
     if (!quiet) audio.boom();
     S.flash = 1; S.flashColor = '#fff3d6';
-    S.shake = reduce() ? 0 : 2;
-    const n = reduce() ? 40 : 160;
-    const { x, y } = vehicleScreenPos();
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const v = 30 + Math.random() * 220;
-      const fire = Math.random() < 0.6;
-      emit({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.8 + Math.random() * 1.8, size: fire ? 4 + Math.random() * 6 : 6 + Math.random() * 10, grow: fire ? 6 : 14, color: fire ? (Math.random() < 0.5 ? PAL.amber : PAL.accent) : '#5b5f6b', kind: fire ? 'fire' : 'smoke', world: true, drag: 1.6 });
-    }
-    for (let i = 0; i < 7; i++) S.debris.push({ kind: 'chunk', oy: phase === 'arrival' ? 0 : -80, x: 0, y: 0, vx: (Math.random() - 0.5) * 160, vy: (Math.random() - 0.8) * 120, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 8, life: 0 });
+    fire('explode', vehicleScreenPos());
   }
   function escape() {
     S.escaped = { t: 0 };
     caption('Torre de escape disparada! Cápsula se afastando.', 'radio');
+    fire('escape');
   }
+  /**
+   * The sim rolls the touchdown milestone a few metres up (buildProfile): the scene marks the landing as decided
+   * and the craft actually touches the ground when the profile reaches zero altitude (visualTouchdown).
+   */
   function touchdown(hard = false) {
     S.landed = true;
+    S.touch = { hard: !!hard, done: false };
+  }
+  function visualTouchdown() {
+    if (!S.touch || S.touch.done) return;
+    S.touch.done = true;
     S.engineOn = false;
     audio.touchdown();
-    S.shake = Math.max(S.shake, hard ? 1.2 : 0.5);
-    const n = reduce() ? 20 : 90;
-    const { x, y } = vehicleScreenPos();
-    const groundY = y + 26 * scaleU();
-    const dust = body === 'mars' ? '#c97b4a' : '#b8b4a8';
-    for (let i = 0; i < n; i++) {
-      const dir = Math.random() < 0.5 ? -1 : 1;
-      emit({ x: x + dir * Math.random() * 10, y: groundY, vx: dir * (40 + Math.random() * 160), vy: -Math.random() * 40, life: 0, max: 1.2 + Math.random() * 1.6, size: 4 + Math.random() * 6, grow: 16, color: dust, kind: 'smoke', world: false, drag: 1.2 });
-    }
+    S.shake = Math.max(S.shake, S.touch.hard ? 0.6 : 0.2);
+    if (world === 'earth') fire('splashdown');
+    else fire('touchdown', { hard: S.touch.hard });
+  }
+  /** Landed on screen: decided by the sim AND down to the ground (or restored from a finished state). */
+  function visLanded(altKm) {
+    return !!S.landed && (!S.touch || S.touch.done || altKm <= 0.0008);
+  }
+  function captured() {
+    S.engineOn = false;
+    S.inOrbit = true;
+    fire('capture');
   }
 
-  function scaleU() { return Math.max(0.6, Math.min(1.6, S.H / 620)); }
   function vehicleScreenPos() {
-    if (phase === 'arrival') return { x: S.W / 2, y: arrivalKind === 'orbit' ? S.H * 0.36 : landerY() };
-    const tele = telemetryAt(S.profile, S.clock);
-    const lift = Math.min(1, tele.alt / 0.4);
-    return { x: S.W / 2 + Math.min(1, tele.alt / 150) * S.W * 0.05, y: S.H * (0.7 - 0.15 * lift) };
-  }
-  function landerY() {
-    return S.H * 0.4;
+    try { if (lastRS) return R.vehicleScreenPos(lastRS); } catch (e) { renderFailed(e); }
+    return { x: S.W / 2, y: S.H * 0.45 };
   }
 
   // ================================================================ drawing
-  const STARS = Array.from({ length: 140 }, (_, i) => ({ x: (hashStr('sx' + i) % 1000) / 1000, y: (hashStr('sy' + i) % 1000) / 1000, r: 0.4 + (hashStr('sr' + i) % 100) / 70, tw: (hashStr('st' + i) % 628) / 100 }));
-  const CLOUDS = Array.from({ length: 14 }, (_, i) => ({ alt: 1.2 + (hashStr('ca' + i) % 1000) / 1000 * 9, x: (hashStr('cx' + i) % 1000) / 1000, w: 60 + hashStr('cw' + i) % 120 }));
-  const CRATERS = Array.from({ length: 26 }, (_, i) => ({ x: (hashStr('kx' + i) % 1000) / 1000, d: (hashStr('kd' + i) % 1000) / 1000, r: 6 + hashStr('kr' + i) % 26 }));
-  const CROWD = Array.from({ length: 46 }, (_, i) => ({ x: (i + 0.5) / 46 + ((hashStr('px' + i) % 100) / 100 - 0.5) / 60, h: 0.7 + (hashStr('ph' + i) % 100) / 200, sign: hashStr('pg' + i) % 9 === 0, ph: (hashStr('pp' + i) % 628) / 100 }));
-
-  function lerpColor(a, b, t) {
-    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
-    const r = Math.round(((pa >> 16) & 255) + ((((pb >> 16) & 255) - ((pa >> 16) & 255)) * t));
-    const gg = Math.round(((pa >> 8) & 255) + ((((pb >> 8) & 255) - ((pa >> 8) & 255)) * t));
-    const bb = Math.round((pa & 255) + (((pb & 255) - (pa & 255)) * t));
-    return `rgb(${r},${gg},${bb})`;
-  }
-  function skyAt(alt) {
-    const w = phase === 'arrival' ? world : 'earth';
-    const stops = w === 'mars'
-      ? [[0, '#e8a87c', '#c97b4a'], [20, '#b5654a', '#7a3a2a'], [60, '#3a1f2a', '#5b2a26'], [140, '#07060c', '#1a0f14']]
-      : w === 'titan'
-        ? [[0, '#c98a3a', '#e0a95a'], [40, '#8a5a2a', '#b07a3a'], [140, '#1a1208', '#3a2a14']]
-        : w !== 'earth'
-          ? [[0, '#05070f', '#0b1020'], [200, '#05070f', '#0b1020']]
-          : [[0, '#5aa0c8', '#f4c48f'], [10, '#2f6aa3', '#7fb2d6'], [35, '#122a5c', '#2f5d94'], [80, '#070c1f', '#13204a'], [200, '#03050c', '#0b1020']];
-    let i = 0;
-    while (i < stops.length - 2 && alt > stops[i + 1][0]) i++;
-    const a = stops[i], b = stops[Math.min(i + 1, stops.length - 1)];
-    const t = b[0] > a[0] ? Math.max(0, Math.min(1, (alt - a[0]) / (b[0] - a[0]))) : 0;
-    return [lerpColor(a[1], b[1], t), lerpColor(a[2], b[2], t)];
+  let vignette = null;
+  function drawVignette() {
+    if (!vignette || vignette.W !== S.W || vignette.H !== S.H) {
+      const gr = g.createRadialGradient(S.W / 2, S.H * 0.48, Math.min(S.W, S.H) * 0.35, S.W / 2, S.H * 0.48, Math.hypot(S.W, S.H) * 0.62);
+      gr.addColorStop(0, 'rgba(0,0,0,0)');
+      gr.addColorStop(1, 'rgba(0,0,0,0.34)');
+      vignette = { W: S.W, H: S.H, gr };
+    }
+    g.fillStyle = vignette.gr;
+    g.fillRect(0, 0, S.W, S.H);
   }
 
   function draw(dt) {
     const W = S.W, H = S.H;
     g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
     g.clearRect(0, 0, W, H);
+    // scene-level shake (interventions, anomalies); deterministic, none with reduced motion
     let sx = 0, sy = 0;
     if (S.shake > 0 && !reduce()) {
-      const a = S.shake * 5 * scaleU();
-      sx = (Math.random() - 0.5) * a;
-      sy = (Math.random() - 0.5) * a;
+      const a = S.shake * 4;
+      sx = a * (Math.sin(S.t * 57.1) * 0.6 + Math.sin(S.t * 21.7) * 0.4);
+      sy = a * (Math.sin(S.t * 43.3) * 0.6 + Math.sin(S.t * 29.9) * 0.4);
     }
     S.shake = Math.max(0, S.shake - dt * 1.6);
     g.save();
     g.translate(sx, sy);
     if (S.view === 'countdown') drawControlRoom(dt);
-    else if (phase === 'arrival' && arrivalKind === 'orbit') drawOrbitArrival(dt);
-    else if (phase === 'arrival') drawDescent(dt);
-    else drawAscent(dt);
+    else drawFlight(dt);
     drawParticles(dt);
     g.restore();
+    if (S.view !== 'countdown') drawVignette();
     if (S.flash > 0) {
-      g.globalAlpha = Math.min(1, S.flash) * (reduce() ? 0.35 : 0.8);
+      g.globalAlpha = Math.min(1, S.flash) * (reduce() ? 0.3 : 0.75);
+      g.globalCompositeOperation = 'lighter';
       g.fillStyle = S.flashColor;
       g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = 'source-over';
       g.globalAlpha = 1;
       S.flash = Math.max(0, S.flash - dt * 1.8);
     }
     if (S.view === 'result') drawResultFx(dt);
   }
 
-  function drawStars(alpha, drift = 0) {
-    if (alpha <= 0) return;
-    g.fillStyle = PAL.cream;
-    for (const s of STARS) {
-      const x = ((s.x * S.W - drift * (0.3 + s.r * 0.2)) % S.W + S.W) % S.W;
-      const tw = reduce() ? 1 : 0.6 + 0.4 * Math.sin(S.t * 2 + s.tw);
-      g.globalAlpha = alpha * tw;
-      g.fillRect(x, s.y * S.H, s.r, s.r);
+  /** The whole flight (ascent, descent, orbit arrival) through the renderer. */
+  function drawFlight(dt) {
+    const rs = buildRS(dt);
+    try {
+      R.update(rs);
+      lastRS = rs;
+      // the vehicle leaves the pad when the profile starts climbing (a little before the "liftoff" call)
+      if (rs.mode === 'ascent' && rs.tele.altKm > 0.0004) fire('liftoff');
+      if (rs.mode === 'descent' && rs.flags.chute) fire('chute');
+      if (rs.mode === 'descent' && S.landed && S.touch && !S.touch.done && rs.tele.altKm <= 0.0008) { visualTouchdown(); rs.flags.landed = true; rs.flags.engineOn = false; }
+      if (!R.draw(g, rs)) plainSky();
+    } catch (e) {
+      renderFailed(e);
+      plainSky();
     }
-    g.globalAlpha = 1;
+  }
+  /** Plain sky while the renderer module loads (or if it is unavailable). */
+  function plainSky() {
+    const gr = g.createLinearGradient(0, 0, 0, S.H);
+    gr.addColorStop(0, '#04060d'); gr.addColorStop(1, phase === 'arrival' ? '#141821' : '#1d3f66');
+    g.fillStyle = gr;
+    g.fillRect(-20, -20, S.W + 40, S.H + 40);
   }
 
-  // ---------- ascent (side view, following camera)
-  function drawAscent(dt) {
-    const W = S.W, H = S.H, u = scaleU();
-    const tele = telemetryAt(S.profile, S.clock);
-    const alt = tele.alt;
-    const [top, bottom] = skyAt(alt);
-    const grd = g.createLinearGradient(0, 0, 0, H);
-    grd.addColorStop(0, top);
-    grd.addColorStop(1, bottom);
-    g.fillStyle = grd;
-    g.fillRect(-20, -20, W + 40, H + 40);
-    // poster sun near the horizon early on
-    if (alt < 20) {
-      g.globalAlpha = 1 - alt / 20;
-      g.fillStyle = '#ffd59e';
-      g.beginPath(); g.arc(W * 0.78, H * 0.62 + alt * 18, 46 * u, 0, Math.PI * 2); g.fill();
-      g.globalAlpha = 1;
+  // ---------- control room (countdown): a dim room, the window to the pad (or the big screen) and consoles
+  let roomCache = null;
+  function roomBackdrop(W, H) {
+    if (roomCache && roomCache.W === W && roomCache.H === H && roomCache.dpr === S.dpr) return roomCache.c;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(W * S.dpr)); c.height = Math.max(1, Math.round(H * S.dpr));
+    const x = c.getContext('2d');
+    x.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+    // back wall: dark acoustic panels under a soft ceiling light
+    const wall = x.createLinearGradient(0, 0, 0, H);
+    wall.addColorStop(0, '#0c1220'); wall.addColorStop(0.6, '#0a0f1a'); wall.addColorStop(1, '#06090f');
+    x.fillStyle = wall; x.fillRect(0, 0, W, H);
+    const panelW = Math.max(28, W / 9);
+    for (let i = 0; i * panelW < W; i++) {
+      const v = (hashStr('wall' + i) % 7) / 260;
+      x.fillStyle = `rgba(160,180,210,${(0.02 + v).toFixed(3)})`;
+      x.fillRect(i * panelW + 1, 0, panelW - 2, H * 0.62);
     }
-    const drift = Math.pow(Math.max(0, alt), 1.25) * 6;
-    drawStars(Math.max(0, Math.min(1, (alt - 25) / 40)), drift);
-    // earth limb at high altitude
-    if (alt > 60) {
-      const k = Math.min(1, (alt - 60) / 140);
-      const R = W * (6 - k * 4.2);
-      const cy = H + R - H * (0.06 + k * 0.2);
-      g.fillStyle = '#1f5f9e';
-      g.beginPath(); g.arc(W * 0.5, cy, R, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = 'rgba(142,202,230,0.8)';
-      g.lineWidth = 6 * u;
-      g.beginPath(); g.arc(W * 0.5, cy, R + 3 * u, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
-      g.fillStyle = 'rgba(243,233,210,0.18)';
-      for (let i = 0; i < 5; i++) { g.beginPath(); g.ellipse(((i * 0.27 * W - drift * 0.4) % (W * 1.4) + W * 1.4) % (W * 1.4) - W * 0.2, cy - R + 18 * u + i * 4, 50 * u, 6 * u, 0, 0, Math.PI * 2); g.fill(); }
-    }
-    const pos = vehicleScreenPos();
-    // clouds (parallax by altitude)
-    const pxKm = 150 * u;
-    for (const c of CLOUDS) {
-      const y = pos.y - (c.alt - alt) * pxKm;
-      if (y < -60 || y > H + 60) continue;
-      const x = ((c.x * W * 1.6 - drift * 2) % (W * 1.6) + W * 1.6) % (W * 1.6) - W * 0.3;
-      g.fillStyle = 'rgba(243,233,210,0.85)';
-      g.beginPath();
-      g.ellipse(x, y, c.w * u * 0.5, 12 * u, 0, 0, Math.PI * 2);
-      g.ellipse(x + c.w * u * 0.2, y - 8 * u, c.w * u * 0.3, 12 * u, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-    // ground, pad, tower and crowd (scroll away quickly)
-    const groundY = pos.y + 8 * u + alt * 1000 * 0.9 * u;
-    if (groundY < H + 200) {
-      g.fillStyle = '#2b3a2e';
-      g.fillRect(-20, groundY, W + 40, H);
-      g.fillStyle = '#3d5040';
-      g.fillRect(-20, groundY, W + 40, 6 * u);
-      g.fillStyle = '#6b6f7a';
-      g.fillRect(W / 2 - 60 * u, groundY - 6 * u, 120 * u, 8 * u); // pad
-      // tower (blueprint truss)
-      const tx = W / 2 - 48 * u, th = 210 * u;
-      g.strokeStyle = PAL.accent; g.lineWidth = 2 * u;
-      g.strokeRect(tx, groundY - th, 14 * u, th);
-      for (let y = groundY - th; y < groundY; y += 14 * u) { g.beginPath(); g.moveTo(tx, y); g.lineTo(tx + 14 * u, y + 14 * u); g.stroke(); }
-      if (S.clock < 4) { g.beginPath(); g.moveTo(tx + 14 * u, groundY - th * 0.8); g.lineTo(W / 2 - 11 * u, groundY - th * 0.8); g.stroke(); }
-      // crowd silhouettes far left/right
-      g.fillStyle = '#16202a';
-      for (const p of CROWD) {
-        if (p.x > 0.32 && p.x < 0.68) continue;
-        const bob = reduce() ? 0 : Math.abs(Math.sin(S.t * 6 + p.ph)) * 3 * u * (S.mood === 'happy' ? 2 : 1);
-        const x = p.x * W, y = groundY + 20 * u - bob;
-        g.beginPath(); g.arc(x, y - 10 * u * p.h, 4 * u, 0, Math.PI * 2); g.fill();
-        g.fillRect(x - 4 * u, y - 7 * u * p.h, 8 * u, 12 * u);
-      }
-      // venting vapor before liftoff
-      if (S.clock < 5 && !reduce() && Math.random() < 0.4) emit({ x: W / 2 + 12 * u, y: groundY - 140 * u, vx: 20 + Math.random() * 20, vy: -5, life: 0, max: 1.5, size: 4, grow: 10, color: 'rgba(243,233,210,0.6)', kind: 'smoke', world: true, drag: 0.5 });
-    }
-    // camera follows: shift world particles as the ground moves away
-    const dAlt = alt - S.prevAlt;
-    S.prevAlt = alt;
-    const camDy = Math.min(60, dAlt * 1000 * 0.9 * u * (alt < 2 ? 1 : 0.03) + (alt >= 2 ? dAlt * 40 : 0));
-    for (const p of S.particles) if (p.world) p.y += camDy;
-    // debris (stage, fairings, chunks)
-    drawDebris(dt, pos, u);
-    // rocket
-    const tilt = Math.min(1, Math.max(0, (alt - 1) / 140)) * 1.05;
-    if (!S.exploded || S.escaped) drawRocket(pos.x, pos.y, tilt, u, dt, tele);
-    if (S.escaped) drawEscape(dt, pos, u);
+    const lamp = x.createRadialGradient(W / 2, -H * 0.1, 10, W / 2, -H * 0.1, H * 0.8);
+    lamp.addColorStop(0, 'rgba(255,236,200,0.10)'); lamp.addColorStop(1, 'rgba(255,236,200,0)');
+    x.fillStyle = lamp; x.fillRect(0, 0, W, H);
+    const fl = x.createLinearGradient(0, H * 0.62, 0, H);
+    fl.addColorStop(0, '#0b0f17'); fl.addColorStop(1, '#030407');
+    x.fillStyle = fl; x.fillRect(0, H * 0.62, W, H * 0.38);
+    roomCache = { W, H, dpr: S.dpr, c };
+    return c;
   }
 
-  function drawRocket(x, y, tilt, u, dt, tele) {
-    const s = u * 0.95;
-    const w = 20 * s;
-    const h1 = S.staged ? 0 : 118 * s;
-    const h2 = 58 * s;
-    const hp = 34 * s;
-    if (S.exploded) return;
-    g.save();
-    g.translate(x, y);
-    g.rotate(tilt);
-    // exhaust
-    if (S.engineOn) {
-      const n = reduce() ? 1 : 4;
-      const throttle = 0.7 + 0.3 * Math.sin(S.t * 40);
-      for (let i = 0; i < n; i++) {
-        const spread = (Math.random() - 0.5) * 0.5;
-        const v = 180 + Math.random() * 120;
-        const ang = tilt + Math.PI / 2 + spread * 0.4;
-        const wx = x + Math.cos(tilt + Math.PI / 2) * 6 * s;
-        const wy = y + Math.sin(tilt + Math.PI / 2) * 6 * s;
-        emit({ x: wx, y: wy, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v + 40, life: 0, max: 0.4 + Math.random() * (tele.alt < 30 ? 1.1 : 0.4), size: 4 * s, grow: tele.alt < 40 ? 22 : 8, color: Math.random() < 0.3 ? '#fff3d6' : PAL.amber, kind: tele.alt < 40 ? 'fire' : 'spark', world: true, drag: 0.8 });
-      }
-      // flame core
-      const fl = (S.staged ? 30 : 46) * s * throttle * (tele.alt > 40 ? 1.6 : 1);
-      const fg = g.createLinearGradient(0, 0, 0, fl);
-      fg.addColorStop(0, '#fff3d6'); fg.addColorStop(0.4, PAL.amber); fg.addColorStop(1, 'rgba(255,107,53,0)');
-      g.fillStyle = fg;
-      g.beginPath(); g.moveTo(-w * 0.4, 0); g.quadraticCurveTo(0, fl * 1.2, w * 0.4, 0); g.fill();
-    }
-    // stage 1
-    if (!S.staged) {
-      g.fillStyle = PAL.cream;
-      g.fillRect(-w / 2, -h1, w, h1);
-      g.fillStyle = PAL.flag;
-      g.fillRect(-w / 2, -h1 * 0.55, w, 10 * s);
-      g.fillStyle = PAL.navy;
-      g.fillRect(-w / 2, -h1, w, 4 * s);
-      // fins
-      g.fillStyle = PAL.accent;
-      g.beginPath(); g.moveTo(-w / 2, -18 * s); g.lineTo(-w / 2 - 10 * s, 4 * s); g.lineTo(-w / 2, 0); g.fill();
-      g.beginPath(); g.moveTo(w / 2, -18 * s); g.lineTo(w / 2 + 10 * s, 4 * s); g.lineTo(w / 2, 0); g.fill();
-      g.fillStyle = '#3a3f4a';
-      g.fillRect(-w * 0.35, 0, w * 0.7, 5 * s);
-    } else {
-      g.fillStyle = '#3a3f4a';
-      g.fillRect(-w * 0.28, 0, w * 0.56, 6 * s);
-    }
-    // stage 2
-    const y2 = -h1 - h2;
-    g.fillStyle = PAL.cream;
-    g.fillRect(-w / 2, y2, w, h2);
-    g.fillStyle = PAL.navy;
-    g.fillRect(-w / 2, y2 + h2 * 0.3, w, 5 * s);
-    // payload
-    const yp = y2;
-    if (!S.fairingOff) {
-      g.fillStyle = crewed ? PAL.cream : '#e8e1cf';
-      g.beginPath(); g.moveTo(-w / 2, yp); g.quadraticCurveTo(-w / 2, yp - hp, 0, yp - hp - 6 * s); g.quadraticCurveTo(w / 2, yp - hp, w / 2, yp); g.fill();
-      if (crewed) { g.strokeStyle = PAL.accent; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(0, yp - hp - 6 * s); g.lineTo(0, yp - hp - 22 * s); g.stroke(); }
-    } else {
-      g.fillStyle = crewed ? '#d9d2c0' : PAL.amber;
-      if (crewed) { g.beginPath(); g.moveTo(-w / 2, yp); g.lineTo(-w * 0.2, yp - 18 * s); g.lineTo(w * 0.2, yp - 18 * s); g.lineTo(w / 2, yp); g.fill(); }
-      else { g.fillRect(-w * 0.35, yp - 14 * s, w * 0.7, 14 * s); g.fillStyle = '#1f5f9e'; g.fillRect(-w * 1.2, yp - 10 * s, w * 0.7, 6 * s); g.fillRect(w * 0.5, yp - 10 * s, w * 0.7, 6 * s); }
-    }
-    // anomaly glow
-    if (S.shake > 0.5 && !S.exploded) { g.strokeStyle = PAL.amber; g.lineWidth = 2; g.strokeRect(-w / 2 - 3, y2 - 3, w + 6, h2 + 6); }
-    g.restore();
+  function windowRect() {
+    const W = S.W, H = S.H;
+    return { x: Math.round(W * 0.05), y: Math.round(H * 0.04), w: Math.round(W * 0.9), h: Math.round(H * 0.6) };
   }
 
-  function drawDebris(dt, pos, u) {
-    for (const d of S.debris) {
-      d.life += dt;
-      d.vy += 60 * dt;
-      d.x += d.vx * dt;
-      d.y += d.vy * dt;
-      d.rot += d.vr * dt;
-      g.save();
-      g.translate(pos.x + d.x * u, pos.y + ((d.oy || 0) + d.y) * u);
-      g.rotate(d.rot);
-      g.globalAlpha = Math.max(0, 1 - d.life / 5);
-      if (d.kind === 'stage') { g.fillStyle = PAL.cream; g.fillRect(-10 * u, 0, 20 * u, 112 * u); g.fillStyle = PAL.flag; g.fillRect(-10 * u, 50 * u, 20 * u, 10 * u); }
-      else if (d.kind === 'chunk') { g.fillStyle = '#6b6f7a'; g.fillRect(-5 * u, -4 * u, 10 * u, 8 * u); }
-      else { g.fillStyle = '#e8e1cf'; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(d.kind === 'fairL' ? -12 * u : 12 * u, -16 * u, 0, -34 * u); g.lineTo(0, 0); g.fill(); }
-      g.restore();
-    }
-    g.globalAlpha = 1;
-    S.debris = S.debris.filter((d) => d.life < 5);
-  }
-
-  function drawEscape(dt, pos, u) {
-    S.escaped.t += dt;
-    const t = S.escaped.t;
-    const x = pos.x - t * 50 * u;
-    const y = pos.y - 190 * u - t * 90 * u + t * t * 18 * u;
-    g.fillStyle = PAL.cream;
-    g.beginPath(); g.moveTo(x - 10 * u, y); g.lineTo(x - 4 * u, y - 16 * u); g.lineTo(x + 4 * u, y - 16 * u); g.lineTo(x + 10 * u, y); g.fill();
-    if (t > 2) { // parachute
-      g.fillStyle = PAL.accent;
-      g.beginPath(); g.arc(x, y - 50 * u, 22 * u, Math.PI, 0); g.fill();
-      g.strokeStyle = PAL.cream; g.lineWidth = 1;
-      g.beginPath(); g.moveTo(x - 22 * u, y - 50 * u); g.lineTo(x, y - 16 * u); g.lineTo(x + 22 * u, y - 50 * u); g.stroke();
-    } else if (!reduce()) emit({ x, y: y + 2, vx: 30, vy: 80, life: 0, max: 0.5, size: 3, grow: 8, color: PAL.amber, kind: 'fire', world: false });
-  }
-
-  // ---------- arrival (descent over a cratered surface)
-  function drawDescent(dt) {
-    const W = S.W, H = S.H, u = scaleU();
-    const tele = telemetryAt(S.profile, S.clock);
-    const alt = Math.max(0, tele.alt);
-    const [top, bottom] = skyAt(alt);
-    const grd = g.createLinearGradient(0, 0, 0, H);
-    grd.addColorStop(0, top); grd.addColorStop(1, bottom);
-    g.fillStyle = grd;
-    g.fillRect(-20, -20, W + 40, H + 40);
-    const airless = world === 'moon';
-    drawStars(airless ? 1 : Math.min(1, alt / 80) * 0.6, S.clock * 2);
-    if (airless) { // Earth hanging in the lunar sky
-      g.fillStyle = '#1f5f9e';
-      g.beginPath(); g.arc(W * 0.8, H * 0.14, 18 * u, 0, Math.PI * 2); g.fill();
-      g.fillStyle = 'rgba(243,233,210,0.7)';
-      g.beginPath(); g.ellipse(W * 0.8 - 4 * u, H * 0.14 - 4 * u, 8 * u, 3 * u, 0.4, 0, Math.PI * 2); g.fill();
-    }
-    const ly = landerY();
-    const dist = S.landed || alt <= 0.0005 ? 24 * u : Math.log10(1 + alt * 50) * H * 0.18 + 24 * u;
-    const surf = ly + dist;
-    const near = Math.max(0, Math.min(1, 1 - (dist - 24 * u) / (H * 0.6)));
-    const ground = { mars: ['#9c4a24', '#c1683a'], titan: ['#7a5326', '#a8743a'], earth: ['#123e6b', '#1f5f9e'] }[world] || ['#6e6d68', '#9a9a94'];
-    if (surf < H + 40) {
-      const sg = g.createLinearGradient(0, surf, 0, H);
-      sg.addColorStop(0, ground[1]); sg.addColorStop(1, ground[0]);
-      g.fillStyle = sg;
-      g.beginPath();
-      g.moveTo(-20, surf + 10 * u);
-      for (let i = 0; i <= 12; i++) g.lineTo((i / 12) * (W + 40) - 20, surf + Math.sin(i * 1.7) * 6 * u * (1 + near));
-      g.lineTo(W + 20, H + 20); g.lineTo(-20, H + 20); g.fill();
-      // craters with perspective (bigger as we get close); waves on the ocean
-      for (const c of CRATERS) {
-        if (world === 'earth') {
-          const wy = surf + 8 * u + c.d * (H - surf);
-          g.strokeStyle = 'rgba(243,233,210,0.35)'; g.lineWidth = 1.5;
-          const wx = ((c.x * W + S.t * 12 * (0.5 + c.d)) % (W + 40)) - 20;
-          g.beginPath(); g.moveTo(wx - c.r * u, wy); g.quadraticCurveTo(wx, wy - 4 * u, wx + c.r * u, wy); g.stroke();
-          continue;
-        }
-        const cy = surf + 8 * u + c.d * (H - surf);
-        if (cy > H + 30) continue;
-        const sc = (0.4 + near * 1.6) * (0.5 + c.d);
-        const cx = (c.x - 0.5) * W * (1 + near) + W / 2;
-        g.fillStyle = 'rgba(0,0,0,0.22)';
-        g.beginPath(); g.ellipse(cx, cy, c.r * sc * u, c.r * sc * u * 0.35, 0, 0, Math.PI * 2); g.fill();
-        g.strokeStyle = 'rgba(243,233,210,0.25)'; g.lineWidth = 1.5;
-        g.beginPath(); g.ellipse(cx, cy - 1, c.r * sc * u, c.r * sc * u * 0.35, 0, Math.PI, Math.PI * 2); g.stroke();
-      }
-    }
-    drawDebris(dt, { x: W / 2, y: ly }, u);
-    if (S.exploded) return;
-    const vy = S.landed ? surf - 24 * u : ly;
-    if (S.chute) { // supersonic parachute (Mars/Titan/Earth entries)
-      const sway = reduce() ? 0 : Math.sin(S.t * 1.5) * 4 * u;
-      g.fillStyle = PAL.accent;
-      g.beginPath(); g.arc(W / 2 + sway, vy - 80 * u, 34 * u, Math.PI, 0); g.fill();
-      g.fillStyle = PAL.cream;
-      g.fillRect(W / 2 + sway - 34 * u, vy - 82 * u, 68 * u, 4 * u);
-      g.strokeStyle = PAL.cream; g.lineWidth = 1;
-      g.beginPath(); g.moveTo(W / 2 + sway - 34 * u, vy - 80 * u); g.lineTo(W / 2, vy - 26 * u); g.lineTo(W / 2 + sway + 34 * u, vy - 80 * u); g.stroke();
-    }
-    if (world === 'earth') drawCapsule(W / 2, vy, u);
-    else drawLander(W / 2, vy, u);
-  }
-
-  function drawCapsule(x, y, u) {
-    g.save();
-    g.translate(x, y);
-    // heat-shield glow during entry
-    const tele = telemetryAt(S.profile, S.clock);
-    if (tele.alt > 40 && tele.alt < 110 && !S.landed) {
-      g.fillStyle = 'rgba(255,107,53,' + (0.5 + 0.3 * Math.sin(S.t * 20)).toFixed(2) + ')';
-      g.beginPath(); g.ellipse(0, 16 * u, 26 * u, 14 * u, 0, 0, Math.PI); g.fill();
-    }
-    g.fillStyle = '#d9d2c0';
-    g.beginPath(); g.moveTo(-22 * u, 12 * u); g.lineTo(-8 * u, -18 * u); g.lineTo(8 * u, -18 * u); g.lineTo(22 * u, 12 * u); g.closePath(); g.fill();
-    g.fillStyle = '#5b4a3a'; g.fillRect(-22 * u, 10 * u, 44 * u, 5 * u);
-    g.fillStyle = PAL.navy; g.fillRect(-4 * u, -8 * u, 8 * u, 6 * u);
-    g.fillStyle = PAL.flag; g.fillRect(-12 * u, 2 * u, 24 * u, 2 * u);
-    g.restore();
-  }
-
-  // ---------- arrival without landing: orbital insertion over a big planet disc
-  function drawOrbitArrival(dt) {
-    const W = S.W, H = S.H, u = scaleU();
-    const tele = telemetryAt(S.profile, S.clock);
-    const A0 = S.profile.keys[0]?.alt || 3000;
-    const k = Math.max(0, Math.min(1, 1 - tele.alt / A0));
-    g.fillStyle = '#05070f';
-    g.fillRect(-20, -20, W + 40, H + 40);
-    drawStars(1, S.clock * 3);
-    const R = W * (0.55 + 1.6 * k);
-    const cx = W / 2, cy = H + R * 0.62;
-    const col = { moon: ['#9a9a94', '#6e6d68'], mars: ['#c1683a', '#7a3a2a'], jupiter: ['#d8b78a', '#a0703a'], saturn: ['#e0b070', '#a07840'], titan: ['#d09a4a', '#8a5a2a'], earth: ['#1f5f9e', '#123e6b'] }[world] || ['#9a9a94', '#6e6d68'];
-    const pg = g.createRadialGradient(cx - R * 0.3, cy - R * 0.5, R * 0.1, cx, cy, R);
-    pg.addColorStop(0, col[0]); pg.addColorStop(1, col[1]);
-    g.fillStyle = pg;
-    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
-    g.save();
-    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
-    if (world === 'jupiter' || world === 'saturn') {
-      for (let i = 0; i < 9; i++) { g.fillStyle = i % 2 ? 'rgba(122,74,40,0.35)' : 'rgba(243,233,210,0.18)'; g.fillRect(cx - R, cy - R + i * R * 0.12, R * 2, R * 0.06); }
-    } else {
-      g.fillStyle = 'rgba(0,0,0,0.18)';
-      for (const c of CRATERS.slice(0, 14)) { g.beginPath(); g.arc(cx + (c.x - 0.5) * R * 1.4, cy - R * (0.35 + c.d * 0.6), c.r * u * (0.4 + k), 0, Math.PI * 2); g.fill(); }
-    }
-    g.restore();
-    if (world !== 'moon') { g.strokeStyle = 'rgba(243,233,210,0.25)'; g.lineWidth = 4 * u; g.beginPath(); g.arc(cx, cy, R + 3 * u, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
-    if (S.inOrbit) { // captured: draw the orbit ellipse
-      g.setLineDash([6 * u, 6 * u]); g.strokeStyle = PAL.teal; g.lineWidth = 1.5;
-      g.beginPath(); g.ellipse(cx, cy, R * 1.15, R * 0.95, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
-      g.setLineDash([]);
-    }
-    drawDebris(dt, { x: W / 2, y: H * 0.36 }, u);
-    if (S.exploded) return;
-    const x = W * (0.5 + 0.06 * Math.sin(S.clock * 0.05)), y = H * 0.36;
-    drawProbe(x, y, u);
-  }
-
-  function drawProbe(x, y, u) {
-    g.save();
-    g.translate(x, y);
-    if (S.engineOn) { // retro burn points forward (left)
-      const fl = (18 + Math.random() * 8) * u;
-      g.fillStyle = PAL.amber;
-      g.beginPath(); g.moveTo(-14 * u, -4 * u); g.lineTo(-14 * u - fl, 0); g.lineTo(-14 * u, 4 * u); g.fill();
-      if (!reduce() && Math.random() < 0.5) emit({ x: x - 16 * u, y, vx: -120, vy: (Math.random() - 0.5) * 20, life: 0, max: 0.5, size: 2, grow: 5, color: PAL.amber, kind: 'spark', world: false });
-    }
-    g.fillStyle = '#1f5f9e';
-    g.fillRect(-6 * u, -34 * u, 12 * u, 24 * u);
-    g.fillRect(-6 * u, 10 * u, 12 * u, 24 * u);
-    g.strokeStyle = 'rgba(243,233,210,0.5)'; g.lineWidth = 1;
-    for (let i = 0; i < 3; i++) { g.strokeRect(-6 * u, (-34 + i * 8) * u, 12 * u, 8 * u); g.strokeRect(-6 * u, (10 + i * 8) * u, 12 * u, 8 * u); }
-    g.fillStyle = '#d4a017';
-    g.fillRect(-14 * u, -10 * u, 28 * u, 20 * u);
-    g.fillStyle = PAL.cream;
-    g.beginPath(); g.ellipse(10 * u, -14 * u, 4 * u, 9 * u, -0.5, 0, Math.PI * 2); g.fill();
-    g.fillStyle = PAL.flag; g.fillRect(-14 * u, 6 * u, 28 * u, 2 * u);
-    g.restore();
-  }
-
-  function drawLander(x, y, u) {
-    g.save();
-    g.translate(x, y);
-    if (S.engineOn) {
-      const fl = (20 + Math.random() * 8) * u;
-      const fg = g.createLinearGradient(0, 14 * u, 0, 14 * u + fl);
-      fg.addColorStop(0, '#fff3d6'); fg.addColorStop(1, 'rgba(255,183,3,0)');
-      g.fillStyle = fg;
-      g.beginPath(); g.moveTo(-6 * u, 14 * u); g.lineTo(0, 14 * u + fl * 1.4); g.lineTo(6 * u, 14 * u); g.fill();
-      if (!reduce() && Math.random() < 0.6) emit({ x, y: y + 20 * u, vx: (Math.random() - 0.5) * 30, vy: 120, life: 0, max: 0.4, size: 2, grow: 6, color: PAL.amber, kind: 'spark', world: false });
-    }
-    // legs
-    g.strokeStyle = PAL.steel; g.lineWidth = 2.5 * u;
-    g.beginPath(); g.moveTo(-12 * u, 4 * u); g.lineTo(-24 * u, 24 * u); g.moveTo(12 * u, 4 * u); g.lineTo(24 * u, 24 * u); g.stroke();
-    g.fillStyle = PAL.steel;
-    g.fillRect(-28 * u, 23 * u, 8 * u, 3 * u); g.fillRect(20 * u, 23 * u, 8 * u, 3 * u);
-    // descent stage (gold foil) + ascent module
-    g.fillStyle = '#d4a017';
-    g.beginPath(); g.moveTo(-16 * u, -2 * u); g.lineTo(-12 * u, 10 * u); g.lineTo(12 * u, 10 * u); g.lineTo(16 * u, -2 * u); g.lineTo(12 * u, -10 * u); g.lineTo(-12 * u, -10 * u); g.closePath(); g.fill();
-    g.strokeStyle = 'rgba(11,16,32,0.35)'; g.lineWidth = 1;
-    for (let i = -10; i < 12; i += 5) { g.beginPath(); g.moveTo(i * u, -10 * u); g.lineTo((i + 3) * u, 10 * u); g.stroke(); }
-    g.fillStyle = PAL.cream;
-    g.fillRect(-10 * u, -26 * u, 20 * u, 16 * u);
-    g.fillStyle = PAL.navy;
-    g.fillRect(-5 * u, -22 * u, 10 * u, 5 * u);
-    g.fillStyle = PAL.flag;
-    g.fillRect(-10 * u, -12 * u, 20 * u, 2 * u);
-    g.fillStyle = '#3a3f4a';
-    g.fillRect(-4 * u, 10 * u, 8 * u, 4 * u);
-    g.restore();
-  }
-
-  /** Arrival countdown: the control room's big screen shows the target and the approach path. */
-  function drawBigScreen(x, y, w, h, u) {
-    const col = { moon: '#9a9a94', mars: '#c1683a', jupiter: '#d8b78a', saturn: '#e0b070', titan: '#d09a4a', earth: '#1f5f9e' }[world] || '#9a9a94';
-    const R = Math.min(w, h) * 0.32;
-    const cx = x + w * 0.62, cy = y + h * 0.5;
-    g.fillStyle = col;
-    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
-    g.fillStyle = 'rgba(0,0,0,0.25)';
-    g.beginPath(); g.arc(cx + R * 0.35, cy, R, -Math.PI / 2, Math.PI / 2); g.fill();
-    // approach path: dashed arc ending at the target, a blinking dot for the craft
-    g.setLineDash([5 * u, 5 * u]); g.strokeStyle = PAL.teal; g.lineWidth = 1.5;
-    g.beginPath(); g.moveTo(x + w * 0.08, y + h * 0.15); g.quadraticCurveTo(x + w * 0.3, y + h * 0.9, cx - R * 0.7, cy + R * 0.7); g.stroke();
-    g.setLineDash([]);
-    const f = Math.max(0, Math.min(1, 1 - S.cd / COUNT_FROM)) * 0.85;
-    const px = (1 - f) * (1 - f) * (x + w * 0.08) + 2 * (1 - f) * f * (x + w * 0.3) + f * f * (cx - R * 0.7);
-    const py = (1 - f) * (1 - f) * (y + h * 0.15) + 2 * (1 - f) * f * (y + h * 0.9) + f * f * (cy + R * 0.7);
-    if (Math.floor(S.t * 3) % 2 === 0) { g.fillStyle = PAL.amber; g.beginPath(); g.arc(px, py, 4 * u, 0, Math.PI * 2); g.fill(); }
-    // scanlines (retro screen)
-    g.fillStyle = 'rgba(142,202,230,0.05)';
-    for (let yy = y; yy < y + h; yy += 4) g.fillRect(x, yy, w, 1);
-  }
-
-  // ---------- control room (countdown)
-  function drawControlRoom() {
-    const W = S.W, H = S.H, u = scaleU();
+  function drawControlRoom(dt) {
+    const W = S.W, H = S.H;
     const al = AL();
-    const risk = toPct(al?.weather?.risk) ?? 10;
-    const wlabel = String(al?.weather?.label || '').toLowerCase();
-    const rain = risk > 55 || /chuva|tempest|raio/.test(wlabel);
-    const cloudy = rain || risk > 30 || /nubl|vento|nuvem/.test(wlabel);
-    // wall
-    g.fillStyle = '#0f1a33';
-    g.fillRect(-20, -20, W + 40, H + 40);
-    // blueprint grid
-    g.strokeStyle = 'rgba(142,202,230,0.07)'; g.lineWidth = 1;
-    for (let x = 0; x < W; x += 24) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
-    for (let y = 0; y < H; y += 24) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-    // window to the pad
-    const wx = W * 0.06, wy = H * 0.05, ww = W * 0.88, wh = H * 0.5;
     const arr = phase === 'arrival';
-    const sky = g.createLinearGradient(0, wy, 0, wy + wh);
-    if (arr) { sky.addColorStop(0, '#03050c'); sky.addColorStop(1, '#0b1530'); }
-    else { sky.addColorStop(0, cloudy ? '#55657a' : '#5aa0c8'); sky.addColorStop(1, cloudy ? '#8b95a3' : '#f4c48f'); }
-    g.fillStyle = sky;
-    g.fillRect(wx, wy, ww, wh);
+    const excite = Math.max(0, Math.min(1, 1 - S.cd / COUNT_FROM));
+    g.drawImage(roomBackdrop(W, H), 0, 0, W, H);
+    const rect = windowRect();
+    // the view: the pad through the window (ascent) or the approach on the big screen (arrival)
+    try {
+      if (!arr) {
+        const rs = buildRS(dt, { view: { W: rect.w, H: rect.h }, mode: 'pad' });
+        R.update(rs);
+        if (!R.drawPadWindow(g, rect, rs)) { g.fillStyle = '#3d6f99'; g.fillRect(rect.x, rect.y, rect.w, rect.h); }
+      } else {
+        const rs = buildRS(dt, {
+          view: { W: rect.w, H: rect.h }, mode: 'orbit', world,
+          progress: 0.06 + 0.1 * excite, tele: { altKm: S.profile.keys[0]?.alt || 1000, velKms: S.profile.keys[0]?.vel || 2, met: 0 },
+          flags: { engineOn: false, staged: true, fairingOff: true },
+        });
+        g.save();
+        g.beginPath(); g.rect(rect.x, rect.y, rect.w, rect.h); g.clip();
+        g.translate(rect.x, rect.y);
+        if (!R.draw(g, rs)) { g.fillStyle = '#05070f'; g.fillRect(0, 0, rect.w, rect.h); }
+        g.restore();
+      }
+    } catch (e) {
+      renderFailed(e);
+      g.fillStyle = arr ? '#05070f' : '#3d6f99';
+      g.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
     g.save();
-    g.beginPath(); g.rect(wx, wy, ww, wh); g.clip();
-    if (arr) drawBigScreen(wx, wy, ww, wh, u);
-    else if (cloudy) {
-      g.fillStyle = 'rgba(60,70,85,0.7)';
-      for (let i = 0; i < 6; i++) { const cx = wx + ((i * 0.21 * ww + S.t * 8) % (ww + 120)) - 60; g.beginPath(); g.ellipse(cx, wy + 20 * u + (i % 3) * 14 * u, 60 * u, 14 * u, 0, 0, Math.PI * 2); g.fill(); }
-    }
-    // distant pad + rocket
-    const gy = wy + wh * 0.8;
-    if (!arr) {
-    g.fillStyle = '#2b3a2e'; g.fillRect(wx, gy, ww, wh);
-    const rx = wx + ww * 0.5;
-    g.fillStyle = PAL.cream; g.fillRect(rx - 5 * u, gy - 70 * u, 10 * u, 70 * u);
-    g.beginPath(); g.moveTo(rx - 5 * u, gy - 70 * u); g.lineTo(rx, gy - 84 * u); g.lineTo(rx + 5 * u, gy - 70 * u); g.fill();
-    g.fillStyle = PAL.flag; g.fillRect(rx - 5 * u, gy - 40 * u, 10 * u, 4 * u);
-    g.strokeStyle = PAL.accent; g.lineWidth = 1.5 * u; g.strokeRect(rx - 22 * u, gy - 90 * u, 8 * u, 90 * u);
-    if (!reduce() && Math.random() < 0.3) emit({ x: rx + 6 * u, y: gy - 50 * u, vx: 10 + Math.random() * 10, vy: -4, life: 0, max: 1.6, size: 2, grow: 6, color: 'rgba(243,233,210,0.7)', kind: 'smoke', world: false, drag: 0.4 });
-    // ignition glow in the last seconds
-    if (S.cd < 3) { g.fillStyle = `rgba(255,183,3,${0.5 * (1 - S.cd / 3)})`; g.beginPath(); g.ellipse(rx, gy, 30 * u, 8 * u, 0, 0, Math.PI * 2); g.fill(); }
-    }
-    // crowd outside (excitement grows near T-0, cheers on happy mood)
-    const excite = 1 - S.cd / COUNT_FROM;
-    g.fillStyle = '#16202a';
-    for (const p of CROWD) {
-      const bob = reduce() ? 0 : Math.abs(Math.sin(S.t * (3 + excite * 6) + p.ph)) * (1 + excite * 4) * u;
-      const x = wx + p.x * ww, y = wy + wh - bob;
-      g.beginPath(); g.arc(x, y - 16 * u * p.h, 5 * u, 0, Math.PI * 2); g.fill();
-      g.fillRect(x - 5 * u, y - 12 * u * p.h, 10 * u, 16 * u);
-      if (p.sign) { g.fillStyle = PAL.accent; g.fillRect(x - 7 * u, y - 34 * u * p.h - bob, 14 * u, 8 * u); g.fillStyle = '#16202a'; }
-    }
-    if (rain && !reduce() && !arr) {
-      g.strokeStyle = 'rgba(200,220,240,0.5)'; g.lineWidth = 1;
-      for (let i = 0; i < 50; i++) { const x = wx + ((i * 37 + S.t * 300) % ww); const y = wy + ((i * 53 + S.t * 600) % wh); g.beginPath(); g.moveTo(x, y); g.lineTo(x - 3, y + 10); g.stroke(); }
+    g.beginPath(); g.rect(rect.x, rect.y, rect.w, rect.h); g.clip();
+    if (arr) {
+      // big-screen overlay: approach path, craft marker and faint scanlines
+      const u = Math.max(0.7, Math.min(1.4, H / 700));
+      g.setLineDash([5 * u, 6 * u]); g.strokeStyle = 'rgba(126,232,214,0.55)'; g.lineWidth = 1.2;
+      const x0 = rect.x + rect.w * 0.1, y0 = rect.y + rect.h * 0.12;
+      const xc = rect.x + rect.w * 0.18;
+      const x1 = rect.x + rect.w * 0.5, y1 = rect.y + rect.h * 0.62;
+      g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(xc, y1, x1, y1); g.stroke();
+      g.setLineDash([]);
+      const f = excite * 0.9;
+      const px = (1 - f) * (1 - f) * x0 + 2 * (1 - f) * f * xc + f * f * x1;
+      const py = (1 - f) * (1 - f) * y0 + 2 * (1 - f) * f * y1 + f * f * y1;
+      if (reduce() || Math.floor(S.t * 2.5) % 2 === 0) { g.fillStyle = 'rgba(255,196,90,0.95)'; g.beginPath(); g.arc(px, py, 3.2 * u, 0, Math.PI * 2); g.fill(); }
+      g.fillStyle = 'rgba(160,220,255,0.035)';
+      for (let yy = rect.y; yy < rect.y + rect.h; yy += 3) g.fillRect(rect.x, yy, rect.w, 1);
+      g.font = `600 ${Math.round(10 * u)}px system-ui, sans-serif`;
+      g.fillStyle = 'rgba(126,232,214,0.85)';
+      g.fillText('TELEMETRIA · APROXIMAÇÃO', rect.x + 8, rect.y + rect.h - 10);
+    } else {
+      // glass: faint reflection bands, rain streaks in bad weather
+      const risk = toPct(al?.weather?.risk) ?? 10;
+      const rain = risk > 55 || /chuva|tempest|raio/.test(String(al?.weather?.label || '').toLowerCase());
+      const refl = g.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+      refl.addColorStop(0, 'rgba(255,255,255,0.06)'); refl.addColorStop(0.35, 'rgba(255,255,255,0)');
+      refl.addColorStop(0.62, 'rgba(255,255,255,0.035)'); refl.addColorStop(0.7, 'rgba(255,255,255,0)');
+      g.fillStyle = refl; g.fillRect(rect.x, rect.y, rect.w, rect.h);
+      if (rain && !reduce()) {
+        g.strokeStyle = 'rgba(210,225,240,0.28)'; g.lineWidth = 1;
+        for (let i = 0; i < 40; i++) {
+          const x = rect.x + ((i * 37.3 + S.t * 40) % rect.w);
+          const y = rect.y + ((i * 53.7 + S.t * (90 + (i % 5) * 20)) % rect.h);
+          g.beginPath(); g.moveTo(x, y); g.lineTo(x - 1, y + 7); g.stroke();
+        }
+      }
     }
     g.restore();
-    g.strokeStyle = PAL.cream; g.lineWidth = 3 * u; g.strokeRect(wx, wy, ww, wh);
-    g.beginPath(); g.moveTo(wx + ww / 3, wy); g.lineTo(wx + ww / 3, wy + wh); g.moveTo(wx + ww * 2 / 3, wy); g.lineTo(wx + ww * 2 / 3, wy + wh); g.stroke();
+    // window frame
+    g.strokeStyle = '#1c2433'; g.lineWidth = 6;
+    g.strokeRect(rect.x - 2, rect.y - 2, rect.w + 4, rect.h + 4);
+    g.strokeStyle = 'rgba(200,210,225,0.18)'; g.lineWidth = 1;
+    g.strokeRect(rect.x - 5, rect.y - 5, rect.w + 10, rect.h + 10);
     // HOLD lamp
-    if (al?.pendingHold && Math.floor(S.t * 2) % 2 === 0) {
-      g.fillStyle = PAL.amber; g.beginPath(); g.arc(W - 22 * u, 20 * u, 8 * u, 0, Math.PI * 2); g.fill();
+    if (al?.pendingHold && (reduce() || Math.floor(S.t * 2) % 2 === 0)) {
+      const lx = W - 18, ly = rect.y + 14;
+      const halo = g.createRadialGradient(lx, ly, 1, lx, ly, 16);
+      halo.addColorStop(0, 'rgba(255,190,60,0.95)'); halo.addColorStop(1, 'rgba(255,190,60,0)');
+      g.fillStyle = halo; g.beginPath(); g.arc(lx, ly, 16, 0, Math.PI * 2); g.fill();
     }
-    // consoles in tiers
-    for (let row = 0; row < 2; row++) {
-      const cy = H * (0.66 + row * 0.17);
-      const cw = W * (0.86 + row * 0.1);
+    drawConsoles(W, H, rect, excite, al);
+  }
+
+  /** Two tiers of consoles in silhouette, their screens lighting the desks. */
+  function drawConsoles(W, H, rect, excite, al) {
+    const top = rect.y + rect.h + 8;
+    const room = Math.max(40, H - top);
+    // one tier of screens right under the window; the desk below is where the big countdown sits
+    for (let row = 0; row < 1; row++) {
+      const deskH = Math.max(14, room * 0.8);
+      const cy = top + Math.min(room * 0.42, 70);
+      const cw = W * (0.9 + row * 0.14);
       const cx = (W - cw) / 2;
-      g.fillStyle = row ? '#1a2a4d' : '#14223f';
-      g.beginPath(); g.moveTo(cx + 14 * u, cy); g.lineTo(cx + cw - 14 * u, cy); g.lineTo(cx + cw, cy + 40 * u); g.lineTo(cx, cy + 40 * u); g.fill();
       const n = 4 + row;
+      const gap = 6;
+      const sw = (cw - 24 - gap * (n - 1)) / n;
+      const sh = Math.min(48, room * 0.34);
       for (let i = 0; i < n; i++) {
-        const sx = cx + 20 * u + i * (cw - 40 * u) / n;
-        const sw = (cw - 40 * u) / n - 8 * u;
-        g.fillStyle = '#071226'; g.fillRect(sx, cy + 6 * u, sw, 18 * u);
-        g.strokeStyle = i % 2 ? PAL.teal : PAL.amber; g.lineWidth = 1.2;
+        const sx = cx + 12 + i * (sw + gap);
+        const syy = cy - sh * 0.85;
+        const warn = al?.pendingHold && i === 1;
+        const glow = g.createRadialGradient(sx + sw / 2, syy + sh / 2, 2, sx + sw / 2, syy + sh / 2, sw);
+        glow.addColorStop(0, warn ? 'rgba(255,90,70,0.16)' : 'rgba(110,200,255,0.10)');
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = glow; g.fillRect(sx - sw * 0.5, syy - sh, sw * 2, sh * 3);
+        g.fillStyle = '#05101e'; g.fillRect(sx, syy, sw, sh);
+        g.strokeStyle = 'rgba(160,190,220,0.18)'; g.lineWidth = 1; g.strokeRect(sx + 0.5, syy + 0.5, sw - 1, sh - 1);
+        g.save();
+        g.beginPath(); g.rect(sx + 2, syy + 2, sw - 4, sh - 4); g.clip();
+        g.strokeStyle = warn ? 'rgba(255,120,90,0.9)' : i % 2 ? 'rgba(126,232,214,0.8)' : 'rgba(255,200,110,0.8)';
+        g.lineWidth = 1;
         g.beginPath();
-        for (let k = 0; k <= 12; k++) { const px = sx + (k / 12) * sw; const py = cy + 15 * u + Math.sin(S.t * (2 + i) + k * 0.9 + row) * 5 * u * (0.4 + excite); k ? g.lineTo(px, py) : g.moveTo(px, py); }
+        const ph = reduce() ? 0 : S.t * (1.6 + i * 0.5);
+        for (let k = 0; k <= 16; k++) {
+          const px = sx + (k / 16) * sw;
+          const py = syy + sh * 0.6 + Math.sin(ph + k * 0.8 + row * 2) * sh * 0.2 * (0.4 + excite * 0.6);
+          if (k) g.lineTo(px, py); else g.moveTo(px, py);
+        }
         g.stroke();
-        const on = Math.floor(S.t * (1.5 + i * 0.7)) % 3 !== 0;
-        g.fillStyle = on ? (al?.pendingHold && i === 1 ? PAL.red : PAL.teal) : '#24324f';
-        g.fillRect(sx + sw - 6 * u, cy + 28 * u, 4 * u, 4 * u);
+        g.fillStyle = 'rgba(200,220,240,0.35)';
+        for (let k = 0; k < 3; k++) g.fillRect(sx + 4, syy + 4 + k * 4, sw * (0.3 + ((hashStr('l' + i + k + row) % 40) / 100)), 1.5);
+        g.restore();
+      }
+      const dg = g.createLinearGradient(0, cy, 0, cy + deskH);
+      dg.addColorStop(0, row ? '#1a2232' : '#161d2b'); dg.addColorStop(0.08, '#0d121c'); dg.addColorStop(1, '#06080d');
+      g.fillStyle = dg;
+      g.beginPath(); g.moveTo(cx + 10, cy); g.lineTo(cx + cw - 10, cy); g.lineTo(cx + cw, cy + deskH); g.lineTo(cx, cy + deskH); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(150,200,240,0.16)';
+      g.fillRect(cx + 10, cy, cw - 20, 1);
+      for (let i = 0; i < n; i++) {
+        const on = reduce() || Math.floor(S.t * (1.2 + i * 0.6) + row) % 4 !== 0;
+        g.fillStyle = on ? (al?.pendingHold && i === 1 ? '#ff5a46' : '#38d39f') : '#1b2636';
+        g.fillRect(cx + 18 + i * (sw + gap) + sw * 0.8, cy + deskH * 0.35, 3, 3);
       }
     }
   }
+
+  // ---------- small UI particles (confetti / sparks / smoke over the result)
+  function cap() { return reduce() ? 120 : 420; }
+  function emit(p) { if (S.particles.length < cap()) S.particles.push(p); }
 
   // ---------- particles
   function drawParticles(dt) {
@@ -2072,6 +1898,7 @@ function createScene(store, key) {
   } else if (v === 'climax') { startAscent(true); enterClimax(); }
   else enterResult(true);
   renderTrack(S.view === 'result');
+  S.ready = true;
   raf = requestAnimationFrame(frame);
 
   // app.js closes the scene a moment after activeLaunch clears; a scrub card waits for its "Entendido"

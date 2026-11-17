@@ -234,6 +234,34 @@ Opcionais: `inheritedTransit` (sonda real já em voo no início), `vehicleName` 
 OutcomeLevel: `total | partial | recoverable | catastrophic`. FailureType: `propulsion | structure | software | human | environment`.
 Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), detail, weight }`.
 
+### Certificação tripulada (state.crewCert, dono: catalog — nov/2026)
+`vehicles.json crewRated` é só o dia 1. Quem lê "este foguete leva gente?" usa **`calendar.isCrewRated(state, data, vehicleOrId)`**
+(dado OU `state.crewCert.rated[id]`) — missions (validate, pickConfig, draftOptions), risk.missionRisk e os cards `catalog/vehicles`
+(`crewRated` já vem efetivo). Slice: `{ rated: {[vehicleId]: {turn, by, source: 'program'|'calendar'}}, programs: {[vehicleId]: {vehicleId,
+sponsor, customer, startedTurn, readyTurn, weeks, costM, phase: 'work'|'flights'|'demo', demoTurn, demoMissionId, demoAttempts, paused}} }`
+(saves antigos: `ensureSlices` cria vazio). Dados: `vehicle.crewCert = {feasible, flights, costM, weeks, minReliability, ai?, calendarGrant?,
+note}` ou `{feasible: false, reason}`; regras gerais em `vehicles.json crewCertRules` (cliente paga `customerCostMult`, precisa de confiança
+≥ `minTrust` com a operadora e tensão ≤ `maxTension`; `demoDestination`/`demoPayloadT`; IA a cada `aiPeriod` semanas).
+Etapas: engenharia (`weeks`, pago no início) → `flights` voos bem-sucedidos do foguete (histórico + fundo + calendário + jogador, qualquer
+cliente) e confiabilidade média ≥ `minReliability` → voo de demonstração sem tripulação. Jogador: missions cria a missão
+`source: 'cert'` (`certVehicleId`, carga a LEO, `clientPayload`, foguete/destino/tipo travados) e a subida dela decide
+(`calendar.certDemoResult`); cancelar pausa o programa (`pauseCert`), `'vehicle/certify'` retoma de graça. IA: `certTick` sorteia o
+demo (quickOutcome-like, `recordFlight`). `calendarGrant` (Starship ← `starship_hls_demo`) certifica no cronograma real quando o item do
+calendário termina em sucesso, para jogador ou rival. Certificar dá prestígio/reputação ao patrocinador, notícia e sinal
+`vehicle/crewRated {vehicleId, actorId, source}`; vale para todo mundo que pode comprar o foguete.
+Expiração: um programa na fase `demo` (desde `demoSince`) ou pausado (desde `pausedTurn`) há `crewCertRules.demoExpiryWeeks` (52)
+semanas sem voar é apagado em `certTick` (sem reembolso, notícia) — senão um cliente bloquearia o foguete para sempre (um programa
+por veículo). Demo `scheduled`/em voo não expira. Saves antigos sem esses campos usam `demoTurn`/`readyTurn`. missions.certDemos
+cancela sem custo a demo `planning` cujo programa sumiu ou não aponta mais para ela; `pauseCert(state, vid, missionId)` só pausa
+o programa do jogador dono daquela demo.
+- calendar.js exporta `isCrewRated, certRules, certStatus, canStartCert, startCertProgram, grantCrewRating, certDemoResult, linkCertDemo,
+  pauseCert, successfulFlights`; queries `'catalog/crewCert' (vehicleId, actorId?)`, `'catalog/fleet' (actorId?)`.
+- missions.js: action `'vehicle/certify' {vehicleId}` (paga via budget e chama `startCertProgram`; retoma se pausado). Em
+  `missions/draftOptions` cada veículo traz `crewCert` (quando a missão é tripulada e ele não é certificado), `payloadT`, `capacityShortT` e
+  `marginFit {margin, capacityT}|null` (maior margem de combustível de 0/10/20%, abaixo da atual, com que a carga cabe).
+- UI: Missões › Montar explica sob o card cinza o porquê ("Faltam X t…" / "Certificar: N voos + demo, US$ X mi, ~Y meses" com botão,
+  barra de progresso ou "Indisponível: …"); Missões › Frota lista o catálogo com status tripulado; o Painel mostra os programas do jogador.
+
 ## Funções cross-módulo (contratos)
 
 **src/core/outcome.js** [launch-core]

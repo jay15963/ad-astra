@@ -169,6 +169,13 @@ function stat(state, key, delta = 1) {
   state.stats[`missions.${key}`] = (state.stats[`missions.${key}`] || 0) + delta;
 }
 
+/** Effective crew rating (data flag or a certification earned in play: calendar.isCrewRated). */
+function crewRatedV(state, data, v) {
+  if (!v) return false;
+  const f = fn(calendar, 'isCrewRated');
+  return f ? f(state, data, v) : !!v.crewRated;
+}
+
 function techBonus(state, key) {
   const f = fn(research, 'techBonus');
   const v = f ? f(state, state.playerId, key) : 0;
@@ -371,7 +378,7 @@ export function normalizeDraft(d = {}) {
       fuelMargin: clamp(Number.isFinite(cfg.fuelMargin) ? cfg.fuelMargin : 0.1, 0, 0.3),
       payloadT: Number.isFinite(cfg.payloadT) && cfg.payloadT > 0 ? cfg.payloadT : null,
     },
-    source: ['calendar', 'custom', 'contract'].includes(d.source) ? d.source : 'custom',
+    source: ['calendar', 'custom', 'contract', 'cert'].includes(d.source) ? d.source : 'custom',
     calendarId: d.calendarId || null,
     contractId: d.contractId || null,
     clientPayload: !!d.clientPayload,
@@ -539,7 +546,7 @@ function validate(state, data, d, opts = {}) {
   else if (!v) errors.push('Veículo desconhecido.');
   else {
     if (!vehiclesFor(state, data).some((x) => x.id === v.id)) errors.push(`${v.name} não está disponível para a agência agora.`);
-    if (d.crewed && !v.crewRated) errors.push(`${v.name} não é certificado para voo tripulado.`);
+    if (d.crewed && !crewRatedV(state, data, v)) errors.push(`${v.name} não é certificado para voo tripulado.`);
     if (dest) {
       capacity = effectiveCapacity(state, data, v.id, dest.id, d.config.fuelMargin);
       if (capacity.raw <= 0) errors.push(`${v.name} não alcança ${dest.name}.`);
@@ -702,7 +709,7 @@ function pickConfig(state, data, { type, destination, crewed = type === 'crewed'
   for (const sc of scs.slice(0, 6)) {
     const payload = payloadOverride ?? ((sc?.massT ?? 1) + extraPayload);
     for (const v of vehicles) {
-      if (crewed && !v.crewRated) continue;
+      if (crewed && !crewRatedV(state, data, v)) continue;
       const cap = capacityTo(data, v.id, destination) * (1 + techBonus(state, 'payload')) * 0.9;
       if (cap < payload) continue;
       const rel = vehicleReliability(state, data, v.id).mean;
@@ -836,6 +843,7 @@ function cancelMission(state, data, m, { reason = 'player', penalty = true } = {
     }
   } else if (m.paid && penalty) changeActor(state, pid, 'support', -2);
   if (m.contractId) defaultContract(state, data, m.contractId, 'cancel');
+  if (m.certVehicleId) fn(calendar, 'pauseCert')?.(state, m.certVehicleId, m.id);
   if (reason === 'player') {
     addNews(state, {
       headline: `${actorName(state, pid)} cancela ${m.name}`,
@@ -883,6 +891,12 @@ function updateMission(state, data, m, patch = {}) {
     const changed = (k) => k in patch && patch[k] != null && (k === 'crewed' ? !!patch[k] !== !!m[k] : patch[k] !== m[k]);
     if (def && ['type', 'destination', 'crewed'].some(changed)) {
       return { ok: false, error: `${def.name} é um programa com destino e tipo definidos. Para outro alvo, monte uma missão nova.` };
+    }
+  }
+  // a crew-certification demo flies that vehicle, without people
+  if (m.certVehicleId) {
+    if (('vehicleId' in patch && patch.vehicleId && patch.vehicleId !== m.certVehicleId) || patch.crewed || (patch.type && patch.type !== m.type) || (patch.destination && patch.destination !== m.destination)) {
+      return { ok: false, error: 'O voo de demonstração da certificação tem foguete, destino e tipo fixos (sem tripulação).' };
     }
   }
   const merged = {
@@ -1812,6 +1826,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
     m.attempts = (m.attempts || 0) + 1;
     const rf = fn(calendar, 'recordFlight');
     if (rf && m.vehicleId) rf(state, m.vehicleId, success);
+    if (m.certVehicleId) fn(calendar, 'certDemoResult')?.(state, data, m.certVehicleId, success, m.id);
     emitSignal(state, 'mission/launched', { missionId: m.id, actorId: pid });
     stat(state, 'launched');
   }
@@ -2009,10 +2024,24 @@ export function draftOptions(state, data, draftIn = {}) {
     const reasons = [];
     if (d.destination && cap.raw <= 0) reasons.push('Não alcança o destino.');
     else if (d.destination && cap.eff < payloadT) reasons.push(`Capacidade ${String(cap.eff).replace('.', ',')} t < carga ${String(round1(payloadT)).replace('.', ',')} t.`);
-    if (d.crewed && !v.crewRated) reasons.push('Sem certificação para tripulação.');
+    const rated = crewRatedV(state, data, v);
+    if (d.crewed && !rated) reasons.push('Sem certificação para tripulação.');
+    // why and how: capacity gap and the crew-certification path (UI explains both under the card)
+    const capacityShortT = d.destination && cap.raw > 0 && cap.eff < payloadT ? round1(payloadT - cap.eff) : 0;
+    const cs = d.crewed && !rated ? fn(calendar, 'certStatus')?.(state, data, v.id, pid) || null : null;
+    // the cheapest fix the player can make right here: a thinner fuel margin that makes the payload fit
+    let marginFit = null;
+    if (capacityShortT > 0) {
+      for (const mg of [0.2, 0.1, 0]) {
+        if (mg >= d.config.fuelMargin) continue;
+        const c2 = effectiveCapacity(state, data, v.id, d.destination, mg);
+        if (c2.eff >= payloadT) { marginFit = { margin: mg, capacityT: c2.eff }; break; }
+      }
+    }
     return {
       id: v.id, name: v.name, operator: v.operator, operatorName: actorName(state, v.operator), costM: round1((v.costM || 0) * Math.max(0.3, 1 + techBonus(state, 'launchCost'))),
-      capacityT: cap.raw, effectiveCapacityT: cap.eff, crewRated: !!v.crewRated, reusable: !!v.reusable, truthLayer: v.truthLayer,
+      capacityT: cap.raw, effectiveCapacityT: cap.eff, crewRated: rated, reusable: !!v.reusable, truthLayer: v.truthLayer,
+      payloadT: round1(payloadT), capacityShortT, marginFit, crewCert: cs,
       reliability: { mean: rel.mean, low: rel.low, high: rel.high, flights: rel.flights ?? null, band: reliabilityBand(rel) },
       valid: reasons.length === 0 && (!!d.destination || true), reasons, selected: v.id === d.vehicleId,
     };
@@ -2111,6 +2140,7 @@ export function tick(state, data, ctx) {
   launchTick(state, data);
   transitTick(state, data, ctx);
   calendarBriefings(state, data);
+  certDemos(state, data);
   strandedMissions(state, data);
   opportunities(state, data, ctx);
   contractOffers(state, data, ctx);
@@ -2150,6 +2180,70 @@ function strandedMissions(state, data) {
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Crew certification (human-rating): the player's side. Program state lives in calendar.js (state.crewCert);
+// here: paying for it ('vehicle/certify') and the uncrewed demo flight, a normal mission (source 'cert',
+// type cargo to LEO, client payload = the capsule mass simulator) flown on Launch Day. Its ascent decides the rating.
+// ---------------------------------------------------------------------------------------------
+
+function certDemos(state, data) {
+  const pid = state.playerId;
+  const progs = state.crewCert?.programs || {};
+  // demo missions left over after the vehicle got rated some other way (calendar milestone): cancel at no cost
+  for (const m of state.missions) {
+    if (!m.certVehicleId || m.status !== 'planning') continue;
+    if (crewRatedV(state, data, vehicleDef(data, m.certVehicleId))) {
+      const res = cancelMission(state, data, m, { reason: 'obsolete', penalty: false });
+      if (res.ok && m.paid) changeActor(state, pid, 'support', 2); // nobody blames you for a test that is no longer needed
+    } else if (progs[m.certVehicleId]?.sponsor !== pid || progs[m.certVehicleId]?.demoMissionId !== m.id) {
+      cancelMission(state, data, m, { reason: 'obsolete', penalty: false }); // program expired (demo never flown): drop the orphan
+    }
+  }
+  for (const p of Object.values(progs)) {
+    if (p.sponsor !== pid || p.phase !== 'demo' || p.paused) continue;
+    if (Number.isFinite(p.demoTurn) && state.turn < p.demoTurn) continue;
+    const cur = p.demoMissionId ? missionById(state, p.demoMissionId) : null;
+    if (cur && ['planning', 'scheduled', 'launch', 'transit', 'arrival'].includes(cur.status)) continue;
+    const v = vehicleDef(data, p.vehicleId);
+    if (!v) continue;
+    const rules = fn(calendar, 'certRules')?.(data) || {};
+    const res = createMission(state, data, {
+      name: `Demo de certificação: ${v.name}`.slice(0, 60), source: 'cert', type: 'cargo', destination: rules.demoDestination || 'leo',
+      vehicleId: v.id, spacecraftId: null, clientPayload: true, crewed: false,
+      config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: rules.demoPayloadT || 8 },
+      crew: autoCrew(state, data, 0),
+    });
+    if (!res.ok) continue;
+    res.mission.certVehicleId = v.id;
+    res.mission.estimate = estimateOf(riskFor(state, data, res.mission));
+    fn(calendar, 'linkCertDemo')?.(state, v.id, res.missionId);
+    issueCard(state, `Certificação do ${v.name}: falta o voo de demonstração`,
+      `Engenharia, voos e confiabilidade aprovados. Agende "${res.mission.name}" (sem tripulação) em Missões › Programa. Se ele chegar à órbita, o ${v.name} passa a levar gente. Sem o voo em ${rules.demoExpiryWeeks ?? 52} semanas, o programa é arquivado.`);
+  }
+}
+
+/** Player starts (pays) or resumes the crew certification of a vehicle. */
+function certifyVehicle(state, data, vehicleId) {
+  const pid = state.playerId;
+  const can = fn(calendar, 'canStartCert');
+  const start = fn(calendar, 'startCertProgram');
+  if (!can || !start) return { ok: false, error: 'Certificação indisponível.' };
+  const chk = can(state, data, vehicleId, pid);
+  if (!chk.ok) return { ok: false, error: chk.error };
+  const v = vehicleDef(data, vehicleId);
+  if (!chk.resume) {
+    if (!canPay(state, chk.costM)) return { ok: false, error: `Caixa insuficiente: a certificação custa ${fmtMoney(chk.costM)}.` };
+    if (!pay(state, chk.costM, `Certificação tripulada: ${v?.name || vehicleId}`)) return { ok: false, error: 'Pagamento recusado.' };
+  }
+  const res = start(state, data, vehicleId, pid);
+  if (!res.ok) {
+    if (!chk.resume) receive(state, pid, chk.costM, 'missions', 'Estorno: certificação');
+    return { ok: false, error: res.error };
+  }
+  stat(state, 'certStarted');
+  return { ok: true, vehicleId, costM: chk.resume ? 0 : chk.costM, weeks: chk.weeks, resumed: !!chk.resume };
+}
+
 const PRIVILEGED_DRAFT_KEYS = ['grantM', 'grantShare', 'milestone', 'calendarId', 'contractId', 'deadlineTurn', 'targetTurn', 'readyTurn', 'clientPayload'];
 /** A draft as the player may send it: no grants, no program/contract links, always a custom mission. */
 export function publicDraft(draft) {
@@ -2179,6 +2273,7 @@ export const actions = {
     const { m, err } = getM(state, action);
     return err || cancelMission(state, data, m);
   },
+  'vehicle/certify': (state, data, action) => certifyVehicle(state, data, action.vehicleId),
   'mission/estimate': (state, data, action) => {
     const d = { ...normalizeDraft(action.draft || {}), riskMod: 0 };
     const r = riskFor(state, data, d, action.draft?.launchTurn);

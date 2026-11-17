@@ -640,3 +640,30 @@ body.reduce-motion .ticker-track { overflow-x: auto; }
 .ms-crewrisk b { font-weight: 600; }
 .ms-crewrisk .muted { font-size: .74rem; }
 .chip.ms-crewrisk-chip { font-weight: 600; }
+
+/* ---------- crew certification + capacity help (Missões › Montar / Frota) ---------- */
+.veh-wrap { display: flex; flex-direction: column; gap: 0; }
+.veh-wrap > .veh-card { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.veh-help {
+  border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius-s) var(--radius-s);
+  background: rgba(255, 255, 255, .025); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;
+}
+.veh-help > summary.veh-help-sum { cursor: pointer; color: var(--ink2); font-weight: 600; min-height: 28px; display: list-item; line-height: 28px; }
+.veh-help:not([open]) { padding-top: 2px; padding-bottom: 2px; }
+.veh-help-body { display: flex; flex-direction: column; gap: 6px; }
+.veh-help-body > .btn { align-self: flex-start; }
+.cert-box { display: flex; flex-direction: column; gap: 5px; }
+.cert-box.muted { opacity: .8; }
+.cert-box .btn { align-self: flex-start; }
+.cert-title { font-weight: 600; color: var(--ink2); }
+.cert-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.cert-steps li.ok { color: var(--good); }
+.fleet { display: flex; flex-direction: column; gap: 10px; }
+.fleet-list { display: flex; flex-direction: column; gap: 8px; }
+.fleet-card {
+  border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px; display: flex; flex-direction: column; gap: 6px;
+  background: linear-gradient(180deg, var(--panel), var(--bg2));
+}
+.fleet-card.disabled { opacity: .6; }
+.fleet-top { display: flex; align-items: center; gap: 10px; }
+.fleet-top .veh-text { flex: 1; min-width: 0; }

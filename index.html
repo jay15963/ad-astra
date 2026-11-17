@@ -3,16 +3,77 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="description" content="Dirija uma agência espacial na corrida lunar de 2026 a 2030. Jogo de estratégia para celular." />
   <meta name="theme-color" content="#0b1020" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="color-scheme" content="dark" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Ad Astra" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="application-name" content="Ad Astra" />
+  <meta name="format-detection" content="telephone=no" />
   <title>Ad Astra</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180" />
+  <script>
+    // Start the game data downloads right away, in parallel with the module graph below (app.js picks these
+    // promises up in boot; without them it fetches the files itself). Keep the list = DATA_FILES in
+    // src/core/data.js (tests/sw-pwa.test.mjs checks it).
+    (function () {
+      try {
+        var files = ['scenario', 'actors', 'vehicles', 'spacecraft', 'destinations', 'calendar', 'politics', 'geopolitics', 'tech', 'events', 'crew', 'bodies'];
+        var out = {};
+        files.forEach(function (n) {
+          var p = fetch('data/' + n + '.json', { cache: 'no-cache' }).then(function (r) {
+            if (!r.ok) throw new Error(n + '.json ' + r.status);
+            return r.json();
+          });
+          p.catch(function () { /* app.js retries on its own */ });
+          out[n] = p;
+        });
+        window.__adastraData = out;
+      } catch (e) { /* old browser: app.js loads the data */ }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="src/ui/launch-scene.css" />
   <link rel="stylesheet" href="src/ui/map.css" />
+  <!-- stylesheets the tabs inject on first use: fetched at idle priority so the first visit has no unstyled flash -->
+  <link rel="prefetch" href="src/ui/techtree.css" as="style" />
+  <link rel="prefetch" href="src/ui/worldmap.css" as="style" />
+  <!-- the whole static module graph of app.js in one round trip instead of a 6-level import waterfall
+       (keep in sync: tests/sw-pwa.test.mjs) -->
+  <link rel="modulepreload" href="src/ui/app.js" />
+  <link rel="modulepreload" href="src/core/data.js" />
+  <link rel="modulepreload" href="src/core/rng.js" />
+  <link rel="modulepreload" href="src/core/helpers.js" />
+  <link rel="modulepreload" href="src/core/time.js" />
+  <link rel="modulepreload" href="src/core/outcome.js" />
+  <link rel="modulepreload" href="src/core/engine.js" />
+  <link rel="modulepreload" href="src/sim/politics.js" />
+  <link rel="modulepreload" href="src/sim/diplomacy.js" />
+  <link rel="modulepreload" href="src/sim/budget.js" />
+  <link rel="modulepreload" href="src/sim/research.js" />
+  <link rel="modulepreload" href="src/sim/crew.js" />
+  <link rel="modulepreload" href="src/sim/calendar.js" />
+  <link rel="modulepreload" href="src/sim/risk.js" />
+  <link rel="modulepreload" href="src/sim/narrative.js" />
+  <link rel="modulepreload" href="src/sim/missions.js" />
+  <link rel="modulepreload" href="src/sim/launch.js" />
+  <link rel="modulepreload" href="src/ui/store.js" />
+  <link rel="modulepreload" href="src/ui/components.js" />
+  <link rel="modulepreload" href="src/ui/portrait.js" />
+  <link rel="modulepreload" href="src/ui/settings.js" />
+  <link rel="modulepreload" href="src/ui/newgame.js" />
+  <link rel="modulepreload" href="src/ui/decisions.js" />
+  <link rel="modulepreload" href="src/ui/dashboard.js" />
+  <link rel="modulepreload" href="src/ui/missions-tab.js" />
+  <link rel="modulepreload" href="src/ui/research-tab.js" />
+  <link rel="modulepreload" href="src/ui/worldmap.js" />
+  <link rel="modulepreload" href="src/ui/world-tab.js" />
+  <link rel="modulepreload" href="src/ui/crew-view.js" />
 </head>
 <body>
   <div id="app" aria-live="polite">

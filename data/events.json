@@ -1776,10 +1776,10 @@
         "signalWhere": {
           "actor": "rival"
         },
-        "chance": 0.5
+        "chance": 0.4
       },
       "weight": 10,
-      "cooldownWeeks": 40,
+      "cooldownWeeks": 52,
       "choices": [
         {
           "id": "accelerate",
@@ -1853,6 +1853,18 @@
         {
           "title": "A {rival} levou mais uma",
           "text": "O marco era seu no papel, mas a bandeira fincada é da {rival}. A sala de imprensa está cheia, o telefone do ministério não para e os estagiários fazem memes no grupo interno. A pergunta é sempre a mesma: o que muda daqui em diante?"
+        },
+        {
+          "title": "{milestone}: a {rival} na frente",
+          "text": "As imagens da {rival} rodam o mundo: {milestone}. No corredor, alguém cola a manchete no quadro de avisos com um ponto de interrogação. A diretoria quer uma resposta antes da próxima audiência."
+        },
+        {
+          "title": "O mundo aplaude a {rival}",
+          "text": "Chefes de Estado parabenizam a {rival} pelo feito ({milestone}). Seus patrocinadores ligam para perguntar quando chega a vez de vocês. A sala de engenharia está dividida entre correr e caprichar."
+        },
+        {
+          "title": "Placar da corrida: {rival} pontua",
+          "text": "Comentaristas já falam em virada: a {rival} acaba de somar {milestone} ao currículo. Seus números ainda são bons, mas a narrativa da semana não é sua. Como reagir?"
         }
       ]
     },
@@ -7093,7 +7105,17 @@
           ]
         }
       ],
-      "maxCount": 1
+      "maxCount": 1,
+      "variants": [
+        {
+          "title": "{rival} oferece os dados do feito",
+          "text": "Depois de {milestone}, a {rival} abriu o arquivo da missão para parceiros. Seus cientistas já baixaram o catálogo de arquivos; o ministério pergunta o que a {rival} quer em troca."
+        },
+        {
+          "title": "Mão estendida, outra vez",
+          "text": "A {rival} repete o gesto: dados de {milestone} para quem quiser colaborar. A imprensa chama de diplomacia científica; seus rivais internos chamam de propaganda."
+        }
+      ]
     },
     {
       "id": "rival_failure_help",
@@ -7699,7 +7721,7 @@
   ],
   "groups": {
     "_doc": "Janela compartilhada (semanas): depois de um evento do grupo, os outros do mesmo grupo esperam esse tempo (padrão 16).",
-    "rival_first": 26,
+    "rival_first": 39,
     "rival_failure": 20,
     "crew_morale": 20,
     "media": 16,

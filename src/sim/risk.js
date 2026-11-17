@@ -499,7 +499,7 @@ export function missionRisk(state, data, plan = {}) {
     errors.push(`${sc.name || sc.id} não voa no ${vehicle.name || vehicle.id}.`);
   }
   if (crewed) {
-    if (vehicle && !vehicle.crewRated) errors.push(`${vehicle.name || vehicle.id} não é certificado para tripulação.`);
+    if (vehicle && !(typeof calendar.isCrewRated === 'function' ? calendar.isCrewRated(state, data, vehicle) : vehicle.crewRated)) errors.push(`${vehicle.name || vehicle.id} não é certificado para tripulação.`);
     if (!sc) errors.push('Missão tripulada precisa de uma cápsula.');
     else if (!(sc.crew > 0) || !['capsule', 'lander'].includes(sc.kind)) errors.push(`${sc.name || sc.id} não leva tripulação.`);
     else if (astronauts.length > sc.crew) errors.push(`${sc.name || sc.id} leva no máximo ${sc.crew} tripulantes.`);
