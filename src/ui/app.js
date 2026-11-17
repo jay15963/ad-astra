@@ -3,7 +3,7 @@
 
 import { loadData, browserReader } from '../core/data.js';
 import { createStore } from './store.js';
-import { h, raw, button, toast, fallbackPanel, closeAllModals, fmtDate, chip, openModal, fmtBand, esc, newsIcon } from './components.js';
+import { h, raw, button, toast, fallbackPanel, closeAllModals, fmtDate, chip, openModal, fmtBand, esc, iconSVG, cleanFlags } from './components.js';
 import { emblemSVG } from './portrait.js';
 import { applySettings, render as renderSettings, APP_VERSION, BUILD_DATE } from './settings.js';
 import { renderTitle, renderGameOver } from './newgame.js';
@@ -14,15 +14,28 @@ import * as researchTab from './research-tab.js';
 import * as worldTab from './world-tab.js';
 import * as crewView from './crew-view.js';
 
+// bottom navbar (CSmanager .barra-inferior): stroke icon names from components.ICONS. The centre disc (time)
+// sits after Pesquisa (DISC_AT = index of the first tab drawn after it). 6 tabs + the disc = 7 equal slots, so
+// the disc lands exactly on the screen centre, like CSmanager's 7-slot bar (cs-dash-1.png).
+const DISC_AT = 3;
+const HOLD_MS = 450; // long-press on the disc before "Próximo evento" fires
+const RUN_MAX_WEEKS = 26; // "Próximo evento" looks at most half a year ahead (as before)
+const RUN_STEP_MS = 90; // pause between the run's weeks, so a 1-4 week run is visible on the disc
+const RUN_MIN_MS = 520; // a run shows its ring at least this long (most runs stop on an event within 1-4 weeks)
+const MOVE_CANCEL_PX = 10; // a finger that slides this far off its start point cancels the long-press
+const HINT_KEY = 'adastra.hint.hold';
 const TABS = [
-  { id: 'painel', label: 'Painel', icon: '◉' },
-  { id: 'missoes', label: 'Missões', icon: '🚀' },
-  { id: 'pesquisa', label: 'Pesquisa', icon: '⚗' },
-  { id: 'mapa', label: 'Mapa', icon: '🌍' },
-  { id: 'mundo', label: 'Mundo', icon: '📰' },
+  { id: 'painel', label: 'Painel' },
+  { id: 'missoes', label: 'Missões' },
+  { id: 'pesquisa', label: 'Pesquisa' },
+  { id: 'mapa', label: 'Mapa' },
+  { id: 'mundo', label: 'Mundo' },
+  { id: 'equipe', label: 'Equipe' },
 ];
+// screen names shown as the header title
+const SCREEN_TITLES = { painel: 'Painel', missoes: 'Missões', pesquisa: 'Pesquisa', mapa: 'Mapa', mundo: 'Mundo', equipe: 'Equipe', ajustes: 'Ajustes' };
 // views reachable from a tab (highlight the parent tab)
-const VIEW_PARENT = { equipe: 'painel', ajustes: null };
+const VIEW_PARENT = { ajustes: null };
 
 const ui = {
   route: { tab: 'painel', sub: '' },
@@ -61,7 +74,7 @@ async function boot() {
   store = createStore(data);
   applySettings(store.settings);
   store.ui = {
-    navigate, openDecision: (id) => openDecision(store, id), advance, route: () => ui.route, version: APP_VERSION,
+    navigate, openDecision: (id) => openDecision(store, id), advance, advanceToEvent: () => runToEvent(), route: () => ui.route, version: APP_VERSION,
     // a view that swaps screens inside one route (builder steps) asks for the top explicitly
     scrollTop: () => { if (ui.shell?.view) ui.shell.view.scrollTop = 0; },
     // space map "Planejar missão aqui": open Missões › Montar with this destination preselected
@@ -71,7 +84,7 @@ async function boot() {
   store.subscribe(onStoreChange);
   // sheets push their own history entry (components.openModal), so back closes a sheet first; a real route
   // change leaves those entries behind it
-  window.addEventListener('hashchange', () => { closeAllModals({ keepHistory: true }); parseHash(); renderView(); renderTabbar(); });
+  window.addEventListener('hashchange', () => { closeAllModals({ keepHistory: true }); parseHash(); renderView(); renderTabbar(); renderHeader(); });
   parseHash();
   // resume straight into the game if a save exists and we were mid-launch (Pilar: fechar o app não prejudica)
   const info = store.saveInfo();
@@ -134,12 +147,13 @@ function showTitle() {
   closeLaunch();
   // the title screen has no route: drop a stale '#ajustes' (a later start navigates to #painel)
   if (location.hash) { try { history.replaceState(history.state, '', location.pathname + location.search); } catch { /* */ } }
+  document.body.classList.remove('in-shell');
   renderTitle(appRoot, store, {
     onStart: () => { navigate('painel'); renderAll(); },
     onSettings: () => {
       appRoot.innerHTML = '';
       const c = h('div', { class: 'standalone' });
-      appRoot.appendChild(c);
+      appRoot.appendChild(h('div', { class: 'title-page' }, c));
       renderSettings(c, store, { onExit: showTitle, onQuit: showTitle });
     },
   });
@@ -158,7 +172,7 @@ function parseHash() {
 function navigate(tab, sub = '') {
   const target = `#${tab}${sub ? '/' + sub : ''}`;
   if (location.hash !== target) location.hash = target; // triggers hashchange -> render
-  else { parseHash(); renderView(); renderTabbar(); }
+  else { parseHash(); renderView(); renderTabbar(); renderHeader(); }
 }
 
 // ------------------------------------------------------------------ store reaction
@@ -171,8 +185,14 @@ function onStoreChange(state, action, res) {
   if (type === 'ui/load' || type === 'ui/newGame') { renderAll(); return; }
   // during an active launch the overlay covers the shell: skip heavy re-renders on every step
   if (state.activeLaunch && type.startsWith('launch/')) { syncLaunch(); return; }
+  // "Próximo evento" runs week by week: only the cheap chrome (date, ticker, disc ring) follows each step;
+  // the screen redraws once at the end (runToEvent)
+  if (ui.run && type === 'time/advance' && !state.gameOver && !state.activeLaunch && ui.shell) {
+    renderHeader(); renderTicker(); renderTabbar();
+    return;
+  }
   renderAll();
-  if (type === 'time/advance') afterAdvance(res);
+  if (type === 'time/advance' && !ui.run) afterAdvance(res);
 }
 
 function renderAll() {
@@ -188,7 +208,7 @@ function renderAll() {
   renderHeader();
   renderTicker();
   renderTabbar();
-  renderView(); // also redraws the time bar
+  renderView();
   syncLaunch();
 }
 
@@ -197,36 +217,41 @@ function renderAll() {
 function ensureShell() {
   if (ui.shell && ui.shell.root.isConnected) return;
   appRoot.innerHTML = '';
+  document.body.classList.add('in-shell');
   const s = {
     header: h('header', { class: 'topbar' }),
     ticker: h('div', { class: 'ticker', role: 'marquee', 'aria-label': 'Manchetes', onclick: () => navigate('mundo') }),
     view: h('main', { class: 'view', id: 'view' }),
-    timebar: h('div', { class: 'timebar' }),
     tabbar: h('nav', { class: 'tabbar', 'aria-label': 'Abas' }),
   };
-  s.root = h('div', { class: 'shell' }, s.header, s.ticker, s.view, s.timebar, s.tabbar);
+  s.root = h('div', { class: 'shell' }, s.header, s.ticker, s.view, s.tabbar);
   appRoot.appendChild(s.root);
   ui.shell = s;
   ui.tickerTop = null;
+  buildTabbar(s.tabbar);
 }
 
+/** Header (CSmanager .barra-topo): emblem + current screen name, "agência · data" below, Ajustes on the right. */
 function renderHeader() {
+  if (!ui.shell || !store?.state) return;
   const st = store.state;
   const me = st.actors?.[st.playerId] || { id: st.playerId, short: String(st.playerId || '').toUpperCase() };
   const el = ui.shell.header;
-  // the header only shows the agency and the date: skip rebuilding the emblem SVG on every action
-  const key = `${st.playerId}|${st.turn}|${me.flag || ''}|${me.short || me.name || ''}|${me.color || ''}`;
+  const title = SCREEN_TITLES[ui.route.tab] || 'Painel';
+  // skip rebuilding the emblem SVG on every action: only route, agency or date change the header
+  const key = `${title}|${st.playerId}|${st.turn}|${me.flag || ''}|${me.short || me.name || ''}|${me.color || ''}`;
   if (el.dataset.key === key && el.firstChild) return;
   el.dataset.key = key;
   el.innerHTML = '';
+  // no flag here: the emblem already identifies the agency (and Windows has no flag-emoji glyphs)
+  const agency = `${me.short || me.name || st.playerId}`;
   el.append(
-    h('button', { class: 'agency', type: 'button', onclick: () => navigate('painel'), 'aria-label': 'Ir ao painel' },
-      raw(emblemSVG(me, { size: 34 }), 'agency-emblem'),
+    h('button', { class: 'agency', type: 'button', onclick: () => navigate('painel'), 'aria-label': `${title} · ${agency}. Ir ao painel` },
+      raw(emblemSVG(me, { size: 30 }), 'agency-emblem'),
       h('div', { class: 'agency-text' },
-        h('div', { class: 'agency-name' }, `${me.flag ? me.flag + ' ' : ''}${me.short || me.name || st.playerId}`),
-        h('div', { class: 'agency-date' }, fmtDate(st.turn, st.startYear)))),
-    h('span', { class: 'era-chip', title: 'Era 4: A Década Lunar' }, 'Era 4 · Década Lunar'),
-    h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Ajustes', onclick: () => navigate('ajustes') }, '⚙'));
+        h('h1', { class: 'agency-title' }, title),
+        h('div', { class: 'agency-sub' }, `${agency} · ${fmtDate(st.turn, st.startYear)}`))),
+    h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Ajustes', title: 'Ajustes', onclick: () => navigate('ajustes') }, raw(iconSVG('ajustes', 24), 'ic-wrap')));
 }
 
 function renderTicker() {
@@ -236,63 +261,188 @@ function renderTicker() {
   ui.tickerTop = top;
   const el = ui.shell.ticker;
   el.innerHTML = '';
-  const items = news.length ? news.map((n) => `${newsIcon(n)} ${n.headline}`) : ['Sem manchetes por enquanto. O mundo está observando.'];
+  // no emoji in the strip (DESIGN §2): headlines only, separated by a dot
+  const items = news.length ? news.map((n) => cleanFlags(n.headline || '')) : ['Sem manchetes por enquanto. O mundo está observando.'];
   const line = items.map((t) => `<span class="tick-item">${esc(t)}</span>`).join('');
   const secs = Math.max(20, Math.round(items.join('').length * 0.16)); // constant reading speed
-  el.append(h('span', { class: 'ticker-label' }, 'AO VIVO'),
+  el.append(h('span', { class: 'ticker-label' }, 'Ao vivo'),
     h('div', { class: 'ticker-track' }, h('div', { class: 'ticker-move', style: { animationDuration: `${secs}s` }, html: line + line })));
 }
 
+/** Tab buttons + centre disc, built once per shell: renders update them in place (a long-press survives). */
+function buildTabbar(el) {
+  el.innerHTML = '';
+  ui.tabs = {};
+  TABS.forEach((t, i) => {
+    if (i === DISC_AT) el.appendChild(buildDisc());
+    const badge = h('span', { class: 'tab-badge', 'aria-hidden': 'true' });
+    badge.hidden = true;
+    const btn = h('button', { class: 'tab', type: 'button', onclick: () => navigate(t.id) },
+      h('span', { class: 'tab-icon' }, raw(iconSVG(t.id, 24), 'ic-wrap'), badge),
+      h('span', { class: 'tab-label' }, t.label));
+    ui.tabs[t.id] = { btn, badge };
+    el.appendChild(btn);
+  });
+}
+
 function renderTabbar() {
-  if (!ui.shell) return;
+  if (!ui.shell || !ui.tabs) return;
   const st = store.state;
   const active = VIEW_PARENT[ui.route.tab] !== undefined ? VIEW_PARENT[ui.route.tab] : ui.route.tab;
   const nDec = st.decisions?.length || 0;
   const newsBadge = (st.news || []).filter((n) => n.importance >= 2 && n.turn > ui.seenNewsTurn).length;
-  const badges = { painel: nDec, mundo: active === 'mundo' ? 0 : Math.min(newsBadge, 9) };
+  const badges = { painel: nDec, mundo: active === 'mundo' ? 0 : Math.min(newsBadge, 10) };
   if (active === 'mundo') ui.seenNewsTurn = st.turn;
-  const el = ui.shell.tabbar;
   const hot = nDec > 0 && st.decisions.some((d) => d.blocking);
-  const key = `${active}|${badges.painel}|${badges.mundo}|${hot}`;
-  if (el.dataset.key === key && el.firstChild) return; // same tabs, same badges: keep the buttons
-  el.dataset.key = key;
-  el.innerHTML = '';
   for (const t of TABS) {
-    el.appendChild(h('button', {
-      class: ['tab', t.id === active && 'active'], type: 'button', 'aria-current': t.id === active ? 'page' : null,
-      onclick: () => navigate(t.id),
-    }, h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, t.icon), h('span', { class: 'tab-label' }, t.label),
-    badges[t.id] ? h('span', { class: ['badge', t.id === 'painel' && hot && 'badge-hot'] }, String(badges[t.id])) : null));
+    const { btn, badge } = ui.tabs[t.id];
+    const n = badges[t.id] || 0;
+    const shown = t.id === 'mundo' && newsBadge > 9 ? '9+' : String(n);
+    const badgeLabel = t.id === 'painel' ? `${n} ${n === 1 ? 'decisão pendente' : 'decisões pendentes'}` : `${shown} ${n === 1 ? 'notícia nova' : 'notícias novas'}`;
+    btn.classList.toggle('active', t.id === active);
+    btn.classList.toggle('hot', t.id === 'painel' && hot);
+    if (t.id === active) btn.setAttribute('aria-current', 'page'); else btn.removeAttribute('aria-current');
+    if (n) btn.setAttribute('aria-label', `${t.label}, ${badgeLabel}`); else btn.removeAttribute('aria-label');
+    badge.hidden = !n;
+    if (n && badge.textContent !== shown) badge.textContent = shown;
   }
+  renderDisc();
 }
 
-function renderTimebar() {
-  const el = ui.shell.timebar;
-  el.innerHTML = '';
-  const st = store.state;
-  // hidden where the screen needs the room (map, settings, mission builder has its own sticky nav)
-  el.classList.toggle('hidden', ui.route.tab === 'mapa' || ui.route.tab === 'ajustes' || (ui.route.tab === 'missoes' && ui.route.sub === 'nova'));
-  if (st.gameOver) {
-    el.append(h('div', { class: 'timebar-msg' }, 'Campanha encerrada.'), button('Resumo', () => { ui.lookingAfterEnd = false; renderAll(); }, { kind: 'primary', small: true }));
-    return;
-  }
-  const blocked = store.blocked();
-  if (blocked === 'decision') {
-    const d = sortDecisions(st.decisions).find((x) => x.blocking);
-    el.append(h('div', { class: 'timebar-msg' }, h('strong', null, 'Tempo parado: '), d?.title || 'decisão pendente'),
-      button('Decidir', () => d && openDecision(store, d.id), { kind: 'urgent', small: true }));
-    return;
-  }
-  if (blocked === 'launch') {
-    el.append(h('div', { class: 'timebar-msg' }, h('strong', null, 'Lançamento em andamento')),
-      button('Sala de controle', () => { launchState.key = null; syncLaunch(); }, { kind: 'urgent', small: true }));
-    return;
-  }
-  el.append(
-    button(h('span', { class: 'btn-label' }, '+1 semana'), () => advance(1, false), { kind: 'ghost', icon: '⏵', cls: 'time-btn' }),
-    // "evento" hides on narrow screens with big text (styles.css @container timebar); aria-label keeps the full name
-    button(h('span', { class: 'btn-label' }, 'Próximo', h('span', { class: 'lbl-more' }, ' evento')), () => advance(26, true), { kind: 'primary', icon: '⏩', cls: 'time-btn grow', title: 'Próximo evento' }));
+// ------------------------------------------------------------------ centre disc (time)
+// CSmanager .barra-inferior-central: tap = +1 semana; hold = próximo evento (the ring fills while held, then
+// shows the run). A stopped clock turns the disc into the way out (Decidir / Lançar) instead of a dead button.
+
+function buildDisc() {
+  const disc = h('span', { class: 'tab-disc', 'aria-hidden': 'true' });
+  const label = h('span', { class: 'tab-label', 'aria-hidden': 'true' });
+  const btn = h('button', { class: 'tab-central', type: 'button' }, disc, label);
+  const d = ui.disc = { btn, disc, label, mode: '', key: '', raf: 0, fired: false, releasedAt: 0, down: null, slid: false };
+  btn.addEventListener('pointerdown', (e) => {
+    d.fired = false;
+    d.slid = false;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // remember what the disc was when the finger came down: a run that ends between pointerdown and click
+    // must not turn a "Parar" tap into "+1 semana"
+    d.down = { mode: d.mode, x: e.clientX, y: e.clientY, at: performance.now() };
+    // touch pointers are captured implicitly, so pointerleave would only fire on release: let it go
+    try { if (btn.hasPointerCapture?.(e.pointerId)) btn.releasePointerCapture(e.pointerId); } catch { /* */ }
+    if (d.mode === 'play') startHold();
+  });
+  btn.addEventListener('pointermove', (e) => {
+    if (!d.down || d.slid || !e.buttons) return;
+    if (Math.hypot(e.clientX - d.down.x, e.clientY - d.down.y) > MOVE_CANCEL_PX) { d.slid = true; endHold(); }
+  });
+  // leaving while still pressed = slid away (touch fires pointerleave after pointerup too: buttons is 0 then)
+  btn.addEventListener('pointerleave', (e) => { if (d.down && e.buttons) d.slid = true; endHold(); });
+  for (const ev of ['pointerup', 'pointercancel']) btn.addEventListener(ev, endHold);
+  btn.addEventListener('contextmenu', (e) => e.preventDefault()); // Android long-press menu
+  btn.addEventListener('click', onDiscClick);
+  // Shift+Enter = the hold action from a keyboard (the Painel links also offer both actions)
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.shiftKey && d.mode === 'play') { e.preventDefault(); runToEvent(); }
+  });
+  return btn;
 }
+
+function startHold() {
+  const d = ui.disc;
+  const t0 = performance.now();
+  d.btn.classList.add('segurando');
+  const step = () => {
+    const p = Math.min(1, (performance.now() - t0) / HOLD_MS);
+    d.disc.style.setProperty('--anel', `${Math.round(p * 360)}deg`);
+    if (p < 1) { d.raf = requestAnimationFrame(step); return; }
+    d.raf = 0;
+    d.fired = true; // the click that follows the release is not a tap
+    d.btn.classList.remove('segurando');
+    store.vibrate(15);
+    rememberHint();
+    runToEvent();
+  };
+  d.raf = requestAnimationFrame(step);
+}
+
+function endHold() {
+  const d = ui.disc;
+  if (!d) return;
+  if (d.raf) cancelAnimationFrame(d.raf);
+  d.raf = 0;
+  d.btn.classList.remove('segurando');
+  if (!ui.run) d.disc.style.removeProperty('--anel');
+  d.releasedAt = performance.now();
+}
+
+function onDiscClick() {
+  const d = ui.disc;
+  const now = performance.now();
+  // the mode the press started in (pointer), else the current one (keyboard: Space/Enter)
+  const down = d.down && now - d.down.at < 2000 ? d.down : null;
+  const slid = d.slid;
+  d.down = null;
+  d.slid = false;
+  // the click that ends a long-press is not a tap (a stale flag from a release outside the button is ignored)
+  if (d.fired) { d.fired = false; if (now - d.releasedAt < 800) return; }
+  if (slid) return; // the finger slid away: cancelled, neither a hold nor a tap
+  const mode = down ? down.mode : d.mode;
+  if (mode === 'run') { if (ui.run) ui.run.cancel = true; return; }
+  // a run that just ended on its own: this tap was meant as "Parar", not as another week
+  if (mode === 'play' && now - (ui.runEndedAt || 0) < 300) return;
+  if (mode === 'over' || d.mode === 'over') { showSummary(); return; }
+  advance(1, false); // stopped clock: advance() opens the decision / the control room
+  if (mode === 'play') maybeHint();
+}
+
+/** Game over, looking at the final world: the disc goes back to the campaign summary. */
+function showSummary() {
+  if (!store?.state?.gameOver) return;
+  ui.lookingAfterEnd = false;
+  renderAll();
+}
+
+function discState() {
+  const st = store.state;
+  if (ui.run) return { mode: 'run', icon: 'carregando', label: 'Parar', aria: 'Avançando até o próximo evento. Toque para parar.' };
+  if (!st || st.gameOver) return { mode: 'over', icon: 'trofeu', label: 'Resumo', aria: 'Campanha encerrada. Ver o resumo da campanha' };
+  const b = store.blocked();
+  if (b === 'decision') {
+    const dec = sortDecisions(st.decisions).find((x) => x.blocking);
+    return { mode: 'decision', icon: 'alerta', label: 'Decidir', aria: `Tempo parado: ${dec?.title || 'decisão pendente'}. Abrir a decisão` };
+  }
+  if (b === 'launch') return { mode: 'launch', icon: 'missoes', label: 'Lançar', aria: 'Lançamento em andamento. Abrir a sala de controle' };
+  return { mode: 'play', icon: 'continuar', label: '+1 semana', aria: 'Avançar 1 semana. Segure para avançar até o próximo evento' };
+}
+
+function renderDisc() {
+  const d = ui.disc;
+  if (!d || !store?.state) return;
+  const s = discState();
+  // the run's length is unknown (it stops on the next event, usually within 1-4 weeks): the ring is an
+  // indeterminate arc that spins (.girando) and grows a little with each week, never a near-empty x/26 fill
+  if (ui.run) d.disc.style.setProperty('--anel', `${Math.round(Math.min(330, 110 + ui.run.done * 30))}deg`);
+  const key = `${s.mode}|${s.label}|${s.aria}`;
+  if (d.key === key) return;
+  if (d.mode === 'play' && s.mode !== 'play') endHold();
+  d.key = key;
+  d.mode = s.mode;
+  d.btn.className = ['tab-central', `is-${s.mode}`, s.mode === 'run' && 'ocupado girando'].filter(Boolean).join(' ');
+  d.btn.disabled = !store.state;
+  d.btn.setAttribute('aria-label', s.aria);
+  d.btn.title = s.mode === 'play' ? 'Toque: +1 semana · Segure: próximo evento' : s.aria;
+  if (s.mode !== 'run') d.disc.style.removeProperty('--anel');
+  d.disc.innerHTML = iconSVG(s.icon, 26);
+  d.label.textContent = s.label;
+}
+
+/** First tap: say once that holding the disc skips to the next event. */
+function maybeHint() {
+  try {
+    if (localStorage.getItem(HINT_KEY)) return;
+    localStorage.setItem(HINT_KEY, '1');
+  } catch { return; }
+  setTimeout(() => toast('Segure para avançar até o próximo evento', 'info', 4200), 500);
+}
+function rememberHint() { try { localStorage.setItem(HINT_KEY, '1'); } catch { /* */ } }
 
 function renderView() {
   if (!ui.shell || !store.state) return;
@@ -307,7 +457,8 @@ function renderView() {
   view.innerHTML = '';
   view.dataset.route = `${ui.route.tab}/${ui.route.sub}`;
   view.classList.toggle('view-map', ui.route.tab === 'mapa');
-  const container = h('div', { class: 'view-inner' });
+  // entry motion only when the screen changes, not on every re-render of the same screen
+  const container = h('div', { class: ['view-inner', !sameRoute && 'entering'] });
   view.appendChild(container);
   const tab = ui.route.tab;
   try {
@@ -326,7 +477,6 @@ function renderView() {
     container.appendChild(fallbackPanel('Esta aba ainda está em construção. O resto do jogo continua funcionando.', e));
   }
   view.scrollTop = scroll;
-  renderTimebar();
 }
 
 /** Mapa tab comes from another module (map.js): load lazily and fall back gracefully. */
@@ -359,6 +509,7 @@ function renderMap(container) {
 function advance(weeks, stopOnEvent) {
   const st = store.state;
   if (!st || st.gameOver) return;
+  if (ui.run) return; // a "Próximo evento" run owns the clock until it stops
   const b = store.blocked();
   if (b === 'decision') {
     const d = sortDecisions(st.decisions).find((x) => x.blocking);
@@ -368,6 +519,47 @@ function advance(weeks, stopOnEvent) {
   if (b === 'launch') { launchState.key = null; syncLaunch(); return; }
   const res = store.dispatch({ type: 'time/advance', weeks, stopOnEvent });
   if (!res?.ok) toast(res?.error || 'O tempo não pôde avançar.', 'bad');
+}
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * "Próximo evento": the same advance as time/advance {weeks: 26, stopOnEvent: true}, dispatched one week at a
+ * time so the disc ring can show the run (CSmanager .ocupado). The engine checks its stop conditions per
+ * week, so it stops at the same place; it also stops on a stopped clock or when the disc is tapped again.
+ */
+async function runToEvent(maxWeeks = RUN_MAX_WEEKS) {
+  const st = store?.state;
+  if (ui.run || !st || st.gameOver) return;
+  if (store.blocked()) { advance(1, false); return; }
+  const run = ui.run = { done: 0, max: maxWeeks, cancel: false };
+  const quick = !!store.settings.reduceMotion;
+  const t0 = performance.now();
+  renderDisc();
+  let last = null;
+  let total = 0;
+  try {
+    while (total < maxWeeks && !run.cancel) {
+      if (!store.state || store.state.gameOver || store.blocked()) break;
+      const res = store.dispatch({ type: 'time/advance', weeks: 1, stopOnEvent: true });
+      if (!res?.ok) { toast(res?.error || 'O tempo não pôde avançar.', 'bad'); break; }
+      last = res;
+      total += res.advanced || 0;
+      run.done = total;
+      renderDisc();
+      if (res.stoppedBy || !res.advanced) break;
+      await wait(quick ? 0 : RUN_STEP_MS);
+    }
+    // keep the ring up long enough to be seen (a 1-week run would otherwise flash for ~90ms)
+    const left = RUN_MIN_MS - (performance.now() - t0);
+    if (!quick && left > 0 && !run.cancel) await wait(left);
+  } finally {
+    ui.run = null;
+    ui.runEndedAt = performance.now();
+  }
+  if (!store.state) return;
+  renderAll();
+  afterAdvance({ ok: true, advanced: total, stoppedBy: last?.stoppedBy || null });
 }
 
 /** Feedback after time passes: toast + auto-open the decision that stopped the clock. */

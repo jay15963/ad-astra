@@ -71,7 +71,7 @@ export const PROPELLANT = {
   kerolox: {
     core: '#fffbea', mid: '#ffbe55', tail: 'rgba(255,110,30,0)', smoke: '#5e554c', diamonds: '#fff4c8', luminous: 1,
     ramp: [[160, 50, 14], [255, 122, 30], [255, 184, 70], [255, 236, 186]], dia: [255, 236, 190], diaK: 1.25, L0: 24, L1: 26, Wk: 1.15, opaque: 0.6,
-    smoke2: 'kero_contrail', smokeA: 0.55, smokeRate: 14, smokeGrow: 5, soot: 0.45, glow: [255, 150, 60],
+    smoke2: 'kero_contrail', smokeA: 0.6, smokeRate: 16, smokeGrow: 6, soot: 0.12, glow: [255, 150, 60],
   },
   // LH2/LOX (RS-25, Vulcain, RL10, LE-7, CE-20): nearly transparent, bright Mach disks
   hydrolox: {
@@ -125,7 +125,7 @@ const PAL = [
   [255, 255, 255], // 0 white
   [238, 241, 243], // 1 steam (deluge)
   [92, 84, 76], //    2 kerolox soot (fuel-rich, brownish)
-  [206, 202, 196], // 3 kerolox contrail
+  [228, 227, 224], // 3 kerolox contrail (condensed water + a little soot: pale grey-white)
   [241, 244, 247], // 4 water vapour (hydrolox)
   [236, 234, 228], // 5 solid motor smoke (Al2O3)
   [214, 211, 206], // 6 methalox (faint)
@@ -238,8 +238,10 @@ function ringSprite() {
 const NB = 9; // expansion buckets (0 = sea level .. NB-1 = hard vacuum)
 const PW = 64, PH = 256;
 const plumeWf = (Pp, ex) => 2.4 * (Pp.Wk || 1) + 13.6 * Math.pow(ex, 1.6) + 26 * Math.pow(ex, 3); // texture width in nozzle diameters
-const plumeLf = (Pp, ex) => Pp.L0 + Pp.L1 * ex * (1 - 0.3 * ex * ex); // texture length in nozzle diameters
+const plumeLf = (Pp, ex) => Pp.L0 + Pp.L1 * ex * (1 - 0.3 * ex * ex) + 22 * ex * ex * ex; // texture length in nozzle diameters (the underexpanded bell trails far behind)
 
+const sstep01 = (x) => { const t = x < 0 ? 0 : x > 1 ? 1 : x; return t * t * (3 - 2 * t); };
+const VAC_GLOW = [196, 212, 240];
 function plumeTex(prop, b) {
   return sprite(`plume|${prop}|${b}`, PW, PH, (d) => {
     const Pp = propOf(prop);
@@ -247,9 +249,12 @@ function plumeTex(prop, b) {
     const Wf = plumeWf(Pp, ex), Lf = plumeLf(Pp, ex);
     const r0 = 1 / Wf; // nozzle half-width as a fraction of the texture half-width
     const rmax = 0.8 + 0.15 * ex;
-    const shapeK = 1 + 5 * ex; // vacuum: the boundary turns outward right at the lip
-    const vis = 1 - 0.72 * ex;
-    const coreV = (1.6 * (1 + 1.5 * ex)) / Lf;
+    // vacuum: the boundary turns outward at the lip but keeps opening along the length (a bell / jellyfish,
+    // not a round fan): a gentle power law instead of an instant flare
+    const shapeK = 1 + 2.4 * ex;
+    const vis = 1 - 0.3 * ex; // the underexpanded vacuum bell stays visible: thin but huge, lit by the sun
+    const coreV = (1.6 * (1 + 3 * ex)) / Lf;
+    const vacK = sstep01((ex - 0.35) / 0.5); // 0 = dense collimated flame, 1 = translucent underexpanded bell
     const seed = 3001 + b * 17 + prop.length * 101;
     const nc = ex < 0.6 ? Math.round(7 - 8 * ex) : 0; // shock cells
     const diaW = Pp.diaK * (1 - ex / 0.6);
@@ -259,7 +264,7 @@ function plumeTex(prop, b) {
       const z = v * Lf; // distance from exit in diameters
       const shape = 1 - Math.pow(1 - v, shapeK);
       const rv = r0 + (rmax - r0) * shape;
-      const A = Math.pow(1 - v, 0.55 + 1.5 * ex) * smooth(0, 0.02, v + 0.01);
+      const A = Math.pow(1 - v, 0.55 + 1.5 * ex * (1 - vacK) + 0.75 * vacK) * smooth(0, 0.02, v + 0.01);
       for (let x = 0; x < PW; x++) {
         const u = ((x + 0.5) / PW) * 2 - 1;
         const n1 = fbm(u * 3.2, v * 7 + 0.3, 3, seed);
@@ -267,6 +272,15 @@ function plumeTex(prop, b) {
         const rr = rv * (1 + (n1 - 0.5) * 0.7 * v);
         const q = (u + (n1 - 0.5) * 0.08 * v) / rr;
         let body = A * Math.exp(-Math.pow(q * q, 2 - 0.55 * ex) * (1.0 + 1.2 * ex)) * (1 + (n2 - 0.5) * 1.2 * (1 - 0.75 * ex)) * (1 - 0.35 * v * (1 - n1));
+        if (vacK > 0) {
+          // translucent bell: dim filled interior + a brighter outer shock envelope (the plume boundary seen
+          // edge-on), axial streaks, fading slowly along a long length
+          const aq = Math.abs(q);
+          const env = Math.exp(-(((aq - 0.86) / 0.13) ** 2)) * (0.75 + 0.5 * n1);
+          const fill = Math.exp(-aq * aq * 1.5) * (0.85 + (n2 - 0.5) * 0.7);
+          const bell = A * (0.42 * fill + 0.36 * env * (1 - 0.6 * v)) * (aq < 1.25 ? 1 : Math.exp(-(((aq - 1.25) / 0.12) ** 2)));
+          body = body * (1 - vacK) + bell * vacK;
+        }
         const qc = u / (r0 * 0.62 * (1 + 2.2 * ex));
         const core = Math.exp(-qc * qc * 2.4) * Math.exp(-v / coreV);
         // shock diamonds: bright rhombi + Mach disk at each cell front
@@ -289,7 +303,10 @@ function plumeTex(prop, b) {
         if (h < 0.33) { const f = h / 0.33; cr = R[0][0] + (R[1][0] - R[0][0]) * f; cg = R[0][1] + (R[1][1] - R[0][1]) * f; cb = R[0][2] + (R[1][2] - R[0][2]) * f; }
         else if (h < 0.7) { const f = (h - 0.33) / 0.37; cr = R[1][0] + (R[2][0] - R[1][0]) * f; cg = R[1][1] + (R[2][1] - R[1][1]) * f; cb = R[1][2] + (R[2][2] - R[1][2]) * f; }
         else { const f = Math.min(1, (h - 0.7) / 0.45); cr = R[2][0] + (R[3][0] - R[2][0]) * f; cg = R[2][1] + (R[3][1] - R[2][1]) * f; cb = R[2][2] + (R[3][2] - R[2][2]) * f; }
-        const a1 = Math.min(1, Math.pow(h, 0.85)) * vis;
+        // in near-vacuum the gas outside the hot core is no longer flame-coloured: a translucent sunlit white-blue bell
+        const cool = ex > 0.45 ? sstep01((ex - 0.45) / 0.45) * (1 - Math.min(1, core * 1.6)) : 0;
+        if (cool > 0) { cr += (206 - cr) * cool * 0.85; cg += (220 - cg) * cool * 0.85; cb += (246 - cb) * cool * 0.85; }
+        const a1 = Math.min(1, Math.pow(h, 0.85) * (1 + 0.8 * cool)) * vis;
         let rr2 = cr * a1, gg2 = cg * a1, bb2 = cb * a1;
         rr2 += Pp.dia[0] * dia + 255 * core * 0.35; gg2 += Pp.dia[1] * dia + 250 * core * 0.35; bb2 += Pp.dia[2] * dia + 240 * core * 0.35;
         const a = Math.min(1, Math.max(rr2, gg2, bb2) / 255);
@@ -303,6 +320,12 @@ function plumeTex(prop, b) {
 
 function plumeGeom(Pp, ex, dPx) {
   return { len: dPx * plumeLf(Pp, ex), w: dPx * plumeWf(Pp, ex) };
+}
+
+/** One idle slice of prebuilding plume textures for these propellants (all expansion buckets). True when done. */
+export function prewarmPlumes(props = []) {
+  for (const p of props) { const k = propKey(p); for (let b = 0; b < NB; b++) if (!MEMO.has(`plume|${k}|${b}`)) { plumeTex(k, b); return false; } }
+  return true;
 }
 
 // ------------------------------------------------------------------ pure painters
@@ -332,7 +355,8 @@ export function drawPlume(ctx, nozzle, { prop = 'kerolox', pBar = 1, throttle = 
   const gs = glowSprite(Pp.glow, 'p' + k);
   if (gs) {
     const gw = Math.max(dPx * 3.2, g.w * 1.1 * lk);
-    ctx.globalAlpha = clamp01(0.16 * lum * (1 - 0.55 * ex) * Math.min(1, Pp.luminous + 0.3));
+    // flame-coloured air glow only where there is air; in vacuum nothing scatters the light (no brown haze)
+    ctx.globalAlpha = clamp01(0.16 * lum * (1 - ex) * (1 - ex) * Math.min(1, Pp.luminous + 0.3));
     ctx.drawImage(gs, -gw / 2, -glen * 0.1, gw, glen * 0.75);
   }
   // body: crossfade the two nearest expansion buckets; within each, boil by crossfading mirrored copies
@@ -369,10 +393,11 @@ export function drawPlume(ctx, nozzle, { prop = 'kerolox', pBar = 1, throttle = 
     ctx.drawImage(hs, -hw / 2, -hw * 0.35, hw, hw * 0.9);
   }
   // hard vacuum: faint, enormous "jellyfish" halo from the underexpanded flow
-  if (ex > 0.85 && gs) {
-    const jw = dPx * 34 * lk * (ex - 0.85) / 0.15, jl = g.len * 0.9 * lk;
-    ctx.globalAlpha = clamp01(0.07 * lum * ((ex - 0.85) / 0.15));
-    ctx.drawImage(gs, -jw / 2, -jl * 0.08, jw, jl);
+  const vg = ex > 0.8 ? glowSprite(VAC_GLOW, 'vac') : null;
+  if (vg) {
+    const jw = dPx * 30 * lk * (ex - 0.8) / 0.2, jl = g.len * 0.9 * lk;
+    ctx.globalAlpha = clamp01(0.06 * Math.min(1, th * 1.4) * ((ex - 0.8) / 0.2));
+    ctx.drawImage(vg, -jw / 2, -jl * 0.08, jw, jl);
   }
   ctx.restore();
 }
@@ -525,7 +550,7 @@ export function drawParachutes(ctx, x, y, { count = 1, kind = 'main', deploy = 1
 }
 
 function plasmaTex(v) {
-  return sprite(`plasma|${v}`, 96, 192, (d, W, H) => {
+  return sprite(`plasma|${v}`, 160, 320, (d, W, H) => {
     const seed = 5150 + v * 37;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const u = (((x + 0.5) / W) * 2 - 1) * 3; // body radii
@@ -577,8 +602,8 @@ export function drawReentryPlasma(ctx, x, y, { intensity = 1, radiusPx = 20, ang
     ctx.strokeStyle = 'rgba(255,200,140,0.9)'; ctx.lineWidth = Math.max(0.6, r * 0.05);
     ctx.globalAlpha = clamp01(I);
     ctx.beginPath();
-    for (let i = 0; i < 7; i++) {
-      const px = (R() - 0.5) * 2.2 * r, py = (0.6 + R() * 6) * r, l = (0.3 + R() * 0.9) * r;
+    for (let i = 0; i < 6; i++) {
+      const px = (R() - 0.5) * 1.6 * r, py = (0.4 + R() * 2.6) * r, l = (0.15 + R() * 0.45) * r;
       ctx.moveTo(px, py); ctx.lineTo(px * 1.05, py + l);
     }
     ctx.stroke();
@@ -800,7 +825,7 @@ export function createFx({ cap = 600, seed = 1, reduce = false } = {}) {
     exhaust(x, y, { angle = 0, prop = 'kerolox', pBar = 1, pxPerM = 4, dt = 0.016, rate: rt = 1, d = 3 } = {}) {
       const Pp = propOf(prop);
       const ex = expansionOf(pBar);
-      if (ex > 0.97) return; // hard vacuum: exhaust is invisible
+      if (ex > 0.86) return; // above ~45 km the exhaust no longer condenses into puffs (no cumulus at 70 km)
       const ppm = Math.max(0.05, num(pxPerM, 4));
       const dPx = Math.max(1, num(d, 3) * ppm);
       const g = plumeGeom(Pp, ex, dPx);
@@ -816,10 +841,11 @@ export function createFx({ cap = 600, seed = 1, reduce = false } = {}) {
         const la = rnd(-1, 1) * (12 + 40 * ex);
         const vX = -sa * sp + ca * la, vY = ca * sp + sa * la;
         const soot = Pp.soot && R() < Pp.soot;
-        const big = Math.max(dPx * 1.2, 4);
+        // big, densely overlapping puffs: they merge into one continuous column down to the pad cloud
+        const big = Math.max(dPx * 1.9, 5);
         spawn(sx, sy, vX, vY, K.smoke, {
-          m: (soot ? rnd(0.7, 1.4) : rnd(2.2, 4.5)) * (1 - 0.65 * ex),
-          s: big * rnd(0.6, 1),
+          m: (soot ? rnd(0.4, 0.8) : rnd(3, 5.5)) * (1 - 0.65 * ex),
+          s: big * (soot ? rnd(0.5, 0.8) : rnd(0.9, 1.4)),
           gr: dPx * Pp.smokeGrow * rnd(0.8, 1.4) * (1 + 3 * ex),
           dr: 1.1, g: ex1 * rnd(-4, 2),
           c: soot ? P.soot : P[Pp.smoke2],
@@ -856,12 +882,32 @@ export function createFx({ cap = 600, seed = 1, reduce = false } = {}) {
     },
 
     /** LOX boil-off: cold, dense vapour streaming downwind and sinking. */
-    vent(x, y, { dir = 1, dt = 0.016, rate: rt = 1 } = {}) {
-      const cnt = count(rate(9 * num(rt, 1) * num(dt, 0.016)), 3);
+    vent(x, y, { dir = 1, dt = 0.016, rate: rt = 1, ppm = 0 } = {}) {
+      // sizes follow the world scale when ppm is given (so vents read the same in the pad window and full screen)
+      const q = ppm > 0 ? Math.max(0.35, Math.min(2.5, ppm / 4)) : 1;
+      // many small, faint puffs = a continuous wisp that leaves the valve fast, slows, drifts downwind and sinks
+      const cnt = count(rate(52 * num(rt, 1) * num(dt, 0.016)), 5);
       for (let i = 0; i < cnt; i++) {
-        spawn(num(x) + rnd(-1, 1), num(y) + rnd(-1, 1), num(dir, 1) * rnd(10, 26), rnd(-4, 3), K.steam, {
-          m: rnd(1.4, 2.6), s: rnd(1.2, 2.2), gr: rnd(9, 16), dr: 0.7, g: rnd(3, 8), c: P.lox, a: rnd(0.35, 0.55),
+        spawn(num(x) + rnd(-0.6, 0.6) * q, num(y) + rnd(-0.6, 0.6) * q, num(dir, 1) * rnd(16, 34) * q, rnd(-3, 3) * q, K.steam, {
+          m: rnd(1.5, 2.8), s: rnd(0.7, 1.3) * q, gr: rnd(6, 13) * q, dr: 1.3, g: rnd(5, 12) * q, c: P.lox, a: rnd(0.22, 0.4),
         });
+      }
+    },
+
+    /** Sound-suppression deluge (from ~T-10 s): water sprayed across the deck, mist rolling off its edges. */
+    deluge(x, groundY, { ppm = 4, dt = 0.016, intensity = 1, halfW = 12 } = {}) {
+      const I = clamp01(num(intensity, 1));
+      if (!I) return;
+      const p = Math.max(0.2, num(ppm, 4));
+      x = num(x); groundY = num(groundY);
+      const nD = count(rate(60 * I * num(dt, 0.016)), 6);
+      for (let i = 0; i < nD; i++) { // water jets arcing out of the rainbirds
+        const side = R() < 0.5 ? -1 : 1;
+        spawn(x + side * rnd(halfW * 0.6, halfW) * p, groundY - rnd(0, 1) * p, -side * rnd(4, 12) * p, -rnd(6, 12) * p, K.drop, { m: rnd(0.5, 0.9), s: Math.max(0.6, 0.25 * p), dr: 0.2, g: 22 * p, c: P.white, a: rnd(0.4, 0.7) });
+      }
+      const nM = count(rate(14 * I * num(dt, 0.016)), 3);
+      for (let i = 0; i < nM; i++) { // spray mist hugging the deck
+        spawn(x + rnd(-halfW, halfW) * p, groundY - rnd(0, 2) * p, rnd(-4, 4) * p, -rnd(0.5, 2) * p, K.steam, { m: rnd(1.5, 3), s: rnd(2, 4) * p, gr: rnd(6, 12) * p, dr: 0.8, g: -0.2 * p, c: P.steam, a: rnd(0.18, 0.32) * I });
       }
     },
 
@@ -887,7 +933,7 @@ export function createFx({ cap = 600, seed = 1, reduce = false } = {}) {
       for (let i = 0; i < nP; i++) { // separation ring: gas jets out sideways in the sep plane
         const side = i % 2 ? 1 : -1, sp = rnd(18, 60) * ppm, back = rnd(-6, 14) * ppm;
         spawn(x + qx * side * rnd(0, 1.5) * ppm, y + qy * side * rnd(0, 1.5) * ppm, qx * side * sp - ux * back, qy * side * sp - uy * back, K.steam,
-          { m: rnd(0.5, 1.2), s: ppm * rnd(0.5, 1), gr: ppm * rnd(6, 12), dr: 0.7, c: P.white, a: rnd(0.25, 0.5), front: true });
+          { m: rnd(0.3, 0.65), s: ppm * rnd(0.5, 1), gr: ppm * rnd(10, 18), dr: 0.3, c: P.vapor, a: rnd(0.12, 0.26), front: true }); // vacuum: the gas flashes out and thins in a blink
       }
       for (let j = -1; j <= 1; j += 2) { // ullage motors on the upper stage, firing aft
         const bx = x + qx * j * 1.6 * ppm + ux * 2 * ppm, by = y + qy * j * 1.6 * ppm + uy * 2 * ppm;
@@ -897,10 +943,10 @@ export function createFx({ cap = 600, seed = 1, reduce = false } = {}) {
             { m: rnd(0.4, 0.8), s: ppm * 0.4, gr: ppm * rnd(1.5, 3), dr: 1.2, c: P.solid, a: 0.6, front: true, h: 0.6, hk: 6 });
         }
       }
-      for (let i = 0; i < (red ? 6 : 26); i++) { // frozen LOX flakes glittering in the sun
+      for (let i = 0; i < (red ? 2 : 8); i++) { // a few frozen LOX flakes catching the sun
         const a = rnd(0, TAU), sp = rnd(2, 14) * ppm;
         spawn(x + rnd(-1, 1) * ppm, y + rnd(-1, 1) * ppm, Math.cos(a) * sp - ux * 6 * ppm, Math.sin(a) * sp - uy * 6 * ppm, K.spark,
-          { m: rnd(1.2, 2.6), s: rnd(0.6, 1.1), dr: 0.2, c: P.glint, a: rnd(0.5, 0.9), front: true });
+          { m: rnd(0.5, 1.1), s: rnd(0.5, 0.8), dr: 0.2, c: P.glint, a: rnd(0.3, 0.6), front: true });
       }
     },
 
@@ -968,12 +1014,22 @@ export function createFx({ cap = 600, seed = 1, reduce = false } = {}) {
       const atm = ATMOS.has(wd) || wd == null;
       x = num(x); y = num(y);
       const m = red ? 0.3 : 1;
-      spawn(x, y, 0, 0, K.glow, { m: 0.4, s: 40 * s, gr: 150 * s, dr: 0, c: P.flash, a: 1, front: true });
-      const lobes = [rnd(0, TAU), rnd(0, TAU), rnd(0, TAU), rnd(0, TAU), rnd(0, TAU)];
-      for (let i = 0; i < Math.round(30 * m); i++) { // fireball: a few irregular lobes, not a sphere
-        const a = R() < 0.7 ? lobes[(R() * 5) | 0] + rnd(-0.45, 0.45) : rnd(0, TAU), v = rnd(30, 190) * s;
-        spawn(x + Math.cos(a) * rnd(0, 8) * s, y + Math.sin(a) * rnd(0, 8) * s, Math.cos(a) * v, Math.sin(a) * v, K.fire,
-          { m: rnd(0.6, 1.8), s: rnd(8, 22) * s, gr: rnd(20, 56) * s, dr: atm ? 2.2 : 0.4, g: atm ? -rnd(10, 40) * s : 0, a: rnd(0.35, 0.7), front: true });
+      spawn(x, y, 0, 0, K.glow, { m: 0.22, s: 22 * s, gr: 70 * s, dr: 0, c: P.flash, a: 0.9, front: true }); // brief flash, not a disc
+      // fireball: 4-6 billowing lobes thrown out along the vehicle's momentum and sideways, each a cluster of
+      // turbulent fire puffs of staggered size and speed (cauliflower edge), with a few cool sooty pockets
+      const nl = 4 + ((R() * 3) | 0);
+      const lobes = [];
+      for (let i = 0; i < nl; i++) lobes.push({ a: dir != null && i < 2 ? num(dir) + rnd(-0.5, 0.5) : rnd(0, TAU), v: rnd(60, 170) * s, r: rnd(0.7, 1.3) });
+      for (const lb2 of lobes) {
+        for (let j = 0; j < Math.round(9 * m); j++) {
+          const a = lb2.a + rnd(-0.32, 0.32), v = lb2.v * rnd(0.35, 1.05);
+          spawn(x + Math.cos(a) * rnd(0, 6) * s, y + Math.sin(a) * rnd(0, 6) * s, Math.cos(a) * v, Math.sin(a) * v, K.fire,
+            { m: rnd(0.7, 1.9), s: rnd(6, 16) * s * lb2.r, gr: rnd(18, 46) * s * lb2.r, dr: atm ? 2.4 : 0.4, g: atm ? -rnd(10, 40) * s : 0, a: rnd(0.4, 0.75), front: true });
+        }
+        if (atm) for (let j = 0; j < Math.round(3 * m); j++) { // dark soot pockets inside the lobe
+          const a = lb2.a + rnd(-0.4, 0.4), v = lb2.v * rnd(0.3, 0.8);
+          spawn(x, y, Math.cos(a) * v, Math.sin(a) * v, K.smoke, { m: rnd(1.2, 2.4), s: rnd(6, 12) * s, gr: rnd(30, 60) * s, dr: 2, g: -rnd(4, 14) * s, c: P.xsmoke, a: 0.55, h: 0.8, hk: 2.5, front: true });
+        }
       }
       for (let i = 0; i < Math.round(30 * m); i++) { // smoke, lit from inside, rising
         const a = rnd(0, TAU), v = rnd(15, 110) * s;

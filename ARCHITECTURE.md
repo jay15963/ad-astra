@@ -467,6 +467,32 @@ estado do service worker.
 Tema por era: `document.body.dataset.era = '4'`; CSS variables por era em styles.css. Fonte do sistema. Retrato, polegar, alvos >= 44px,
 `env(safe-area-inset-*)`. Acessibilidade: texto escalável (`--text-scale`), modo daltonismo (sem depender só de vermelho/verde), reduzir movimento, nada só por som.
 
+### Renderizador do Dia de Lançamento (src/ui/launch-render, nov/2026)
+Canvas 2D procedural (sem imagens externas) que `launch-scene.js` carrega com `import('./launch-render/index.js')` dinâmico: se o
+módulo falhar, a cena segue sem a arte (o resultado nunca depende dele). **Contrato completo: [src/ui/launch-render/README.md](src/ui/launch-render/README.md)**
+(API, dados de arte, harness). Módulos:
+- `index.js` — `createLaunchRenderer({seed})` → `{ reset, event, update, draw, drawPadWindow, vehicleScreenPos, stats }`; recebe
+  da cena um "render state" (modo pad/ascent/descent/orbit, telemetria, marcos, flags) e desenha; prewarm em `requestIdleCallback`
+  (plumas, nuvens, mapas da Terra/destino, faixas do limbo) durante contagem e cruzeiro.
+- `textures.js` — PRNG/ruído com semente (hash dos ids; nunca `Math.random`), cache LRU de canvases offscreen (48 MB, geração
+  preguiçosa com orçamento por quadro), céu, estrelas, limbo da Terra, discos planetários, nuvens, base de lançamento, terreno de pouso.
+- `vehicles.js` + **data/vehicle-art.json** — pintor de foguetes/naves a partir de dimensões reais (todo id de vehicles.json e
+  spacecraft.json tem arte; ids desconhecidos caem num template por família). Arte nunca vai para vehicles.json.
+- `fx.js` — plumas por propelente e pressão ambiente (diamantes de Mach, expansão no vácuo), colar de condensação, paraquedas,
+  plasma de reentrada, partículas em pool. `camera.js` — enquadramentos de subida/descida/órbita/plataforma.
+Regras: só apresentação (nunca lê/escreve o sim além do `activeLaunch` recebido), DPR ≤ 2, respeita `reduce` (reduzir movimento).
+Harness: `tools/launch-preview.html?scene=…&vehicle=…&body=…&t=…` (ver README §6). Testes: `tests/launch-render.test.mjs`.
+sw.js não precisa de lista: o crawl do precache segue o `import()` dinâmico e o `new URL('…/vehicle-art.json', import.meta.url)`.
+
+### Design (nov/2026)
+O visual segue o sistema derivado do CSmanager — especificação completa em **[docs/DESIGN.md](docs/DESIGN.md)** (tokens, ícones, shell,
+componentes, telas). Resumo: "cinza é a interface; cor é significado" — superfícies quase pretas `--s0..--s4`, bordas de 1px
+(`--line`/`--line-strong`), texto `--text/--text-2/--text-3`, cor só semântica (`--green`, `--red`, `--amber` = sua agência/ação principal,
+`--info`); cards planos com raio 6px; fonte do sistema (Inter se instalada, senão system-ui) + mono em rótulos pequenos em caixa alta
+com espaçamento. A barra de abas (`.tabbar`) espelha `.barra-inferior`: barra plana `--s1`, ícone + rótulo, item atual com traço de
+3×22px no topo. Os tokens ficam em `styles.css` (`body, body[data-era="4"]` — hoje uma paleta única para todas as eras). Mapa, mapa-múndi
+e cena de lançamento mantêm a própria imagem; só o cromo (cabeçalhos, folhas, chips) segue o sistema.
+
 ## Testes e ferramentas
 - `npm test` → `node --test tests/*.test.mjs` (no Windows `node --test tests/` falha; use o glob) (cada módulo tem `tests/<modulo>.test.mjs`; use `loadDataNode(root)` de `src/core/data.js`).
 - `node tools/smoke.mjs [seeds] [actor]` — bot joga campanhas completas com todos os atores jogáveis, faz save/load no meio, falha em exceção ou `log` com "erro".

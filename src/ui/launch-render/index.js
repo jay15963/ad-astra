@@ -4,14 +4,15 @@
 // consistent picture so the preview harness works end to end. Builders improve their modules; this file
 // only orchestrates (order of layers, event → fx/debris, camera).
 
-import { hash, SUN, sunFor, drawSky, drawStarfield, drawEarthLimb, drawClouds, drawCloudsFront, drawLaunchSite, siteStyleOf, drawTerrain, drawGroundShadow, drawPlanetDisc, textureStats } from './textures.js';
-import { resolveStack, attachedParts, detachedBy, activeNozzles, paintVehicle, paintPart, paintCraft, craftArt, craftNozzles } from './vehicles.js';
-import { createFx, ambientPressure, drawPlume, drawCondensationCollar, drawParachutes, drawReentryPlasma } from './fx.js';
+import { hash, SUN, sunFor, drawSky, drawStarfield, drawEarthLimb, drawClouds, drawCloudsFront, drawLaunchSite, siteStyleOf, drawTerrain, drawGroundShadow, drawPlanetDisc, textureStats, drawBodyLimb, prewarmBodyLimb, prewarmEarthLimb, prewarmMaps, prewarmSprites, LIMB_BUCKETS } from './textures.js';
+import { resolveStack, attachedParts, detachedBy, activeNozzles, paintVehicle, paintPart, paintCraft, craftArt, craftNozzles, payloadMount, breakupPieces } from './vehicles.js';
+import { createFx, ambientPressure, drawPlume, drawCondensationCollar, drawParachutes, drawReentryPlasma, prewarmPlumes } from './fx.js';
 import { createCamera, ascentFrame, descentFrame, orbitFrame } from './camera.js';
 
 export { SUN } from './textures.js';
 export { loadVehicleArt, setVehicleArt } from './vehicles.js';
 
+const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const AIRLESS = new Set(['moon', 'mercury', 'europa', 'ganymede', 'callisto', 'io', 'phobos', 'deimos', 'ceres', 'vesta', 'enceladus', 'triton', 'pluto', 'charon']);
 
 /** Lander/capsule actually drawn in a descent (a crewed Orion mission lands in its partner lander). */
@@ -38,6 +39,24 @@ function visualRS(rs) {
   return { ...rs, tele: { ...(rs.tele || {}), altKm: (rs.tele?.altKm || 0) * e } };
 }
 
+/** Mars/Titan/Venus EDL: is the descent craft still inside its aeroshell, and has the heat shield gone? */
+const EDL_WORLDS = new Set(['mars', 'titan', 'venus']);
+function encapsulated(c) { return !!c && (c.template === 'rotorcraft' || c.template === 'rover' || (c.template === 'lander' && !!c.aeroshell)); }
+function edlStage(rs, craft, world, flags, evs) {
+  const encaps = EDL_WORLDS.has(world) && encapsulated(craft);
+  if (!encaps) return { encaps: false, shell: null, shieldOff: false };
+  const ev = evs || rs.events || {};
+  const powered = ev.powered != null && !flags.chute;
+  if (flags.landed || powered) return { encaps: true, shell: null, shieldOff: true };
+  const D = craft.aeroshell?.d || (craft.template === 'rotorcraft' ? 3.75 : 4.5);
+  const shell = SHELLS.get(craft.id || craft.name) || { name: (craft.name || '') + ' aeroshell', template: 'aeroshell', shellD: D, backshellMat: 'white_paint', inner: descentCraftId(rs) };
+  SHELLS.set(craft.id || craft.name, shell);
+  const tc = ev.chute;
+  const shieldOff = !!flags.chute && tc != null && rs.t - tc > 2.2;
+  return { encaps: true, shell, shieldOff };
+}
+const SHELLS = new Map();
+
 /** Core (centre) stage diameter: where the tower umbilicals attach. */
 function coreDiameter(st) {
   const p = (st?.parts || []).find((q) => !q.x && (q.role === 'stage' || q.role === 'upper'));
@@ -62,7 +81,46 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
   const trail = { x: new Float32Array(TRAIL_N), y: new Float32Array(TRAIL_N), age: new Float32Array(TRAIL_N), w: new Float32Array(TRAIL_N), n: 0, head: 0, acc: 0, prop: 'kerolox' };
   const trailShift = (dx, dy) => { for (let i = 0; i < trail.n; i++) { trail.x[i] += dx; trail.y[i] += dy; } }; // read by debris painters (tail-off plumes, fin deployment)
 
-  const flagsOf = (rs) => ({ ...(rs.flags || {}), boostersOff: !!(rs.flags?.boostersOff || events.boosterSep != null || rs.flags?.staged) });
+  const sepState = { done: false };
+  let ullAcc = 0, ignFlash = false;
+  // upper-stage ignition after staging: a few seconds of coast (cold-gas push-off, ullage) before the vacuum
+  // engine lights; its radiatively-cooled extension then heats from dark grey to dull red-orange
+  const S2_IGN = 2.6;
+  const s2Since = (rs) => (rs.flags?.staged && events.staging != null ? Number(rs.t) - events.staging : Infinity);
+  const flagsOf = (rs) => ({
+    ...(rs.flags || {}),
+    ...(rs.flags?.staged && s2Since(rs) < S2_IGN ? { engineOn: false } : {}),
+    s2Glow: rs.flags?.staged ? 0.85 * sstep(S2_IGN, S2_IGN + 3, s2Since(rs)) : 0.85,
+    s2Throttle: rs.flags?.staged ? sstep(S2_IGN, S2_IGN + 0.6, s2Since(rs)) : 1,
+    boostersOff: !!(rs.flags?.boostersOff || events.boosterSep != null || rs.flags?.staged), payloadSep: sepState.done,
+    // Orion-style service-module arrays unfold over ~4 s, a few seconds after the LAS / fairing jettison
+    arraysK: events.fairing != null ? Math.max(0, Math.min(1, (Number(rs.t) - events.fairing - 2.5) / 4)) : rs.flags?.fairingOff && events.fairing == null ? 1 : 0,
+  });
+
+  /** Spacecraft separation ~1.5 s after SECO: springs push it off the adapter, it drifts away slowly, arrays out. */
+  function payloadRelease(rs, st, flags) {
+    if (sepState.done || events.seco == null || rs.t - events.seco < 1.5 || flags.exploded || !flags.fairingOff) return;
+    const pm = payloadMount(st, flags);
+    if (!pm) { sepState.done = true; return; }
+    sepState.done = true;
+    const fr = ascentFrame(rs, st.heightM);
+    const ppm = fr.pxPerM, light = lightOf(rs);
+    const at = toScreen(fr, 0, pm.y);
+    const ux = Math.sin(fr.tilt), uy = -Math.cos(fr.tilt);
+    const craft = pm.craft;
+    const t0 = rs.t;
+    fx.addDebris({
+      paint: (c) => {
+        const age = clock.t - t0;
+        const k = ppm * pm.scale;
+        paintCraft(c, craft, { pxPerM: k, light, mode: age > 2.5 ? 'flight' : 'stack', legs: 0, t: clock.t });
+      },
+      x: at.x, y: at.y, vx: ux * 0.7 * ppm, vy: uy * 0.7 * ppm, gravity: 0, drag: 0, rel: true, rot: fr.tilt, vr: 0.035, life: 600, recede: 0.004,
+    });
+    fx.jet(at.x, at.y, Math.atan2(-uy, -ux), { ppm: Math.max(0.6, ppm * 0.4), hot: false, len: 0.4 });
+  }
+  /** The camera reads event times (staging re-framing) from rs.events: give it the renderer's own record too. */
+  const withEvents = (rs) => (events.staging != null && rs.events?.staging == null ? { ...rs, events: { ...(rs.events || {}), staging: events.staging } } : rs);
   const stackOf = (rs) => resolveStack(rs.vehicleId, rs.craftId, { crewed: !!rs.crewed });
   const lightOf = (rs) => rs.light || sunFor(rs.mode, rs.world, rs.siteId) || SUN;
 
@@ -97,6 +155,19 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     const t0 = rs.t;
     const reusable = !!st.art?.reuse;
     for (const p of detachedBy(st, name, prev)) {
+      if (p.role === 'booster' || p.role === 'stage') {
+        addSep(rs, st, p, reusable);
+        if (seps[seps.length - 1]?.kind === 'srb') { // booster separation motors: forward (nose) + aft clusters firing outward
+          const side = Math.sign(p.x || 0) || 1, L = (p.len || 30) * ppm, at = toScreen(fr, p.x || 0, p.y || 0);
+          for (const along of [0.93, 0.07]) {
+            const bx = at.x + ux * L * along + qx * side * (p.d || 3) * 0.5 * ppm, by = at.y + uy * L * along + qy * side * (p.d || 3) * 0.5 * ppm;
+            const ang = Math.atan2(qy * side, qx * side);
+            fx.jet(bx, by, ang, { ppm, hot: true, len: 1.1 });
+            fx.jet(bx, by, ang + (along > 0.5 ? -0.5 : 0.5) * side, { ppm, hot: true, len: 0.7 });
+          }
+        }
+        continue;
+      }
       const halves = p.role === 'fairing' && !p.hippo ? [':L', ':R'] : [''];
       for (const h of halves) {
         const part = h ? { ...p, id: p.id + h } : p;
@@ -153,8 +224,228 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     else fx.staging(sep.x, sep.y, { angle: fr.tilt, pxPerM: fr.pxPerM });
   }
 
+  // ---------------------------------------------------------------- separated stages / boosters
+  // Kept in vehicle metres relative to the still-flying stack (x across, y along its axis, centre of mass), so
+  // they stay consistent while the camera re-frames / zooms on the upper stage. Physically paced: a few m/s of
+  // outward push, a few degrees per second of rotation, relative deceleration so they fall behind; reusable
+  // cores flip with nitrogen RCS puffs, deploy grid fins and start the boostback; everything recedes in depth.
+  const seps = [];
+  function addSep(rs, st, p, reusable) {
+    const side = Math.sign(p.x || 0) || 0;
+    const solid = p.role === 'booster' && (p.engines?.prop === 'solid' || (!p.engines?.prop && /srb|gem|p120|eap|s200|pso/i.test(p.id || '')));
+    const soyuz = /soyuz/.test(st.vehicleId || '') && p.role === 'booster';
+    const kind = p.role === 'stage' ? 'stage' : solid ? 'srb' : 'liq';
+    const flip = kind === 'stage' ? reusable && !!p.gridFins : kind === 'liq' && !!p.gridFins;
+    const len = p.len || 30;
+    seps.push({
+      p, st, kind, side, flip, soyuz, t0: rs.t, len,
+      cx: p.x || 0, cy: (p.y || 0) + len / 2, ref: p.role === 'stage' ? (p.y || 0) + len : (p.y || 0) + len * 0.6,
+      vx: kind === 'stage' ? 0 : side * (solid ? 4 : soyuz ? 2.5 : 3.2),
+      vy: kind === 'stage' ? -1.4 : -0.5,
+      rot: 0, vr: kind === 'stage' ? (flip ? 0 : -0.035) : side * (solid ? 0.09 : soyuz ? 0.42 : 0.03),
+      depth: 0, puff: 0, smoke: 0,
+      life: kind === 'stage' ? 10.5 : kind === 'liq' ? 11 : 9,
+    });
+    if (seps.length > 8) seps.shift();
+  }
+  function stepSeps(rs, dt, fr) {
+    for (let i = seps.length - 1; i >= 0; i--) {
+      const s = seps[i];
+      const age = rs.t - s.t0;
+      if (age > s.life || age < -1) { seps.splice(i, 1); continue; }
+      let ay;
+      if (s.kind === 'srb') ay = -11;
+      else if (s.kind === 'liq') ay = -(s.soyuz ? 9 : 6) * Math.min(1, age / 1.5);
+      else ay = age < S2_IGN ? -0.25 : -1.6 * Math.min(1, (age - S2_IGN) / 1.5);
+      s.vy += ay * dt;
+      s.cx += s.vx * dt; s.cy += s.vy * dt;
+      if (s.flip && age > 1.3) { // N2 cold-gas thrusters at the top flip the stage (slow, ~12 deg/s)
+        const dir = s.kind === 'stage' ? -1 : s.side || -1;
+        if (Math.abs(s.vr) < 0.21) s.vr += dir * 0.07 * dt;
+        if (!rs.reduce && age < 8) {
+          s.puff += dt;
+          if (s.puff > 0.3) {
+            s.puff = 0;
+            const top = sepPoint(fr, s, 0, s.len * 0.47);
+            const a = fr.tilt + s.rot;
+            const out = Math.sin(age * 5.3) > 0 ? 1 : -1;
+            fx.rcs(top.x, top.y, a + (out > 0 ? 0 : Math.PI));
+          }
+        }
+      }
+      s.rot += s.vr * dt;
+      s.depth += dt * (s.kind === 'stage' ? (age < S2_IGN ? 0.015 : 0.25) : s.kind === 'srb' ? 0.06 : 0.05);
+      if (s.kind === 'srb' && !rs.reduce && age < 3.5) { // residual smoke from the burnt-out motor
+        s.smoke += dt;
+        if (s.smoke > 0.09) {
+          s.smoke = 0;
+          const n = sepPoint(fr, s, 0, -s.len * 0.5);
+          const a = fr.tilt + s.rot + Math.PI / 2;
+          fx.jet(n.x, n.y, a, { ppm: Math.max(0.6, fr.pxPerM * 0.7), hot: false, len: 0.6 * (1 - age / 3.5) + 0.2 });
+        }
+      }
+    }
+  }
+  /** Screen point of a separated body's local point (metres from its centre of mass, y up its axis). */
+  function sepPoint(fr, s, lx, ly) {
+    const sc = 1 / (1 + s.depth);
+    const c = Math.cos(s.rot), sn = Math.sin(s.rot);
+    const wx = s.cx + (lx * c + ly * sn), wy = s.cy + (-lx * sn + ly * c);
+    const ref = s.ref; // perspective about the base of the tracked upper stack
+    return toScreen(fr, wx * sc, ref + (wy - ref) * sc);
+  }
+  function drawSeps(ctx, rs, fr, light) {
+    for (const s of seps) {
+      const age = rs.t - s.t0;
+      const sc = 1 / (1 + s.depth);
+      const c = sepPoint(fr, s, 0, 0);
+      const ppm = fr.pxPerM * sc;
+      const L = s.len * ppm;
+      if (L < 1) continue;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, (s.life - age) / 2));
+      ctx.translate(c.x, c.y);
+      ctx.rotate(fr.tilt + s.rot);
+      ctx.translate(0, L / 2);
+      const e = s.p.engines;
+      const bell = e ? (e.bellLen || 1) : 0;
+      const pBar = ambientPressure('earth', clock.alt);
+      if (s.kind === 'srb' && age < 1.3 && !rs.reduce && e) { // SRB tail-off: a dying, smoky plume
+        drawPlume(ctx, { x: 0, y: bell * ppm, d: e.bellD || 3 }, { prop: 'solid', pBar, pxPerM: ppm, t: rs.t, throttle: Math.max(0.05, 1 - age / 1.3) * 0.7, seed: 7 });
+      }
+      if (s.flip && e && age > 7 && age < s.life - 0.3) { // boostback burn: three engines relight, plume up-range
+        const thr = Math.min(1, (age - 7) / 0.5);
+        drawPlume(ctx, { x: 0, y: bell * ppm, d: (e.bellD || 0.9) * 1.6 }, { prop: e.prop || 'kerolox', pBar, pxPerM: ppm, t: rs.t, throttle: thr * 0.5, lengthM: s.len * 0.9, reduce: rs.reduce, seed: 11 });
+      }
+      const fins = s.flip ? Math.max(0, Math.min(1, (age - 1.6) / 1.8)) : 0;
+      paintPart(ctx, s.st, s.p, { pxPerM: ppm, light, tilt: fr.tilt + s.rot, finsOut: fins, glow: 0 });
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Falcon transporter-erector strongback: a white lattice column beside the stack with clamp arms on the
+   * first and second stage. It rocks back a few degrees (arms open) in the last seconds of the count and stays
+   * on the pad after liftoff. ox/oy = pad centre on screen (vehicle base), k = px per metre.
+   */
+  function drawStrongback(ctx, st, k, ox, oy, retract, light) {
+    if (st.art?.family !== 'falcon' || !(k > 0.2)) return;
+    const R = coreDiameter(st) / 2;
+    const top = Math.min(st.heightM, (Number(st.art?.payloadTop) || st.heightM) + 0.5);
+    const x0 = R + 1.0, w = 2.4, hinge = x0 + w;
+    const a = Math.max(0, Math.min(1, retract)) * 0.07;
+    const lit = (Number(light?.ax) || -0.6) < 0; // sun from the left: the vehicle-facing chord is lit
+    ctx.save();
+    ctx.translate(ox + hinge * k, oy);
+    ctx.rotate(a);
+    ctx.translate(-hinge * k, 0);
+    // chords
+    const cw = Math.max(0.7, 0.32 * k);
+    ctx.fillStyle = lit ? '#e6e6e2' : '#b9bbbb'; ctx.fillRect(x0 * k, -top * k, cw, top * k);
+    ctx.fillStyle = lit ? '#a9abac' : '#d6d6d2'; ctx.fillRect((x0 + w) * k - cw, -top * k, cw, top * k);
+    // zig-zag bracing + horizontal battens
+    ctx.strokeStyle = 'rgba(205,206,204,0.85)'; ctx.lineWidth = Math.max(0.5, 0.14 * k);
+    ctx.beginPath();
+    const bay = 2.6;
+    for (let y = 0, i = 0; y < top - 0.1; y += bay, i++) {
+      const y1 = Math.min(top, y + bay);
+      ctx.moveTo((i % 2 ? x0 : x0 + w) * k, -y * k); ctx.lineTo((i % 2 ? x0 + w : x0) * k, -y1 * k);
+      ctx.moveTo(x0 * k, -y * k); ctx.lineTo((x0 + w) * k, -y * k);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(30,32,34,0.35)'; ctx.fillRect(x0 * k + cw, -top * k, Math.max(0.5, 0.12 * k), top * k); // inner shadow
+    // clamp arms: reach the skin while latched, swing open as the strongback retracts
+    const open = Math.max(0, Math.min(1, retract));
+    for (const yA of [top - 2.5, st.heightM * 0.62, st.heightM * 0.3]) {
+      const len = (x0 - R) * (1 - 0.65 * open);
+      ctx.fillStyle = '#d8d8d4';
+      ctx.fillRect((x0 - len) * k, -(yA + 0.35) * k, len * k, Math.max(0.8, 0.7 * k));
+      ctx.fillStyle = '#4a4c50'; ctx.fillRect((x0 - len) * k, -(yA + 0.5) * k, Math.max(0.6, 0.25 * k), Math.max(1, 1 * k));
+    }
+    ctx.restore();
+  }
+
+  // EDL hardware dropped on the way down: heat shield (falls away below), backshell + chute (left behind above)
+  const edlSpawned = { shield: false, back: false };
+  function edlDebris(rs, flags) {
+    const world = rs.world || 'moon';
+    const craft = craftArt(descentCraftId(rs));
+    if (!EDL_WORLDS.has(world) || !encapsulated(craft)) return;
+    const ev = events;
+    const d = descentFrame(rs, craft.heightM);
+    const k = d.pxPerM, light = lightOf(rs);
+    const D = craft.aeroshell?.d || (craft.template === 'rotorcraft' ? 3.75 : 4.5);
+    const shell = { name: (craft.name || '') + ' aeroshell', template: 'aeroshell', shellD: D, backshellMat: 'white_paint' };
+    if (!edlSpawned.shield && flags.chute && ev.chute != null && rs.t - ev.chute > 2.2) {
+      edlSpawned.shield = true;
+      fx.addDebris({ paint: (c) => paintCraft(c, shell, { pxPerM: k, light, part: 'shield' }), x: d.craftX, y: d.craftY, vx: 4, vy: 10, gravity: 40, drag: 0.05, rot: 0, vr: 0.35, life: 6, recede: 0.08 });
+    }
+    if (!edlSpawned.back && ev.powered != null && !flags.chute && ev.chute != null && !flags.landed) {
+      edlSpawned.back = true;
+      const t0 = rs.t;
+      fx.addDebris({
+        paint: (c) => {
+          drawParachutes(c, 0, -D * 0.75 * k, { count: 1, kind: 'dgb', deploy: 1, t: clock.t, pxPerM: k * 0.5, sway: 0 });
+          paintCraft(c, shell, { pxPerM: k, light, part: 'back' });
+        },
+        x: d.craftX, y: d.craftY, vx: -14, vy: -30, gravity: 0, ay: 18, drag: 0.3, rot: 0, vr: -0.05, life: 5, recede: 0.1,
+        tick: (o) => { if (clock.t - t0 > 0.6) o.vr = -0.12; },
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- idle-time prewarm
+  // While the countdown / cruise is on screen, the textures the next beats need (Earth maps, the Earth-limb
+  // altitude buckets of the climb, the target world's maps and its limb buckets) are built in idle slices of
+  // ≤ ~8 ms, so staging and landing never stall on a texture build.
+  const pw = { sig: '', queue: [], running: false };
+  function schedulePrewarm(ctx, rs) {
+    let dpr = 1, FW = rs.view?.W || 375, FH = rs.view?.H || 700;
+    try { const m = ctx.getTransform(); dpr = Math.max(1, Math.min(2, Math.hypot(m.a, m.b) || 1)); if (ctx.canvas?.width) { FW = ctx.canvas.width / dpr; FH = ctx.canvas.height / dpr; } } catch { /* keep */ }
+    const sig = `${rs.mode}|${rs.world}|${rs.bodyId}|${Math.round(FW)}x${Math.round(FH)}|${dpr}`;
+    if (pw.sig === sig || typeof requestIdleCallback === 'undefined' && typeof setTimeout === 'undefined') return;
+    pw.sig = sig;
+    const full = { W: FW, H: FH };
+    const fake = { getTransform: () => ({ a: dpr, b: 0, d: dpr, e: 0, f: 0 }) };
+    const q = [];
+    if (rs.mode === 'pad' || rs.mode === 'ascent') {
+      const st = stackOf(rs);
+      const props = [...new Set((st.parts || []).filter((p) => p.engines).map((p) => p.engines.prop || 'kerolox'))];
+      q.push(() => prewarmPlumes(props));
+      q.push(() => prewarmSprites({ clouds: true, light: SUN }));
+      q.push(() => prewarmMaps('earth'));
+      q.push(() => prewarmEarthLimb(dpr, full, LIMB_BUCKETS, sunFor('ascent', 'earth') || SUN));
+    } else {
+      const w = rs.world || rs.bodyId || 'moon';
+      if (w !== 'earth') {
+        q.push(() => prewarmMaps(w));
+        q.push(() => prewarmSprites({ rocksWorld: w, light: sunFor('descent', w) || SUN }));
+        q.push(() => prewarmBodyLimb(fake, full, w, [360, 240, 160, 110, 75, 50, 33, 22, 15, 10, 7, 4.5, 3], sunFor('descent', w) || SUN));
+      }
+      q.push(() => prewarmMaps('earth'));
+    }
+    pw.queue = q;
+    if (pw.running) return;
+    pw.running = true;
+    const ric = typeof requestIdleCallback === 'function' ? (fn) => requestIdleCallback(fn, { timeout: 300 }) : (fn) => setTimeout(() => fn({ timeRemaining: () => 10 }), 40);
+    const loop = (dl) => {
+      let guard = 0;
+      while (pw.queue.length && guard++ < 6 && (!dl || dl.timeRemaining() > 3)) {
+        let done = true;
+        try { done = pw.queue[0](); } catch { done = true; }
+        if (done) pw.queue.shift();
+      }
+      if (pw.queue.length) ric(loop); else pw.running = false;
+    };
+    ric(loop);
+  }
+
+  // the countdown pad window frames the stack lower and smaller than the full-screen pad shot (see drawPadWindow)
+  let winMode = false;
+  const padWinFrame = (rs, st) => ({ pxPerM: ((rs.view?.H || 600) * 0.5) / Math.max(5, st.heightM), anchorX: (rs.view?.W || 375) / 2, anchorY: (rs.view?.H || 600) * 0.9, tilt: 0 });
+
   const R = {
-    reset() { events = {}; fx.clear(); prevGround = null; trail.n = 0; trail.head = 0; },
+    reset() { events = {}; fx.clear(); prevGround = null; trail.n = 0; trail.head = 0; edlSpawned.shield = edlSpawned.back = false; sepState.done = false; seps.length = 0; ullAcc = 0; ignFlash = false; },
     events() { return { ...events }; },
 
     event(name, payload = {}) {
@@ -168,9 +459,29 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
         case 'explode': {
           const p = payload.x != null ? payload : vehicleScreenPos(rs);
           const tilt = rs.mode === 'ascent' ? ascentFrame(rs, stackOf(rs).heightM).tilt : 0;
-          fx.explosion(p.x, p.y, { scale: 1.2, world: rs.world, dir: tilt - Math.PI / 2 }); cam.shake(2); break;
+          fx.explosion(p.x, p.y, { scale: 1.2, world: rs.world, dir: tilt - Math.PI / 2 }); cam.shake(2);
+          if (rs.mode === 'ascent') {
+            // the exhaust column ends at the failure point: the last few hundred metres of trail are blown apart
+            const drop = Math.min(trail.n, 10);
+            trail.head = (trail.head - drop + TRAIL_N) % TRAIL_N; trail.n -= drop;
+            // torn fragments of the actual vehicle, tumbling out of the fireball with smoke / fire trails
+            const st = stackOf(rs), fr = ascentFrame(rs, st.heightM), ppm = fr.pxPerM;
+            const pre = { ...flagsOf(rs), exploded: false };
+            const pieces = breakupPieces(st, pre, { pxPerM: ppm, light: lightOf(rs), seed: hash(String(rs.seed || 1)), max: rs.reduce ? 4 : 10 });
+            pieces.forEach((pc, i) => {
+              const at = toScreen(fr, pc.x, pc.y);
+              const ux = Math.sin(fr.tilt), uy = -Math.cos(fr.tilt);
+              fx.addDebris({
+                paint: pc.paint, x: at.x, y: at.y,
+                vx: (pc.vx * 2.2 + ux * 18) * ppm, vy: (-pc.vy * 1.6 + uy * 18) * ppm,
+                rot: fr.tilt, vr: pc.vr * 1.4, gravity: 24 * ppm, drag: 0.5, life: 3.5 + (i % 3) * 0.8, recede: 0.08,
+                trail: i % 3 === 0 ? 'fire' : 'smoke',
+              });
+            });
+          }
+          break;
         }
-        case 'touchdown': { const p = vehicleScreenPos(rs); cam.shake(payload.hard ? 1.2 : 0.5); fx.landingDust(p.x, p.y + 20, { intensity: 1, world: rs.world, pxPerM: 4, dt: 0.5 }); break; }
+        case 'touchdown': { const c = craftArt(descentCraftId(rs)); const d = descentFrame(rs, c.heightM); cam.shake(payload.hard ? 1.2 : 0.5); fx.landingDust(d.craftX, d.groundY, { intensity: 1, world: rs.world, pxPerM: d.pxPerM, dt: 0.5 }); break; } // last gust of regolith at engine cutoff, at the footpads
         case 'splashdown': {
           const c = craftArt(descentCraftId(rs)); const d = descentFrame(rs, c.heightM);
           fx.splash(d.craftX, d.groundY, { scale: Math.max(0.6, Math.min(2, (c.widthM || 4) * d.pxPerM / 40)) }); break;
@@ -184,6 +495,7 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
       if (!rs) return;
       rs = visualRS(rs);
       if (rs.events) for (const [k, v] of Object.entries(rs.events)) if (events[k] == null && Number.isFinite(v)) events[k] = v;
+      rs = withEvents(rs);
       last = rs;
       clock.t = Number(rs.t) || 0; clock.alt = rs.tele?.altKm || 0; clock.reduce = !!rs.reduce;
       const dt = Math.max(0, Math.min(0.1, Number(rs.dt) || 0));
@@ -192,16 +504,34 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
       const flags = flagsOf(rs);
       if (rs.mode === 'ascent' || rs.mode === 'pad') {
         const st = stackOf(rs);
+        payloadRelease(rs, st, flags);
         // visual-only booster separation (no milestone): at ~42 km, before staging
         if (st.hasBoosters && !flags.staged && events.boosterSep == null && (rs.tele?.altKm || 0) > 42) R.event('boosterSep');
         const fr = ascentFrame(rs, st.heightM);
+        stepSeps(rs, dt, fr);
+        const s2t = s2Since(rs);
+        if (s2t < S2_IGN + 0.4 && !rs.reduce && !flags.exploded) { // cold-gas ullage / attitude puffs during the coast
+          const up = (st.parts || []).find((q) => !q.x && q.role === 'upper');
+          ullAcc += dt;
+          if (ullAcc > 0.42 && up) {
+            ullAcc = 0;
+            const sd = Math.sin(s2t * 9.1) > 0 ? 1 : -1;
+            const q = toScreen(fr, sd * (up.d || 3) * 0.5, up.y + 0.8);
+            fx.rcs(q.x, q.y, fr.tilt + (sd > 0 ? 0 : Math.PI) + 0.4);
+          }
+          if (s2t >= S2_IGN && !ignFlash && up?.engines) { // ignition: TEA-TEB green-white flash at the throat
+            ignFlash = true;
+            const q = toScreen(fr, 0, up.y - (up.engines.bellLen || 2) * 0.3);
+            fx.jet(q.x, q.y, fr.tilt + Math.PI / 2, { ppm: Math.max(0.6, fr.pxPerM * 0.4), hot: true, len: 0.5 });
+          }
+        }
         if (prevGround != null) {
           const dy = Math.max(-80, Math.min(80, fr.groundY - prevGround));
           if (Number.isFinite(dy) && !flags.exploded) { const sh = (rs.tele?.altKm || 0) < 3 ? dy : dy * 0.05 + 0.8; fx.shift(0, sh); trailShift(0, sh); }
         }
         prevGround = fr.groundY;
         const pBar = ambientPressure('earth', rs.tele?.altKm);
-        for (let i = 0; i < trail.n; i++) trail.age[i] += dt;
+        for (let i = 0; i < trail.n; i++) trail.age[i] += dt * (flags.exploded ? 2 : 1); // a broken-off column disperses faster
         if (flags.engineOn && !flags.exploded && (rs.tele?.altKm || 0) > 0.05 && (rs.tele?.altKm || 0) < 48) {
           const noz = activeNozzles(st, flags);
           if (noz.length) {
@@ -229,15 +559,28 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
           }
           if ((rs.tele?.altKm || 0) < 0.4) fx.padBillow(fr.anchorX, fr.groundY, { intensity: 1, dt, pxPerM: fr.pxPerM });
         } else if (!flags.exploded && (rs.tele?.altKm || 0) <= 0) {
-          // LOX boil-off venting on the pad (builder: vent valve positions per stack)
-          const v1 = toScreen(fr, st.maxWidthM * 0.2, st.heightM * 0.55), v2 = toScreen(fr, -st.maxWidthM * 0.2, st.heightM * 0.3);
-          fx.vent(v1.x, v1.y, { dir: 1, dt, rate: 1 }); fx.vent(v2.x, v2.y, { dir: -1, dt, rate: 0.6 });
+          // LOX boil-off on the pad: upper-stage vent, booster LOX vent and the T-0 umbilical, streaming downwind
+          // and sinking (cold, dense vapour); the sound-suppression deluge starts at T-10 s
+          const vf = winMode ? padWinFrame(rs, st) : fr;
+          const ppm = vf.pxPerM, vR = coreDiameter(st) / 2;
+          const s1 = (st.parts || []).find((p) => !p.x && p.role === 'stage');
+          const s2 = (st.parts || []).find((p) => !p.x && p.role === 'upper');
+          const pts = [];
+          if (s2) pts.push([vR * 0.95, s2.y + s2.len * 0.75, 1, 1.1], [-vR * 0.95, s2.y + s2.len * 0.55, -1, 0.45]);
+          if (s1) pts.push([vR * 0.95, s1.y + s1.len * 0.58, 1, 0.9], [-vR * 0.95, s1.y + s1.len * 0.8, -1, 0.4]);
+          pts.push([vR * 1.05, 2.5, 1, 0.5]);
+          for (const [x, y, dir, r] of pts) { const q = toScreen(vf, x, y); fx.vent(q.x, q.y, { dir, dt, rate: r, ppm }); }
+          if (rs.mode === 'pad' && Number.isFinite(rs.cd) && rs.cd <= 10) {
+            const g = toScreen(vf, 0, 0);
+            fx.deluge(g.x, g.y, { ppm, dt, intensity: Math.min(1, (10 - rs.cd) / 2), halfW: Math.max(8, coreDiameter(st) * 2.2) });
+          }
         }
-      } else if (rs.mode === 'descent' && flags.engineOn && !flags.landed) {
+      } else if (rs.mode === 'descent') edlDebris(rs, flags);
+      if (rs.mode === 'descent' && flags.engineOn && !flags.landed) {
         const c = craftArt(descentCraftId(rs));
         const d = descentFrame(rs, c.heightM);
         const altM = (rs.tele?.altKm || 0) * 1000;
-        const reach = 60 + 1.5 * nozzleHeightM(c); // plume reaches the ground from this height (HLS: high-mounted thrusters)
+        const reach = Math.max(rs.world === "mars" || rs.world === "titan" ? 95 : 70, 60 + 1.5 * nozzleHeightM(c)); // plume reaches the ground from this height (HLS: high-mounted thrusters)
         if (rs.world !== 'earth' && altM < Math.max(1000, reach * 2)) {
           const near = Math.max(0, 1 - altM / reach);
           const far = 0;
@@ -250,7 +593,9 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
 
     draw(ctx, rs) {
       if (!rs) return;
-      rs = visualRS(rs);
+      rs = withEvents(visualRS(rs));
+      schedulePrewarm(ctx, rs);
+      winMode = false;
       ctx.save();
       const o = cam.offset();
       ctx.translate(o.x, o.y);
@@ -261,6 +606,8 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     },
 
     drawPadWindow(ctx, rect, rs) {
+      schedulePrewarm(ctx, rs);
+      winMode = true;
       const st = stackOf(rs);
       // framed a little lower and smaller than the full-screen pad shot so the telemetry cards across the top
       // of the stage never cover the payload / fairing (vehicle top ≈ 40 % down the window)
@@ -273,8 +620,13 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
       drawSky(ctx, view, 'earth', 0, { weather: rs.weather });
       drawClouds(ctx, view, { altKm: 0, pxPerKm: 30, anchorY: rect.h * gyR, t: rs.t, coverage: (rs.weather?.risk || 20) / 100 });
       drawLaunchSite(ctx, view, { style: siteStyleOf(rs.siteId || st.site), groundY: rect.h * gyR, pxPerM: pf.pxPerM, t: rs.t, tower: st.tower, towerArm: 1, towerHeightM: st.heightM * 1.05, vehicleD: coreDiameter(st) });
+      fx.draw(ctx, 'back');
+      drawStrongback(ctx, st, pf.pxPerM, rect.w / 2, rect.h * gyR, Number.isFinite(rs.cd) ? (12 - rs.cd) / 6 : 0, lightOf(rs));
+      ctx.save();
       ctx.translate(rect.w / 2, rect.h * gyR);
       paintVehicle(ctx, st, { pxPerM: pf.pxPerM, light: lightOf(rs), flags: {}, frost: 1, t: rs.t, reduce: rs.reduce });
+      ctx.restore();
+      fx.draw(ctx, 'front');
       ctx.restore();
     },
 
@@ -293,10 +645,15 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     drawStarfield(ctx, view, { alpha: sky.starAlpha * (alt > 22 ? 0.4 : 1), drift: fr.drift, t: rs.t, seed: 7, reduce: rs.reduce }); // Earth limb in frame → short exposure
     drawEarthLimb(ctx, view, { altKm: alt, light, t: rs.t, tilt: fr.tilt });
     drawClouds(ctx, view, { altKm: alt, pxPerKm: fr.pxPerKm, anchorY: fr.anchorY, drift: fr.drift, t: rs.t, coverage: (rs.weather?.risk || 25) / 100 });
-    if (fr.groundY < view.H + 400) {
+    if (fr.groundY < view.H + 400 && alt < 4) { // the pad never reappears under the Earth limb at orbital altitudes
       const since = events.liftoff != null ? rs.t - events.liftoff : -1;
       drawLaunchSite(ctx, view, { style: siteStyleOf(rs.siteId || st.site), groundY: fr.groundY, pxPerM: fr.pxPerM, t: rs.t, tower: st.tower, towerArm: since < 0 ? 1 : Math.max(0, 1 - since / 1.5), towerHeightM: st.heightM * 1.05, reduce: rs.reduce, vehicleD: coreDiameter(st) });
     }
+    if (fr.groundY < view.H + 400 && alt < 1.5) {
+      const padX = fr.anchorX + Math.sin(fr.tilt) * (fr.groundY - fr.anchorY); // the pad stays put while the rocket climbs
+      drawStrongback(ctx, st, fr.pxPerM, padX, fr.groundY, rs.mode === 'pad' && Number.isFinite(rs.cd) ? (12 - rs.cd) / 6 : 1, light);
+    }
+    if (!flags.exploded && flags.engineOn) drawContrail(ctx, rs, st, fr, flags, light, alt);
     drawTrail(ctx, rs, light);
     fx.draw(ctx, 'back');
     if (!flags.exploded) {
@@ -304,9 +661,10 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
       if (flags.engineOn) {
         for (const n of activeNozzles(st, flags)) {
           const s = toScreen(fr, n.x, n.y);
-          drawPlume(ctx, { x: s.x, y: s.y, d: n.d }, { prop: n.prop, pBar, pxPerM: fr.pxPerM, t: rs.t, angle: fr.tilt, reduce: rs.reduce, seed: hash(n.partId || '') % 97 });
+          drawPlume(ctx, { x: s.x, y: s.y, d: n.d }, { prop: n.prop, pBar, pxPerM: fr.pxPerM, t: rs.t, angle: fr.tilt, reduce: rs.reduce, seed: hash(n.partId || '') % 97, throttle: flags.staged ? flags.s2Throttle : 1 });
         }
       }
+      drawSeps(ctx, rs, fr, light); // separated hardware sits over the upper-stage plume, under the vehicle
       ctx.save();
       ctx.translate(fr.anchorX, fr.anchorY);
       ctx.rotate(fr.tilt);
@@ -350,6 +708,57 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     }
   }
 
+  /**
+   * Persistent contrail / smoke column: a ribbon from the end of the flame down the past trajectory (which was
+   * steeper) to the bottom of the screen, widening with age. White and sun-lit low down, thinning out by ~40 km.
+   */
+  function drawContrail(ctx, rs, st, fr, flags, light, alt) {
+    const fade = sstep(0.25, 1.5, alt) * (1 - sstep(24, 44, alt));
+    if (fade < 0.01) return;
+    const noz = activeNozzles(st, flags);
+    if (!noz.length) return;
+    const prop = noz[0].prop;
+    let sx = 0, sy = 0;
+    for (const n of noz) { const q = toScreen(fr, n.x, n.y); sx += q.x; sy += q.y; }
+    sx /= noz.length; sy /= noz.length;
+    const pBar = ambientPressure('earth', alt);
+    const ext = Math.max(...noz.map((n) => Math.abs(n.x))) * 2 + noz[0].d;
+    const flameL = noz[0].d * fr.pxPerM * (pBar > 0.3 ? 8 : 6);
+    const H = rs.view.H, W = rs.view.W;
+    const solid = prop === 'solid', clean = prop === 'hydrolox' || prop === 'methalox';
+    const col = solid ? [246, 244, 240] : prop === 'hypergolic' ? [206, 168, 132] : clean ? [240, 244, 248] : [228, 226, 222];
+    const A = (solid ? 0.75 : clean ? 0.42 : 0.55) * fade;
+    const w0 = Math.max(3, ext * fr.pxPerM * 1.1);
+    const pts = [];
+    let x = sx - Math.sin(fr.tilt) * flameL, y = sy + Math.cos(fr.tilt) * flameL;
+    const t0 = fr.tilt;
+    const seg = Math.max(14, (H - y) / 18);
+    for (let i = 0; i < 40 && y < H + 60 && x > -80 && x < W + 80; i++) {
+      pts.push([x, y]);
+      const a = t0 * (1 - Math.min(1, i / 26) * 0.75); // older parts of the path were steeper
+      x -= Math.sin(a) * seg; y += Math.cos(a) * seg;
+    }
+    pts.push([x, y]);
+    if (pts.length < 2) return;
+    const lx = Number(light?.ax) || -0.6;
+    const wob = rs.reduce ? 0 : 1;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const f = i / (pts.length - 1);
+        const w = (w0 + f * w0 * (solid ? 9 : 6)) * (1 + 0.08 * Math.sin(i * 1.7 + rs.t * 0.6 * wob));
+        const a = A * (pass === 0 ? 0.22 : pass === 1 ? 0.5 : 0.35) * Math.min(1, 0.35 + i * 0.25) * (1 - 0.45 * f);
+        const sh = pass === 2 ? lx * w * 0.2 : 0;
+        const k = pass === 2 ? 1.06 : pass === 1 ? 0.9 : 0.82;
+        ctx.strokeStyle = `rgba(${Math.min(255, col[0] * k) | 0},${Math.min(255, col[1] * k) | 0},${Math.min(255, col[2] * k) | 0},${a.toFixed(3)})`;
+        ctx.lineWidth = w * (pass === 0 ? 1.8 : pass === 1 ? 1 : 0.42);
+        ctx.beginPath(); ctx.moveTo(pts[i][0] + sh, pts[i][1]); ctx.lineTo(pts[i + 1][0] + sh, pts[i + 1][1]); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   /** Continuous exhaust trail: soft ribbon from the flame tail down the past trajectory, widening and fading. */
   function drawTrail(ctx, rs, light) {
     if (trail.n < 2) return;
@@ -365,10 +774,14 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     // newest → oldest; three passes: soft wide halo, body, sun-lit edge
     for (let pass = 0; pass < 3; pass++) {
-      for (let k = 0; k < trail.n - 1; k++) {
-        const i = (trail.head - 1 - k + TRAIL_N * 2) % TRAIL_N, j = (i - 1 + TRAIL_N) % TRAIL_N;
+      // older samples are joined with a coarser stride (2, then 3): the ribbon is wide and soft there, so the
+      // fewer strokes are invisible but halve the per-frame stroke count of a long climb
+      for (let k = 0, step = 1; k < trail.n - 1; k += step) {
+        const i = (trail.head - 1 - k + TRAIL_N * 2) % TRAIL_N;
         const ag = trail.age[i];
         if (ag > life) break;
+        step = Math.min(ag < 1 ? 1 : ag < 3 ? 2 : 3, trail.n - 1 - k);
+        const j = (i - step + TRAIL_N) % TRAIL_N;
         const f = ag / life;
         const w = trail.w[i] * (1 + ag * (solid ? 0.7 : 0.4));
         const a = baseA * Math.pow(1 - f, 1.4) * Math.min(1, ag * 6 + 0.25);
@@ -395,40 +808,75 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     drawStarfield(ctx, view, { alpha: AIRLESS.has(world) ? 0.16 : sky.starAlpha * 0.4, drift: (rs.clock || 0) * 2, t: rs.t, seed: 11, reduce: rs.reduce }); // sunlit ground in frame
     if (world === 'moon') drawPlanetDisc(ctx, 'earth', view.W * 0.8, view.H * 0.14, 18, { light, t: rs.t });
     if (world === 'europa') drawPlanetDisc(ctx, 'jupiter', view.W * 0.75, view.H * 0.16, 46, { light, t: rs.t });
-    drawTerrain(ctx, view, world, { altM: alt * 1000, pxPerM: d.pxPerM, groundY: d.groundY, scrollX: d.scrollX, t: rs.t, seed: hash('site|' + world + '|' + (rs.seed || 0)), light });
+    // above ~9 km the world is seen as a curved limb (its map, craters, haze); below ~3 km the perspective terrain
+    const limbK = world === 'earth' ? 0 : sstep(3, 9, alt);
+    const limbArgs = { altKm: alt, light, horizonY: Math.min(d.groundY - view.H * 0.05, view.H * 0.62) };
+    let limbDone = limbK >= 0.999 && drawBodyLimb(ctx, view, world, { ...limbArgs, alpha: 1 });
+    if (!limbDone) {
+      drawTerrain(ctx, view, world, { altM: alt * 1000, pxPerM: d.pxPerM, groundY: d.groundY, scrollX: d.scrollX, t: rs.t, seed: hash('site|' + world + '|' + (rs.seed || 0)), light });
+      if (limbK > 0) limbDone = drawBodyLimb(ctx, view, world, { ...limbArgs, alpha: limbK });
+    }
     const altM = alt * 1000;
-    if (world !== 'earth') drawGroundShadow(ctx, d.craftX, d.groundY, { widthPx: (craft.widthM || 3) * d.pxPerM * 0.6, heightAboveM: altM, pxPerM: d.pxPerM, light, world, objHeightM: craft.heightM, objWidthM: Math.min(craft.widthM || 3, (craft.heightM || 3) * 0.6) });
+    if (world !== 'earth' && limbK < 0.6) drawGroundShadow(ctx, d.craftX, d.groundY, { widthPx: (craft.widthM || 3) * d.pxPerM * 0.6, heightAboveM: altM, pxPerM: d.pxPerM, light, world, objHeightM: craft.heightM, objWidthM: Math.min(craft.widthM || 3, (craft.heightM || 3) * 0.6) });
     fx.draw(ctx, 'back');
     if (!flags.exploded) {
-      if (flags.chute) drawParachutes(ctx, d.craftX, d.craftY - craft.heightM * d.pxPerM, { count: world === 'earth' ? 4 : 1, kind: world === 'earth' ? 'main' : 'dgb', deploy: 1, t: rs.t, pxPerM: d.pxPerM * 0.5, sway: rs.reduce ? 0 : 3 });
-      if (world !== 'moon' && alt > 35 && alt < 120 && !flags.chute) drawReentryPlasma(ctx, d.craftX, d.craftY - craft.heightM * d.pxPerM * 0.4, { intensity: Math.min(1, (alt - 35) / 30), radiusPx: (craft.widthM || 4) * d.pxPerM * 0.6, angle: Math.PI, t: rs.t });
+      const edl = edlStage(rs, craft, world, flags, events);
       const since = events.touchdown != null ? rs.t - events.touchdown : -1;
       // legs deploy during the terminal descent (~2.5 → 1.2 km) and stay out; footpads compress at contact
       const legs = flags.landed ? 1 : Math.max(0, Math.min(1, (2500 - altM) / 1300));
       const compress = since >= 0 ? Math.max(0, 1 - since / 0.45) * 0.75 + 0.25 : 0;
-      const firing = flags.engineOn && !flags.landed && world !== 'earth';
-      const co = { pxPerM: d.pxPerM, light, mode: flags.landed ? 'landed' : flags.chute ? 'chute' : 'flight', legs, compress, engineOn: flags.engineOn, t: rs.t };
-      // plumes come out of each nozzle exit in craft-local metres (same transform as the hull): painted behind the hull
-      const noz = firing ? craftNozzles(craft, co) : [];
-      for (const n of noz) {
-        drawPlume(ctx, { x: d.craftX + n.x * d.pxPerM, y: d.craftY - n.y * d.pxPerM, d: n.d }, { prop: n.prop || 'hypergolic', pBar: ambientPressure(world, alt), pxPerM: d.pxPerM, t: rs.t, angle: n.angle || 0, reduce: rs.reduce, seed: Math.round(n.x * 7) & 63, lengthM: n.lengthM ?? (n.d < 1.2 ? n.d * 10 : undefined), throttle: n.prop === 'hypergolic' ? 0.75 : 1 });
-      }
-      if (world === 'earth' && flags.landed) drawFloating(ctx, rs, craft, d, light, co);
-      else {
-        ctx.save();
-        ctx.translate(d.craftX, d.craftY);
-        paintCraft(ctx, craft, co);
+      // solar arrays stay stowed through entry, descent and touchdown; they unfold ~2 s after the dust settles
+      const arrays = edl.encaps || craft.template === 'lander' ? (since >= 0 ? Math.max(0, Math.min(1, (since - 2) / 2.5)) : 0) : 1;
+      if (edl.shell) {
+        // entry inside the aeroshell: heat shield leading, plasma sheath + wake scaled by velocity; then the
+        // supersonic chute on the backshell, heat-shield jettison, and the lander hanging under the backshell
+        const D = edl.shell.shellD, k = d.pxPerM;
+        const hShell = D * 0.67;
+        const vel = Math.max(0, rs.tele?.velKms || 0);
+        const topY = d.craftY - (edl.shieldOff ? D * 0.75 : hShell) * k;
+        if (flags.chute) drawParachutes(ctx, d.craftX, topY, { count: 1, kind: 'dgb', deploy: Math.min(1, Math.max(0.15, (rs.t - (events.chute ?? rs.t - 2)) / 0.8)), t: rs.t, pxPerM: k * 0.5, sway: rs.reduce ? 0 : 3 });
+        const heat = flags.chute ? 0 : Math.min(1, Math.max(0, (vel - 1.2) / 3.5)) * Math.min(1, Math.max(0, (alt - 8) / 15));
+        if (heat > 0.02) drawReentryPlasma(ctx, d.craftX, d.craftY - D * 0.5 * k * 0.92, { intensity: heat, radiusPx: D * k * 0.5, angle: Math.PI, t: rs.t, reduce: rs.reduce }); // bow shock hugs the heat shield
+        ctx.save(); ctx.translate(d.craftX, d.craftY);
+        paintCraft(ctx, edl.shell, { pxPerM: k, light, mode: edl.shieldOff ? 'chute' : 'flight', legs: edl.shieldOff ? Math.min(1, (rs.t - (events.chute || 0) - 2.6) / 1.5) : 0, engineOn: false, t: rs.t });
+        if (heat > 0.05) { // the heat shield glows dull orange
+          const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, D * 0.6 * k);
+          gr.addColorStop(0, `rgba(255,150,70,${(0.55 * heat).toFixed(3)})`); gr.addColorStop(1, 'rgba(255,90,30,0)');
+          ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, -D * 0.05 * k, D * 0.62 * k, D * 0.2 * k, 0, 0, Math.PI * 2); ctx.fill();
+        }
         ctx.restore();
+      } else {
+        if (flags.chute) drawParachutes(ctx, d.craftX, d.craftY - craft.heightM * d.pxPerM, { count: world === 'earth' ? 4 : 1, kind: world === 'earth' ? 'main' : 'dgb', deploy: 1, t: rs.t, pxPerM: d.pxPerM * 0.5, sway: rs.reduce ? 0 : 3 });
+        if (world !== 'moon' && alt > 35 && alt < 120 && !flags.chute && !edl.encaps) drawReentryPlasma(ctx, d.craftX, d.craftY - craft.heightM * d.pxPerM * 0.4, { intensity: Math.min(1, (alt - 35) / 30), radiusPx: (craft.widthM || 4) * d.pxPerM * 0.6, angle: Math.PI, t: rs.t });
+        const firing = flags.engineOn && !flags.landed && world !== 'earth';
+        const co = { pxPerM: d.pxPerM, light, mode: flags.landed ? 'landed' : flags.chute ? 'chute' : 'flight', legs, compress, engineOn: flags.engineOn, t: rs.t, arrays };
+        // plumes come out of each nozzle exit in craft-local metres (same transform as the hull): painted behind the hull
+        const noz = firing ? craftNozzles(craft, co) : [];
+        for (const n of noz) {
+          drawPlume(ctx, { x: d.craftX + n.x * d.pxPerM, y: d.craftY - n.y * d.pxPerM, d: n.d }, { prop: n.prop || 'hypergolic', pBar: ambientPressure(world, alt), pxPerM: d.pxPerM, t: rs.t, angle: n.angle || 0, reduce: rs.reduce, seed: Math.round(n.x * 7) & 63, lengthM: n.lengthM ?? (n.d < 1.2 ? n.d * 10 : undefined), throttle: n.throttle ?? (n.prop === 'hypergolic' ? 0.75 : 1) });
+        }
+        if (world === 'earth' && flags.landed) drawFloating(ctx, rs, craft, d, light, co);
+        else {
+          ctx.save();
+          ctx.translate(d.craftX, d.craftY);
+          paintCraft(ctx, craft, co);
+          ctx.restore();
+        }
       }
     }
     fx.draw(ctx, 'front');
   }
 
-  /** Capsule floating after splashdown: bobbing, clipped at a wavy waterline, absorbed below, broken reflection, foam, collapsed mains. */
+  /**
+   * Capsule floating after splashdown: bobbing, clipped at a wavy waterline, absorbed below, a vertically smeared
+   * wave-broken reflection (slices of one offscreen render of the hull), a thin foam line, mains lying downwind.
+   * No flotation collar: Dragon / Orion / Starliner float on their own hull.
+   */
+  const FLOAT = { c: null, g: null };
   function drawFloating(ctx, rs, craft, d, light, co) {
-    const k = d.pxPerM, W = rs.view.W, t = rs.reduce ? 0 : rs.t;
+    const k = d.pxPerM, t = rs.reduce ? 0 : rs.t;
     const since = events.splashdown != null ? rs.t - events.splashdown : 3;
-    const D = craft.widthM || 4;
+    const D = craft.widthM || 4, Hc = (craft.heightM || 3) + 1;
     const settle = Math.min(1, since / 1.2);
     const bob = Math.sin(t * 1.3) * 0.12 + Math.sin(t * 2.1 + 1) * 0.06;
     const sink = (0.25 + 0.55 * settle + bob) * k;                 // heat shield + ~25 % of the side under water
@@ -442,40 +890,46 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
       for (let x = x0 - 20; x <= x1 + 20; x += 3) ctx.lineTo(x, wave(x));
       ctx.lineTo(x1 + 20, below ? rs.view.H + 10 : -10); ctx.closePath();
     };
-    // collapsed main chutes lying on the water downwind, with risers to the capsule apex
+    // collapsed mains floating well downwind (cut away at splashdown), mostly awash: muted, flat, irregular
     const mains = Math.max(1, craft.chutes || 3);
     for (let i = 0; i < Math.min(4, mains); i++) {
-      const cx = d.craftX + (2.2 + i * 1.4) * D * 0.45 * k * (1 + 0.15 * Math.sin(i * 2.3)), cy = wy + (0.3 + i * 0.35) * k;
-      const rx = D * 0.55 * k * (0.9 + 0.2 * Math.sin(i * 1.7 + t * 0.4)), ry = Math.max(1.2, D * 0.08 * k);
+      const cx = d.craftX + (3.6 + i * 1.7) * D * 0.45 * k * (1 + 0.15 * Math.sin(i * 2.3)), cy = wy + (0.5 + i * 0.4) * k;
+      const rx = D * 0.5 * k * (0.9 + 0.2 * Math.sin(i * 1.7 + t * 0.4)), ry = Math.max(1, D * 0.05 * k);
       ctx.save();
-      ctx.strokeStyle = 'rgba(220,214,200,0.55)'; ctx.lineWidth = Math.max(0.5, 0.03 * k);
-      ctx.beginPath(); ctx.moveTo(d.craftX, wy - (craft.heightM || 3) * 0.85 * k + sink); ctx.quadraticCurveTo((d.craftX + cx) / 2, wy - 0.4 * k, cx - rx, cy); ctx.stroke();
       const g = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0);
-      g.addColorStop(0, '#e9e4d8'); g.addColorStop(0.3, '#d65a2c'); g.addColorStop(0.5, '#efeae0'); g.addColorStop(0.75, '#d65a2c'); g.addColorStop(1, '#e2ddd0');
-      ctx.globalAlpha = 0.85; ctx.fillStyle = g;
+      g.addColorStop(0, 'rgba(214,210,198,0.5)'); g.addColorStop(0.3, 'rgba(184,92,62,0.45)'); g.addColorStop(0.55, 'rgba(220,216,206,0.5)'); g.addColorStop(0.8, 'rgba(184,92,62,0.4)'); g.addColorStop(1, 'rgba(214,210,198,0.3)');
+      ctx.fillStyle = g;
       ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0.03 * Math.sin(t + i), 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.25; ctx.fillStyle = '#0b2a3a'; ctx.beginPath(); ctx.ellipse(cx, cy + ry * 0.5, rx * 0.95, ry * 0.5, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    // broken reflection (vertically stretched, wavy strips) below the waterline
+    // hull rendered once per frame offscreen; the reflection is made of thin slices of it, flipped, smeared down and
+    // displaced by the swell (smoothly varying offsets, so it ripples instead of breaking into bars)
+    const dpr = (() => { try { const m = ctx.getTransform(); return Math.max(1, Math.min(2, Math.hypot(m.a, m.b))); } catch { return 1; } })();
+    const SWp = Math.ceil(D * 2 * k * dpr) + 4, SHp = Math.ceil(Hc * k * dpr) + 4;
+    if (!FLOAT.c || FLOAT.c.width < SWp || FLOAT.c.height < SHp) {
+      try { FLOAT.c = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(SWp, SHp) : Object.assign(document.createElement('canvas'), { width: SWp, height: SHp }); FLOAT.g = FLOAT.c.getContext('2d'); } catch { FLOAT.c = null; }
+    }
     ctx.save();
     waterPath(true); ctx.clip();
-    const hPx = (craft.heightM || 3) * k;
-    for (let y = 0; y < hPx * 1.3; y += 2) {
-      const off = Math.sin(y * 0.35 + t * 3) * (1 + y * 0.04) + Math.sin(y * 0.11 - t * 1.7) * 1.5;
-      ctx.save();
-      ctx.beginPath(); ctx.rect(x0, wy + y, x1 - x0, 2); ctx.clip();
-      ctx.translate(off, wy); ctx.scale(1, -1.15); ctx.translate(0, -wy);
-      ctx.globalAlpha = 0.22 * (1 - y / (hPx * 1.3));
-      ctx.translate(d.craftX, d.craftY + sink); ctx.rotate(roll);
-      paintCraft(ctx, craft, co);
-      ctx.restore();
+    if (FLOAT.g) {
+      const g = FLOAT.g;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, FLOAT.c.width, FLOAT.c.height);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.translate(D * k + 2 / dpr, Hc * k); g.rotate(roll); paintCraft(g, craft, co);
+      const hPx = (Hc * k - sink) * 1.25;
+      const step = 1.5;
+      for (let y = 0; y < hPx; y += step) {
+        const f = y / hPx;
+        const off = (Math.sin(y * 0.16 + t * 2.4) * 1.2 + Math.sin(y * 0.045 - t * 1.3) * 2.2) * (0.4 + f * 1.6);
+        const srcY = (Hc * k - sink - y / 1.25) * dpr; // flipped, smeared ×1.25
+        if (srcY < 0) break;
+        ctx.globalAlpha = 0.26 * (1 - f) * (1 - f);
+        ctx.drawImage(FLOAT.c, 0, Math.max(0, srcY - step * dpr), SWp, step * dpr, d.craftX - D * k - 2 / dpr + off, wy + y, SWp / dpr, step + 0.6);
+      }
     }
+    ctx.globalAlpha = 1;
     // submerged hull: faint, blue-green absorbed
-    paint(0.32);
-    ctx.restore();
-    ctx.save();
-    waterPath(true); ctx.clip();
+    paint(0.3);
     ctx.fillStyle = 'rgba(16,74,88,0.35)';
     ctx.beginPath(); ctx.ellipse(d.craftX, wy + 0.4 * k, D * 0.55 * k, 0.9 * k, 0, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
@@ -484,25 +938,19 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     waterPath(false); ctx.clip();
     paint(1);
     ctx.restore();
-    // foam collar hugging the hull + wet line
+    // thin broken foam line where the hull meets the water (stronger in the first seconds), no collar
     ctx.save();
-    const fw = D * 0.56 * k;
-    // irregular foam: seeded blobs along the ring where the hull meets the water (denser at the front)
-    for (let i = 0; i < 46; i++) {
+    const fw = D * 0.52 * k;
+    for (let i = 0; i < 28; i++) {
       const h = Math.sin(i * 12.9898) * 43758.5453, r1 = h - Math.floor(h), h2 = Math.sin(i * 78.233) * 12543.21, r2 = h2 - Math.floor(h2);
-      const a = (i / 46) * Math.PI * 2 + r1 * 0.2 + (rs.reduce ? 0 : t * 0.05);
-      const ex = d.craftX + Math.cos(a) * fw * (1 + r2 * 0.12), ey = wy + 0.1 * k + Math.sin(a) * Math.max(1.5, 0.22 * k);
-      const front = Math.sin(a) > 0 ? 1 : 0.55;
-      ctx.globalAlpha = (0.35 + 0.45 * r2) * front;
-      ctx.fillStyle = '#f2f6f7';
-      ctx.beginPath(); ctx.ellipse(ex, ey, Math.max(0.8, (0.12 + r1 * 0.22) * k), Math.max(0.5, (0.04 + r2 * 0.05) * k), 0, 0, Math.PI * 2); ctx.fill();
+      const a = (i / 28) * Math.PI * 2 + r1 * 0.2 + (rs.reduce ? 0 : t * 0.05);
+      const ex = d.craftX + Math.cos(a) * fw * (1 + r2 * 0.1), ey = wave(d.craftX + Math.cos(a) * fw) + 0.05 * k + Math.sin(a) * Math.max(1, 0.12 * k);
+      ctx.globalAlpha = (0.08 + 0.2 * r2) * (Math.sin(a) > 0 ? 1 : 0.4) * (0.5 + 0.5 * (1 - settle));
+      ctx.fillStyle = '#eef3f4';
+      ctx.beginPath(); ctx.ellipse(ex, ey, Math.max(0.7, (0.08 + r1 * 0.16) * k), Math.max(0.4, (0.025 + r2 * 0.03) * k), 0, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.globalAlpha = 1;
-    ctx.globalAlpha = 0.35 + 0.25 * (1 - settle);
-    ctx.fillStyle = '#f4f7f8';
-    ctx.beginPath(); ctx.ellipse(d.craftX, wy + 0.25 * k, fw * (1.25 + 0.6 * (1 - settle)), Math.max(1.5, 0.35 * k), 0, 0, Math.PI); ctx.fill();
     ctx.restore();
-    void W; void light;
+    void light;
   }
 
   function drawOrbit(ctx, rs) {
@@ -519,9 +967,17 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
       const encapsulated = raw && (raw.template === 'rotorcraft' || raw.template === 'rover' || (raw.aeroshell && raw.template === 'lander'));
       if (encapsulated) { drawEntryStack(ctx, raw, o, light, rs); fx.draw(ctx, 'front'); return; }
       const craft = raw;
-      const k = Math.max(2, Math.min(14, (view.W * 0.32) / Math.max(1, craft.widthM || 4)));
-      if (flags.engineOn) drawPlume(ctx, { x: o.craftX - (craft.bus?.w || 2) * k * 0.5, y: o.craftY, d: 0.5 }, { prop: 'hypergolic', pBar: 0, pxPerM: k, t: rs.t, angle: Math.PI / 2, lengthM: 6, reduce: rs.reduce });
-      ctx.save(); ctx.translate(o.craftX, o.craftY); paintCraft(ctx, craft, { pxPerM: k, light, mode: 'flight', heading: 0, engineOn: flags.engineOn, t: rs.t }); ctx.restore();
+      // probes are framed by their real array span (Europa Clipper: ~30 m wings, 3 m HGA); crewed craft by width
+      const span = craft.template === 'probe' ? 0.84 : 0.32;
+      const k = Math.max(2, Math.min(14, (view.W * span) / Math.max(1, craft.widthM || 4)));
+      const co = { pxPerM: k, light, mode: 'flight', heading: 0, engineOn: flags.engineOn, t: rs.t };
+      if (flags.engineOn) { // the burn comes out of the craft's own engine bell(s), painted behind the hull
+        for (const n of craftNozzles(craft, co)) {
+          if (n.prop === 'ion') continue;
+          drawPlume(ctx, { x: o.craftX + n.x * k, y: o.craftY - n.y * k, d: n.d }, { prop: n.prop || 'hypergolic', pBar: 0, pxPerM: k, t: rs.t, angle: n.angle || 0, lengthM: Math.max(4, n.d * 12), throttle: 0.8, reduce: rs.reduce, seed: 5 });
+        }
+      }
+      ctx.save(); ctx.translate(o.craftX, o.craftY); paintCraft(ctx, craft, co); ctx.restore();
     }
     fx.draw(ctx, 'front');
   }

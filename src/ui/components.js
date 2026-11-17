@@ -116,6 +116,54 @@ export function fmtEffect(key, value) {
   return `${pct > 0 ? '+' : ''}${pct}% ${label}`;
 }
 
+// ---------------------------------------------------------------- icons
+// Inline stroke icons (24x24 grid, 1.8 stroke, currentColor), ported from CSmanager's responsivo.tsx TRACOS
+// plus the Ad Astra tabs drawn on the same grid. docs/DESIGN.md §2.
+
+export const ICONS = {
+  painel: '<path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>',
+  missoes: '<path d="M12 2.8c2.9 1.9 4.4 5 4.4 8.9v4.8H7.6v-4.8c0-3.9 1.5-7 4.4-8.9z"/><circle cx="12" cy="9.8" r="1.7"/><path d="M7.6 12.8l-2.6 2.6v3.6l2.6-1.6M16.4 12.8l2.6 2.6v3.6l-2.6-1.6M10.2 19.4L12 21.2l1.8-1.8"/>',
+  pesquisa: '<path d="M9 3.5h6M10 3.5v5.6L4.9 17.9A2.1 2.1 0 0 0 6.7 21h10.6a2.1 2.1 0 0 0 1.8-3.1L14 9.1V3.5"/><path d="M7 15h10"/>',
+  mapa: '<circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="12" rx="9.5" ry="4.6" transform="rotate(-28 12 12)"/><circle cx="20.4" cy="7.5" r="1.3" fill="currentColor" stroke="none"/>',
+  mundo: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.3 3.4 5.2 3.4 8.5s-1.1 6.2-3.4 8.5c-2.3-2.3-3.4-5.2-3.4-8.5s1.1-6.2 3.4-8.5z"/>',
+  ajustes: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8M16 4.5v5M10 14.5v5"/>',
+  fechar: '<path d="M6 6l12 12M18 6L6 18"/>',
+  voltar: '<path d="M15 5l-7 7 7 7"/>',
+  avancar: '<path d="M9 5l7 7-7 7"/>',
+  proximo: '<path d="M4.5 6.5v11l7.5-5.5zM12 6.5v11l7.5-5.5zM20 6v12"/>',
+  continuar: '<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>',
+  carregando: '<path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/>',
+  relogio: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  trofeu: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20.5h7M9.5 17h5"/>',
+  ranking: '<path d="M5 20V12M10 20V6M15 20v-9M20 20V9M3 20.5h18"/>',
+  equipe: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c.6-3.1 2.8-5 5.5-5s4.9 1.9 5.5 5"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.8c1.5.7 2.6 2.4 3 4.7"/>',
+  caixa: '<path d="M3.5 13.5l2.6-7.3A1.5 1.5 0 0 1 7.5 5h9a1.5 1.5 0 0 1 1.4 1.2l2.6 7.3V18a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/>',
+  transferir: '<path d="M4 8.5h15l-4-4M20 15.5H5l4 4"/>',
+  editar: '<path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  mais: '<path d="M12 5v14M5 12h14"/>',
+  menos: '<path d="M5 12h14"/>',
+  alvo: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>',
+  expandir: '<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.1"/>',
+  alerta: '<path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.4v.1"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  cadeado: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+  noticia: '<path d="M4 5.5h13v13a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9.5h3v9a2 2 0 0 1-4 0M7.5 9h6M7.5 12.5h6M7.5 16h4"/>',
+  seta: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+};
+
+/** SVG markup string for a stroke icon. Unknown name -> empty svg (never throws). */
+export function iconSVG(name, size = 24) {
+  const s = Number(size) || 24;
+  return `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name] || ''}</svg>`;
+}
+
+/** Stroke icon as an element: <span class="ic-wrap">. */
+export function icon(name, size = 24, cls = '') {
+  return raw(iconSVG(name, size), ['ic-wrap', cls].filter(Boolean).join(' '));
+}
+
 // ---------------------------------------------------------------- DOM helpers
 
 /**
@@ -175,6 +223,38 @@ export function card({ title, subtitle, icon, cls, onClick, right } = {}, ...chi
   return h('div', props, head, children);
 }
 
+let flagOk = null;
+/**
+ * True when this platform draws regional-indicator pairs as flags. Windows has no flag-emoji glyphs and shows
+ * "us" / "IN" letters instead, which reads as a typo next to a name. Outside a browser (tests) flags are kept.
+ */
+export function hasFlagEmoji() {
+  if (flagOk != null) return flagOk;
+  flagOk = true;
+  try {
+    if (typeof document === 'undefined') return flagOk;
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return flagOk;
+    ctx.font = '32px sans-serif';
+    const pair = ctx.measureText(String.fromCodePoint(0x1F1FA, 0x1F1F8)).width;
+    const one = ctx.measureText(String.fromCodePoint(0x1F1FA)).width;
+    // a real flag is one glyph (about one indicator wide); unsupported shows two letters side by side
+    flagOk = one > 0 && pair < one * 1.5;
+  } catch { flagOk = true; }
+  return flagOk;
+}
+
+/** Flag emoji + space before an actor name when the platform draws flags, else "" (emblem/name identify it). */
+export function flagPrefix(a) {
+  return a?.flag && hasFlagEmoji() ? `${a.flag} ` : '';
+}
+
+/** Text from the sim (headlines, decision titles) without flag emoji where the platform would draw them as letters. */
+export function cleanFlags(text) {
+  const s = String(text ?? '');
+  return hasFlagEmoji() ? s : s.replace(/[\u{1F1E6}-\u{1F1FF}]{2}\s?/gu, '');
+}
+
 /** kind: '' | 'good' | 'bad' | 'warn' | 'info' | 'muted' | 'accent' */
 export function chip(text, kind = '', props = {}) {
   return h(props.onclick ? 'button' : 'span', { ...props, class: ['chip', kind && `chip-${kind}`, props.class] }, text);
@@ -212,14 +292,25 @@ export function bar(value, { min = 0, max = 100, kind = '', label, key, showValu
     showValue ? h('span', { class: 'bar-value' }, String(Math.round(v))) : null);
 }
 
-export function button(label, onClick, { kind = '', disabled = false, icon, title, cls, small } = {}) {
+/**
+ * Button. kind: '' | primary | ghost | danger | urgent | light | link. icon: an ICONS name (stroke icon) or any
+ * text/Node. big: 48px / radius 12 (action bar, sheet footers). iconSize: px for a stroke icon (default 18).
+ */
+export function button(label, onClick, { kind = '', disabled = false, icon: ic, title, cls, small, big, iconSize = 18 } = {}) {
+  let iconEl = null;
+  if (ic instanceof Node) iconEl = h('span', { class: 'btn-icon', 'aria-hidden': 'true' }, ic);
+  else if (typeof ic === 'string' && ICONS[ic]) iconEl = raw(iconSVG(ic, iconSize), 'btn-icon');
+  else if (ic) iconEl = h('span', { class: 'btn-icon', 'aria-hidden': 'true' }, String(ic));
   return h('button', {
-    class: ['btn', kind && `btn-${kind}`, small && 'btn-small', cls], type: 'button', disabled: !!disabled, title, 'aria-label': title || null,
+    class: ['btn', kind && `btn-${kind}`, small && 'btn-small', big && 'btn-big', cls], type: 'button', disabled: !!disabled, title, 'aria-label': title || null,
     onclick: (e) => { if (!e.currentTarget.disabled) onClick?.(e); }, // live state: callers may toggle .disabled later
-  }, icon ? h('span', { class: 'btn-icon', 'aria-hidden': 'true' }, icon) : null, label);
+  }, iconEl, label);
 }
 
-/** Segmented control: options [{id,label,badge?}] */
+/**
+ * Segmented control: options [{id,label,badge?}].
+ * Default = joined in-card toggle; { cls: 'tabs' } = screen sub-navigation with an underline (DESIGN §4.6).
+ */
 export function segmented(options, active, onChange, { cls } = {}) {
   return h('div', { class: ['segmented', cls], role: 'tablist' },
     options.map((o) => h('button', {
@@ -239,12 +330,27 @@ export function trend(delta, { goodWhenUp = true, format = (d) => String(Math.ro
     `${up ? '▲' : '▼'} ${format(Math.abs(delta))}`);
 }
 
-export function emptyState(text, icon = '✦') {
-  return h('div', { class: 'empty' }, h('div', { class: 'empty-icon', 'aria-hidden': 'true' }, icon), h('p', null, text));
+/** Empty state (CSmanager .vazio). iconName: an ICONS name; emoji/other glyphs are ignored. */
+export function emptyState(text, iconName = '') {
+  const ic = typeof iconName === 'string' && ICONS[iconName] ? raw(iconSVG(iconName, 20), 'empty-icon') : null;
+  return h('div', { class: 'empty' }, ic, h('p', null, text));
 }
 
 export function sectionTitle(text, right) {
   return h('div', { class: 'section-title' }, h('h2', null, text), right || null);
+}
+
+/** Small text link for section-title right slots: "Ver tudo →". */
+export function linkButton(label, onClick, { arrow = true, title } = {}) {
+  return h('button', { class: 'btn-link', type: 'button', onclick: onClick, title: title || null },
+    label, arrow ? raw(iconSVG('seta', 14), 'btn-link-ic') : null);
+}
+
+/** Page head (CSmanager .dir-cabecalho): h1 + optional lead + optional right slot. */
+export function viewHead(title, { lead, right } = {}) {
+  return h('div', { class: 'view-head' },
+    h('div', { class: 'view-head-text' }, h('h1', { class: 'view-title' }, title), lead ? h('p', { class: 'view-lead' }, lead) : null),
+    right || null);
 }
 
 /** Tiny SVG sparkline element from numbers. */
@@ -345,7 +451,7 @@ export function openModal(content, { title, cls, dismissable = true, onClose } =
     }
     backdrop.classList.add('closing');
     document.removeEventListener('keydown', onKey);
-    setTimeout(() => backdrop.remove(), reduceMotion() ? 0 : 180);
+    setTimeout(() => backdrop.remove(), reduceMotion() ? 0 : 240);
     try { onClose?.(); } catch (e) { console.error(e); }
   };
   const onKey = (e) => { if (e.key === 'Escape' && dismissable && modalStack[modalStack.length - 1] === close) close(); };
@@ -358,7 +464,7 @@ export function openModal(content, { title, cls, dismissable = true, onClose } =
     h('div', { class: 'modal-grab', 'aria-hidden': 'true' }),
     title || dismissable ? h('div', { class: 'modal-head' },
       title ? h('h2', { class: 'modal-title' }, title) : h('span'),
-      dismissable ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Fechar', onclick: close }, '✕') : null) : null,
+      dismissable ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Fechar', onclick: close }, icon('fechar', 20)) : null) : null,
     h('div', { class: 'modal-body' }, body));
   const backdrop = h('div', { class: 'modal-backdrop', onclick: (e) => { if (e.target === backdrop && dismissable) close(); } }, sheet);
   overlayRoot().appendChild(backdrop);
@@ -399,8 +505,8 @@ export function confirmDialog(text, { okLabel = 'Confirmar', cancelLabel = 'Canc
     const close = openModal((close) => h('div', { class: 'confirm' },
       typeof text === 'string' ? h('p', null, text) : text, // a Node brings its own layout
       h('div', { class: 'btn-row' },
-        button(cancelLabel, () => { answered = true; resolve(false); close(); }, { kind: 'ghost' }),
-        button(okLabel, () => { answered = true; resolve(true); close(); }, { kind: danger ? 'danger' : 'primary' }))),
+        button(cancelLabel, () => { answered = true; resolve(false); close(); }, { big: true }),
+        button(okLabel, () => { answered = true; resolve(true); close(); }, { kind: danger ? 'danger' : 'primary', big: true }))),
     { title, onClose: () => { if (!answered) resolve(false); } });
     void close;
   });
@@ -427,7 +533,7 @@ export function toast(text, kind = 'info', ms = 2800) {
 export function fallbackPanel(text = 'Este painel ainda está em construção.', err) {
   if (err) console.warn('[Ad Astra] painel:', err);
   return h('div', { class: 'fallback' },
-    h('span', { class: 'fallback-icon', 'aria-hidden': 'true' }, '🛠️'),
+    raw(iconSVG('alerta', 18), 'fallback-icon'),
     h('div', null, h('div', null, text), err ? h('small', { class: 'muted' }, String(err.message || err).slice(0, 120)) : null));
 }
 

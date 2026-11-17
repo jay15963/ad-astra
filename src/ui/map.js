@@ -8,6 +8,7 @@
 
 import { weeksToText, formatTurn } from '../core/time.js';
 import { makeRng } from '../core/rng.js';
+import { iconSVG, hasFlagEmoji } from './components.js';
 
 /* ------------------------------------------------------------------ */
 /* Constantes                                                          */
@@ -202,7 +203,7 @@ export function actorInfo(state, data, id) {
     for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
     color = FALLBACK_ACTOR_COLORS[h % FALLBACK_ACTOR_COLORS.length];
   }
-  return { id, name: a.name || a.short || id, short: a.short || a.name || id, flag: a.flag || '', color };
+  return { id, name: a.name || a.short || id, short: a.short || a.name || id, flag: a.flag && hasFlagEmoji() ? a.flag : '', color };
 }
 
 /* ------------------------------------------------------------------ */
@@ -762,11 +763,11 @@ function blocksHtml(dv, max = 10, cls = 'map-blocks') {
   return `${h}</span>`;
 }
 
-/** Route legs as one segmented bar (trunk grey, legs in the line color), width relative to `maxDv`. */
+/** Route legs as one segmented bar (neutral grey; the line colour lives only on the swatch), width relative to `maxDv`. */
 function legsBarHtml(segments, color, maxDv) {
   const total = segments.reduce((t, s) => t + s.dv, 0);
   const parts = segments.map((s, i) => {
-    const c = s.from === 'earth' ? TRUNK_COLOR : color;
+    const c = 'var(--text-2, #9b9ba6)';
     return `<i style="flex:${s.dv.toFixed(2)};background:${c};opacity:${s.from === 'earth' ? 0.55 : 0.6 + 0.4 * (i / Math.max(1, segments.length - 1))}" title="${s.dv.toFixed(1)} km/s"></i>`;
   }).join('');
   return `<span class="map-legs" aria-hidden="true"><span class="map-legs__fill" style="width:${Math.round((total / Math.max(1, maxDv)) * 100)}%">${parts}</span></span>`;
@@ -931,14 +932,14 @@ export function render(container, store) {
   const levelBar = el('div', 'map-levels');
   levelBar.setAttribute('role', 'group');
   levelBar.setAttribute('aria-label', 'Nível de zoom');
-  levelBar.innerHTML = levels.map((l) => `<button type="button" data-level="${esc(l.id)}" title="${esc(l.name)}">${esc(l.short || l.name)}</button>`).join('') + `<button type="button" class="map-legend-btn" data-legend="1" aria-label="Legenda">?</button>`;
+  levelBar.innerHTML = levels.map((l) => `<button type="button" data-level="${esc(l.id)}" title="${esc(l.name)}">${esc(l.short || l.name)}</button>`).join('') + `<button type="button" class="map-legend-btn" data-legend="1" aria-label="Legenda">${iconSVG('info', 20)}</button>`;
   const stage = el('div', 'map-stage');
   const canvas = document.createElement('canvas');
   canvas.className = 'map-canvas';
   canvas.setAttribute('role', 'img');
   canvas.setAttribute('aria-label', 'Mapa do sistema solar. Toque em um corpo para abrir a ficha; pinça ou toque duplo para aproximar.');
   stage.append(canvas);
-  const zoomBox = el('div', 'map-zoom', `<button type="button" data-zoom="in" aria-label="Aproximar">+</button><button type="button" data-zoom="out" aria-label="Afastar">−</button>`);
+  const zoomBox = el('div', 'map-zoom', `<button type="button" data-zoom="in" aria-label="Aproximar">${iconSVG('mais', 20)}</button><button type="button" data-zoom="out" aria-label="Afastar">${iconSVG('menos', 20)}</button>`);
   const legend = el('div', 'map-legend');
   const winBox = el('div', 'map-windows');
   const metro = el('div', 'map-metro');
@@ -2066,6 +2067,7 @@ export function render(container, store) {
     if (MEM.camAuto) refitAuto();
     legend.classList.toggle('is-open', !!MEM.legend);
     legend.innerHTML = MEM.legend ? legendHtml() : '';
+    levelBar.querySelector('[data-legend]')?.setAttribute('aria-pressed', MEM.legend ? 'true' : 'false');
   }
 
   function legendHtml() {
@@ -2133,7 +2135,7 @@ export function render(container, store) {
       <span class="map-sheet__dot" style="${dotStyle}"></span>
       <div><h3>${esc(title)}</h3><p class="map-sheet__tipo">${sub}</p></div>
       ${chipHtml || ''}
-      <button type="button" class="map-sheet__close" data-close="1" aria-label="Fechar">×</button>
+      <button type="button" class="map-sheet__close" data-close="1" aria-label="Fechar">${iconSVG('fechar', 20)}</button>
     </header>`;
   const planetDot = (b, fogState) => {
     const c = b?.display?.color || '#888';
@@ -2390,7 +2392,7 @@ export function render(container, store) {
     metro.innerHTML = `<div class="map-regions" role="group" aria-label="Linhas">${chips}</div>
       <h3 class="map-metro__title"><i style="background:${reg.color}"></i>${esc(reg.name)}</h3>
       <div class="map-metro__scroll">${svg}</div>
-      <p class="map-metro__hint">O número amarelo em cada trecho é a energia gasta nele, em km/s. Toque numa estação para planejar uma missão.</p>
+      <p class="map-metro__hint">O número em cada trecho é a energia gasta nele, em km/s. Toque numa estação para planejar uma missão.</p>
       <ul class="map-lines">${cards}</ul>`;
   }
 

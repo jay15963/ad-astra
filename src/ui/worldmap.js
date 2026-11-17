@@ -2,7 +2,7 @@
 // linhas de tensão entre os países dos atores, zonas disputadas/em conflito e linha do tempo do histórico.
 // Só apresenta o que o sim calculou ('geo/state', 'geo/history', 'politics/actor'). data/world.json
 // (Natural Earth 110m, domínio público) é carregado sob demanda, só quando o mapa aparece.
-import { h, chip, button, attempt, reduceMotion, fmtMonth, TENSION_LABELS } from './components.js';
+import { h, chip, button, attempt, reduceMotion, fmtMonth, TENSION_LABELS, iconSVG, flagPrefix } from './components.js';
 import { relKey } from '../core/helpers.js';
 
 // ------------------------------------------------------------------ module state (survives re-renders)
@@ -240,10 +240,10 @@ export function render(container, store, opts = {}) {
   const legend = h('div', { class: 'wm-legend', hidden: !V.legend }, legendContent(geo));
   const past = geo.isPast ? h('div', { class: 'wm-past' }, `Vendo ${fmtMonth(T, st.startYear)}`, ' ', h('button', { class: 'wm-link', type: 'button', onclick: () => { V.turn = null; rerender(); } }, 'voltar a hoje')) : null;
   const tools = h('div', { class: 'wm-tools' },
-    h('button', { class: 'wm-btn', type: 'button', 'aria-label': 'Aproximar', onclick: () => zoomBy(1.6) }, '+'),
-    h('button', { class: 'wm-btn', type: 'button', 'aria-label': 'Afastar', onclick: () => zoomBy(1 / 1.6) }, '−'),
-    h('button', { class: 'wm-btn', type: 'button', 'aria-label': 'Centralizar na sua agência', onclick: () => { V.k = 1; centerOnHq(); layout(); draw(); } }, '⌖'),
-    h('button', { class: ['wm-btn', V.legend && 'on'], type: 'button', 'aria-label': 'Legenda', 'aria-expanded': String(V.legend), onclick: (e) => { V.legend = !V.legend; legend.hidden = !V.legend; e.currentTarget.classList.toggle('on', V.legend); e.currentTarget.setAttribute('aria-expanded', String(V.legend)); } }, 'ⓘ'));
+    h('button', { class: 'wm-btn', type: 'button', 'aria-label': 'Aproximar', onclick: () => zoomBy(1.6), html: iconSVG('mais', 20) }),
+    h('button', { class: 'wm-btn', type: 'button', 'aria-label': 'Afastar', onclick: () => zoomBy(1 / 1.6), html: iconSVG('menos', 20) }),
+    h('button', { class: 'wm-btn', type: 'button', 'aria-label': 'Centralizar na sua agência', onclick: () => { V.k = 1; centerOnHq(); layout(); draw(); }, html: iconSVG('alvo', 20) }),
+    h('button', { class: ['wm-btn', V.legend && 'on'], type: 'button', 'aria-label': 'Legenda', 'aria-expanded': String(V.legend), onclick: (e) => { V.legend = !V.legend; legend.hidden = !V.legend; e.currentTarget.classList.toggle('on', V.legend); e.currentTarget.setAttribute('aria-expanded', String(V.legend)); }, html: iconSVG('info', 20) }));
   const stage = h('div', { class: 'wm-stage' }, canvas, tools, past, legend, card);
   root.append(stage, timeline(store, geo, hist, T, (t) => { V.turn = t >= now ? null : t; rerender(); }, (e) => focusEvent(e)));
 
@@ -292,7 +292,6 @@ export function render(container, store, opts = {}) {
   if (!ctx) { stage.replaceChildren(h('div', { class: 'wm-loading' }, 'Seu navegador não desenha o mapa.')); return () => {}; }
   const pats = makePatterns(ctx);
   let W = 0, H = 0, dpr = 1, s0 = 1;
-  const TOOLS_W = 56;
   let toolsRect = null;
   let hits = [];
   let paths = [];
@@ -324,15 +323,15 @@ export function render(container, store, opts = {}) {
       const at = c?.area || z?.label || null;
       if (at) {
         const [cx, cy] = project(at.lon, at.lat);
-        const room = W - 2 * TOOLS_W;
+        const room = W - 20;
         if (Math.abs(cx - x) * s0 < room && Math.abs(cy - y) * s0 < H - 40) { x = (x + cx) / 2; y = (y + cy) / 2; }
       }
       V.cx = x; V.cy = y;
     }
     clampView();
-    // the +/−/⌖/ⓘ column covers the top-right corner: labels treat it as an obstacle
+    // the +/−/⌖/ⓘ row covers the bottom-right corner: labels treat it as an obstacle
     const tr = tools.getBoundingClientRect?.();
-    toolsRect = tr && tr.width ? [tr.left - r.left - 4, tr.top - r.top - 4, tr.width + 8, tr.height + 8] : [W - TOOLS_W, 0, TOOLS_W, 170];
+    toolsRect = tr && tr.width ? [tr.left - r.left - 4, tr.top - r.top - 4, tr.width + 8, tr.height + 8] : [W - 190, H - 54, 190, 54];
   }
   const kMin = () => Math.min(1, W / (2 * XMAX * s0));
   function clampView() {
@@ -441,7 +440,7 @@ export function render(container, store, opts = {}) {
         ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.lineWidth = 4.2 + pulse * 1.2; ctx.stroke(e.p);
         ctx.strokeStyle = k === 'neutral' ? '#56d4ff' : (BLOC_STYLE[k] || BLOC_STYLE.neutral).fill; ctx.lineWidth = 2.2; ctx.stroke(e.p);
       }
-      if (playerIsos.has(e.id)) { ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 1.6; ctx.stroke(e.p); }
+      if (playerIsos.has(e.id)) { ctx.strokeStyle = '#e3b341'; ctx.lineWidth = 1.6; ctx.stroke(e.p); }
       if (V.sel?.type === 'country' && V.sel.id === e.id) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.4; ctx.stroke(e.p); }
     }
 
@@ -484,10 +483,10 @@ export function render(container, store, opts = {}) {
       const [x, y] = ll(q.lon, q.lat);
       const dy = q.dy ?? -14;
       const opt = { fs: fs * 0.74, bold: q.isPlayer };
-      const [w, hh] = pillSize(ctx, `${q.flag} ${q.short}`, opt);
+      const [w, hh] = pillSize(ctx, `${flagPrefix(q)}${q.short}`, opt);
       let px = x, py = y + dy;
-      // under the controls column: slide the tag to its left edge so it stays readable
-      if (toolsRect && rectsOverlap([px - w / 2, py - hh / 2, w, hh], toolsRect)) px = Math.min(px, toolsRect[0] - w / 2 - 2);
+      // under the controls row: lift the tag above it so it stays readable
+      if (toolsRect && rectsOverlap([px - w / 2, py - hh / 2, w, hh], toolsRect)) py = Math.min(py, toolsRect[1] - hh / 2 - 2);
       hqPlace.set(q.actorId, [px, py]);
       obstacles.push([px - w / 2, py - hh / 2, w, hh]);
     }
@@ -525,7 +524,7 @@ export function render(container, store, opts = {}) {
       const [bw, bh] = pillSize(ctx, txt, bopt);
       // slide along the line's normal until it clears HQ tags, other badges and the controls
       const [px, py] = placeAway(mx, my, bw, bh, obstacles, { dx: nx, dy: ny });
-      const b = pill(ctx, px, py, txt, { ...bopt, bg: 'rgba(8,12,26,.88)', border: ls.color, color: '#fff' });
+      const b = pill(ctx, px, py, txt, { ...bopt, bg: 'rgba(12,12,15,.9)', border: ls.color, color: '#ecedf0' });
       obstacles.push(b);
       hits.push({ type: 'line', id: l.key, rect: b, prio: 1 });
     }
@@ -565,7 +564,7 @@ export function render(container, store, opts = {}) {
         hits.push({ type: 'zone', id: z.id, rect: r, prio: 1 });
         }
       } else if (z.status === 'ceasefire' && V.k >= 1.4) {
-        pill(ctx, x, y, '⏸', { fs: fs * 0.7, bg: 'rgba(20,26,44,.9)', border: '#e8edf7', color: '#fff', pad: 3 });
+        pill(ctx, x, y, '⏸', { fs: fs * 0.7, bg: 'rgba(12,12,15,.9)', border: '#e8edf7', color: '#fff', pad: 3 });
       }
       if (z.changedTurn != null) {
         const r = pill(ctx, x, y + fs * 1.25, `mudou de controle em ${fmtMonth(z.changedTurn, st.startYear)}`, { fs: fs * 0.66, bg: 'rgba(6,40,56,.92)', border: '#56d4ff', color: '#dff6ff' });
@@ -587,10 +586,10 @@ export function render(container, store, opts = {}) {
     for (const q of geo.hqs) {
       const [x, y] = ll(q.lon, q.lat);
       ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2);
-      ctx.fillStyle = q.isPlayer ? '#ffd166' : '#fff'; ctx.fill();
+      ctx.fillStyle = q.isPlayer ? '#e3b341' : '#ecedf0'; ctx.fill();
       ctx.strokeStyle = '#0b1020'; ctx.lineWidth = 1; ctx.stroke();
       const [px, py] = hqPlace.get(q.actorId) || [x, y + (q.dy ?? -14)];
-      const r = pill(ctx, px, py, `${q.flag} ${q.short}`, { fs: fs * 0.74, bg: q.isPlayer ? 'rgba(60,44,6,.95)' : 'rgba(10,14,30,.9)', border: q.isPlayer ? '#ffd166' : (q.color || '#cdbf9f'), color: '#fff', bold: q.isPlayer });
+      const r = pill(ctx, px, py, `${flagPrefix(q)}${q.short}`, { fs: fs * 0.74, bg: 'rgba(12,12,15,.92)', border: q.isPlayer ? '#e3b341' : '#2a2a33', color: '#ecedf0', bold: q.isPlayer });
       hits.push({ type: 'hq', id: q.actorId, rect: r, prio: 0 });
     }
   }
@@ -664,7 +663,7 @@ export function render(container, store, opts = {}) {
     const content = V.sel ? attempt(() => cardFor(store, geo, byIso, V.sel, opts, geoNow), null) : null;
     if (!content) { card.hidden = true; card.replaceChildren(); return; }
     card.replaceChildren(
-      h('button', { class: 'wm-card-close', type: 'button', 'aria-label': 'Fechar', onclick: () => select(null) }, '✕'),
+      h('button', { class: 'wm-card-close', type: 'button', 'aria-label': 'Fechar', onclick: () => select(null), html: iconSVG('fechar', 16) }),
       content);
     card.hidden = false;
   }
@@ -701,7 +700,7 @@ function shortLevel(l) {
 /** Rounded label centered at (x, y). Returns its hit rect [x, y, w, h]. */
 /** Size of a pill without drawing it: [w, h]. */
 function pillSize(ctx, text, { fs = 11, bold = false, pad = 5 } = {}) {
-  ctx.font = `${bold ? '700 ' : ''}${Math.round(fs)}px system-ui, "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+  ctx.font = `${bold ? '700 ' : ''}${Math.round(fs)}px Inter, system-ui, "Segoe UI", "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
   return [Math.ceil(ctx.measureText(text).width) + pad * 2, Math.round(fs * 1.5)];
 }
 
@@ -728,7 +727,7 @@ export function placeAway(x, y, w, h, obstacles, { dx = 0, dy = -1, step = 0, tr
 }
 
 function pill(ctx, x, y, text, { fs = 11, bg, border, color = '#fff', bold = false, pad = 5 } = {}) {
-  ctx.font = `${bold ? '700 ' : ''}${Math.round(fs)}px system-ui, "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+  ctx.font = `${bold ? '700 ' : ''}${Math.round(fs)}px Inter, system-ui, "Segoe UI", "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
   const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
   const hh = Math.round(fs * 1.5);
   const rx = x - w / 2, ry = y - hh / 2;
@@ -758,7 +757,7 @@ function cardFor(store, geo, byIso, sel, opts, geoNow = geo) {
     return h('div', null,
       h('h3', { class: 'wm-card-title' }, `▲ ${s.name}`),
       h('p', { class: 'small muted' }, `Base de lançamento · ${countryName(geo, s.country)}`),
-      users.length ? h('div', { class: 'chips' }, users.map((a) => chip(`${a.flag || ''} ${a.short || a.name}`.trim(), 'muted'))) : h('p', { class: 'tiny muted' }, 'Sem agência do jogo operando aqui.'));
+      users.length ? h('div', { class: 'chips' }, users.map((a) => chip(`${flagPrefix(a)}${a.short || a.name}`.trim(), 'muted'))) : h('p', { class: 'tiny muted' }, 'Sem agência do jogo operando aqui.'));
   }
   if (sel.type === 'line') {
     const l = geo.tensionLines.find((x) => x.key === sel.id);
@@ -825,7 +824,7 @@ function actorBlock(store, geo, actorId, opts, big = false) {
   const blocName = a.bloc ? st.blocs?.[a.bloc]?.short || st.blocs?.[a.bloc]?.name || a.bloc : 'sem bloco';
   return h('div', { class: ['wm-actor', big && 'big'] },
     h('div', { class: 'wm-actor-head' },
-      h('strong', null, `${a.flag || ''} ${big ? a.name : a.short || a.name}`.trim()),
+      h('strong', null, `${flagPrefix(a)}${big ? a.name : a.short || a.name}`.trim()),
       actorId === me ? chip('você', 'accent') : chip(`${['○', '●', '●●', '●●●', '●●●●'][t]} ${TENSION_LABELS[t]}`, t >= 3 ? 'bad' : t >= 1 ? 'warn' : 'muted')),
     h('div', { class: 'tiny muted' }, [a.kind === 'company' ? 'empresa' : 'agência', blocName, pol.government ? `governo: ${pol.government}` : null, pol.priorityLabel ? `prioridade: ${pol.priorityLabel}` : null].filter(Boolean).join(' · ')),
     econ ? h('div', { class: 'tiny' }, econ, crisis ? h('span', { class: 'warn-text' }, ` · ${crisis}`) : null) : null,
@@ -909,9 +908,9 @@ function timeline(store, geo, hist, T, onScrub, onFocus) {
   const label = h('span', { class: 'wm-when' }, T >= now ? `Hoje · ${fmtMonth(now, st.startYear)}` : fmtMonth(T, st.startYear));
   return h('div', { class: 'wm-timeline' },
     h('div', { class: 'wm-tl-row' },
-      h('button', { class: 'wm-btn small', type: 'button', 'aria-label': 'Evento anterior', disabled: !prev, onclick: () => prev && onScrub(prev.turn) }, '◀'),
+      h('button', { class: 'wm-btn small', type: 'button', 'aria-label': 'Evento anterior', disabled: !prev, onclick: () => prev && onScrub(prev.turn), html: iconSVG('voltar', 18) }),
       h('div', { class: 'wm-track' }, ticks, range),
-      h('button', { class: 'wm-btn small', type: 'button', 'aria-label': 'Próximo evento', disabled: !next && T >= now, onclick: () => onScrub(next ? next.turn : now) }, '▶')),
+      h('button', { class: 'wm-btn small', type: 'button', 'aria-label': 'Próximo evento', disabled: !next && T >= now, onclick: () => onScrub(next ? next.turn : now), html: iconSVG('avancar', 18) })),
     h('div', { class: 'wm-tl-caption' }, label,
       at ? h('span', { class: ['tiny', 'wm-ev', isBlocEvent(at) && 'wm-ev-bloc'] }, ' · ',
         isBlocEvent(at) ? h('span', { class: ['wm-bloc-mark', 'inline', at.kind === 'bloc_join' ? 'join' : 'leave', `b-${at.bloc || 'neutral'}`], 'aria-hidden': 'true' }) : null,

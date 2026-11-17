@@ -26,7 +26,7 @@ export const MATERIALS = {
   orange_foam: { base: '#c2652a', dark: '#5e2a0c', light: '#e8955a', spec: 0.02, shin: 4, rough: 1, wrap: 0.18, grain: 0.08, mottle: 0.12 },
   carbon_black: { base: '#25272b', dark: '#0c0d0f', light: '#5a5e66', spec: 0.3, shin: 22, rough: 0.5, wrap: 0.1, grain: 0.04, mottle: 0.06 },
   bare_aluminium: { base: '#b6bbc1', dark: '#5c6168', light: '#eef1f4', spec: 0.5, shin: 28, rough: 0.35, metal: 0.45, wrap: 0.05, grain: 0.03, mottle: 0.06 },
-  gold_foil: { base: '#c99a3e', dark: '#6e4a12', light: '#ffe7a0', spec: 0.75, shin: 26, rough: 0.4, metal: 0.8, wrap: 0, crinkle: 0.55, grain: 0.02, mottle: 0.08 },
+  gold_foil: { base: '#c99a3e', dark: '#6e4a12', light: '#ffe7a0', spec: 0.75, shin: 26, rough: 0.4, metal: 0.8, wrap: 0, crinkle: 0.35, grain: 0.02, mottle: 0.08 },
   silver_foil: { base: '#c6c9ce', dark: '#62666c', light: '#ffffff', spec: 0.7, shin: 26, rough: 0.4, metal: 0.75, wrap: 0, crinkle: 0.3, grain: 0.02, mottle: 0.06 },
   silver_tile: { base: '#d2d5d7', dark: '#70757b', light: '#ffffff', spec: 0.28, shin: 14, rough: 0.5, wrap: 0.15, grain: 0.03, mottle: 0.05 },
   ablator: { base: '#4b3b2f', dark: '#140f0c', light: '#6a5646', spec: 0.03, shin: 3, rough: 1, wrap: 0.3, grain: 0.08, mottle: 0.14 },
@@ -316,22 +316,27 @@ const nAt = (T, u, v) => T[((v | 0) & 255) * TS + ((u | 0) & 255)];
 
 let CT = null; // crinkle (worley F1) tile for foil normals
 function crinkleTile() {
+  // MLI blanket: a smooth sheen with soft, mostly vertical wrinkles where the layers sag between tie points,
+  // a few broad pillows, and taped seams — not a crumpled-paper facet pattern
   if (CT) return CT;
-  const N = 128, cells = 9, r = rng(hash('vehicles|crinkle'));
-  const pts = [];
-  for (let i = 0; i < cells * cells; i++) pts.push([r(), r()]);
+  const N = 128, r = rng(hash('vehicles|mli'));
+  const G = 8, lat = new Float32Array(G * G);
+  for (let i = 0; i < G * G; i++) lat[i] = r();
+  const vn = (x, y) => { // periodic value noise on an 8×8 lattice over the tile
+    const gx = (x / N) * G, gy = (y / N) * G, ix = Math.floor(gx), iy = Math.floor(gy), fx = gx - ix, fy = gy - iy;
+    const a = lat[(iy % G) * G + (ix % G)], b = lat[(iy % G) * G + ((ix + 1) % G)], c = lat[((iy + 1) % G) * G + (ix % G)], d = lat[((iy + 1) % G) * G + ((ix + 1) % G)];
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  };
+  const ph = [r() * 6.28, r() * 6.28, r() * 6.28];
   CT = new Float32Array(N * N);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const gx = (x / N) * cells, gy = (y / N) * cells, cx = Math.floor(gx), cy = Math.floor(gy);
-    let best = 9, second = 9;
-    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
-      const ix = (cx + ox + cells) % cells, iy = (cy + oy + cells) % cells;
-      const p = pts[iy * cells + ix];
-      const dx = cx + ox + p[0] - gx, dy = cy + oy + p[1] - gy;
-      const dd = dx * dx + dy * dy;
-      if (dd < best) { second = best; best = dd; } else if (dd < second) second = dd;
-    }
-    CT[y * N + x] = Math.sqrt(second) - Math.sqrt(best); // ridges at cell borders → crumple facets
+    const n = vn(x, y), n2 = vn(x * 2 + 17, y * 2 + 5);
+    const warp = (n - 0.5) * 18;
+    const wr = Math.sin(((x + warp) / N) * Math.PI * 2 * 5 + ph[0]) * 0.5 + Math.sin(((x * 0.7 + y * 0.3 + warp) / N) * Math.PI * 2 * 3 + ph[1]) * 0.3;
+    const pillow = Math.sin((x / N) * Math.PI * 2 * 2 + ph[2]) * Math.sin((y / N) * Math.PI * 2 * 2) * 0.35;
+    const seam = (y % 64 < 1.5 ? -0.45 : 0) + (((x + 23) % 128) < 1.5 ? -0.3 : 0);
+    CT[y * N + x] = 0.32 + 0.12 * wr * (0.6 + n2) + 0.12 * pillow + seam * 0.5 + (n - 0.5) * 0.1;
   }
   return CT;
 }
@@ -672,7 +677,7 @@ function shadeBody(img, fimg, G, L) {
         const fn = nAt(T, u * 2.6 + 31 + seed, ym * 1.3);
         const sp2 = nAt(T, u * 24 + 7, ym * 24);
         let fm = fSharp ? 0.72 + 0.28 * fn : smooth(0.3, 0.7, fn * 0.92 + sp2 * 0.1);
-        if (!fSharp && lum > 0.35) fm *= 0.42; // on white paint frost is a faint bluish bloom, not a bright patch
+        if (!fSharp && lum > 0.35) fm *= 0.85 + 0.35 * sp2; // on white paint frost is a matte, grainy bluish bloom (visible, never a bright patch)
         let zoneK = frostRow;
         if (!fSharp) { // ragged edges + vertical drip streaks (ice forms in runs down the tank)
           const jit = (nAt(T, u * 3.1 + seed, ym * 0.35) - 0.5) * frostE * 2.4;
@@ -684,9 +689,10 @@ function shadeBody(img, fimg, G, L) {
         fm *= zoneK * frost * (isTile ? 0.22 : 1);
         if (fm > 0.01) {
           const fdif = Math.max(0, (ndl + 0.45) / 1.45);
-          const fr2 = 0.74 * (GND[0] + (SKY[0] - GND[0]) * sw + SUNC[0] * fdif) * 0.9;
-          const fg2 = 0.85 * (GND[1] + (SKY[1] - GND[1]) * sw + SUNC[1] * fdif) * 0.9;
-          const fb2 = 0.94 * (GND[2] + (SKY[2] - GND[2]) * sw + SUNC[2] * fdif) * 0.9 + 0.02;
+          const grain = 0.86 + 0.2 * sp2;
+          const fr2 = (lum > 0.35 ? 0.6 : 0.7) * grain * (GND[0] + (SKY[0] - GND[0]) * sw + SUNC[0] * fdif) * 0.9;
+          const fg2 = (lum > 0.35 ? 0.7 : 0.82) * grain * (GND[1] + (SKY[1] - GND[1]) * sw + SUNC[1] * fdif) * 0.9;
+          const fb2 = (lum > 0.35 ? 0.84 : 0.95) * grain * (GND[2] + (SKY[2] - GND[2]) * sw + SUNC[2] * fdif) * 0.9 + 0.03;
           fd[idx] = toByte(fr2 * ao); fd[idx + 1] = toByte(fg2 * ao); fd[idx + 2] = toByte(fb2 * ao);
           fd[idx + 3] = Math.round(a * Math.min(0.93, fm));
         }
@@ -908,7 +914,7 @@ function markDecor(G, mk) {
     case 'window': { // dark rounded window(s) placed around the circumference
       const n = Math.max(1, num(mk.n, 1)), spread = num(mk.spread, 0.9);
       for (let i = 0; i < n; i++) {
-        const ph = n === 1 ? s * 1.2 : -spread + (2 * spread * i) / (n - 1);
+        const ph = (n === 1 ? s * 1.2 : -spread + (2 * spread * i) / (n - 1)) + num(mk.off, 0); // off: rotate the set (asymmetric, never a 'face')
         const x = G.X(Math.sin(ph) * r), w = num(mk.w, 0.5) * kb * Math.cos(ph);
         if (w < 0.6) continue;
         g.fillStyle = '#0b0e14';
@@ -1117,9 +1123,9 @@ function nozzleGlow(ctx, e, k, glow) {
     const hTop = Lb * 0.69 * k;
     const gr = ctx.createLinearGradient(0, 0, 0, -hTop);
     const a = clamp(glow, 0, 1);
-    gr.addColorStop(0, `rgba(150,30,10,${(0.35 * a).toFixed(3)})`);
-    gr.addColorStop(0.45, `rgba(235,90,30,${(0.62 * a).toFixed(3)})`);
-    gr.addColorStop(0.85, `rgba(255,170,80,${(0.9 * a).toFixed(3)})`);
+    gr.addColorStop(0, `rgba(120,24,8,${(0.06 * a).toFixed(3)})`); // the exit rim stays dark: the bell reads as a big grey cone
+    gr.addColorStop(0.45, `rgba(220,70,22,${(0.38 * a).toFixed(3)})`);
+    gr.addColorStop(0.85, `rgba(255,160,70,${(0.85 * a).toFixed(3)})`);
     gr.addColorStop(1, `rgba(255,214,140,${(0.95 * a).toFixed(3)})`);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -1426,10 +1432,22 @@ export function paintVehicle(ctx, stack, { pxPerM = 4, light = SUN, tilt = 0, fl
         ctx.restore();
       }
     } else {
+      const aK = variant === 'esm' ? clamp(num(flags.arraysK, 0), 0, 1) : 0;
+      if (aK > 0.01) { // Orion ESM X-wing arrays unfolding after the LAS/fairing is gone (rear pair foreshortened, behind)
+        const L = frameOf(ctx, light, tilt).Lx, d = p.d * 0.8, span = 7 * aK, ay = p.len * 0.45;
+        drawPanel(ctx, k, L, -d / 2 - 0.35, -d / 2 - 0.35 - span * 0.92, ay + 0.55, 1.6, { panels: 3, shade: 0.35, tilt: -0.12 });
+        drawPanel(ctx, k, L, d / 2 + 0.35, d / 2 + 0.35 + span * 0.92, ay + 0.55, 1.6, { panels: 3, shade: 0.35, tilt: -0.12 });
+      }
       paintPart(ctx, stack, p, {
         pxPerM: k, light, tilt, showHiddenEngines: p === firstUpper, gimbal: firing ? gim : 0,
-        glow: firing && p.engines?.vac ? 0.85 : 0, frost, variant, legsOut: p.role === 'stage' ? legsOut : 0,
+        glow: firing && p.engines?.vac ? (Number.isFinite(flags.s2Glow) ? flags.s2Glow : 0.85) : 0, frost, variant, legsOut: p.role === 'stage' ? legsOut : 0,
       });
+      if (aK > 0.01) {
+        const L = frameOf(ctx, light, tilt).Lx, d = p.d * 0.8, span = 7 * aK, ay = p.len * 0.45;
+        for (const sx of [-1, 1]) drawStrut(ctx, k, L, sx * d / 2, ay, sx * (d / 2 + 0.35), ay, 0.18);
+        drawPanel(ctx, k, L, -d / 2 - 0.3, -d / 2 - 0.3 - span, ay, 2, { panels: 3, tilt: 0.1 });
+        drawPanel(ctx, k, L, d / 2 + 0.3, d / 2 + 0.3 + span, ay, 2, { panels: 3, tilt: 0.1 });
+      }
     }
     ctx.restore();
     topM = Math.max(topM, p.y + p.len);
@@ -1442,14 +1460,14 @@ export function paintVehicle(ctx, stack, { pxPerM = 4, light = SUN, tilt = 0, fl
       const y0 = upper.y + upper.len;
       ctx.save();
       ctx.translate(0, -y0 * k);
-      paintPayload(ctx, stack, fair, upper, k, light);
+      paintPayload(ctx, stack, fair, upper, k, light, flags.payloadSep);
       ctx.restore();
     }
   }
   return { topM, widthM: stack.maxWidthM };
 }
 
-function paintPayload(ctx, stack, fair, upper, k, light) {
+function paintPayload(ctx, stack, fair, upper, k, light, adapterOnly = false) {
   const fr = frameOf(ctx, light, 0);
   const dU = Math.min(num(upper.dTop, upper.d), upper.d);
   const paf = { id: `paf|${stack.vehicleId}`, segs: [{ len: 1.1, d: dU * 0.92, dTop: Math.min(1.7, dU * 0.45), mat: 'grey_paint' }, { len: 0.25, d: 1.7, mat: 'bare_aluminium' }] };
@@ -1457,8 +1475,25 @@ function paintPayload(ctx, stack, fair, upper, k, light) {
   const c = stack.craft || BUILTIN_CRAFT;
   const dims = craftStackDims(c);
   const f = Math.min(1, (fair.d * 0.82) / Math.max(0.5, dims.w), (fair.len * 0.75) / Math.max(0.5, dims.h));
+  if (adapterOnly) return; // spacecraft separated: only the payload adapter stays on the upper stage
   ctx.translate(0, -1.35 * k);
   paintCraft(ctx, c, { pxPerM: k * f, light, mode: 'stack', legs: 0 });
+}
+
+/**
+ * Where the payload sits on the upper stage once the fairing is gone (vehicle metres, y up) and its scale, so the
+ * composer can release it as a separate body (spacecraft separation at orbit). null for crewed / integrated stacks.
+ */
+export function payloadMount(stack, flags = {}) {
+  if (!stack || stack.payload !== 'fairing') return null;
+  const att = attachedParts(stack, { ...flags, fairingOff: true });
+  const fair = stack.parts.find((p) => p.role === 'fairing');
+  const upper = [...att].filter((p) => !p.x).sort((a, b) => b.y + b.len - (a.y + a.len))[0];
+  if (!fair || !upper) return null;
+  const c = stack.craft || BUILTIN_CRAFT;
+  const dims = craftStackDims(c);
+  const f = Math.min(1, (fair.d * 0.82) / Math.max(0.5, dims.w), (fair.len * 0.75) / Math.max(0.5, dims.h));
+  return { y: upper.y + upper.len + 1.35, scale: f, craft: c, h: dims.h * f };
 }
 
 // ------------------------------------------------------------------ spacecraft
@@ -1624,18 +1659,73 @@ function capsuleBody(c, mode) {
     ],
     soot: char * 0.95, sootColor: '#3a2a1e', seamEvery: c.mat === 'silver_tile' ? 0.42 : 0, seamStrength: 0.1,
     marks: [
-      ...(c.windows ? [{ type: 'window', y: H * 0.55, h: Math.min(0.55, H * 0.14), w: 0.45, n: Math.min(3, c.windows), spread: 0.75 }] : []),
+      ...(c.windows ? [{ type: 'window', y: H * 0.56, h: Math.min(0.42, H * 0.11), w: 0.36, n: Math.min(2, c.windows), spread: c.windows >= 4 ? 0.5 : 0.42, off: c.windowOff ?? 0.38 }] : []),
+      ...(c.hatch && !c.superDraco ? [{ type: 'patch', y: H * 0.26, h: H * 0.26, w: D * 0.2, s: c.hatch, color: c.hatchColor || '#b9bdc1' }] : []),
       ...(c.band ? [{ type: 'band', y: hs + H * 0.05, h: H * 0.16, color: c.band }] : []),
-      ...(c.superDraco ? [{ type: 'patch', y: hs + 0.15, h: 0.9, w: 0.75, s: -0.7, color: '#1d1f22' }, { type: 'patch', y: hs + 0.15, h: 0.9, w: 0.75, s: 0.7, color: '#1d1f22' }] : []),
+
       ...(c.logo ? [{ type: 'text', y: H * 0.3, h: H * 0.12, text: c.logo, color: c.logoColor || '#1b1d21', w: D * 0.45 }] : []),
     ],
-    decor: c.mat === 'silver_tile' ? (G) => { // Orion backshell tile grid with vertical lines
+    decor: c.superDraco ? (G) => dragonDecor(G, c, { hs, sh, H, char }) : c.mat === 'silver_tile' ? (G) => { // Orion backshell tile grid with vertical lines
       const { g, prof, kb } = G;
       if (kb * 0.42 < 3) return;
       g.strokeStyle = 'rgba(0,0,0,0.08)'; g.lineWidth = 1;
       for (let a = -1.4; a <= 1.4; a += 0.14) { g.beginPath(); for (let y = hs; y < H - sh; y += 0.2) g.lineTo(G.X(Math.sin(a) * prof.rAt(y)), G.Y(y)); g.stroke(); }
     } : null,
   }));
+}
+
+/**
+ * Crew Dragon backshell details (albedo, lit afterwards): SuperDraco pod fairings (raised, darker panels with
+ * the paired nozzle slots), rows of Draco ports, the side hatch outline, and after entry soot streaks swept
+ * aft-to-fore by the flow: dark and dense near the heat shield, thinning toward the nose.
+ */
+function dragonDecor(G, c, { hs, sh, H, char }) {
+  const { g, prof, kb } = G;
+  const R = rng(hash(`dragon|${c.name || ''}`));
+  const sideX = (s, y) => Math.sin(s) * prof.rAt(y);
+  // SuperDraco pods: four around the base; two in view at about +-50 deg, foreshortened
+  for (const ph of [-0.95, 0.95]) {
+    const y0 = hs + 0.12, y1 = hs + 1.25;
+    const xc = sideX(ph, (y0 + y1) / 2), w = 0.62 * Math.cos(ph) * kb;
+    if (w < 1) continue;
+    g.fillStyle = '#c9ccd0'; g.fillRect(G.X(xc) - w / 2, G.Y(y1), w, (y1 - y0) * kb);
+    g.fillStyle = '#26282c';
+    for (const dx of [-0.22, 0.22]) {
+      const nw = Math.max(0.6, 0.2 * Math.cos(ph) * kb);
+      g.fillRect(G.X(xc + dx * Math.cos(ph)) - nw / 2, G.Y(y0 + 0.42), nw, 0.3 * kb);
+    }
+  }
+  // Draco thruster ports: small dark dots in a few clusters near the top and middle
+  g.fillStyle = '#2a2c30';
+  for (const [ph, yy] of [[-0.3, H * 0.72], [0.55, H * 0.72], [-0.75, H * 0.45], [0.2, H * 0.5]]) {
+    const xc = sideX(ph, yy), r = Math.max(0.5, 0.06 * kb * Math.cos(ph));
+    for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(G.X(xc) + (i - 1) * r * 2.6, G.Y(yy), r, 0, Math.PI * 2); g.fill(); }
+  }
+  // side hatch: thin seam outline, not a filled tile
+  if (c.hatch) {
+    const ph = c.hatch, yA = H * 0.27, yB = H * 0.53, xc = sideX(ph, (yA + yB) / 2), w = 0.95 * Math.cos(ph) * kb;
+    if (w > 2) { g.strokeStyle = 'rgba(60,62,66,0.45)'; g.lineWidth = Math.max(0.5, kb * 0.02); g.strokeRect(G.X(xc) - w / 2, G.Y(yB), w, (yB - yA) * kb); }
+  }
+  if (!(char > 0)) return;
+  // entry soot: streaks along the flow (vertical), dense near the shield, fading upward; slightly wavy
+  const n = Math.round(90 * Math.min(1, kb / 6) + 30);
+  for (let i = 0; i < n; i++) {
+    const s = (R() * 2 - 1) * 1.45;
+    const len = (H - hs - sh) * (0.25 + 0.75 * Math.pow(R(), 0.7));
+    const w = Math.max(0.6, kb * (0.03 + R() * 0.09));
+    const a = (0.12 + 0.3 * R()) * char;
+    const y0 = hs;
+    const gr = g.createLinearGradient(0, G.Y(y0), 0, G.Y(y0 + len));
+    gr.addColorStop(0, `rgba(36,26,18,${a.toFixed(3)})`); gr.addColorStop(0.5, `rgba(48,36,26,${(a * 0.55).toFixed(3)})`); gr.addColorStop(1, 'rgba(60,46,34,0)');
+    g.strokeStyle = gr; g.lineWidth = w;
+    g.beginPath();
+    for (let y = y0; y <= y0 + len; y += 0.25) { const x = sideX(s + Math.sin(y * 1.7 + i) * 0.02, y); g.lineTo(G.X(x), G.Y(y)); }
+    g.stroke();
+  }
+  // darker scorched band just above the heat shield
+  const gb = g.createLinearGradient(0, G.Y(hs), 0, G.Y(hs + 0.9));
+  gb.addColorStop(0, `rgba(30,22,16,${(0.55 * char).toFixed(3)})`); gb.addColorStop(1, 'rgba(30,22,16,0)');
+  g.fillStyle = gb; g.fillRect(0, G.Y(hs + 0.9), G.W, 0.9 * kb);
 }
 
 function paintCapsule(ctx, c, k, fr, o) {
@@ -1682,7 +1772,19 @@ function paintCapsule(ctx, c, k, fr, o) {
   drawAt(ctx, capsuleBody(c, mode), 0, 0, k, fr);
   if (c.nose === 'hinged') {
     const nb = cbody(c, `nose|${mode === 'chute' || mode === 'landed' ? 1 : 0}`, () => ({ segs: [{ len: 0.85, d: top * 0.98, dTop: top * 0.3, shape: 'ellipse', mat: c.mat || 'white_paint' }], soot: mode === 'chute' || mode === 'landed' ? 0.4 : 0, sootColor: '#3a2a1e' }));
-    drawAt(ctx, nb, 0, H, k, fr);
+    const open = mode === 'landed' || mode === 'flight' && o.noseOpen ? 1 : 0;
+    if (open) { // docking adapter (grey ring + dark hatch) exposed, nose cone swung open on its forward hinge
+      const da = cbody(c, 'dockadapter', () => ({ segs: [{ len: 0.32, d: top * 0.78, dTop: top * 0.72, mat: 'bare_aluminium' }, { len: 0.06, d: top * 0.8, mat: 'grey_paint' }] }));
+      drawAt(ctx, da, 0, H, k, fr);
+      ctx.fillStyle = 'rgba(20,22,26,0.85)'; ctx.fillRect(-top * 0.22 * k, -(H + 0.36) * k, top * 0.44 * k, Math.max(0.6, 0.04 * k));
+      ctx.save();
+      ctx.translate(top * 0.5 * k, -(H + 0.05) * k); // hinge on the +x rim
+      ctx.rotate(1.75);
+      ctx.translate(-top * 0.5 * k, (H + 0.05) * k);
+      drawAt(ctx, nb, 0, H + 0.05, k, fr);
+      ctx.restore();
+      drawStrut(ctx, k, L, top * 0.5, H + 0.05, top * 0.5 + 0.25, H + 0.4, 0.08); // hinge arm
+    } else drawAt(ctx, nb, 0, H, k, fr);
   } else {
     const tun = cbody(c, 'tunnel', () => ({ segs: [{ len: 0.35, d: top * 0.62, mat: 'bare_aluminium' }] }));
     drawAt(ctx, tun, 0, H, k, fr);
@@ -1764,7 +1866,14 @@ function landerBodies(c) {
       ],
     })) });
   } else if (kind === 'deck') {
-    list.push({ y: g.clear, b: cbody(c, 'body', () => ({ segs: [{ len: g.bodyH * 0.55, d: g.bodyW * 0.7, dTop: g.bodyW, mat: c.foil || 'gold_foil' }, { len: g.bodyH * 0.45, d: g.bodyW, dTop: g.bodyW * 0.96, mat }], section: { n: 6, rot: 0 } })) });
+    // Phoenix / InSight: a thin decagonal deck (white top, black-and-gold MLI edge) on a lower thrust structure;
+    // the spherical propellant tanks and thruster pods hang underneath (painted in paintLander)
+    list.push({ y: g.clear + g.bodyH * 0.12, b: cbody(c, 'struct', () => ({ segs: [{ len: g.bodyH * 0.5, d: g.bodyW * 0.42, dTop: g.bodyW * 0.5, mat: 'mli_black' }], section: { n: 6, rot: 0 } })) });
+    list.push({ y: g.clear + g.bodyH * 0.62, b: cbody(c, 'body', () => ({ segs: [{ len: g.bodyH * 0.2, d: g.bodyW, mat: c.foil || 'gold_foil' }, { len: g.bodyH * 0.07, d: g.bodyW * 1.02, mat: 'grey_paint' }, { len: g.bodyH * 0.06, d: g.bodyW * 0.96, mat }], section: { n: 10, rot: 0 } })) });
+  } else if (kind === 'octa') {
+    // Lanyue-style descent stage: octagonal gold-foil box (black MLI skirt below, silver top deck) with the
+    // spherical tanks bulging through the side bays
+    list.push({ y: g.clear, b: cbody(c, 'body', () => ({ segs: [{ len: g.bodyH * 0.14, d: g.bodyW * 0.9, dTop: g.bodyW * 0.96, mat: 'mli_black' }, { len: g.bodyH * 0.72, d: g.bodyW, mat: c.foil || 'gold_foil' }, { len: g.bodyH * 0.14, d: g.bodyW, dTop: g.bodyW * 0.92, mat: 'silver_foil' }], section: { n: 8, rot: 22.5 }, seamEvery: g.bodyH * 0.24, seamStrength: 0.12 })) });
   } else if (kind === 'tanks') {
     list.push({ y: g.clear, b: cbody(c, 'body', () => ({ segs: [{ len: g.bodyH * 0.7, d: g.bodyW * 0.5, dTop: g.bodyW * 0.5, dMid: g.bodyW * 0.92, shape: 'sphere', mat: 'silver_foil' }, { len: g.bodyH * 0.3, d: g.bodyW, mat }], section: { n: 8, rot: 22.5 } })) });
   } else {
@@ -1783,9 +1892,20 @@ function landerBodies(c) {
   }
   let top = g.clear + g.bodyH;
   if (c.propModule) { /* the cabin sits on the propulsion module (box above) */ }
-  if (c.cabin && kind !== 'cyl') {
+  if (c.cabin && kind === 'octa') {
+    // distinct ascent stage: silver interstage deck, then a faceted white crew cabin with a docking hatch on top
+    const ch = Math.min(3, g.bodyH * 1.05), cd = g.bodyW * 0.66;
+    list.push({ y: top, b: cbody(c, 'cabin', () => ({ segs: [
+      { len: ch * 0.12, d: cd * 1.12, dTop: cd * 1.05, mat: 'silver_foil' },
+      { len: ch * 0.2, d: cd * 1.05, dTop: cd, mat: 'gold_foil' },
+      { len: ch * 0.46, d: cd, dTop: cd * 0.92, mat: c.cabinMat || 'white_paint' },
+      { len: ch * 0.14, d: cd * 0.92, dTop: cd * 0.5, mat: c.cabinMat || 'white_paint' },
+      { len: ch * 0.08, d: cd * 0.36, mat: 'grey_paint' },
+    ], section: { n: 8, rot: 22.5 }, marks: [{ type: 'window', y: ch * 0.6, h: 0.36, w: 0.34, n: 2, spread: 0.32, off: 0.25 }, { type: 'patch', y: ch * 0.34, h: ch * 0.36, w: cd * 0.24, s: -0.42, color: '#b9bcbf' }], seamEvery: 0.6, seamStrength: 0.08 })) });
+    top += ch;
+  } else if (c.cabin && kind !== 'cyl') {
     const ch = Math.min(2.6, g.bodyH * 0.9), cd = g.bodyW * 0.62;
-    list.push({ y: top, b: cbody(c, 'cabin', () => ({ segs: [{ len: ch * 0.75, d: cd, mat: c.cabinMat || 'white_paint' }, { len: ch * 0.25, d: cd, dTop: cd * 0.5, shape: 'ellipse', mat: c.cabinMat || 'white_paint' }], marks: [{ type: 'window', y: ch * 0.45, h: 0.4, w: 0.4, n: 2, spread: 0.45 }], seamEvery: 0.7, seamStrength: 0.08 })) });
+    list.push({ y: top, b: cbody(c, 'cabin', () => ({ segs: [{ len: ch * 0.75, d: cd, mat: c.cabinMat || 'white_paint' }, { len: ch * 0.25, d: cd, dTop: cd * 0.5, shape: 'ellipse', mat: c.cabinMat || 'white_paint' }], marks: [{ type: 'window', y: ch * 0.52, h: 0.32, w: 0.3, n: 1, s: c.cabinWindowS ?? 0.38 }, { type: 'patch', y: ch * 0.12, h: ch * 0.4, w: cd * 0.22, s: -0.3, color: '#c4c6c8' }], seamEvery: 0.7, seamStrength: 0.08 })) });
     top += ch;
   }
   if (c.ascent) {
@@ -1802,21 +1922,62 @@ function paintLander(ctx, c, k, fr, o) {
   const dy = -g.stroke * comp;
   const e = c.engine || { prop: 'hypergolic', bellD: 0.6, bellLen: 0.8 };
   const nozzles = [];
+  // solar arrays stay folded through cruise, entry and landing; o.arrays (0..1) unfolds them after touchdown
+  const dep = clamp(num(o.arrays, 1), 0, 1);
   if (c.solar === 'round') { // two UltraFlex discs seen obliquely
     const R = (num(c.solarSpanM, 5.5) / 2 - g.bodyW / 2) / 2;
     for (const sx of [-1, 1]) { // side view: the deployed fans are seen nearly edge-on (thin ellipses), hinged at the deck edge
+      if (dep < 0.98) { // stowed: the folded fan is a flat pack lying on the deck edge (cover + gold rim), opening like a hand fan
+        const Rs = R * (0.42 + 0.58 * dep);
+        const cx = sx * (g.bodyW / 2 + Rs * 0.62), cy = g.clear + g.bodyH * 0.97 + dy + 0.05;
+        const ry = Math.max(0.6, (0.06 * R + 0.09 * (1 - dep)) * k), rx = Math.max(0.8, Rs * k);
+        const gd = ctx.createLinearGradient(0, -cy * k - ry, 0, -cy * k + ry);
+        gd.addColorStop(0, litCss('bare_aluminium', [0, 0.95, 0.3], L)); gd.addColorStop(0.45, litCss('bare_aluminium', [sx * 0.3, 0.2, 0.95], L));
+        gd.addColorStop(0.62, litCss('gold_foil', [sx * 0.2, -0.2, 0.95], L)); gd.addColorStop(1, litCss('gold_foil', [0, -0.9, 0.4], L));
+        ctx.fillStyle = gd;
+        ctx.beginPath(); ctx.ellipse(cx * k, -cy * k, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(20,26,44,0.55)'; // cells peeking out of the folded gores
+        ctx.fillRect(cx * k - rx * 0.85, -cy * k - ry * 0.12, rx * 1.7, Math.max(0.5, ry * 0.18));
+        continue;
+      }
       drawStrut(ctx, k, L, sx * g.bodyW * 0.42, g.clear + g.bodyH * 0.92 + dy, sx * (g.bodyW / 2 + R * 0.12), g.clear + g.bodyH * 0.96 + dy, 0.06);
       drawDisc(ctx, k, L, sx * (g.bodyW / 2 + R), g.clear + g.bodyH * 0.96 + dy, R, { squash: 0.11, edge: true });
     }
   }
-  if (c.solar === 'wings') for (const sx of [-1, 1]) drawPanel(ctx, k, L, sx * g.bodyW / 2, sx * num(c.widthM, 4) / 2, g.clear + g.bodyH * 0.9 + dy, Math.max(0.8, g.bodyH * 0.8), { panels: 1, tilt: -0.05 });
+  if (c.solar === 'wings' && dep < 0.98) for (const sx of [-1, 1]) drawPanel(ctx, k, L, sx * g.bodyW / 2, sx * (g.bodyW / 2 + (num(c.widthM, 4) / 2 - g.bodyW / 2) * dep + 0.05), g.clear + g.bodyH * 0.9 + dy, Math.max(0.8, g.bodyH * 0.8), { panels: 1, tilt: -0.05 });
+  else if (c.solar === 'wings') for (const sx of [-1, 1]) drawPanel(ctx, k, L, sx * g.bodyW / 2, sx * num(c.widthM, 4) / 2, g.clear + g.bodyH * 0.9 + dy, Math.max(0.8, g.bodyH * 0.8), { panels: 1, tilt: -0.05 });
   drawLanderLegs(ctx, k, L, g, legs, comp, false);
   // main engine(s)
   const nE = Math.max(1, num(e.n, 1));
-  const xs = nE === 1 ? [0] : nE >= 12 ? [-g.bodyW * 0.3, -g.bodyW * 0.1, g.bodyW * 0.1, g.bodyW * 0.3] : nE === 4 ? [-g.bodyW * 0.22, g.bodyW * 0.22] : [-g.bodyW * 0.25, 0, g.bodyW * 0.25];
-  for (const x of xs) {
-    drawBell(ctx, k, fr, x, g.clear + dy + 0.02, e, { glow: o.engineOn ? 0.55 : 0 });
-    nozzles.push({ x, y: g.clear + dy - num(e.bellLen, 0.6), d: num(e.bellD, 0.5), prop: e.prop || 'hypergolic', angle: 0 });
+  if (c.body === 'deck' && nE >= 6) {
+    // two propellant spheres under the deck, then six pods of canted pulse thrusters on the deck rim
+    const tR = g.bodyH * 0.33;
+    for (const sx of [-1, 1]) {
+      const tx = sx * g.bodyW * 0.2 * k, ty = -(g.clear + g.bodyH * 0.42 + dy) * k, r = tR * k;
+      const gr = ctx.createRadialGradient(tx + L[0] * r * 0.45, ty - L[1] * r * 0.45, r * 0.08, tx, ty, r);
+      gr.addColorStop(0, litCss('bare_aluminium', [L[0], L[1], 0.9], L)); gr.addColorStop(0.6, litCss('bare_aluminium', [0, 0, 1], L, null)); gr.addColorStop(1, litCss('bare_aluminium', [-L[0], -L[1], 0.2], L));
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(tx, ty, r, 0, Math.PI * 2); ctx.fill();
+    }
+    const podY = g.clear + g.bodyH * 0.62 + dy;
+    const pods = [-0.47, -0.17, 0.17, 0.47];
+    const eb = { ...e, bellD: num(e.bellD, 0.25), bellLen: num(e.bellLen, 0.3) };
+    for (const px of pods) {
+      const x = px * g.bodyW;
+      ctx.fillStyle = litCss('mli_black', [Math.sign(px) * 0.4, -0.3, 0.85], L); // pod housing
+      ctx.fillRect((x - eb.bellD * 0.9) * k, -(podY + 0.02) * k, eb.bellD * 1.8 * k, Math.max(1, eb.bellLen * 0.6 * k));
+      for (const cant of [-0.22, 0.22]) {
+        const nx = x + cant * eb.bellD * 1.6;
+        const a = cant - Math.sign(px) * 0.1;
+        drawBell(ctx, k, fr, nx, podY - eb.bellLen * 0.25, eb, { glow: o.engineOn ? 0.4 : 0, angle: a });
+        nozzles.push({ x: nx - Math.sin(a) * eb.bellLen, y: podY - eb.bellLen * 1.25, d: eb.bellD, prop: e.prop || 'hypergolic', angle: a, lengthM: eb.bellD * 9, throttle: 0.4 });
+      }
+    }
+  } else {
+    const xs = nE === 1 ? [0] : nE >= 12 ? [-g.bodyW * 0.3, -g.bodyW * 0.1, g.bodyW * 0.1, g.bodyW * 0.3] : nE === 4 ? [-g.bodyW * 0.22, g.bodyW * 0.22] : [-g.bodyW * 0.25, 0, g.bodyW * 0.25];
+    for (const x of xs) {
+      drawBell(ctx, k, fr, x, g.clear + dy + 0.02, e, { glow: o.engineOn ? 0.55 : 0 });
+      nozzles.push({ x, y: g.clear + dy - num(e.bellLen, 0.6), d: num(e.bellD, 0.5), prop: e.prop || 'hypergolic', angle: 0, ...(num(e.bellD, 0.5) >= 0.6 ? { lengthM: num(e.bellD, 0.5) * 16, throttle: 0.95 } : {}) });
+    }
   }
   for (const it of list) drawAt(ctx, it.b, 0, it.y + dy, k, fr);
   if (c.solar === 'top') drawPanel(ctx, k, L, -g.bodyW * 0.55, g.bodyW * 0.55, top + dy + 0.06, 0.12, { panels: 1, cellM: 0.2 });
@@ -1827,9 +1988,29 @@ function paintLander(ctx, c, k, fr, o) {
     ctx.fillStyle = '#18224a'; ctx.fillRect(-rw * k * 0.3, -(g.clear + g.bodyH + 0.45 + dy) * k, rw * k * 1.2, 0.08 * k);
     for (const wx of [0, 0.5, 1]) { ctx.fillStyle = '#2a2a2c'; ctx.beginPath(); ctx.arc((-rw * 0.2 + rw * wx) * k, -(g.clear + g.bodyH + 0.08 + dy) * k, 0.1 * k, 0, 7); ctx.fill(); }
   }
-  // antenna mast
-  drawStrut(ctx, k, L, g.bodyW * 0.3, top + dy, g.bodyW * 0.3, top + dy + 0.6, 0.05);
-  drawDish(ctx, k, L, g.bodyW * 0.3, top + dy + 0.7, Math.max(0.35, g.bodyW * 0.22), { tilt: -0.4 });
+  if (c.body === 'deck') {
+    const y0 = top + dy;
+    // instrument boxes on the deck
+    for (const [bx, bw, bh, m] of [[-0.32, 0.22, 0.16, 'white_paint'], [0.05, 0.18, 0.1, 'gold_foil'], [0.28, 0.12, 0.2, 'grey_paint']]) {
+      ctx.fillStyle = tubeFill(ctx, (bx - bw / 2) * g.bodyW * k, 0, (bx + bw / 2) * g.bodyW * k, 0, bw * g.bodyW * k * 0.5, m, L);
+      ctx.fillRect((bx - bw / 2) * g.bodyW * k, -(y0 + bh * g.bodyH) * k, bw * g.bodyW * k, bh * g.bodyH * k);
+    }
+    // stowed robotic arm: upper arm along the deck, forearm folded back, scoop at the elbow
+    const ax0 = -g.bodyW * 0.42, ay0 = y0 + 0.12;
+    drawStrut(ctx, k, L, ax0, ay0, ax0 + g.bodyW * 0.5, ay0 + 0.1, 0.07);
+    drawStrut(ctx, k, L, ax0 + g.bodyW * 0.5, ay0 + 0.1, ax0 + g.bodyW * 0.12, ay0 + 0.22, 0.06);
+    ctx.fillStyle = litCss('bare_aluminium', [0.3, 0.6, 0.7], L); ctx.fillRect((ax0 + g.bodyW * 0.08) * k, -(ay0 + 0.3) * k, 0.14 * k, 0.12 * k);
+    // UHF helix and a short camera mast
+    drawStrut(ctx, k, L, g.bodyW * 0.36, y0, g.bodyW * 0.36, y0 + 0.36, 0.06, 'white_paint');
+    ctx.strokeStyle = 'rgba(40,40,44,0.6)'; ctx.lineWidth = Math.max(0.5, 0.015 * k);
+    ctx.beginPath(); for (let i = 0; i < 6; i++) { const yy = -(y0 + 0.06 + i * 0.05) * k; ctx.moveTo((g.bodyW * 0.36 - 0.03) * k, yy); ctx.lineTo((g.bodyW * 0.36 + 0.03) * k, yy - 0.02 * k); } ctx.stroke();
+    drawStrut(ctx, k, L, -g.bodyW * 0.08, y0, -g.bodyW * 0.08, y0 + 0.55, 0.05);
+    ctx.fillStyle = litCss('grey_paint', [-0.3, 0.5, 0.8], L); ctx.fillRect((-g.bodyW * 0.08 - 0.07) * k, -(y0 + 0.66) * k, 0.14 * k, 0.11 * k);
+  } else {
+    // antenna mast
+    drawStrut(ctx, k, L, g.bodyW * 0.3, top + dy, g.bodyW * 0.3, top + dy + 0.6, 0.05);
+    drawDish(ctx, k, L, g.bodyW * 0.3, top + dy + 0.7, Math.max(0.35, g.bodyW * 0.22), { tilt: -0.4 });
+  }
   drawLanderLegs(ctx, k, L, g, legs, comp, true);
   return { heightM: num(c.heightM, top), widthM: num(c.widthM, g.span), nozzles };
 }
@@ -1855,10 +2036,15 @@ function paintStarship(ctx, c, k, fr, o) {
     return {
       segs, seamEvery: 1.83, seamStrength: 0.18, ringTone: 0.09, frost: 0,
       marks: [
-        ...(c.windows ? [{ type: 'window', y: H * 0.86, h: 0.6, w: 0.7, n: 3, spread: 0.6 }] : []),
-        ...(c.landingThrusters ? [{ type: 'band', y: H * 0.71, h: 0.9, color: '#2a2b2e' }] : []),
+        ...(c.windows ? [{ type: 'window', y: H * 0.6, h: 0.55, w: 0.42, n: 5, spread: 0.72 }, { type: 'window', y: H * 0.57, h: 0.5, w: 0.4, n: 3, spread: 0.5, off: 0.2 }] : []),
+        ...(c.landingThrusters ? [{ type: 'band', y: H * 0.62, h: 0.35, color: '#4a4c50' }] : []),
+        ...(c.windows ? [ // crew airlock + elevator: framed door and the elevator rail running down the white section
+          { type: 'patch', y: H * 0.535, h: 3.6, w: 2.5, s: -0.2, color: '#9a9ea4' },
+          { type: 'patch', y: H * 0.54, h: 3.2, w: 2.1, s: -0.2, color: '#e6e8ea' },
+          { type: 'patch', y: H * 0.54 + 1.4, h: 0.7, w: 0.7, s: -0.2, color: '#14181e' },
+          { type: 'stripe', y: H * 0.05, h: H * 0.485, w: 0.3, s: -0.2, color: '#7f848a' },
+        ] : []),
         ...(c.door ? [{ type: 'patch', y: H * 0.72, h: 5, w: 3, color: '#9da2a8' }] : []),
-        { type: 'text', y: H * 0.42, h: H * 0.2, text: 'STARSHIP', vertical: true, color: c.topWhite ? '#1b1d21' : '#2a2c30', size: 1.8, s: 0.35 },
       ],
     };
   });
@@ -1873,13 +2059,20 @@ function paintStarship(ctx, c, k, fr, o) {
   if (c.flaps) drawFlaps(ctx, profileOf(b), k, L, !!c.tiles);
   ctx.save(); ctx.translate(0, -clear * k); ctx.restore();
   if (c.landingThrusters) {
+    // mid-body ring of landing thrusters: recessed dark pods around the hull (foreshortened toward the limbs)
+    for (let i = -3; i <= 3; i++) {
+      const th = (i / 3.6) * (Math.PI / 2), px = Math.sin(th) * D / 2, wv = Math.max(0.6, 0.75 * Math.cos(th) * k);
+      ctx.fillStyle = litCss('engine_dark', [Math.sin(th), 0.1, Math.cos(th)], L);
+      ctx.fillRect(px * k - wv / 2, -(clear + H * 0.62 + 0.75) * k, wv, 1.1 * k);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(px * k - wv * 0.3, -(clear + H * 0.62 + 0.15) * k, wv * 0.6, 0.35 * k);
+    }
     for (const sx of [-1, 1]) {
       ctx.fillStyle = litCss('engine_dark', [sx, 0, 0.3], L);
-      ctx.fillRect(sx > 0 ? (D / 2 - 0.05) * k : -(D / 2 + 0.55) * k, -(clear + H * 0.72 + 0.9) * k, 0.6 * k, 1.2 * k);
-      nozzles.push({ x: sx * (D / 2 + 0.3), y: clear + H * 0.72 - 0.9, d: 0.75, prop: 'methalox', angle: -sx * 0.32, lengthM: 24 });
+      ctx.fillRect(sx > 0 ? (D / 2 - 0.05) * k : -(D / 2 + 0.55) * k, -(clear + H * 0.62 + 0.9) * k, 0.6 * k, 1.2 * k);
+      nozzles.push({ x: sx * (D / 2 + 0.3), y: clear + H * 0.62 - 0.9, d: 0.75, prop: 'methalox', angle: -sx * 0.32, lengthM: 24 });
     }
     if (o.engineOn) for (const sx of [-1, 1]) {
-      const gx = sx * (D / 2 + 0.25) * k, gy = -(clear + H * 0.72 - 0.3) * k;
+      const gx = sx * (D / 2 + 0.25) * k, gy = -(clear + H * 0.62 - 0.3) * k;
       const gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, 1.5 * k);
       gr.addColorStop(0, 'rgba(255,240,220,0.9)'); gr.addColorStop(1, 'rgba(160,140,255,0)');
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(gx, gy, 1.5 * k, 0, 7); ctx.fill(); ctx.restore();
@@ -2058,8 +2251,10 @@ function paintAeroshell(ctx, c, k, fr, o) {
   if (inner && ((mode === 'flight' && o.engineOn) || mode === 'landed')) return paintCraft(ctx, inner, { ...o, depth: (o.depth || 0) + 1 });
   const shield = cbody(c, 'shield', () => ({ segs: [{ len: D * 0.14, d: D * 0.3, dTop: D, shape: 'easeOut', mat: c.shellMat || 'ablator' }], soot: 0.4, sootColor: '#2a1e16' }));
   const back = cbody(c, 'back', () => ({ segs: [{ len: D * 0.05, d: D, dTop: D * 0.96, mat: 'black_paint' }, { len: D * 0.36, d: D * 0.96, dTop: D * 0.48, mat: c.backshellMat || 'white_paint' }, { len: D * 0.12, d: D * 0.48, dTop: D * 0.3, shape: 'ellipse', mat: c.backshellMat || 'white_paint' }], seamEvery: D * 0.08, seamStrength: 0.08 }));
+  if (o.part === 'back') { drawAt(ctx, back, 0, D * 0.22, k, fr); return { heightM: D * 0.53, widthM: D, nozzles: [] }; }
+  if (o.part === 'shield') { drawAt(ctx, shield, 0, 0, k, fr); return { heightM: D * 0.14, widthM: D, nozzles: [] }; }
   if (mode === 'chute' && inner) { // heat shield dropped: lander visible under the backshell
-    paintCraft(ctx, inner, { ...o, mode: 'flight', legs: 0.6, depth: (o.depth || 0) + 1, pxPerM: k });
+    paintCraft(ctx, inner, { ...o, mode: 'flight', legs: num(o.legs, 0.6), arrays: 0, engineOn: false, depth: (o.depth || 0) + 1, pxPerM: k });
     drawAt(ctx, back, 0, D * 0.22, k, fr);
     return { heightM: D * 0.75, widthM: D, nozzles: [] };
   }

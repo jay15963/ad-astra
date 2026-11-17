@@ -1,0 +1,378 @@
+/* Missões (Programa / Montar / Contratos / Frota) + the mission sheet — docs/DESIGN.md §4, §5 (Builder "missões").
+   Linked by missions-tab.js after styles.css, so these rules win over the old `missions` sections there on equal
+   specificity. CSmanager references: .dir-lista-mensagens (lists), .dir-bloco (cards), .dir-kpi (stats),
+   .aviso (notes), .medidor (gauge), selected card of Elenco (selectable tiles), .folha (sheet). */
+
+/* ---------- page ---------- */
+.missions { gap: 12px; }
+.missions > .segmented.tabs { margin-bottom: 0; }
+.missions > * { animation: ms-in .22s var(--curve) backwards; }
+.missions > .view-head, .missions > .segmented { animation: none; }
+@keyframes ms-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* eyebrow labels (CSmanager .dir-kpi .rot) */
+.ms-eyebrow, .missions .field > span.ms-eyebrow, .ms-sheet .field > span.ms-eyebrow {
+  font-size: var(--t10); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3);
+}
+/* field labels inside a section: sentence case, so they read under the section eyebrow */
+.missions .field > span.ms-eyebrow, .ms-sheet .field > span.ms-eyebrow {
+  font-size: var(--t12); font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-2);
+}
+/* a disabled main action reads as "not yet", not as a dimmed brown amber */
+.missions .btn-primary:disabled, .ms-sheet .btn-primary:disabled {
+  opacity: 1; background: var(--s2); border-color: var(--line); color: var(--text-3);
+}
+.ms-lead { margin: 0; color: var(--text-3); font-size: var(--t12); line-height: 1.55; }
+.ms-body { margin: 0; color: var(--text-2); font-size: var(--t12); line-height: 1.55; }
+.ms-wide { width: 100%; }
+.ms-count {
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--t10); line-height: 16px; color: var(--text-2);
+  background: var(--s2); border: 1px solid var(--line-strong); border-radius: 9px; min-width: 22px; padding: 0 6px; text-align: center;
+}
+.chip.ms-date { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.missions > div:not(.view-head):not(.segmented):not(.builder), .builder-body > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.missions .section-title { padding-top: 12px; }
+
+/* leading 36px circle with the type emoji (CSmanager .dir-lista-mensagens .icone) */
+.ms-dot {
+  flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--s3); display: grid; place-items: center;
+  font-size: 18px; line-height: 1; overflow: hidden;
+}
+.card-icon > .ms-dot { width: 100%; height: 100%; background: none; }
+
+/* notes (CSmanager .aviso) */
+.ms-notes { display: flex; flex-direction: column; gap: 6px; }
+.ms-note { line-height: 1.45; }
+.ms-note > span { min-width: 0; }
+.ms-note-ic { flex: none; line-height: 0; margin-top: 1px; }
+.ms-note.bad .ms-note-ic svg { stroke-width: 2.2; }
+.ms-reason { color: var(--text-2); }
+
+/* ---------- Programa: missions as one divided list card ---------- */
+.missions .mission-list {
+  display: flex; flex-direction: column; gap: 0; background: var(--s1); border: 1px solid var(--line);
+  border-radius: var(--r-card); overflow: hidden;
+}
+.mission-list > .mission-card {
+  border: 0; border-radius: 0; border-bottom: 1px solid var(--line); background: none; padding: 12px 14px; gap: 8px;
+  transition: background .15s;
+}
+.mission-list > .mission-card:last-child { border-bottom: 0; }
+.mission-list > .mission-card.tappable:active { transform: none; background: var(--s2); }
+@media (hover: hover) { .mission-list > .mission-card.tappable:hover { background: var(--s2); border-color: var(--line); } }
+.mission-card .card-head { align-items: flex-start; }
+.mission-card .card-head > .chip { margin-top: 2px; flex: none; }
+.mission-card .card-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.mission-card .ms-veh { white-space: nowrap; }
+.mission-card .card-sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* chips and the ETA bar line up with the title, not with the circle */
+.mission-card > .chips, .mission-card > .bar-row { margin-left: 48px; }
+.mission-card > .bar-row { grid-template-columns: auto 1fr; gap: 10px; }
+.mission-card > .bar-row .bar-label { color: var(--text-2); font-size: var(--t11); }
+.mission-card.st-transit, .mission-card.st-operations { border-color: var(--line); }
+.mission-card.st-cancelled { opacity: .55; }
+.mission-card.st-done { opacity: 1; }
+/* amber only when the card asks the player to act (payment due) */
+.mission-card.needs-pay .ms-dot { background: var(--yellow-bg); box-shadow: 0 0 0 1px #e3b34155; }
+.ms-empty .empty { padding: 28px 18px; }
+
+/* ---------- mission sheet ---------- */
+.ms-sheet .mission-sheet { display: flex; flex-direction: column; gap: 12px; }
+.ms-sheet-hero { display: flex; align-items: center; gap: 12px; }
+.ms-sheet-hero .chips { flex: 1; min-width: 0; }
+.ms-sheet .section-title { padding-top: 6px; }
+.ms-sheet .btn-col { gap: 8px; }
+.ms-sheet .btn-col > .ms-eyebrow { margin-top: 4px; }
+
+/* key/value rows (solid dividers, CSmanager .dir-lista-simples) */
+.missions .kv, .ms-sheet .kv { display: flex; flex-direction: column; gap: 0; }
+.ms-sheet .mission-sheet > .kv {
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); padding: 2px 14px;
+}
+.missions .kv-row, .ms-sheet .kv-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 0; font-size: var(--t12);
+  border-bottom: 1px solid var(--line); min-width: 0;
+}
+.missions .kv-row:last-child, .ms-sheet .kv-row:last-child { border-bottom: 0; }
+.missions .kv-row > span:first-child, .ms-sheet .kv-row > span:first-child { color: var(--text-3); flex: none; }
+.missions .kv-row > span:last-child, .ms-sheet .kv-row > span:last-child {
+  color: var(--text); text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere;
+}
+.summary-card { padding: 2px 14px; gap: 0; }
+
+/* crew strip */
+.ms-sheet .crew-strip { display: flex; gap: 8px; flex-wrap: wrap; }
+.ms-sheet .crew-mini {
+  width: 76px; padding: 8px 4px; gap: 2px; background: var(--s1); border: 1px solid var(--line); border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.ms-sheet .crew-mini .face svg { border-radius: 50%; background: var(--s3); }
+.ms-sheet .crew-mini .small { font-size: var(--t11); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-sheet .crew-mini .tiny { font-size: var(--t9); line-height: 1.25; }
+
+/* flight log as list rows */
+.ms-log {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0;
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden;
+}
+.ms-log li { padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: var(--t12); color: var(--text-2); line-height: 1.5; }
+.ms-log li:last-child { border-bottom: 0; }
+
+/* report */
+.ms-sheet .report { display: flex; flex-direction: column; gap: 10px; }
+.ms-sheet .outcome-banner {
+  font-family: var(--font); text-transform: none; letter-spacing: -.01em; font-size: var(--t15); font-weight: 650;
+  padding: 12px 14px; border-radius: var(--r); text-align: left;
+}
+.ms-sheet .ob-good { background: var(--green-bg); color: var(--green); }
+.ms-sheet .ob-bad { background: var(--red-bg); color: var(--red); }
+.ms-sheet .ob-warn, .ms-sheet .ob-accent { background: var(--yellow-bg); color: var(--yellow); }
+.ms-sheet .causes {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0;
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden;
+}
+.ms-sheet .causes > li {
+  padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: var(--t12); display: flex; flex-direction: column; gap: 2px;
+}
+.ms-sheet .causes > li:last-child { border-bottom: 0; }
+.ms-sheet .cause-kind { font-size: var(--t10); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.ms-sheet .causes strong { font-weight: 600; color: var(--text); }
+/* headline quotes (DESIGN §4.15): no beige paper, no serif */
+.ms-sheet .headlines { display: flex; flex-direction: column; gap: 6px; }
+.ms-sheet .headlines blockquote {
+  margin: 0; background: var(--s2); color: var(--text); border-left: 3px solid var(--line-strong);
+  border-radius: 0 var(--r) var(--r) 0; padding: 10px 12px; font: 600 var(--t15)/1.4 var(--font);
+}
+
+/* ---------- chance gauge (CSmanager .medidor) ---------- */
+.missions .gauge, .ms-sheet .gauge {
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-kpi); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.missions .gauge-label, .ms-sheet .gauge-label {
+  font-family: var(--font); font-size: var(--t10); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3);
+}
+.missions .gauge-value, .ms-sheet .gauge-value {
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--t24); font-weight: 600; letter-spacing: -.02em;
+  line-height: 1.15; color: var(--text);
+}
+.missions .g-good .gauge-value, .ms-sheet .g-good .gauge-value { color: var(--green); }
+.missions .g-warn .gauge-value, .ms-sheet .g-warn .gauge-value { color: var(--yellow); }
+.missions .g-bad .gauge-value, .ms-sheet .g-bad .gauge-value { color: var(--red); }
+.missions .g-muted .gauge-value, .ms-sheet .g-muted .gauge-value { color: var(--text-3); }
+.missions .gauge-track, .ms-sheet .gauge-track {
+  position: relative; height: 8px; border-radius: 4px; margin: 4px 0 2px; opacity: 1;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--red) 55%, var(--s1)), color-mix(in srgb, var(--yellow) 55%, var(--s1)) 50%, color-mix(in srgb, var(--green) 55%, var(--s1)));
+}
+.missions .gauge-band, .ms-sheet .gauge-band {
+  position: absolute; top: -3px; bottom: -3px; border: 2px solid var(--text); border-radius: 4px; background: #ffffff1a;
+}
+.missions .gauge > .tiny, .ms-sheet .gauge > .tiny { color: var(--text-3); font-size: var(--t11); line-height: 1.5; }
+.ms-crewrisk {
+  display: flex; align-items: flex-start; gap: 7px; flex-wrap: wrap; margin: 2px 0; padding: 8px 10px; border: 0;
+  border-radius: var(--r); background: var(--yellow-bg); color: var(--yellow); font-size: var(--t11); line-height: 1.45;
+}
+.ms-crewrisk b { font-weight: 600; }
+.ms-crewrisk .muted { color: color-mix(in srgb, var(--yellow) 70%, var(--text-3)); font-size: var(--t11); }
+.chip.ms-crewrisk-chip { font-weight: 500; }
+
+/* factors: ▲/▼ are the non-colour cue, deltas in mono */
+.missions .factors {
+  list-style: none; margin: 0; padding: 4px 14px; display: flex; flex-direction: column; gap: 0;
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); font-size: var(--t12);
+}
+.missions .factors li { padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--text-2); }
+.missions .factors li:last-child { border-bottom: 0; }
+.missions .factors li > span:first-child { font-size: var(--t9); margin-right: 2px; }
+.missions .factors .pos > span:first-child { color: var(--green); }
+.missions .factors .neg > span:first-child { color: var(--red); }
+.missions .factors li > .muted { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text-3); font-size: var(--t10); }
+
+/* ---------- Montar: stepper (DESIGN §4.16) ---------- */
+.builder { display: flex; flex-direction: column; gap: 12px; }
+.builder-body { display: flex; flex-direction: column; gap: 10px; }
+.missions .stepper { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; }
+.missions .stepper li {
+  display: flex; align-items: center; gap: 7px; padding: 6px 8px; min-height: 44px; min-width: 0; cursor: pointer;
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-big); color: var(--text-3);
+  font-size: var(--t11); font-weight: 500; line-height: 1.2; transition: background .15s, color .15s, border-color .15s;
+}
+.missions .stepper li .step-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.missions .stepper li.active { background: var(--s3); border-color: var(--line-strong); color: var(--text); }
+.missions .stepper li.done { color: var(--green); }
+.missions .step-n {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--s4);
+  font: 600 var(--t10)/1 var(--mono); color: var(--text-2);
+}
+.missions .stepper li.active .step-n { background: var(--text); color: var(--s0); }
+.missions .stepper li.done .step-n { background: var(--green-bg); color: var(--green); }
+.missions .step-n svg { display: block; stroke-width: 2.4; }
+
+.builder-nav {
+  display: flex; gap: 8px; position: sticky; bottom: 0; z-index: 2; margin: 0 -2px; padding: 16px 2px 4px;
+  background: linear-gradient(180deg, transparent, var(--s0) 38%);
+}
+.builder-nav .btn { flex: 1; }
+/* last step: the create buttons are the main action, "Voltar" just follows the page */
+.builder-nav.is-last { position: static; background: none; padding-top: 4px; }
+.contract-banner {
+  display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border: 0; border-radius: var(--r);
+  background: var(--yellow-bg); color: var(--yellow); font-size: var(--t12); font-weight: 500;
+}
+.contract-banner > span:not(.ms-note-ic) { flex: 1; min-width: 0; }
+.contract-banner .btn { color: var(--yellow); min-height: 36px; }
+
+/* selectable tiles (DESIGN §4.17, CSmanager Elenco selected card) */
+.missions .type-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 350px) { .missions .type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.missions .type-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px 10px; min-height: 108px; min-width: 0;
+  border-radius: var(--r-big); border: 1px solid var(--line); background: var(--s1); color: var(--text); text-align: center;
+  transition: transform .12s var(--curve), border-color .15s, background .15s;
+}
+.missions .type-btn .type-icon { font-size: 18px; margin-bottom: 2px; }
+.missions .type-name { font-weight: 600; font-size: var(--t12); line-height: 1.2; }
+.missions .type-hint { font-size: var(--t9); color: var(--text-3); line-height: 1.3; }
+.missions .type-btn:active, .missions .dest-card:active:not(:disabled), .missions .veh-card:active:not(:disabled), .missions .person-pick:active { transform: scale(.97); transition-duration: .06s; }
+.missions .type-btn.selected, .missions .dest-card.selected, .missions .veh-card.selected, .missions .person-pick.selected {
+  border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow-line); background: var(--s2);
+}
+.missions .type-btn.selected .ms-dot { background: var(--yellow-bg); }
+@media (hover: hover) {
+  .missions .type-btn:hover:not(.selected), .missions .dest-card:hover:not(.selected):not(:disabled),
+  .missions .veh-card:hover:not(.selected):not(:disabled), .missions .person-pick:hover:not(.selected) { border-color: var(--line-strong); }
+}
+
+.missions .dest-list, .missions .veh-list { display: flex; flex-direction: column; gap: 8px; }
+.missions .dest-card, .missions .veh-card {
+  display: flex; flex-direction: column; gap: 6px; width: 100%; min-height: 56px; padding: 12px 14px; text-align: left;
+  border-radius: var(--r-card); border: 1px solid var(--line); background: var(--s1); color: var(--text);
+  transition: transform .12s var(--curve), border-color .15s, background .15s;
+}
+.missions .veh-card { flex-direction: row; align-items: center; gap: 12px; }
+.missions .dest-card.disabled, .missions .veh-card.disabled { opacity: .45; }
+.missions .dest-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.missions .dest-name, .missions .veh-name { font-weight: 600; font-size: var(--t13); }
+.missions .dest-card .tiny, .missions .veh-card .tiny { font-size: var(--t11); color: var(--text-3); line-height: 1.45; }
+.missions .dest-card .ms-note, .missions .veh-card .ms-note { font-size: var(--t11); color: var(--yellow); }
+.missions .veh-emblem { flex: none; line-height: 0; }
+.missions .veh-emblem svg { display: block; border-radius: 8px; }
+.missions .veh-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.missions .veh-card > .chip { flex: none; }
+.missions .veh-chips { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.missions .veh-chips:empty { display: none; }
+
+/* subway-map route bars (DESIGN §4.18) */
+.missions .dest-card .metro { display: flex; align-items: center; gap: 4px; }
+.missions .dest-card .metro-leg { height: 4px; border-radius: 2px; background: var(--text-3); position: relative; min-width: 10px; }
+.missions .dest-card .metro-leg:nth-child(2n), .missions .dest-card .metro-leg:nth-child(3n) { background: var(--text-3); }
+.missions .dest-card .metro-leg:first-child { background: var(--info); }
+.missions .dest-card .metro-leg::before {
+  content: ""; position: absolute; left: -4px; top: -3px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--s0); border: 2px solid var(--line-strong);
+}
+.missions .dest-card .metro-dv { margin-left: 8px; color: var(--text-3); font-family: var(--mono); font-size: var(--t10); white-space: nowrap; }
+
+/* people pickers */
+.missions .person-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; margin: 0 -2px; scrollbar-width: none; }
+.missions .person-row::-webkit-scrollbar { display: none; }
+.missions .person-pick {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 76px; min-height: 44px; padding: 8px 4px;
+  border-radius: var(--r-big); border: 1px solid var(--line); background: var(--s1); color: var(--text);
+  transition: transform .12s var(--curve), border-color .15s, background .15s;
+}
+.missions .person-pick .face { line-height: 0; margin-bottom: 2px; }
+.missions .person-pick .face svg { border-radius: 50%; background: var(--s3); }
+.missions .person-pick > .tiny:not(.ms-skill) { font-size: var(--t11); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missions .person-pick .ms-skill { font-family: var(--mono); font-size: var(--t9); color: var(--text-3); }
+.missions .person-pick.busy { opacity: .45; }
+.missions .field { gap: 8px; }
+.missions .field > p { margin: 0; }
+.missions .builder-body p.tiny, .missions .builder-body p.small { margin: 0; color: var(--text-3); font-size: var(--t11); line-height: 1.5; }
+
+/* pills rows (spacecraft, landers, dates): wrap, CSmanager filter pills */
+.ms-pills { gap: 6px; }
+.ms-pills > button.chip { max-width: 100%; white-space: normal; text-align: left; line-height: 1.3; padding: 8px 14px; }
+.ms-pills > button.chip-bad { background: var(--red-bg); border-color: var(--red-line); color: var(--red); }
+.ms-pills > button.chip-muted { color: var(--text-3); border-color: var(--line); background: none; }
+
+.ms-final { margin-top: 4px; }
+
+/* ---------- crew certification + capacity help (Montar / Frota) ---------- */
+.missions .veh-wrap { display: flex; flex-direction: column; gap: 0; }
+.missions .veh-wrap > .veh-card { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.missions .veh-help {
+  border: 1px solid var(--line); border-top: 1px dashed var(--line-strong); border-radius: 0 0 var(--r-card) var(--r-card);
+  background: var(--s2); padding: 0 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.missions .veh-help[open] { padding-bottom: 12px; }
+.missions .veh-help > summary.veh-help-sum {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; min-height: 40px; line-height: 1.2;
+  color: var(--text-2); font-size: var(--t12); font-weight: 500;
+}
+.missions .veh-help > summary::-webkit-details-marker { display: none; }
+.missions .veh-help-chev { line-height: 0; color: var(--text-3); transition: transform .2s var(--curve); }
+.missions .veh-help[open] .veh-help-chev { transform: rotate(90deg); }
+.missions .veh-help-body { display: flex; flex-direction: column; gap: 8px; }
+.missions .veh-help-body > .btn { align-self: flex-start; }
+.ms-help-text { color: var(--text-2); font-size: var(--t11); line-height: 1.5; }
+
+.missions .cert-box { display: flex; flex-direction: column; gap: 8px; }
+.missions .cert-box.muted { opacity: 1; }
+.missions .cert-box .btn { align-self: flex-start; }
+.missions .cert-title { font-weight: 600; color: var(--text); font-size: var(--t12); line-height: 1.45; }
+.missions .cert-steps {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; color: var(--text-3); font-size: var(--t11);
+}
+.missions .cert-steps li { display: flex; align-items: flex-start; gap: 7px; line-height: 1.45; }
+.missions .cert-steps li.ok { color: var(--text-2); }
+.missions .cert-ic { flex: none; line-height: 0; width: 14px; height: 14px; margin-top: 1px; }
+.missions .cert-steps li.ok .cert-ic { color: var(--green); }
+.missions .cert-steps li.ok .cert-ic svg { stroke-width: 2.4; }
+.missions .cert-todo { border: 1.5px solid var(--line-strong); border-radius: 50%; box-sizing: border-box; }
+.missions .cert-locked { display: flex; align-items: flex-start; gap: 7px; color: var(--text-3); font-size: var(--t11); line-height: 1.45; }
+.missions .cert-box .bar-row { grid-template-columns: auto 1fr; }
+
+/* Frota: one divided list card */
+.missions .fleet { display: flex; flex-direction: column; gap: 12px; }
+.missions .fleet-list {
+  display: flex; flex-direction: column; gap: 0; background: var(--s1); border: 1px solid var(--line);
+  border-radius: var(--r-card); overflow: hidden;
+}
+.missions .fleet-card {
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.missions .fleet-card:last-child { border-bottom: 0; }
+.missions .fleet-card.disabled { opacity: 1; }
+.missions .fleet-card.disabled .fleet-top, .missions .fleet-card.disabled .fleet-stats { opacity: .5; }
+.missions .fleet-top { display: flex; align-items: center; gap: 12px; }
+.missions .fleet-top .veh-text { flex: 1; min-width: 0; }
+.missions .fleet-top > .chip { flex: none; }
+.missions .fleet-card .veh-text .tiny { font-size: var(--t11); color: var(--text-3); }
+.fleet-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-left: 40px; }
+.fleet-stat { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.fleet-stat .ms-eyebrow { font-size: var(--t9); letter-spacing: .08em; }
+.fleet-stat b { font: 600 var(--t12)/1.3 var(--mono); font-variant-numeric: tabular-nums; color: var(--text); letter-spacing: -.02em; }
+.missions .fleet-card > .cert-box, .missions .fleet-card > .cert-locked { margin-left: 40px; }
+.missions .fleet-card > .cert-box {
+  background: var(--s2); border-radius: var(--r); padding: 10px 12px;
+}
+.ms-cert-card .cert-box { gap: 8px; }
+
+/* contracts: cards (they carry text + actions) */
+.missions .contract-card .card-head > .chip { flex: none; }
+.missions .contract-card > .btn { align-self: flex-start; }
+
+/* ---------- small phones ---------- */
+@media (max-width: 360px) {
+  .mission-card > .chips, .mission-card > .bar-row { margin-left: 0; }
+  .missions .stepper li { padding: 6px; gap: 5px; font-size: var(--t9); }
+  .missions .stepper .step-n { width: 20px; height: 20px; }
+  .fleet-stats, .missions .fleet-card > .cert-box, .missions .fleet-card > .cert-locked { margin-left: 0; }
+  .missions .type-btn { min-height: 96px; }
+}
+
+/* ---------- motion ---------- */
+body.reduce-motion .missions > * { animation: none; }
+@media (prefers-reduced-motion: reduce) { .missions > * { animation: none; } }

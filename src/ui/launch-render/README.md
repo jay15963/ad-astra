@@ -529,3 +529,38 @@ integrator does that last, see §5.0). Known integration notes:
   cold-gas jet. `fx.explosion(…, { dir })`: debris biased along the flight direction.
 - Landings: over the last 5 % of the arrival timeline the picture eases the visual altitude to 0 (the sim's
   telemetry can still read tens of metres at the touchdown milestone). Presentation only.
+
+## 9. Visual review round 2 — contract additions
+
+- textures.js: `drawBodyLimb(ctx, view, world, { altKm, light, horizonY, alpha })` — curved limb of a landing world
+  (body map + LOD crater classes, exaggerated curvature, Mars/Titan/Venus haze band); the composer cross-fades it with
+  `drawTerrain` between 3 and 9 km. Progressive row jobs (`progressive()`, ≤ ~7 ms per live frame) build it and the
+  Earth limb; one-off draws build at once. Prewarm (idle slices, return true when done): `prewarmEarthLimb(dpr, view,
+  alts, light)`, `prewarmBodyLimb(ctx, view, world, alts, light)`, `prewarmMaps(id)` (Earth/rocky/Mars maps are
+  generators), `prewarmSprites({ clouds, rocksWorld, light })`, `LIMB_BUCKETS`. `drawTerrain` caches a static shot.
+  Dev hook: `globalThis.__lrTexLog = []` collects texture builds > 4 ms.
+- fx.js: `prewarmPlumes(props)`, `fx.deluge(x, groundY, { ppm, dt, intensity, halfW })`, `fx.vent(..., { ppm })`.
+- vehicles.js: `payloadMount(stack, flags)`; `paintVehicle` flags `payloadSep` (spacecraft released at orbit) and
+  `arraysK` (Orion ESM X-wing arrays unfolding); `paintCraft` option `arrays` (lander arrays 0 stowed … 1 deployed)
+  and `part: 'back' | 'shield'` for aeroshells; window marks accept `off` (asymmetric placement).
+- index.js: Mars/Titan EDL inside the aeroshell (plasma → chute + backshell → heat-shield jettison → backshell/chute
+  left behind at powered descent), arrays unfold ~2 s after touchdown; persistent contrail ribbon; payload
+  separation ~1.5 s after SECO; pad vents/deluge drawn in the countdown window; idle prewarm per scene.
+- camera.js: ascent zoom eases from the pad framing (0.58 H) to the climb framing so the site never jumps at T-0.
+- launch-scene.js: stamps and the radio-silence caption are placed in the band away from the vehicle; confetti tumbles.
+
+---------------------------------------------------------------------------------------------------------
+
+## Visual review round 3 notes
+
+- Staging: the upper stage coasts `S2_IGN` (2.6 s) after the `staging` event (ullage/RCS puffs, then a
+  TEA-TEB flash) before its engine lights; `flags.s2Throttle` ramps the plume and `flags.s2Glow` heats the
+  MVac/RL10 extension. Separated stages and boosters are metre-based bodies in index.js (`seps`), drawn over
+  the upper-stage plume and under the vehicle, pivoting about their centre of mass: SRBs drift ~4 m/s out at
+  ~5 deg/s with BSM flashes and residual smoke; liquid side cores and reusable first stages flip with N2 puffs,
+  deploy grid fins and start a boostback burn, then recede in depth.
+- Camera: after staging the framing slides up-right while the spent stage is close, then (6.5-11 s) zooms in
+  until the upper stack is ~110-165 px long. `paintVehicle` reads optional `flags.s2Glow`.
+- Plumes: above ~35 km the texture becomes a translucent under-expanded bell (filled interior + brighter shock
+  envelope) that keeps widening along a long length, never a round glow at the nozzle.
+- Falcon pads: `drawStrongback` (transporter-erector) rocks back over the last seconds of the count.

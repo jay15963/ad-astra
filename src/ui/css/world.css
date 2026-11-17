@@ -1,0 +1,203 @@
+/* Aba Mundo (docs/DESIGN.md §4, §5 "Mundo"): notícias, atores, tratados, Tabela da Era e o cartão do mapa-múndi.
+   Linked by world-tab.js after styles.css, so these rules win over the legacy "world" section there at equal
+   specificity. Tokens come from styles.css (Era 4 palette); colour only carries meaning. */
+
+/* ---------- page head ---------- */
+.world .view-head { align-items: flex-end; }
+.world .view-head > .chip { flex: none; margin-left: auto; margin-bottom: 2px; }
+
+/* tension chip: t0 green, t1 neutral, t2 yellow, t3/t4 red; no pulse */
+.chip.tension { gap: 6px; padding: 2px 9px; font-size: var(--t11); line-height: 18px; animation: none; }
+.chip.tension.t0 { color: var(--green); background: var(--green-bg); border-color: var(--green-line); }
+.chip.tension.t1 { color: var(--text-2); background: none; border-color: var(--line-strong); }
+.chip.tension.t2 { color: var(--yellow); background: var(--yellow-bg); border-color: var(--yellow-line); }
+.chip.tension.t3, .chip.tension.t4 { color: var(--red); background: var(--red-bg); border-color: var(--red-line); }
+.chip.tension.t4 { animation: none; }
+.w-tdot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+
+/* 4-step tension meter (actor rows) */
+.w-tmeter { display: inline-flex; gap: 2px; align-items: center; }
+.w-tmeter i { width: 6px; height: 10px; border-radius: 1.5px; background: var(--s4); }
+.w-tmeter.t1 i.on { background: var(--text-2); }
+.w-tmeter.t2 i.on { background: var(--yellow); }
+.w-tmeter.t3 i.on, .w-tmeter.t4 i.on { background: var(--red); }
+
+/* ---------- shared bits ---------- */
+.w-eyebrow { font-size: var(--t10); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); line-height: 1.4; }
+.w-eyebrow.accent { color: var(--yellow); font-weight: 600; }
+.w-count { font-family: var(--mono); font-size: var(--t10); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.w-lead-text { margin: 0 2px 12px; font-size: var(--t12); color: var(--text-3); line-height: 1.5; }
+.world .segmented.tabs { margin-bottom: -2px; }
+.world > div > .section-title:first-child, .world > div > div > .section-title:first-child { padding-top: 2px; }
+.world .segmented.tabs ~ * { animation: w-tab-in .22s var(--curve); }
+@keyframes w-tab-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* filter pills (CSmanager .dir-filtros-caixa): count inside, mono */
+.w-filters { margin-bottom: 4px; }
+.w-pill { flex: none; gap: 8px; }
+.w-pill-n {
+  min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--s4); color: var(--text-2);
+  font: 600 var(--t9)/18px var(--mono); text-align: center; font-variant-numeric: tabular-nums;
+}
+button.chip.active .w-pill-n, button.chip[aria-pressed="true"] .w-pill-n { background: var(--s0); color: var(--text); }
+
+/* ---------- divided list card (CSmanager .dir-lista-mensagens) ---------- */
+.w-list {
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card);
+  overflow: hidden; display: flex; flex-direction: column; gap: 0; min-width: 0;
+}
+.w-row {
+  display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; min-height: 56px; min-width: 0;
+  border-bottom: 1px solid var(--line); background: none; color: inherit; text-align: left;
+  transition: background .15s;
+}
+.w-row:last-child { border-bottom: 0; }
+.w-row-tap { cursor: pointer; }
+.w-row-tap:active { background: var(--s2); }
+@media (hover: hover) { .w-row-tap:hover { background: var(--s2); } }
+.w-row.mine { box-shadow: inset 2px 0 0 var(--yellow); }
+.w-lead {
+  flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--s3);
+  display: grid; place-items: center; font-size: 18px; line-height: 1; color: var(--text-2); overflow: hidden;
+}
+.w-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.w-name { font-size: var(--t13); font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-sub { font-size: var(--t11); color: var(--text-3); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.w-chips { margin-top: 6px; gap: 4px; }
+.w-chev { flex: none; color: var(--text-3); line-height: 0; align-self: center; }
+
+/* ---------- news ---------- */
+.news-feed { display: flex; flex-direction: column; gap: 0; }
+.news-date {
+  font-family: var(--mono); font-size: var(--t9); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3);
+  margin: 14px 2px 6px; padding: 0; border: 0;
+}
+.news-date:first-child { margin-top: 4px; }
+.news-item.w-row { padding: 12px 14px; border-radius: 0; border: 0; border-bottom: 1px solid var(--line); background: none; flex-direction: row; gap: 12px; }
+.news-item.w-row:last-child { border-bottom: 0; }
+.news-item.imp-2, .news-item.imp-3 { border-left: 0; background: none; }
+.news-item.imp-3 .w-lead { background: var(--yellow-bg); box-shadow: 0 0 0 1px #e3b34155; }
+.news-item.mine { box-shadow: inset 2px 0 0 var(--yellow); }
+.world .news-headline, .news-item.imp-3 .news-headline {
+  margin: 0; font-family: var(--font); font-size: var(--t13); font-weight: 600; line-height: 1.35; letter-spacing: 0; color: var(--text);
+}
+.news-item.imp-3 .news-headline { font-size: var(--t15); letter-spacing: -0.01em; }
+.world .news-body { margin: 2px 0 0; font-size: var(--t12); color: var(--text-2); line-height: 1.5; white-space: pre-line; }
+.news-more { display: flex; justify-content: center; padding: 10px 0 2px; }
+.news-more .btn { min-height: 40px; }
+
+/* ---------- actors ---------- */
+.actor-list .actor-row { flex-direction: column; align-items: stretch; gap: 10px; }
+.w-row-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.w-emblem { flex: none; line-height: 0; }
+.w-emblem svg, .actor-hero svg { display: block; border-radius: 50%; }
+.w-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.w-pts { font-family: var(--mono); font-size: var(--t12); font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.w-pts small { font-size: var(--t9); font-weight: 400; color: var(--text-3); letter-spacing: 0; }
+.actor-row .rel-bars { padding-left: 48px; gap: 5px; }
+.actor-row .w-chips { padding-left: 48px; margin-top: -2px; }
+.actor-row .bar-row { grid-template-columns: minmax(84px, 40%) 1fr; }
+@media (max-width: 360px) {
+  .actor-row .rel-bars, .actor-row .w-chips { padding-left: 0; }
+}
+
+/* actor sheet */
+.actor-sheet { display: flex; flex-direction: column; gap: 12px; }
+.actor-hero { display: flex; gap: 14px; align-items: center; }
+.actor-hero p { margin: 2px 0 0; color: var(--text-2); font-size: var(--t12); line-height: 1.45; }
+.w-kpis.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.w-kpis .stat {
+  background: var(--s2); border: 1px solid var(--line); border-radius: var(--r-big); padding: 10px 12px;
+  display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; text-align: left;
+}
+.w-kpis .stat-label { font-size: var(--t10); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.w-kpis .stat-value {
+  font-family: var(--mono); font-size: var(--t17); font-weight: 600; letter-spacing: -0.02em; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.w-kpis .stat-value.is-word { font-family: var(--font); letter-spacing: -0.01em; }
+.actor-sheet .section-title { padding-top: 6px; }
+.actor-sheet .warn-text, .proposal-btn .warn-text { color: var(--yellow); }
+
+/* proposals: list rows; long shot keeps a dashed edge */
+.proposal-list.w-list { gap: 0; }
+.proposal-btn {
+  display: flex; flex-direction: row; align-items: flex-start; gap: 12px; width: 100%; min-height: 56px; padding: 12px 14px;
+  text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; color: var(--text);
+  font: inherit; transition: background .15s;
+}
+.proposal-btn:last-child { border-bottom: 0; }
+.proposal-btn:not(:disabled):active { background: var(--s2); }
+@media (hover: hover) { .proposal-btn:not(:disabled):hover { background: var(--s2); } }
+.proposal-btn.disabled { opacity: .45; }
+.proposal-btn.long-shot { opacity: .8; border-style: solid; box-shadow: inset 0 0 0 1px transparent; outline: 1px dashed var(--line-strong); outline-offset: -5px; border-radius: 10px; }
+.proposal-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.proposal-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.proposal-label { font-size: var(--t13); font-weight: 600; }
+.proposal-btn .tiny { font-size: var(--t11); color: var(--text-3); line-height: 1.4; }
+.proposal-confirm p { margin: 0 0 8px; }
+
+/* ---------- treaties & blocs ---------- */
+.world .card + .card, .world .card + .section-title { margin-top: 0; }
+.world .view-pad > div > .card, .world > div > .card { margin-bottom: 10px; }
+.emblem-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.mini-emblem { line-height: 0; }
+.mini-emblem svg { display: block; border-radius: 50%; }
+.treaty-list > .card {
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 12px 14px; margin: 0;
+}
+.treaty-list > .card:last-child { border-bottom: 0; }
+.treaty-list > .card.mine { box-shadow: inset 2px 0 0 var(--yellow); }
+.treaty-list .btn { align-self: flex-start; }
+
+/* ---------- Tabela da Era (CSmanager ranking, cs-ranking-sub.png) ---------- */
+.league-card { margin-bottom: 4px; }
+.league-th {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line);
+  font-size: var(--t10); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3);
+}
+.league-th .rank { font-family: var(--mono); }
+.league-th-name { flex: 1; padding-left: 38px; }
+.league { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.league-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-height: 56px;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none;
+}
+.league-row:last-child { border-bottom: 0; }
+.league-row.me { border-color: var(--line); background: var(--yellow-bg); box-shadow: inset 2px 0 0 var(--yellow); }
+.league-card .rank {
+  flex: none; width: 30px; text-align: center; font-family: var(--mono); font-size: var(--t12); font-weight: 600;
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
+.league-card .rank.selo {
+  width: 30px; padding: 0; line-height: 20px; border-radius: 3px; background: var(--s3); border: 1px solid var(--line-strong); color: var(--text-2);
+}
+.league-card .rank.selo.gold { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
+.league-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.league-name { display: flex; align-items: center; gap: 6px; font-size: var(--t13); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.league-you { flex: none; }
+.league-pts { flex: none; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 46px; }
+.league-pts strong { font-size: var(--t13); font-weight: 600; letter-spacing: -0.02em; }
+.league-firsts { font-family: var(--font); font-size: var(--t10); color: var(--text-3); white-space: nowrap; }
+
+/* Os primeiros */
+.world .firsts.w-list { display: flex; flex-direction: column; gap: 0; }
+.world .firsts .first-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 52px;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; font-size: var(--t12);
+}
+.world .firsts .first-row:last-child { border-bottom: 0; }
+.world .firsts .first-row.mine { box-shadow: inset 2px 0 0 var(--yellow); }
+.world .first-label { flex: 1; min-width: 0; color: var(--text); line-height: 1.4; }
+.world .first-hist { color: var(--text-3); font-size: var(--t11); }
+.w-mark {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--s3); color: var(--text-3);
+  display: grid; place-items: center; line-height: 0; font-size: 0;
+}
+.first-row.claimed .w-mark { color: var(--text-2); }
+.first-row.mine .w-mark { background: var(--yellow-bg); color: var(--yellow); box-shadow: 0 0 0 1px #e3b34155; }
+.world .first-row:not(.claimed) .first-label { color: var(--text-2); }
+
+body.reduce-motion .world .segmented.tabs ~ * { animation: none; }
+@media (prefers-reduced-motion: reduce) { .world .segmented.tabs ~ * { animation: none; } }
+.world .card .btn-row > .btn-danger { flex: 0 0 auto; }

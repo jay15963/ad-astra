@@ -1,6 +1,40 @@
-// Stellaris-style decision card: portrait, 3-5 lines, choices with effect preview before confirming.
-import { h, raw, chip, button, openModal, toast, fmtIn, esc } from './components.js';
+// Decision card (bottom sheet, CSmanager .folha + .dir-destaque): face, kind eyebrow, 3-5 lines, choices with effect
+// preview before confirming. Also the shared list-row helper and stylesheet loader of the Painel / Equipe screens.
+import { h, raw, chip, button, icon, openModal, toast, fmtIn, esc, cleanFlags } from './components.js';
 import { portraitSVG, emblemSVG, iconPortraitSVG } from './portrait.js';
+
+/**
+ * Painel / decision / Equipe styles (src/ui/css/dashboard.css), injected once like techtree.css / worldmap.css.
+ * Called at import time in the browser (no-op in Node) so the first Painel paint is already styled.
+ */
+export function ensurePainelCss() {
+  try {
+    // index.html links it too (no flash on first paint); this is the fallback for older shells
+    if (typeof document === 'undefined' || document.querySelector('link[data-painel-css], link[href$="css/dashboard.css"]')) return;
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = new URL('./css/dashboard.css', import.meta.url).href;
+    l.dataset.painelCss = '';
+    document.head.appendChild(l);
+  } catch { /* styles are progressive */ }
+}
+ensurePainelCss();
+
+/**
+ * One row of a divided list card (CSmanager .dir-lista-mensagens): leading 36px circle, bold title with optional
+ * mono meta on the right, sub line, optional extra node (bar, chips), optional right slot and chevron.
+ */
+export function listRow({ lead, leadCls, title, sub, meta, extra, right, onClick, cls, chevron } = {}) {
+  const tappable = typeof onClick === 'function';
+  return h(tappable ? 'button' : 'div', { class: ['pn-row', tappable && 'tappable', cls], type: tappable ? 'button' : null, onclick: tappable ? onClick : null },
+    lead != null ? h('span', { class: ['pn-lead', leadCls], 'aria-hidden': 'true' }, lead) : null,
+    h('span', { class: 'pn-text' },
+      h('span', { class: 'pn-top' }, h('b', { class: 'pn-name' }, title), meta != null && meta !== '' ? h('span', { class: 'pn-meta' }, meta) : null),
+      sub ? h('span', { class: 'pn-sub' }, sub) : null,
+      extra || null),
+    right || null,
+    (chevron ?? tappable) ? icon('avancar', 16, 'pn-chev') : null);
+}
 
 const KIND_LABELS = {
   launch: 'Dia de Lançamento', briefing: 'Briefing', contract: 'Contrato', diplomacy: 'Diplomacia', politics: 'Governo',
@@ -38,21 +72,32 @@ export function decisionPortraitSVG(state, d, size = 72) {
   return iconPortraitSVG(d?.kind, { size });
 }
 
-/** Compact row for queues (dashboard, missions tab). */
+/** Title without a repeated kind prefix ("Briefing: Artemis II" under the "Briefing" eyebrow -> "Artemis II"). */
+export function displayTitle(d, fallback = 'Decisão') {
+  const t = cleanFlags(d?.title || '').trim();
+  if (!t) return fallback;
+  const k = kindLabel(d.kind, d).toLowerCase();
+  const m = t.match(/^([^:·—–]+?)\s*[:·—–]\s*(.+)$/);
+  if (m && m[1].toLowerCase() === k) return m[2].charAt(0).toUpperCase() + m[2].slice(1);
+  return t;
+}
+
+/** Compact row for queues (dashboard, missions tab, world tab): a row of a divided list card. */
 export function decisionRow(store, d, { onOpen } = {}) {
   const st = store.state;
-  const urg = d.blocking ? 'bad' : d.urgency >= 3 ? 'warn' : d.urgency >= 2 ? 'accent' : 'muted';
+  const urg = d.blocking ? 'block' : d.urgency >= 3 ? 'high' : d.urgency >= 2 ? 'mid' : 'low';
+  const soon = d.expiresTurn != null && d.expiresTurn - st.turn <= 1;
   return h('button', {
-    class: ['decision-row', d.blocking && 'blocking', `urg-${d.urgency || 1}`], type: 'button',
+    class: ['decision-row', 'pn-row', 'tappable', d.blocking && 'blocking', `urg-${d.urgency || 1}`], type: 'button',
     onclick: () => (onOpen ? onOpen(d) : openDecision(store, d.id)),
   },
-  raw(decisionPortraitSVG(st, d, 44), 'decision-face'),
-  h('div', { class: 'decision-text' },
-    h('div', { class: 'decision-kind' }, kindLabel(d.kind, d),
+  raw(decisionPortraitSVG(st, d, 36), `decision-face pn-lead urg-${urg}`),
+  h('span', { class: 'decision-text pn-text' },
+    h('span', { class: 'decision-kind' }, kindLabel(d.kind, d),
       d.blocking ? chip('bloqueia o tempo', 'bad') : d.urgency >= 3 ? chip('urgente', 'warn') : null),
-    h('div', { class: 'decision-title' }, d.title || 'Decisão pendente'),
-    d.expiresTurn != null ? h('div', { class: 'muted small' }, `Vence ${fmtIn(d.expiresTurn, st.turn)}`) : null),
-  h('span', { class: ['urg-dot', `urg-${urg}`], 'aria-hidden': 'true' }), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'));
+    h('span', { class: 'decision-title' }, d.title || 'Decisão pendente'),
+    d.expiresTurn != null ? h('span', { class: ['pn-sub', soon && 'down'] }, `Vence ${fmtIn(d.expiresTurn, st.turn)}`) : null),
+  icon('avancar', 16, 'pn-chev'));
 }
 
 let openId = null;
@@ -85,7 +130,7 @@ export function openDecision(store, id, { onResolved } = {}) {
   const close = openModal((close) => {
     const previewBox = h('div', { class: 'choice-preview', 'aria-live': 'polite' },
       h('span', { class: 'muted' }, choices.length ? 'Toque numa escolha para ver o efeito.' : ''));
-    const confirm = button(choices.length ? 'Escolha uma opção' : 'Ciente', () => resolve(), { kind: 'primary', disabled: choices.length > 0, cls: 'confirm-btn' });
+    const confirm = button(choices.length ? 'Escolha uma opção' : 'Ciente', () => resolve(), { kind: 'primary', big: true, disabled: choices.length > 0, cls: 'confirm-btn' });
 
     const resolve = () => {
       if (choices.length && !selected) return;
@@ -116,25 +161,25 @@ export function openDecision(store, id, { onResolved } = {}) {
       },
       h('span', { class: 'choice-label' }, c.label || c.id),
       c.preview ? h('span', { class: 'choice-hint' }, c.preview) : null,
-      c.disabled && c.reason ? h('span', { class: 'choice-reason' }, `🔒 ${c.reason}`) : null);
+      c.disabled && c.reason ? h('span', { class: 'choice-reason' }, icon('cadeado', 14), c.reason) : null);
       return btn;
     });
 
-    return h('div', { class: ['event-card', `kind-${String(d.kind || '').split('/')[0]}`] },
+    const left = d.expiresTurn != null ? d.expiresTurn - store.state.turn : null;
+    return h('div', { class: ['event-card', `kind-${String(d.kind || '').split('/')[0]}`, d.blocking && 'blocking'] },
       h('div', { class: 'event-banner' },
-        raw(decisionPortraitSVG(store.state, d, 96), 'event-face'),
+        raw(decisionPortraitSVG(store.state, d, 56), 'event-face'),
         h('div', { class: 'event-meta' },
-          h('div', { class: 'event-kind' }, kindLabel(d.kind, d)),
-          h('h2', { class: 'event-title' }, d.title || 'Decisão'),
-          h('div', { class: 'chips' },
+          h('h3', { class: 'event-title' }, displayTitle(d)),
+          d.blocking || d.urgency >= 3 || left != null ? h('div', { class: 'chips' },
             d.blocking ? chip('bloqueia o tempo', 'bad') : null,
             d.urgency >= 3 ? chip('urgente', 'warn') : null,
-            d.expiresTurn != null ? chip(`vence ${fmtIn(d.expiresTurn, store.state.turn)}`, 'muted') : null))),
+            left != null ? chip(`vence ${fmtIn(d.expiresTurn, store.state.turn)}`, left <= 1 ? 'bad' : '') : null) : null)),
       h('div', { class: 'event-body' }, bodyLines(d.body)),
       h('div', { class: 'choices' }, choiceBtns),
       previewBox,
       h('div', { class: 'modal-actions' }, confirm));
-  }, { cls: 'decision-modal', title: '', onClose: () => { if (openId === id) { openId = null; openClose = null; } } });
+  }, { cls: ['decision-modal', d.blocking && 'blocking-sheet'].filter(Boolean).join(' '), title: kindLabel(d.kind, d), onClose: () => { if (openId === id) { openId = null; openClose = null; } } });
 
   openId = id;
   openClose = close;

@@ -1612,10 +1612,27 @@ function createScene(store, key) {
       if (rs.mode === 'descent' && rs.flags.chute) fire('chute');
       if (rs.mode === 'descent' && S.landed && S.touch && !S.touch.done && rs.tele.altKm <= 0.0008) { visualTouchdown(); rs.flags.landed = true; rs.flags.engineOn = false; }
       if (!R.draw(g, rs)) plainSky();
+      placeOverlays(rs);
     } catch (e) {
       renderFailed(e);
       plainSky();
     }
+  }
+  /**
+   * Stamps and the radio-silence caption never sit on the vehicle: they go to the band (upper or lower third)
+   * away from the craft's projected position, so separations and landings stay visible under them.
+   */
+  let overlayBand = '';
+  function placeOverlays(rs) {
+    if (S.view === 'result') { if (overlayBand) { stamp.style.top = ''; silenceEl.style.top = ''; overlayBand = ''; } return; }
+    let p = null;
+    try { p = R.vehicleScreenPos(rs); } catch { p = null; }
+    const y = p && Number.isFinite(p.y) ? p.y / Math.max(1, S.H) : 0.45;
+    const band = y > 0.42 ? 'top' : 'bottom';
+    if (band === overlayBand) return;
+    overlayBand = band;
+    stamp.style.top = band === 'top' ? '22%' : '70%';
+    silenceEl.style.top = band === 'top' ? '17%' : '78%';
   }
   /** Plain sky while the renderer module loads (or if it is unavailable). */
   function plainSky() {
@@ -1815,7 +1832,12 @@ function createScene(store, key) {
       const size = p.size + p.grow * k;
       g.globalAlpha = (1 - k) * (p.kind === 'smoke' ? 0.55 : 0.9);
       g.fillStyle = p.kind === 'fire' && k > 0.5 ? '#6b6f7a' : p.color;
-      if (p.kind === 'spark') g.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+      if (p.kind === 'confetti') { // paper flakes tumbling down: width flips with the spin, gentle side-to-side flutter
+        const ph = S.t * 6 + p.spin;
+        p.x += Math.sin(ph * 0.5) * 18 * dt;
+        g.globalAlpha = Math.min(1, (1 - k) * 3) * 0.9;
+        g.fillRect(p.x - size / 2 * Math.abs(Math.cos(ph)), p.y - size * 0.35, size * Math.max(0.15, Math.abs(Math.cos(ph))), size * 0.7);
+      } else if (p.kind === 'spark') g.fillRect(p.x - size / 2, p.y - size / 2, size, size);
       else { g.beginPath(); g.arc(p.x, p.y, size, 0, Math.PI * 2); g.fill(); }
     }
     g.globalAlpha = 1;
@@ -1827,7 +1849,7 @@ function createScene(store, key) {
     const rate = reduce() ? 0.15 : 1;
     if (S.resultFx === 'confetti' && Math.random() < 0.9 * rate) {
       const colors = [PAL.accent, PAL.amber, PAL.teal, PAL.cream, PAL.flag];
-      emit({ x: Math.random() * W, y: -10, vx: (Math.random() - 0.5) * 40, vy: 60 + Math.random() * 80, life: 0, max: 4, size: 3 + Math.random() * 3, grow: 0, color: colors[Math.floor(Math.random() * colors.length)], kind: 'spark', world: false });
+      emit({ x: Math.random() * W, y: -10, vx: (Math.random() - 0.5) * 40, vy: 60 + Math.random() * 80, life: 0, max: S.H / 70 + 2, size: 3 + Math.random() * 3, grow: 0, color: colors[Math.floor(Math.random() * colors.length)], kind: 'confetti', spin: Math.random() * 6, world: false });
     } else if (S.resultFx === 'sparks' && Math.random() < 0.3 * rate) {
       emit({ x: Math.random() * W, y: -10, vx: 0, vy: 70, life: 0, max: 3, size: 3, grow: 0, color: PAL.amber, kind: 'spark', world: false });
     } else if (S.resultFx === 'smoke' && Math.random() < 0.25 * rate) {

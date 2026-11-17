@@ -248,6 +248,7 @@ export function cached(key, w, h, paint, opts = null) {
   try { paint(ctx, c.width, c.height); } catch (e) { console.error('launch-render texture', key, e); }
   lastEnd = nowMs();
   winSpent += lastEnd - t0;
+  if (globalThis.__lrTexLog && lastEnd - t0 > 4) globalThis.__lrTexLog.push([key, Math.round(lastEnd - t0)]); // dev profiling hook
   const bytes = c.width * c.height * 4;
   CACHE.set(key, { canvas: c, bytes });
   cacheBytes += bytes;
@@ -295,12 +296,18 @@ function patternOf(ctx, key, canvas) {
   PATTERNS.set(key, { src: canvas, pat });
   return pat;
 }
-let DOMM = null;
+// CanvasPattern.setTransform takes a DOMMatrix2DInit dictionary: one reused plain object avoids allocating a
+// DOMMatrix per ground row (hundreds per frame on a landing). Falls back to a DOMMatrix if a browser insists.
+const PMAT = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+let PMAT_DICT = true;
 function setPatternMatrix(pat, a, b, c, d, e, f) {
   if (!pat || typeof pat.setTransform !== 'function') return false;
-  if (!DOMM && typeof DOMMatrix === 'function') DOMM = DOMMatrix;
-  if (!DOMM) return false;
-  pat.setTransform(new DOMM([a, b, c, d, e, f]));
+  PMAT.a = a; PMAT.b = b; PMAT.c = c; PMAT.d = d; PMAT.e = e; PMAT.f = f;
+  if (PMAT_DICT) {
+    try { pat.setTransform(PMAT); return true; } catch { PMAT_DICT = false; }
+  }
+  if (typeof DOMMatrix !== 'function') return false;
+  pat.setTransform(new DOMMatrix([a, b, c, d, e, f]));
   return true;
 }
 
@@ -371,7 +378,7 @@ export const BODY_LOOK = {
   trojans: L('small', '#5d4a40', ['#2f2620', '#4a3b33', '#655247', '#7f6a5c'], { shape: { a: 1, b: 0.7, amp: 0.1 } }),
   jupiter: L('gas', '#d8b78a', ['#7a4a2a', '#b88a5a', '#dcc6a2', '#f2e8d6'], { craters: 0, atmosphere: { color: '#f0dcc0', thickness: 0.012 } }),
   io: L('rocky', '#d8c060', ['#3a2a14', '#a07a2a', '#d8c060', '#f0e8a0', '#f6f2d8'], { craters: 0.03, dust: '#d8c070' }),
-  europa: L('icy', '#d8d4c8', ['#8a5a3e', '#b09070', '#d2c6b2', '#e8e4da', '#f6f4ee'], { craters: 0.12, dust: '#e8e4da', lon0: 180 }),
+  europa: L('icy', '#d6cbb4', ['#7a4630', '#a27656', '#c8b494', '#ddd1b8', '#eee6d6'], { craters: 0.12, dust: '#e8e4da', lon0: 180 }),
   ganymede: L('icy', '#8f877c', ['#4a443d', '#6b635a', '#8f877c', '#b4ab9e', '#d4cdc2'], { craters: 0.6, rays: 0.6 }),
   callisto: L('icy', '#5f574e', ['#2e2924', '#463f38', '#5f574e', '#7c7368', '#d8d2c8'], { craters: 1, rays: 0.4 }),
   saturn: L('ring', '#e0c890', ['#a88a5a', '#d4ba84', '#e8d6a8', '#f4ead0'], { craters: 0, atmosphere: { color: '#f2e2b8', thickness: 0.012 } }),
@@ -402,10 +409,8 @@ function ensureWorld() {
         WORLD.polys = [];
         for (const c of j.countries) for (const p of c.polygons || []) WORLD.polys.push(p);
         WORLD.ver++;
-        MAPS.delete('earth');
-        // build the Earth maps while the scene is idle (countdown), not on the first frame that needs them
-        const idle = typeof requestIdleCallback === 'function' ? (fn) => requestIdleCallback(fn, { timeout: 4000 }) : (fn) => setTimeout(fn, 300);
-        idle(() => { try { mapsFor('earth'); } catch { /* ignore */ } });
+        // rebuild the Earth maps in idle slices (≤ ~8 ms each); the old maps stay in use until the new ones are done
+        if (MAPS.has('earth')) buildMapsAsync('earth'); else idleRun(() => (MAPS.has('earth') ? true : buildMapsStep('earth', 8)));
       }
       WORLD.state = 2;
     }).catch(() => { WORLD.state = 3; });
@@ -608,13 +613,16 @@ const MARIA = [[33, -16, 17], [28, 17, 10], [8, 30, 11], [17, 59, 7], [-8, 51, 9
   [-24, -39, 5], [56, -20, 5, 0.8], [57, 5, 5, 0.8], [55, 25, 4, 0.7], [13, 4, 4], [7, -30, 8], [-10, -23, 6], [40, -30, 8], [-1, 87, 4, 0.7], [20, 86, 4, 0.6], [-40, 162, 6, 0.6], [27, 147, 3, 0.6]];
 const MARS_DARK = [[9, 70, 12], [-10, 10, 18, 0.8], [-25, -20, 16, 0.75], [-20, 40, 14, 0.7], [-30, 90, 14, 0.6], [45, -30, 12, 0.75], [-55, -40, 18, 0.5], [-20, 140, 18, 0.6], [5, 120, 10, 0.5], [12, -5, 8, 0.6], [-40, 170, 15, 0.5]];
 
-function genRocky(id, look) {
+function* genRockyG(id, look) {
   const small = look.kind === 'small';
   const W = small ? 256 : 512, N = W * W / 2, m = newMap(W, W / 2);
   const seed = hash(id), R = rng(seed);
   const icy = look.kind === 'icy';
+  let io = null;
   const N1 = coarseField(m, 128, (x, y, z) => fbm3(x * 1.8, y * 1.8, z * 1.8, 5, seed));
+  yield;
   for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield;
     const x = m.px[k], y = m.py[k], z = m.pz[k];
     const n1 = N1[k];
     const n2 = fbm3(x * 7, y * 7, z * 7, 3, seed + 9);
@@ -624,47 +632,71 @@ function genRocky(id, look) {
   let MF = null;
   if (id === 'moon') {
     MF = blobField(m, MARIA, seed + 3, 0.45);
+    yield;
     for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield;
       const mare = MF[k];
       const hi = 0.7 + (m.alb[k] - 0.58) * 0.6;            // bright anorthositic highlands
-      const lo = 0.25 + (m.alb[k] - 0.58) * 0.3;           // basalt maria ≈ 0.6× the highland brightness, never black
+      const lo = 0.16 + (m.alb[k] - 0.58) * 0.25;          // basalt maria: dark (~0.55x the highland brightness), never black
       m.alb[k] = lerp(hi, lo, mare);
       m.hgt[k] *= 1 - mare * 0.85;
     }
   } else if (id === 'mercury') {
     const CF = blobField(m, [[30, -170, 25, 0.6], [10, 40, 18, 0.35]], seed, 0.35);
-    for (let k = 0; k < N; k++) { const c = CF[k]; m.alb[k] -= c * 0.12; m.hgt[k] *= 1 - c * 0.5; }
-  } else if (id === 'io') {
+    yield;
     for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield; const c = CF[k]; m.alb[k] -= c * 0.12; m.hgt[k] *= 1 - c * 0.5; }
+  } else if (id === 'io') {
+    // sulphur plains, darker poles, ~70 volcanic centres: irregular black/red calderas (paterae) inside diffuse
+    // plume deposits (white SO2 frost, yellow/orange sulphur rings, red short-chain sulphur around the big ones)
+    io = { pat: new Float32Array(N), red: new Float32Array(N), frost: new Float32Array(N) };
+    for (let k = 0; k < N; k++) {
+      if ((k & 16383) === 16383) yield;
       const x = m.px[k], y = m.py[k], z = m.pz[k];
-      m.alb[k] = 0.62 + fbm3(x * 3, y * 3, z * 3, 4, seed) * 0.25 - sstep(0.55, 0.9, Math.abs(y)) * 0.2;
+      m.alb[k] = 0.64 + fbm3(x * 3, y * 3, z * 3, 4, seed) * 0.22 + fbm3(x * 11, y * 11, z * 11, 3, seed + 2) * 0.06 - sstep(0.6, 0.95, Math.abs(y)) * 0.16;
       m.hgt[k] *= 0.3;
+      io.frost[k] = sstep(0.15, 0.4, fbm3(x * 2.4 + 7, y * 2.4, z * 2.4, 4, seed + 4)) * (1 - sstep(0.5, 0.8, Math.abs(y)));
     }
-    for (let i = 0; i < 60; i++) { // volcanic paterae: black centre, red/orange halo (Pele-like rings)
-      const zz = R() * 1.6 - 0.8, ph = R() * TAU, s = Math.sqrt(1 - zz * zz), c = [s * Math.cos(ph), zz, s * Math.sin(ph)];
-      const a = 0.012 + Math.pow(R(), 3) * 0.06, big = a > 0.04;
+    for (let i = 0; i < 70; i++) {
+      const zz = R() * 1.7 - 0.85, ph = R() * TAU, s = Math.sqrt(1 - zz * zz), c = [s * Math.cos(ph), zz, s * Math.sin(ph)];
+      const a = 0.005 + Math.pow(R(), 3) * 0.022, big = a > 0.014, ring = big ? 7 + R() * 5 : 3 + R() * 2.5, sd = (R() * 1e6) | 0;
+      const ex = [c[2], 0, -c[0]]; const el = Math.hypot(ex[0], ex[2]) || 1; ex[0] /= el; ex[2] /= el; // local east
+      const elong = 0.6 + R() * 0.8;
       for (let k = 0; k < N; k++) {
         const dx = m.px[k] - c[0], dy = m.py[k] - c[1], dz = m.pz[k] - c[2];
         const d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 > a * a * 16) continue;
-        const d = Math.sqrt(d2) / a;
-        if (d < 1) m.alb[k] = Math.min(m.alb[k], 0.05 + d * 0.12);
-        else if (big) m.alb[k] = lerp(m.alb[k], 0.22, 0.6 * Math.exp(-(d - 2.4) * (d - 2.4) * 1.5));
+        if (d2 > a * a * ring * ring) continue;
+        const ue = dx * ex[0] + dz * ex[2];
+        const vn = Math.sqrt(Math.max(0, d2 - ue * ue));
+        const wob = fbm3(m.px[k] * 60, m.py[k] * 60, m.pz[k] * 60, 2, sd) * 0.55;
+        const d = Math.sqrt((ue * ue) / (elong * elong) + vn * vn * elong) / a + wob; // irregular, lobed caldera
+        if (d < 1) io.pat[k] = Math.max(io.pat[k], sstep(1, 0.7, d));
+        const dep = Math.exp(-((d - ring * 0.5) ** 2) / (ring * 1.6)) * (big ? 1 : 0.6) * (0.7 + wob); // diffuse plume deposit
+        if (big) io.red[k] = Math.max(io.red[k], dep * 0.85);
+        else io.frost[k] = Math.max(io.frost[k], dep * 0.6);
       }
+      if ((i & 7) === 7) yield;
     }
   } else if (id === 'europa') {
-    const arcs = arcsOf('europa', 160), minW = (TAU / W) * 0.55;
+    // cream/tan water ice; dense reddish-brown lineae at many widths with ragged edges (flat stains, no relief);
+    // mottled chaos terrain where the crust broke up and refroze
+    const arcs = arcsOf('europa', 260), minW = (TAU / W) * 0.45;
     const CH = coarseField(m, 128, (x, y, z) => fbm3(x * 2.2, y * 2.2, z * 2.2, 4, seed + 7));
+    yield;
     for (let k = 0; k < N; k++) {
+      if ((k & 16383) === 16383) yield;
       const x = m.px[k], y = m.py[k], z = m.pz[k];
-      const la = lineaeAt(x, y, z, arcs, minW, hash('europa|cap') + 5);
-      const chaos = sstep(0.12, 0.32, CH[k]);
+      const rag = fbm3(x * 70, y * 70, z * 70, 2, seed + 3) * 0.004;
+      const la = lineaeAt(x + rag, y, z - rag, arcs, minW, hash('europa|cap') + 5);
+      const chaos = sstep(0.1, 0.3, CH[k]);
       const mott = fbm3(x * 14, y * 14, z * 14, 3, seed + 8);
-      m.alb[k] = 0.8 + fbm3(x * 5, y * 5, z * 5, 3, seed) * 0.08 - la.band * 0.36 + la.crest * 0.08 - chaos * (0.22 + 0.12 * mott);
-      m.hgt[k] = la.crest * 0.003 - chaos * 0.002 + mott * chaos * 0.002;
+      const tan = fbm3(x * 2.5, y * 2.5, z * 2.5, 3, seed + 12);
+      m.alb[k] = 0.66 + fbm3(x * 5, y * 5, z * 5, 3, seed) * 0.07 + tan * 0.08 - la.band * 0.42 - chaos * (0.2 + 0.18 * mott);
+      m.hgt[k] = -chaos * 0.0015 + mott * chaos * 0.0015;
     }
   } else if (id === 'ganymede') {
     for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield;
       const x = m.px[k], y = m.py[k], z = m.pz[k];
       const dark = sstep(0.0, 0.12, fbm3(x * 1.5, y * 1.5, z * 1.5, 4, seed + 3));
       const groove = Math.sin((x * 40 + fbm3(x * 3, y * 3, z * 3, 3, seed) * 14)) * 0.5 + 0.5;
@@ -673,6 +705,7 @@ function genRocky(id, look) {
     }
   } else if (id === 'enceladus') {
     for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield;
       const x = m.px[k], y = m.py[k], z = m.pz[k];
       const s = sstep(-0.55, -0.75, y);
       const stripes = s * sstep(0.9, 0.99, Math.abs(Math.sin(x * 9 + z * 3 + fbm3(x * 4, y * 4, z * 4, 2, seed) * 2)));
@@ -681,6 +714,7 @@ function genRocky(id, look) {
     }
   } else if (id === 'triton') {
     for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield;
       const x = m.px[k], y = m.py[k], z = m.pz[k];
       const cap = sstep(0.0, -0.25, y + fbm3(x * 3, y * 3, z * 3, 3, seed) * 0.2);
       const cant = fbm3(x * 14, y * 14, z * 14, 2, seed + 3) * 0.5 + 0.5;
@@ -689,7 +723,9 @@ function genRocky(id, look) {
     }
   } else if (id === 'pluto') {
     const HF = blobField(m, [[25, 175, 22], [5, 190, 15], [15, 160, 12]], seed, 0.3);
+    yield;
     for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield;
       const x = m.px[k], y = m.py[k], z = m.pz[k];
       const heart = HF[k];
       const belt = sstep(0.25, -0.1, Math.abs(y + 0.12)) * sstep(-0.1, 0.25, fbm3(x * 2, y * 2, z * 2, 4, seed + 1) + 0.15) * (1 - heart);
@@ -697,15 +733,18 @@ function genRocky(id, look) {
       m.hgt[k] *= 1 - heart;
     }
   } else if (id === 'charon') {
-    for (let k = 0; k < N; k++) { const y = m.py[k]; m.alb[k] = lerp(m.alb[k], 0.1, sstep(0.75, 0.92, y + fbm3(m.px[k] * 4, y * 4, m.pz[k] * 4, 3, seed) * 0.1) * 0.8); }
+    for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield; const y = m.py[k]; m.alb[k] = lerp(m.alb[k], 0.1, sstep(0.75, 0.92, y + fbm3(m.px[k] * 4, y * 4, m.pz[k] * 4, 3, seed) * 0.1) * 0.8); }
   } else if (id === 'callisto') {
     for (let k = 0; k < N; k++) m.alb[k] = 0.42 + (m.alb[k] - 0.58) * 0.5;
+    yield;
     stampCrater(m, unitOf(14, 56), 0.09, { depth: 0.25, fresh: 0.7, rayLen: 2, seed: 7 });
   } else if (id === 'vesta') {
     stampCrater(m, unitOf(-75, 300), 0.6, { depth: 0.5, peak: 0.5, seed: 3 });
   }
   const rays = look.rays ?? (icy ? 0.6 : 0.4);
   const mareSkip = MF ? (c, a) => a > 0.009 && blobAt(c[0], c[1], c[2], MARIA, seed + 3, 0.45) > 0.45 : null;
+  yield;
   if (look.craters > 0.02) craterField(m, R, id === 'europa' ? 0.03 : look.craters, { rays, maxA: small ? 0.3 : id === 'europa' ? 0.02 : 0.14, minA: small ? 0.02 : 0.006, depth: icy ? 0.5 : 0.9, skip: mareSkip });
   if (id === 'moon') {
     stampCrater(m, unitOf(-43, -11), 0.024, { depth: 1, fresh: 1, rayLen: 18, seed: 11, peak: 0.3 }); // Tycho
@@ -717,35 +756,44 @@ function genRocky(id, look) {
   if (id === 'ceres') {
     stampCrater(m, unitOf(20, -120), 0.05, { depth: 0.8, seed: 5 });
     const c = unitOf(20, -120);
-    for (let k = 0; k < N; k++) { const d = Math.sqrt((m.px[k] - c[0]) ** 2 + (m.py[k] - c[1]) ** 2 + (m.pz[k] - c[2]) ** 2); if (d < 0.014) m.alb[k] = 1.2; }
+    for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield; const d = Math.sqrt((m.px[k] - c[0]) ** 2 + (m.py[k] - c[1]) ** 2 + (m.pz[k] - c[2]) ** 2); if (d < 0.014) m.alb[k] = 1.2; }
   }
   if (id === 'europa') stampCrater(m, unitOf(-25, 271), 0.012, { depth: 0.6, fresh: 1, rayLen: 10, seed: 21 });
   let tint = null;
   if (id === 'io') {
     tint = (k, out) => {
-      const a = m.alb[k];
-      if (a < 0.34) { const t = sstep(0.05, 0.32, a); out[0] = lerp(25, 200, t); out[1] = lerp(18, 72, t); out[2] = lerp(10, 30, t); }
-      const f = sstep(0.3, 0.55, fbm3(m.px[k] * 4, m.py[k] * 4, m.pz[k] * 4, 3, 77)) * 0.45;
-      out[0] = lerp(out[0], 240, f); out[1] = lerp(out[1], 236, f); out[2] = lerp(out[2], 215, f);
+      const fr = io.frost[k] * 0.55;
+      out[0] = lerp(out[0], 238, fr); out[1] = lerp(out[1], 236, fr); out[2] = lerp(out[2], 214, fr);
+      const rd = io.red[k];
+      out[0] = lerp(out[0], 196, rd * 0.75); out[1] = lerp(out[1], 92, rd * 0.75); out[2] = lerp(out[2], 40, rd * 0.75);
+      const p = io.pat[k];
+      if (p > 0) { const hot = fbm3(m.px[k] * 90, m.py[k] * 90, m.pz[k] * 90, 2, 91); out[0] = lerp(out[0], 34 + 70 * sstep(0.2, 0.5, hot), p); out[1] = lerp(out[1], 26 + 20 * sstep(0.2, 0.5, hot), p); out[2] = lerp(out[2], 18, p); }
     };
   } else if (id === 'pluto') tint = (k, out) => { const t = sstep(0.42, 0.2, m.alb[k]) * 0.6; out[0] = lerp(out[0], 92, t); out[1] = lerp(out[1], 38, t); out[2] = lerp(out[2], 22, t); };
   else if (id === 'charon') tint = (k, out) => { if (m.py[k] > 0.7) { const t = sstep(0.4, 0.15, m.alb[k]) * 0.7; out[0] = lerp(out[0], 112, t); out[1] = lerp(out[1], 60, t); out[2] = lerp(out[2], 44, t); } };
   else if (id === 'triton') tint = (k, out) => { const t = sstep(0.6, 0.85, m.alb[k]) * 0.5; out[0] = lerp(out[0], 238, t); out[1] = lerp(out[1], 208, t); out[2] = lerp(out[2], 204, t); };
+  yield;
   colourize(m, look, tint);
+  yield;
   return finishMap(m);
 }
 
-function genMars(id, look) {
+function* genMarsG(id, look) {
   const W = 512, N = W * W / 2, m = newMap(W, W / 2), seed = hash(id), R = rng(seed);
   const tharsis = [[18, -134, 6, 1], [-1, -113, 3.5, 0.6], [12, -104, 3.5, 0.6], [-9, -121, 3.5, 0.6], [20, -103, 3, 0.4]].map((t) => [...t, unitOf(t[0], t[1])]);
   const N1 = coarseField(m, 128, (x, y, z) => fbm3(x * 2, y * 2, z * 2, 5, seed));
+  yield;
   const DF = blobField(m, MARS_DARK, seed + 5, 0.55), HL = blobField(m, [[-42, 70, 18], [-50, -43, 10, 0.7]], seed + 9, 0.2);
+  yield;
   const DU = coarseField(m, 128, (x, y, z) => fbm3(x * 2.5 + 9, y * 2.5, z * 2.5, 4, seed + 13));
+  yield;
   for (let k = 0; k < N; k++) {
+    if ((k & 16383) === 16383) yield;
     const x = m.px[k], y = m.py[k], z = m.pz[k];
     const n1 = N1[k], n2 = fbm3(x * 8, y * 8, z * 8, 3, seed + 3);
-    const dark = DF[k] * sstep(-0.25, 0.15, n1 + 0.1);
-    let a = 0.6 + n1 * 0.22 + n2 * 0.08 - dark * 0.42;
+    const dark = DF[k] * sstep(-0.35, 0.05, n1 + 0.1);
+    let a = 0.64 + n1 * 0.2 + n2 * 0.08 - dark * 0.68;
     let hh = (n1 * 0.5 + n2 * 0.3) * 0.02;
     const hel = HL[k]; // Hellas, Argyre
     a += hel * 0.12; hh -= hel * 0.03;
@@ -755,11 +803,32 @@ function genMars(id, look) {
     }
     m.alb[k] = a; m.hgt[k] = hh;
   }
-  for (let i = 0; i <= 40; i++) { // Valles Marineris: a chain of elongated troughs
-    const s = Math.sin((i / 40) * Math.PI);
-    stampCrater(m, unitOf(-8 - Math.sin((i / 40) * 3) * 4, -100 + i * 1.6), 0.012 + 0.012 * s, { depth: 0.8, seed: i, albDark: 0.06 });
+  // Valles Marineris: one connected trough system ~4000 km long (Noctis Labyrinthus maze in the west, the deep
+  // central chasmata, chaos and outflow channels opening east into Chryse), dark floors, sharp walls
+  const vmLat = (lo) => -7 - 4 * Math.sin((lo + 100) * 0.06) - (lo > -60 ? (lo + 60) * 0.12 : 0);
+  const vmW = (lo) => (lo < -95 ? 1.2 : lo < -55 ? 2 + 2 * Math.sin(((lo + 95) / 40) * Math.PI) : 2.4 + (lo + 55) * 0.12) * D2R;
+  for (let j = 0; j < m.h; j++) {
+    const lat = (0.5 - (j + 0.5) / m.h) * 180;
+    if (lat > 12 || lat < -25) continue;
+    for (let i = 0; i < m.w; i++) {
+      const lo = ((i + 0.5) / m.w - 0.5) * 360;
+      if (lo < -108 || lo > -30) continue;
+      const k = j * m.w + i;
+      const x = m.px[k], y = m.py[k], z = m.pz[k];
+      const wig = fbm3(x * 30, y * 30, z * 30, 3, seed + 40) * 0.6 * D2R;
+      let d = Math.abs(lat * D2R - vmLat(lo) * D2R + wig) / vmW(lo);
+      if (lo < -95) d = Math.min(d, Math.abs(Math.sin((lo * 0.9 + lat * 1.7) * 0.35 + fbm3(x * 12, y * 12, z * 12, 2, seed + 41) * 2)) * 2.2 + Math.abs(lat * D2R - vmLat(lo) * D2R) / (4 * D2R)); // maze
+      if (lo > -45) d = Math.min(d, (Math.abs(lat - (-2 + (lo + 45) * 0.9)) * D2R) / (1.2 * D2R) + 0.35); // outflow to Chryse
+      const fade = sstep(-108, -100, lo) * sstep(-30, -38, lo);
+      const trough = (1 - sstep(0.75, 1.05, d)) * fade, wall = Math.exp(-((d - 0.95) ** 2) / 0.012) * fade;
+      m.hgt[k] -= trough * 0.03;
+      m.alb[k] += -trough * 0.2 + wall * 0.05;
+    }
   }
+  yield;
+  yield;
   craterField(m, R, look.craters, { rays: 0, depth: 0.55, maxA: 0.08 });
+  yield;
   colourize(m, look, (k, out) => {
     const y = m.py[k], x = m.px[k], z = m.pz[k];
     const capN = sstep(0.925, 0.955, y + fbm3(x * 5, y * 5, z * 5, 3, seed + 11) * 0.03);
@@ -769,8 +838,12 @@ function genMars(id, look) {
     const dust = sstep(0.25, 0.55, DU[k]) * 0.3;
     out[0] = lerp(out[0], 214, dust); out[1] = lerp(out[1], 160, dust); out[2] = lerp(out[2], 112, dust);
   });
+  yield;
   return finishMap(m);
 }
+
+function genRocky(id, look) { const it = genRockyG(id, look); let r = it.next(); while (!r.done) r = it.next(); return r.value; }
+function genMars(id, look) { const it = genMarsG(id, look); let r = it.next(); while (!r.done) r = it.next(); return r.value; }
 
 const JUP_BANDS = [[-90, 0.5], [-60, 0.45], [-45, 0.62], [-37, 0.4], [-30, 0.72], [-23, 0.62], [-19, 0.3], [-10, 0.25], [-7, 0.8], [0, 0.86], [7, 0.78], [9, 0.22], [17, 0.28], [21, 0.78], [27, 0.5], [32, 0.72], [37, 0.42], [45, 0.6], [60, 0.45], [90, 0.42]];
 function bandAt(bands, lat) {
@@ -840,25 +913,33 @@ function genSun(id) {
   return finishMap(m);
 }
 
-function genEarth() {
+/** Earth maps as a generator: yields every few rows so an idle-time rebuild never blocks a frame for long. */
+function* genEarthG() {
   ensureWorld();
+  const ver = WORLD.ver;
   const W = 512, H = 256, m = newMap(W, H), seed = 1337;
   let land = rasterLand(W, H);
+  yield;
   if (!land) { // fallback continents until world.json arrives
     land = new Float32Array(W * H);
     const LF = coarseField(m, 256, (x, y, z) => fbm3(x * 1.6, y * 1.6, z * 1.6, 5, seed));
     for (let k = 0; k < W * H; k++) land[k] = sstep(0.02, 0.08, LF[k]);
   }
   const near = blurMap(land, W, H, 2);
+  yield;
   const wide = blurMap(land, W, H, 7);
+  yield;
   m.spec = new Float32Array(W * H);
   m.night = new Float32Array(W * H);
   const NF = coarseField(m, 256, (x, y, z) => fbm3(x * 6, y * 6, z * 6, 4, seed + 1));
+  yield;
   const MF = coarseField(m, 256, (x, y, z) => ridge3(x * 5, y * 5, z * 5, 4, seed + 4));
+  yield;
   const ocean = mkRamp([[0, '#051a33'], [0.5, '#082a52'], [0.8, '#0f4470'], [0.93, '#1c6a8c'], [1, '#3a8f9e']]);
   const out = [0, 0, 0];
   const FOREST = rgbOf('#26401c'), RAIN = rgbOf('#1c3616'), GRASS = rgbOf('#55663a'), SAV = rgbOf('#8c7e4a'), DESERT = rgbOf('#cfae78'), SAND = rgbOf('#dcc293'), ROCK = rgbOf('#76675a'), TUNDRA = rgbOf('#6d6a58'), BOREAL = rgbOf('#2a3a25'), ICE = rgbOf('#f1f4f8');
   for (let j = 0; j < H; j++) {
+    if ((j & 7) === 7) yield;
     const lat = (0.5 - (j + 0.5) / H) * 180, al = Math.abs(lat);
     for (let i = 0; i < W; i++) {
       const k = j * W + i, x = m.px[k], y = m.py[k], z = m.pz[k], lo = ((i + 0.5) / W - 0.5) * 360;
@@ -897,8 +978,13 @@ function genEarth() {
   const CW = 512, CH = 256;
   m.cloud = new Float32Array(CW * CH); m.cw = CW; m.ch = CH;
   const cm = newMap(CW, CH);
-  const WX = coarseField(cm, 128, (x, y, z) => fbm3(x * 2.2, y * 2.2, z * 2.2, 3, seed + 20)), WY = coarseField(cm, 128, (x, y, z) => fbm3(x * 2.2 + 5, y * 2.2, z * 2.2, 3, seed + 21));
+  yield;
+  const WX = coarseField(cm, 128, (x, y, z) => fbm3(x * 2.2, y * 2.2, z * 2.2, 3, seed + 20));
+  yield;
+  const WY = coarseField(cm, 128, (x, y, z) => fbm3(x * 2.2 + 5, y * 2.2, z * 2.2, 3, seed + 21));
+  yield;
   for (let j = 0; j < CH; j++) {
+    if ((j & 7) === 7) yield;
     const lat = (0.5 - (j + 0.5) / CH) * 180, al = Math.abs(lat);
     const band = 0.18 * Math.exp(-((lat - 6) ** 2) / 40) - 0.2 * Math.exp(-((al - 24) ** 2) / 90) + 0.16 * Math.exp(-((al - 55) ** 2) / 140) - 0.05;
     for (let i = 0; i < CW; i++) {
@@ -909,9 +995,39 @@ function genEarth() {
       m.cloud[k] = sstep(0.02, 0.38, v) * (0.75 + 0.25 * sstep(0.2, 0.5, v));
     }
   }
-  m.worldVer = WORLD.ver;
+  yield;
+  m.worldVer = ver;
   return finishMap(m);
 }
+function genEarth() { const it = genEarthG(); let r = it.next(); while (!r.done) r = it.next(); return r.value; }
+
+
+const MAPGEN = new Map(); // id -> running generator (Earth only; other bodies build in one idle slice)
+/** Advances the async build of a body's maps by ~budget ms. Returns true when the maps are current. */
+function buildMapsStep(id, budget = 8) {
+  const key = BODY_LOOK[id] ? id : 'generic';
+  const cur = MAPS.get(key);
+  const look = BODY_LOOK[key];
+  const incremental = key === 'earth' || key === 'mars' || (look.kind !== 'gas' && look.kind !== 'ring' && look.kind !== 'cloudy' && look.kind !== 'star' && look.kind !== 'haze');
+  if (key !== 'earth' && cur) return true;
+  if (!incremental) { mapsFor(key); return true; }
+  if (key === 'earth' && cur && cur.worldVer === WORLD.ver) return true;
+  let it = MAPGEN.get(key);
+  if (!it) { it = key === 'earth' ? genEarthG() : key === 'mars' ? genMarsG(key, look) : genRockyG(key, look); MAPGEN.set(key, it); }
+  const t0 = nowMs();
+  for (;;) {
+    const r = it.next();
+    if (r.done) { MAPGEN.delete(key); MAPS.set(key, r.value); return true; }
+    if (nowMs() - t0 > budget) return false;
+  }
+}
+/** Runs step() in idle callbacks until it returns true. */
+function idleRun(step) {
+  const ric = typeof requestIdleCallback === 'function' ? (fn) => requestIdleCallback(fn, { timeout: 250 }) : (fn) => setTimeout(() => fn({ timeRemaining: () => 8 }), 30);
+  const go = () => ric(() => { let done = false; try { done = step(); } catch { done = true; } if (!done) go(); });
+  go();
+}
+function buildMapsAsync(id) { idleRun(() => buildMapsStep(id, 8)); }
 
 /** Planet maps per body id (generated once; Earth regenerates when world.json arrives). */
 function mapsFor(id) {
@@ -919,6 +1035,7 @@ function mapsFor(id) {
   const look = BODY_LOOK[key];
   let m = MAPS.get(key);
   if (m) return m;
+  const t0 = nowMs();
   if (key === 'earth') m = genEarth();
   else if (key === 'mars') m = genMars(key, look);
   else if (key === 'titan') m = genTitan(key);
@@ -926,6 +1043,7 @@ function mapsFor(id) {
   else if (look.kind === 'gas' || look.kind === 'ring' || look.kind === 'cloudy') m = genGas(key, look);
   else m = genRocky(key, look);
   MAPS.set(key, m);
+  if (globalThis.__lrTexLog) globalThis.__lrTexLog.push(['maps|' + key, Math.round(nowMs() - t0)]);
   return m;
 }
 
@@ -1068,7 +1186,7 @@ function renderSphere(buf, S, id, look, lb, rot, withClouds, tiltB = 0.3) {
             const cw = withClouds ? sample1(maps.cloud, maps.cw, maps.ch, cu, cv) : 0;
             const sp = sample1(maps.spec, MW, MH, u, v) * (1 - cw);
             const hd = Math.max(0, (nx * Hx + ny * Hy + nz * Hz) / Hn);
-            const spec = sp * (Math.pow(hd, 90) * 260 + Math.pow(hd, 14) * 40) * sstep(0, 0.1, mus);
+            const spec = sp * (Math.pow(hd, 260) * 170 + Math.pow(hd, 40) * 16) * sstep(0, 0.1, mus);
             const cE = Math.max(0, mus) ** 0.8 * sstep(-0.05, 0.1, mus);
             cr = lerp(cr, 250 * cE, cw) + spec; cg = lerp(cg, 252 * cE, cw) + spec * 0.96; cb = lerp(cb, 255 * cE, cw) + spec * 0.88;
             const nl2 = sample1(maps.night, MW, MH, u, v) * sstep(0.02, -0.12, mus) * (1 - cw * 0.8);
@@ -1149,7 +1267,7 @@ export function drawPlanetDisc(ctx, bodyId, cx, cy, r, { light = SUN, rot = 0, t
   const lb = lightBucket(light);
   const rq = rot ? Math.round((((num(rot) % TAU) + TAU) % TAU) / TAU * 64) % 64 : 0;
   const tiltB = 2 * r * dpr > 700 ? -0.95 : 0.3; // big discs (orbit arrival): show mid-latitudes at the top limb
-  const key = `disc|${id}|${S}|${lb}|${rq}|${clouds ? 1 : 0}|${id === 'earth' ? WORLD.ver : 0}|${tiltB}`;
+  const key = `disc|${id}|${S}|${lb}|${rq}|${clouds ? 1 : 0}|${id === 'earth' ? (mapsFor('earth').worldVer || 0) : 0}|${tiltB}`;
   const spr = cached(key, S, S, (g) => paintSphereSprite(g, S, id, look, lb, (rq / 64) * TAU, clouds, tiltB));
   if (spr) {
     const big = 2 * r * pad * dpr > S * 1.15;
@@ -1217,7 +1335,7 @@ function arcsOf(id, n) {
     const b = [nrm[1] * t[2] - nrm[2] * t[1], nrm[2] * t[0] - nrm[0] * t[2], nrm[0] * t[1] - nrm[1] * t[0]];
     const th = R() * TAU, ctr = [t[0] * Math.cos(th) + b[0] * Math.sin(th), t[1] * Math.cos(th) + b[1] * Math.sin(th), t[2] * Math.cos(th) + b[2] * Math.sin(th)];
     const big = R() < 0.18;
-    a.push({ n: nrm, c: ctr, cosL: Math.cos((big ? 0.7 : 0.15) + R() * (big ? 1.1 : 0.55)), w: (big ? 0.0032 : 0.0009) + R() * (big ? 0.004 : 0.0016), dark: big ? 0.85 : 0.45 + R() * 0.4 });
+    a.push({ n: nrm, c: ctr, cosL: Math.cos((big ? 0.7 : 0.15) + R() * (big ? 1.1 : 0.55)), w: (big ? 0.0018 : 0.0006) + R() * (big ? 0.0022 : 0.0012), dark: big ? 0.8 : 0.4 + R() * 0.4, ph: R() * 50 });
   }
   ARCS.set(key, a);
   return a;
@@ -1230,10 +1348,15 @@ function lineaeAt(x, y, z, arcs, minW, seed) {
     const along = x * A.c[0] + y * A.c[1] + z * A.c[2];
     if (along < A.cosL) continue;
     const s = Math.abs(x * A.n[0] + y * A.n[1] + z * A.n[2] + wx * A.n[0] + wy * A.n[2]);
-    const w = Math.max(minW, A.w);
-    if (s > w * 1.6) continue;
+    // width swells and pinches along the ridge, edges are ragged, and the band is a DOUBLE ridge: two dark
+    // reddish flanks with a paler medial line (no tube shading anywhere)
+    const pinch = 0.45 + 0.9 * (0.5 + 0.5 * gn3(along * 40 + A.ph, A.ph, 0.3, seed + 7));
+    const w = Math.max(minW, A.w * pinch);
+    if (s > w * 2) continue;
     const fadeEnd = sstep(A.cosL, A.cosL + (1 - A.cosL) * 0.25, along);
-    const b = (1 - sstep(w * 0.7, w * 1.3, s)) * A.dark * fadeEnd * Math.min(1, A.w / w); // sub-pixel arcs fade, never fatten
+    const rag = gn3(x * 900, y * 900, z * 900, seed + 9) * 0.35 * w;
+    const sr = s + rag;
+    const b = (1 - sstep(w * 0.7, w * 1.3, sr)) * A.dark * fadeEnd * Math.min(1, (A.w * pinch) / w) * (A.w > minW * 1.5 ? 0.62 + 0.38 * sstep(w * 0.08, w * 0.4, sr) : 1); // sub-pixel arcs fade, never fatten
     if (b > band) band = b;
     const cr = (1 - sstep(w * 0.12, w * 0.32, s)) * fadeEnd * (A.w > minW * 1.5 ? 1 : 0);
     if (cr > crest) crest = cr;
@@ -1313,8 +1436,7 @@ function capRows(job, j0, j1) {
       }
       if (arcs) {
         const la = lineaeAt(px, py, pz, arcs, minW, seed + 5);
-        hh += la.crest * minW * 0.5 - la.band * minW * 0.1;
-        ab -= la.band * 0.55; ab += la.crest * 0.25;
+        ab -= la.band * 0.5; // flat albedo bands: lineae are stains, not tubes
       }
       Hs[k] = hh; job.A[k] = ab;
     }
@@ -1360,7 +1482,7 @@ function capRows(job, j0, j1) {
       E += 0.028; // earthshine / skylight: the night side is never pure black
       const alb = clamp(1 + job.A[k], 0.35, 1.6);
       cr *= E * alb; cg *= E * alb; cb *= E * alb;
-      if (europa && job.A[k] < -0.05) { const t = clamp(-job.A[k] * 1.2, 0, 1); cr = lerp(cr, 150 * E, t * 0.55); cg = lerp(cg, 96 * E, t * 0.55); cb = lerp(cb, 62 * E, t * 0.55); }
+      if (europa && job.A[k] < -0.05) { const t = clamp(-job.A[k] * 1.4, 0, 1); cr = lerp(cr, 140 * E, t * 0.6); cg = lerp(cg, 82 * E, t * 0.6); cb = lerp(cb, 52 * E, t * 0.6); }
       if (atm) {
         const lit = sstep(-0.3, 0.35, mus), rim = Math.pow(1 - zs, 3.2), kk = 0.35 * lit;
         cr += AC[0] * rim * kk; cg += AC[1] * rim * kk; cb += AC[2] * rim * kk;
@@ -1395,7 +1517,7 @@ function capJob(id, look, lb, rot, rB, dpr, rect) {
     c, g, img, W, Hh, id, look, maps, L, lon0: (look.lon0 || 0) * D2R + rot, nx0: rect[0], ny0: rect[1], step, rect, rB,
     cbt: Math.cos(tiltB), sbt: Math.sin(tiltB), Hs: new Float32Array(N), A: new Float32Array(N), Uu: new Float32Array(N), Vv: new Float32Array(N),
     hDone: new Uint8Array(Hh), rows: 0, classes, seed: hash(id + '|cap'),
-    arcs: id === 'europa' ? arcsOf(id, 160) : null, minW: Math.max(pxRad * 0.7, 0.0006),
+    arcs: id === 'europa' ? arcsOf(id, 260) : null, minW: Math.max(pxRad * 0.7, 0.0006),
   };
 }
 
@@ -1456,12 +1578,12 @@ function drawDiscCap(ctx, id, look, cx, cy, r, lb, rq) {
 
 // ------------------------------------------------------------------ Earth limb (ray-traced, cached per altitude bucket)
 
-const LIMB_ALTS = [24, 30, 38, 48, 60, 75, 95, 120, 150, 190, 240, 300, 380, 480, 600, 760, 960, 1200, 1500, 1900, 2400];
+const LIMB_ALTS = [16, 20, 24, 30, 38, 48, 60, 75, 95, 120, 150, 190, 240, 300, 380, 480, 600, 760, 960, 1200, 1500, 1900, 2400];
 const LIMB_CURV = 2.2; // curvature exaggeration (readable horizon arc on a phone)
 const LIMB_SITE = { lat: 28.5, lon: -80.6, head: 90 }; // Cape Canaveral, looking east (downrange)
 
 /** Ray-traces the curved Earth below a camera at altKm into an RGBA buffer (SW×SH, horizon at rowHor). */
-function renderLimb(buf, SW, SH, rowHor, altKm, L3) {
+function renderLimb(buf, SW, SH, rowHor, altKm, L3, j0 = 0, j1 = SH) {
   const m = mapsFor('earth');
   const Re = 6371 / LIMB_CURV, h = Math.max(1, altKm), Rc = Re + h;
   const dip = Math.acos(Re / Rc), tdip = Math.tan(dip);
@@ -1489,7 +1611,10 @@ function renderLimb(buf, SW, SH, rowHor, altKm, L3) {
       let cr = SMP[0] * (1 + det * 0.18), cg = SMP[1] * (1 + det * 0.18), cb = SMP[2] * (1 + det * 0.15);
       const cbase = sample1(cloud, CW, CH, u * (CW / MW), v * (CH / MH));
       const cdet = fbm3(ex * 120 + 3, ey * 120, ez * 120, 3, 93);
-      const cl = sstep(0.2, 0.6, cbase * 0.9 + cdet * 0.6 + 0.16) * (0.75 + 0.25 * sstep(-0.2, 0.3, cdet));
+      // clustered cloud systems: the large-scale map decides where (fronts, ITCZ), the detail only frays the edges
+      // and adds cumulus streets inside, so open ocean stays clear instead of salt-and-pepper speckle
+      const streets = 0.5 + 0.5 * Math.sin((ex * 900 + ez * 300) + cdet * 6);
+      const cl = sstep(0.16, 0.52, cbase * 1.1 + cdet * 0.32 + 0.1) * (0.7 + 0.3 * sstep(-0.2, 0.3, cdet)) * (0.8 + 0.2 * streets);
       const mu0 = nx * L3[0] + ny * L3[1] + nz * L3[2];
       const E = Math.max(0, mu0) * 1.15 + 0.05;
       cr *= E; cg *= E; cb *= E;
@@ -1515,12 +1640,13 @@ function renderLimb(buf, SW, SH, rowHor, altKm, L3) {
     const gl = Math.exp(-Math.max(0, hmin) / 10.5);
     const k = sstep(0, 45, hmin);
     out[0] = lerp(205, 30, k); out[1] = lerp(232, 90, k); out[2] = lerp(255, 225, k);
-    out[3] = clamp(gl * 1.25 + Math.exp(-Math.max(0, hmin) / 38) * 0.18, 0, 1);
+    // feather the sprite's top rows: the glow must fade into the sky gradient, never end in a straight seam
+    out[3] = clamp(gl * 1.25 + Math.exp(-Math.max(0, hmin) / 38) * 0.18, 0, 1) * sstep(0, rowHor * 0.45, fj);
     return false;
   };
   // the limb edge: analytic test of the 4 pixel corners; mixed pixels are supersampled 4×4 (anti-aliased arc)
   const hits = (fi, fj) => { let dx = (fi - SW / 2) / F, dy = -tdip - (fj - rowHor) / F; const dl = Math.hypot(dx, dy, 1); dy /= dl; const bq = Rc * dy; return bq * bq - (Rc * Rc - Re * Re) > 0 && bq < 0; };
-  for (let j = 0; j < SH; j++) {
+  for (let j = j0; j < j1; j++) {
     for (let i = 0; i < SW; i++) {
       const o = (j * SW + i) * 4;
       const c0 = hits(i, j), c1 = hits(i + 1, j), c2 = hits(i, j + 1), c3 = hits(i + 1, j + 1);
@@ -1541,21 +1667,57 @@ function renderLimb(buf, SW, SH, rowHor, altKm, L3) {
 }
 
 const LAST_LIMB = { c: null, sh: 0 };
+function earthLimbGeom(dpr, W, H) {
+  const SW = Math.round(clamp(W * dpr * (dpr > 1.5 ? 0.36 : 0.44), 208, 360) / 16) * 16; // phones: lighter sprite
+  const scale = W / SW;
+  const rowHor = Math.round(SW * 0.2);
+  const SH = Math.ceil((rowHor + (H * 0.34 + 24) / scale) / 32) * 32; // fixed per view: no regen while the horizon moves
+  return { SW, SH, scale, rowHor };
+}
+const earthL3 = (lb) => { const L0 = bucketLight(lb); const sx = L0.ax, sy = -L0.ay, sz = 0.55; const n = Math.hypot(sx, sy, sz); return [sx / n, sy / n, sz / n]; };
+/**
+ * One idle slice of prebuilding what a flight will need (call from requestIdleCallback until it returns true):
+ * Earth maps (async generator), the Earth-limb altitude buckets of the climb, the target body's maps.
+ */
+export function prewarmEarthLimb(dpr, view, altsKm = [], light = SUN) {
+  const W = num(view?.W, 375), H = num(view?.H, 700);
+  if (!buildMapsStep('earth', 8)) return false;
+  const { SW, SH, rowHor } = earthLimbGeom(clamp(num(dpr, 1), 1, 2), W, H);
+  const lb = lightBucket(light), L3 = earthL3(lb);
+  const mver = mapsFor('earth').worldVer || 0;
+  for (const a of altsKm) {
+    const key = `limb|${a}|${SW}|${SH}|${lb}|${mver}`;
+    if (ready(key)) continue;
+    progressive(key, SW, SH, () => (d, j0, j1) => renderLimb(d, SW, SH, rowHor, a, L3, j0, j1), { idle: true, chunk: 4 });
+    return false;
+  }
+  return true;
+}
+/**
+ * One idle slice of prebuilding the small sprites a scene will need (cloud decks for the climb, boulders for a
+ * landing world): builds one sprite per call, returns true when all are cached.
+ */
+export function prewarmSprites({ clouds = false, rocksWorld = null, light = SUN } = {}) {
+  const lb = lightBucket(light);
+  if (clouds) for (const kind of ['cu', 'st', 'ci']) for (let v = 0; v < 4; v++) { if (!CACHE.has(`cloud3|${kind}|${v}|${lb}`)) { cloudSprite(kind, v, lb); return false; } }
+  if (rocksWorld) for (let v = 0; v < 4; v++) { if (!CACHE.has(`rock|${rocksWorld}|${v}|${lb}`)) { rockSprite(rocksWorld, v, lb); return false; } }
+  return true;
+}
+/** One idle slice of building a body's planet maps. */
+export function prewarmMaps(id) { return buildMapsStep(id, 8); }
+export const LIMB_BUCKETS = Object.freeze([16, 20, 24, 30, 38, 48, 60, 75, 95, 120, 150, 190, 240]);
 /** Curved Earth below the camera at altKm. Returns { horizonY } (screen y of the limb at centre). */
 export function drawEarthLimb(ctx, view, { altKm = 0, light = SUN, t = 0, tilt = 0 } = {}) {
   void t; void tilt;
   const W = num(view?.W, 375), H = num(view?.H, 700);
   const alt = Math.max(0, num(altKm));
-  if (alt < 22) return { horizonY: H * 2 };
+  if (alt < 14) return { horizonY: H * 2 };
   ensureWorld();
-  const k = sstep(22, 115, alt);
-  const horizonY = lerp(H * 1.06, H * 0.66, k);
-  const fadeIn = sstep(22, 42, alt);
-  const dpr = devScale(ctx);
-  const SW = Math.round(clamp(W * dpr * 0.44, 224, 400) / 16) * 16;
-  const scale = W / SW;
-  const rowHor = Math.round(SW * 0.2);
-  const SH = Math.ceil((rowHor + (H * 0.34 + 24) / scale) / 32) * 32; // fixed per view: no regen while the horizon moves
+  // the curved horizon rises into the bottom of the frame from ~15 km (thin blue limb) and settles at 2/3 by orbit
+  const k = sstep(14, 115, alt);
+  const horizonY = lerp(H * 1.0, H * 0.66, k);
+  const fadeIn = sstep(14, 30, alt);
+  const { SW, SH, scale, rowHor } = earthLimbGeom(devScale(ctx), W, H);
   const lb = lightBucket(light);
   const L0 = bucketLight(lb);
   const L3 = (() => { const sx = L0.ax, sy = -L0.ay, sz = 0.55; const n = Math.hypot(sx, sy, sz); return [sx / n, sy / n, sz / n]; })();
@@ -1565,16 +1727,18 @@ export function drawEarthLimb(ctx, view, { altKm = 0, light = SUN, t = 0, tilt =
   const i0 = Math.max(0, i1 - 1);
   const a0 = LIMB_ALTS[i0], a1 = LIMB_ALTS[i1];
   const wgt = a1 === a0 ? 0 : clamp(Math.log(alt / a0) / Math.log(a1 / a0), 0, 1);
-  const spr = (a, d = false) => (d ? lazy : cached)(`limb|${a}|${SW}|${SH}|${lb}|${WORLD.ver}`, SW, SH, (g) => { const img = g.createImageData(SW, SH); renderLimb(img.data, SW, SH, rowHor, a, L3); g.putImageData(img, 0, 0); });
+  const mver = mapsFor('earth').worldVer || 0;
+  // ray-traced progressively (≤ ~7 ms per frame while live); until ready the last sprite (or a gradient) stands in
+  const spr = (a) => progressive(`limb|${a}|${SW}|${SH}|${lb}|${mver}`, SW, SH, () => (d, j0, j1) => renderLimb(d, SW, SH, rowHor, a, L3, j0, j1), { chunk: 4 });
   const top = horizonY - rowHor * scale;
   ctx.save();
   ctx.imageSmoothingEnabled = true;
-  let s0 = spr(a0, !!LAST_LIMB.c);
+  let s0 = spr(a0);
   if (s0) LAST_LIMB.c = s0; else if (LAST_LIMB.c && LAST_LIMB.c.width === SW) s0 = LAST_LIMB.c;
   if (s0) {
     ctx.globalAlpha = fadeIn;
     ctx.drawImage(s0, 0, top, W, s0.height * scale);
-    if (wgt > 0.02 && a1 !== a0) { const s1 = spr(a1, true); if (s1) { ctx.globalAlpha = fadeIn * wgt; ctx.drawImage(s1, 0, top, W, s1.height * scale); } }
+    if (wgt > 0.02 && a1 !== a0) { const s1 = spr(a1); if (s1) { ctx.globalAlpha = fadeIn * wgt; ctx.drawImage(s1, 0, top, W, s1.height * scale); } }
     const bot = top + s0.height * scale;
     if (bot < H) { ctx.globalAlpha = fadeIn; ctx.fillStyle = '#123a5e'; ctx.fillRect(0, bot - 1, W, H - bot + 2); }
   } else {
@@ -1584,6 +1748,248 @@ export function drawEarthLimb(ctx, view, { altKm = 0, light = SUN, t = 0, tilt =
   }
   ctx.restore();
   return { horizonY };
+}
+
+// ------------------------------------------------------------------ progressive textures (row jobs, ≤ ~7 ms per frame)
+
+const PJOBS = new Map(); // key -> { c, g, img, rows, H, W, rowsFn }
+let PJ_SPENT = 0, PJ_WIN = -1e9;
+const PJ_BUDGET = 7;
+/**
+ * A texture painted row by row: make() returns rowsFn(data, j0, j1, w, h), which fills rows [j0, j1) of an RGBA
+ * buffer. While a live animation runs, all jobs together advance at most ~7 ms per frame and this returns null
+ * until the texture is complete; a one-off draw (tests, screenshots) builds it at once. `idle` = called from an
+ * idle callback (prewarm): one ~8 ms slice. Finished canvases go into the LRU cache under `key`.
+ */
+function progressive(key, w, h, make, { idle = false, chunk = 8 } = {}) {
+  const hit = CACHE.get(key);
+  if (hit) { CACHE.delete(key); CACHE.set(key, hit); return hit.canvas; }
+  let job = PJOBS.get(key);
+  if (!job) {
+    const c = makeCanvas(w, h);
+    const g = c && c.getContext('2d');
+    if (!g) return null;
+    let rowsFn = null;
+    try { rowsFn = make(); } catch (e) { console.error('launch-render progressive', key, e); return null; }
+    job = { c, g, img: g.createImageData(c.width, c.height), rows: 0, H: c.height, W: c.width, rowsFn };
+    PJOBS.set(key, job);
+  }
+  const live = liveFrames >= 3;
+  const t0 = nowMs();
+  if (t0 - PJ_WIN > 12) PJ_SPENT = 0;
+  const limit = idle ? 8 : live ? Math.max(0.5, PJ_BUDGET - PJ_SPENT) : Infinity;
+  while (job.rows < job.H) {
+    const n = Math.min(job.H - job.rows, chunk);
+    try { job.rowsFn(job.img.data, job.rows, job.rows + n, job.W, job.H); } catch (e) { console.error('launch-render progressive', key, e); job.rows = job.H; break; }
+    job.rows += n;
+    if (nowMs() - t0 >= limit) break;
+  }
+  if (!idle && live) { PJ_SPENT += nowMs() - t0; PJ_WIN = nowMs(); }
+  if (job.rows < job.H) return null;
+  job.g.putImageData(job.img, 0, 0);
+  PJOBS.delete(key);
+  const bytes = job.W * job.H * 4;
+  CACHE.set(key, { canvas: job.c, bytes });
+  cacheBytes += bytes;
+  for (const [k, v] of CACHE) { if (cacheBytes <= CACHE_BUDGET || k === key) break; CACHE.delete(k); cacheBytes -= v.bytes; }
+  return job.c;
+}
+const ready = (key) => CACHE.has(key);
+
+// ------------------------------------------------------------------ curved limb of a landing world (suborbital view)
+
+/** Mean radii (km) of landing worlds. The limb view shrinks big bodies so the curvature reads on a phone. */
+const BODY_RKM = { moon: 1737, mars: 3390, mercury: 2440, europa: 1561, titan: 2575, venus: 6052, ganymede: 2634, callisto: 2410, io: 1822, enceladus: 252, triton: 1353, pluto: 1188, charon: 606, ceres: 470, vesta: 263, phobos: 11, deimos: 6, generic: 1500 };
+/** Landing site under the descent (lat, lon deg, body map coordinates): Tranquility Base, Jezero, ... */
+const BODY_SITE = { moon: [0.7, 23.5], mars: [18.4, 77.5], mercury: [10, 20], europa: [5, 180], titan: [-10, 165], io: [5, 10], ganymede: [10, 0], callisto: [10, 0] };
+const BLIMB_ALTS = [2, 3, 4.5, 7, 10, 15, 22, 33, 50, 75, 110, 160, 240, 360];
+/** Atmospheric haze per world: k (vertical optical depth), scale height (km), haze and limb-glow colours. */
+const BODY_AIR = {
+  mars: { k: 0.2, Hs: 11, col: [206, 152, 106], glow: [222, 172, 122] },
+  titan: { k: 1.6, Hs: 40, col: [204, 146, 68], glow: [222, 160, 80] },
+  venus: { k: 2.5, Hs: 16, col: [230, 205, 150], glow: [240, 220, 170] },
+};
+
+function bodyLimbRows(world, a, SW, SH, rowHor, L3, F) {
+  const id = BODY_LOOK[world] ? world : 'generic';
+  const look = BODY_LOOK[id];
+  const m = mapsFor(id);
+  const Rb = BODY_RKM[id] || 1500;
+  const Re = Math.min(Rb, 900 + Rb * 0.1); // displayed radius (km): curvature exaggeration for big worlds
+  const scaleK = Rb / Re;
+  const h = Math.max(0.5, a), Rc = Re + h;
+  const dip = Math.acos(Re / Rc), tdip = Math.tan(dip);
+  const site = BODY_SITE[id] || [0, 0];
+  const up0 = unitOf(site[0], site[1]), la = site[0] * D2R, lo = site[1] * D2R;
+  const east0 = [Math.cos(lo), 0, -Math.sin(lo)], north0 = [-Math.sin(la) * Math.sin(lo), Math.cos(la), -Math.sin(la) * Math.cos(lo)];
+  const { w: MW, h: MH, col } = m;
+  const air = BODY_AIR[id] || null;
+  const fam = terrainFamily(id);
+  const dens = look.craters ?? 0.3;
+  // crater classes (cell = radians on the real body): a class only shows where its craters span a few pixels, so
+  // the far field never aliases into stripes and the near field still gets small craters (power-law population)
+  const base = fam === 'lunar' || fam === 'rubble' ? 1 : fam === 'mars' ? 0.5 : fam === 'ice' ? 0.22 : 0.06;
+  const CL = [0.03, 0.015, 0.0075, 0.0037, 0.0019, 0.00095, 0.00048, 0.00024, 0.00012]
+    .map((cell, i) => [{ cell, p: Math.min(0.8, (0.32 + i * 0.06) * dens * base * 1.3), depth: fam === 'mars' ? 0.2 : 0.38, fresh: 2 + (i > 4 ? 1 : 0) }]);
+  const seed = hash(id + '|blimb');
+  const N = SW * SH;
+  const Hs = new Float32Array(N), FP = new Float32Array(N), CV = new Float32Array(N), AB = new Float32Array(N);
+  const NX = new Float32Array(N), NY = new Float32Array(N), NZ = new Float32Array(N), BC = new Float32Array(N * 3);
+  const done = new Uint8Array(SH);
+  const haze = air ? (1 - Math.exp(-h / air.Hs) * 0.4) : 0;
+  const pass1 = (j) => {
+    if (done[j]) return;
+    done[j] = 1;
+    for (let i = 0; i < SW; i++) {
+      const k = j * SW + i;
+      let dx = (i + 0.5 - SW / 2) / F, dy = -tdip - (j + 0.5 - rowHor) / F, dz = 1;
+      const dl = Math.hypot(dx, dy, dz); dx /= dl; dy /= dl; dz /= dl;
+      const bq = Rc * dy, disc = bq * bq - (Rc * Rc - Re * Re);
+      if (!(disc > 0 && -bq - Math.sqrt(disc) > 0)) {
+        FP[k] = -1;
+        const tc = -bq; let hmin = h;
+        if (tc > 0) { const qx = tc * dx, qy = Rc + tc * dy, qz = tc * dz; hmin = Math.hypot(qx, qy, qz) - Re; }
+        CV[k] = hmin;
+        continue;
+      }
+      const t = -bq - Math.sqrt(disc);
+      const nx = (t * dx) / Re, ny = (Rc + t * dy) / Re, nz = (t * dz) / Re;
+      NX[k] = nx; NY[k] = ny; NZ[k] = nz;
+      const cosv = Math.max(0.02, -(nx * dx + ny * dy + nz * dz));
+      CV[k] = cosv;
+      // camera frame (x = south, y = up, z = east, as the Earth limb) → body map space
+      const ex = up0[0] * ny + east0[0] * nz - north0[0] * nx, ey = up0[1] * ny + east0[1] * nz - north0[1] * nx, ez = up0[2] * ny + east0[2] * nz - north0[2] * nx;
+      const lat = Math.asin(clamp(ey, -1, 1)), lon = Math.atan2(ex, ez);
+      sample3(col, MW, MH, (lon / TAU + 0.5) * MW, (0.5 - lat / Math.PI) * MH);
+      BC[k * 3] = SMP[0]; BC[k * 3 + 1] = SMP[1]; BC[k * 3 + 2] = SMP[2];
+      const fp = t / (F * Re); // radians of the displayed sphere per pixel (across)
+      FP[k] = fp;
+      const fpReal = (fp / cosv) / scaleK; // ... of the real body, along the line of sight (worst case)
+      // the crater chart is anchored on the site: (east, north) offsets from it in radians of the real body
+      const u = (nz) / scaleK, v = (-nx) / scaleK;
+      let hh = 0, ab = 0;
+      for (let c = 0; c < CL.length; c++) {
+        const C = CL[c][0];
+        const wgt = sstep(1.5, 5, (C.cell * 0.3) / fpReal);
+        if (wgt < 0.02) continue;
+        craterSum(u, v, CL[c], seed + c * 7, 1);
+        hh += CR.h * wgt; ab += CR.b * wgt;
+      }
+      const g1 = sstep(1.5, 5, 0.0006 / fpReal), g2 = sstep(1.5, 5, 0.00008 / fpReal);
+      if (g1 > 0) hh += gn3(u * 2600, v * 2600, 0.5, seed + 3) * 0.00012 * g1;
+      if (g2 > 0) hh += gn3(u * 16000, v * 16000, 1.5, seed + 4) * 0.000022 * g2;
+      if (fam === 'mars') ab += fbm3(ex * 160, ey * 160, ez * 160, 3, seed + 9) * 0.22;
+      else if (fam === 'ice') { const cr = Math.abs(fbm3(ex * 60, ey * 60, ez * 60, 3, seed + 11)); ab -= (1 - sstep(0.0, 0.035, cr)) * 0.35; }
+      else {
+        ab += fbm3(ex * 220, ey * 220, ez * 220, 3, seed + 12) * 0.08;
+        if (fam === 'lunar') { const mp = fbm3(ex * 22, ey * 22, ez * 22, 5, seed + 13); ab -= sstep(0.06, 0.13, mp) * 0.32; } // mare flows: dark, sharp-edged
+      }
+      Hs[k] = hh; AB[k] = ab;
+    }
+  };
+  return (d, j0, j1) => {
+    for (let j = Math.max(0, j0 - 1); j < Math.min(SH, j1 + 1); j++) pass1(j);
+    for (let j = j0; j < j1; j++) {
+      for (let i = 0; i < SW; i++) {
+        const k = j * SW + i, o = k * 4;
+        if (FP[k] < 0) { // sky above the limb: the thin atmosphere glows (airless worlds: nothing)
+          if (!air) { d[o + 3] = 0; continue; }
+          const al = clamp(Math.exp(-Math.max(0, CV[k]) / (air.Hs * 1.3)) * 1.05, 0, 1);
+          d[o] = air.glow[0]; d[o + 1] = air.glow[1]; d[o + 2] = air.glow[2]; d[o + 3] = 255 * al;
+          continue;
+        }
+        const fp = FP[k] / scaleK, cosv = CV[k];
+        const kl = i > 0 && FP[k - 1] >= 0 ? k - 1 : k, kr = i < SW - 1 && FP[k + 1] >= 0 ? k + 1 : k;
+        const ku = j > 0 && FP[k - SW] >= 0 ? k - SW : k, kd = j < SH - 1 && FP[k + SW] >= 0 ? k + SW : k;
+        const Hx = kr === kl ? 0 : (Hs[kr] - Hs[kl]) / ((kr - kl) * fp);
+        const Hf = kd === ku ? 0 : -(Hs[kd] - Hs[ku]) / ((((kd - ku) / SW) * fp) / cosv);
+        const nx = NX[k], ny = NY[k], nz = NZ[k];
+        let tx = 1 - nx * nx, ty = -nx * ny, tz = -nx * nz; let tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+        let fx = -nz * nx, fy = -nz * ny, fz = 1 - nz * nz; tl = Math.hypot(fx, fy, fz) || 1; fx /= tl; fy /= tl; fz /= tl;
+        const g1 = clamp(Hx, -2.5, 2.5), g2 = clamp(Hf, -2.5, 2.5);
+        let mx = nx - g1 * tx - g2 * fx, my = ny - g1 * ty - g2 * fy, mz = nz - g1 * tz - g2 * fz;
+        const ml = Math.hypot(mx, my, mz) || 1; mx /= ml; my /= ml; mz /= ml;
+        const m0 = Math.max(0, mx * L3[0] + my * L3[1] + mz * L3[2]);
+        const flat = nx * L3[0] + ny * L3[1] + nz * L3[2];
+        let E = air ? Math.pow(m0, 0.9) * 1.1 + 0.1 : (1.25 * m0 / (m0 + cosv * 0.85 + 0.04) + 0.3 * m0) * sstep(-0.05, 0.08, flat);
+        E += 0.025;
+        const alb = clamp(1 + AB[k], 0.4, 1.6);
+        let cr = BC[k * 3] * E * alb, cg = BC[k * 3 + 1] * E * alb, cb = BC[k * 3 + 2] * E * alb;
+        if (air) {
+          const hz = 1 - Math.exp(-air.k * haze * Math.min(14, 0.4 + 1 / cosv));
+          cr = lerp(cr, air.col[0], hz); cg = lerp(cg, air.col[1], hz); cb = lerp(cb, air.col[2], hz);
+        }
+        d[o] = cr > 255 ? 255 : cr; d[o + 1] = cg > 255 ? 255 : cg; d[o + 2] = cb > 255 ? 255 : cb; d[o + 3] = 255;
+      }
+    }
+  };
+}
+
+const LAST_BLIMB = new Map(); // world -> last complete sprite (shown while the next altitude bucket builds)
+/** Sprite geometry for the body limb (fixed per view: altitude changes never resize it). */
+function blimbGeom(ctx, W, H, horizonY) {
+  const dpr = devScale(ctx);
+  const SW = Math.round(clamp(W * dpr * (dpr > 1.5 ? 0.42 : 0.6), 192, 336) / 16) * 16;
+  const scale = W / SW;
+  const rowHor = Math.round(SW * 0.16);
+  const SH = Math.ceil((rowHor + (H - horizonY + 4) / scale) / 16) * 16;
+  return { SW, SH, scale, rowHor, F: (SW / 2) / Math.tan((70 * D2R) / 2) }; // wide lens: the limb visibly arcs
+}
+const blimbKey = (world, a, g, lb) => `blimb|${world}|${a}|${g.SW}|${g.SH}|${lb}`;
+function blimbL3(lb) { const L0 = bucketLight(lb); const v = [L0.ax, 0.5, 0.3]; const n = Math.hypot(v[0], v[1], v[2]); return [v[0] / n, v[1] / n, v[2] / n]; }
+const nearestBucket = (a) => BLIMB_ALTS.reduce((p, q) => (Math.abs(Math.log(q / a)) < Math.abs(Math.log(p / a)) ? q : p), BLIMB_ALTS[0]);
+
+/**
+ * Curved world seen from altitude during a descent (above ~3 km): the body's map with craters and albedo, real
+ * (exaggerated) curvature, and a haze band for atmospheres (Mars butterscotch, Titan orange). horizonY = screen y
+ * of the limb at the centre; alpha cross-fades with the perspective terrain. Returns true when drawn.
+ */
+export function drawBodyLimb(ctx, view, world, { altKm = 0, light = SUN, horizonY, alpha = 1 } = {}) {
+  tick();
+  const W = num(view?.W, 375), H = num(view?.H, 700);
+  if (!(alpha > 0.01) || world === 'earth') return false;
+  const hy = num(horizonY, H * 0.62);
+  const g = blimbGeom(ctx, W, H, hy);
+  const lb = lightBucket(light);
+  const alt = clamp(num(altKm), BLIMB_ALTS[0], BLIMB_ALTS[BLIMB_ALTS.length - 1]);
+  let i1 = BLIMB_ALTS.findIndex((a) => a >= alt); if (i1 < 0) i1 = BLIMB_ALTS.length - 1;
+  const i0 = Math.max(0, i1 - 1), a0 = BLIMB_ALTS[i0], a1 = BLIMB_ALTS[i1];
+  const wgt = a1 === a0 ? 0 : clamp(Math.log(alt / a0) / Math.log(a1 / a0), 0, 1);
+  const L3 = blimbL3(lb);
+  const spr = (a) => progressive(blimbKey(world, a, g, lb), g.SW, g.SH, () => bodyLimbRows(world, a, g.SW, g.SH, g.rowHor, L3, g.F), { chunk: 4 });
+  // the nearer bucket first; the other one once the first is done and the blend actually needs it
+  const near = wgt < 0.5 ? a0 : a1, other = near === a0 ? a1 : a0;
+  const sN = spr(near);
+  const sO = sN && (ready(blimbKey(world, other, g, lb)) || (wgt > 0.1 && wgt < 0.9)) ? spr(other) : null;
+  const s0 = near === a0 ? sN : sO, s1 = near === a1 ? sN : sO;
+  const top = hy - g.rowHor * g.scale;
+  const fb = LAST_BLIMB.get(world);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  try { ctx.imageSmoothingQuality = 'high'; } catch { /* old */ }
+  let drew = false;
+  const blit = (c, a) => { if (!c || a <= 0.003) return; ctx.globalAlpha = alpha * a; ctx.drawImage(c, 0, top, W, c.height * g.scale); drew = true; };
+  if (s0 && s1) { blit(s0, 1); blit(s1, wgt); } else if (s0 || s1) blit(s0 || s1, 1);
+  else if (fb && fb.width === g.SW && fb.height === g.SH) blit(fb, 1);
+  if (sN) LAST_BLIMB.set(world, sN);
+  ctx.restore();
+  return drew;
+}
+
+/** One idle slice of prebuilding the limb sprites a descent will need. Returns true when all are ready. */
+export function prewarmBodyLimb(ctx, view, world, altsKm = [], light = SUN, horizonFrac = 0.62) {
+  if (world === 'earth') return true;
+  const W = num(view?.W, 375), H = num(view?.H, 700);
+  const g = blimbGeom(ctx, W, H, H * horizonFrac);
+  const lb = lightBucket(light), L3 = blimbL3(lb);
+  for (const a of altsKm) {
+    const b = nearestBucket(Math.max(BLIMB_ALTS[0], a));
+    const key = blimbKey(world, b, g, lb);
+    if (ready(key)) continue;
+    progressive(key, g.SW, g.SH, () => bodyLimbRows(world, b, g.SW, g.SH, g.rowHor, L3, g.F), { idle: true, chunk: 4 });
+    return false;
+  }
+  return true;
 }
 
 // ------------------------------------------------------------------ sky
@@ -1628,6 +2034,22 @@ export function skyColors(world, altKm, { sunElev = 0.5, weather = null } = {}) 
   return { zenith: '#000000', mid: '#000000', horizon: '#020308', haze: 'rgba(0,0,0,0)', starAlpha: 1 };
 }
 
+/** The sun in black space: a small white disc with a tight bloom (no wide haze). */
+function drawSunDisc(ctx, x, y, k = 1) {
+  if (!(k > 0.01)) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 0, x, y, 30);
+  g.addColorStop(0, `rgba(255,252,240,${(0.9 * k).toFixed(3)})`);
+  g.addColorStop(0.16, `rgba(255,246,226,${(0.55 * k).toFixed(3)})`);
+  g.addColorStop(0.4, `rgba(255,236,200,${(0.08 * k).toFixed(3)})`);
+  g.addColorStop(1, 'rgba(255,236,200,0)');
+  ctx.fillStyle = g; ctx.fillRect(x - 30, y - 30, 60, 60);
+  ctx.fillStyle = `rgba(255,255,252,${k.toFixed(3)})`;
+  ctx.beginPath(); ctx.arc(x, y, 3.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
 /** Full-screen sky: gradient, horizon haze and a soft sun glare (opts.light). */
 export function drawSky(ctx, view, world, altKm, opts = {}) {
   tick();
@@ -1649,11 +2071,16 @@ export function drawSky(ctx, view, world, altKm, opts = {}) {
     const warm = world === 'mars' ? [190, 205, 230] : world === 'titan' ? [255, 200, 120] : [255, 236, 200];
     const gl = ctx.createRadialGradient(sx, sy, 0, sx, sy, rad);
     const ov = opts.weather && num(opts.weather.risk) > 60 ? 0.4 : 1;
-    gl.addColorStop(0, `rgba(${warm[0]},${warm[1]},${warm[2]},${(0.42 * ov * (1 - thin * 0.4)).toFixed(3)})`);
-    gl.addColorStop(0.25, `rgba(${warm[0]},${warm[1]},${warm[2]},${(0.14 * ov).toFixed(3)})`);
-    gl.addColorStop(1, `rgba(${warm[0]},${warm[1]},${warm[2]},0)`);
-    ctx.fillStyle = gl; ctx.fillRect(-40, -40, W + 80, H + 80);
-  }
+    // the scattering glare only exists in air: it fades out above ~35 km (no grey smudge on black space)
+    const airK = world === 'earth' ? 1 - sstep(30, 65, alt) : 1 - sstep(25, 60, alt);
+    if (airK > 0.01) {
+      gl.addColorStop(0, `rgba(${warm[0]},${warm[1]},${warm[2]},${(0.42 * ov * (1 - thin * 0.4) * airK).toFixed(3)})`);
+      gl.addColorStop(0.25, `rgba(${warm[0]},${warm[1]},${warm[2]},${(0.14 * ov * airK).toFixed(3)})`);
+      gl.addColorStop(1, `rgba(${warm[0]},${warm[1]},${warm[2]},0)`);
+      ctx.fillStyle = gl; ctx.fillRect(-40, -40, W + 80, H + 80);
+    }
+    if (airK < 0.99) drawSunDisc(ctx, sx, sy, 1 - airK);
+  } else drawSunDisc(ctx, W * (0.5 + num(light.ax) * 0.62), H * (0.42 + num(light.ay) * 0.5), 1);
   return s;
 }
 
@@ -1733,7 +2160,7 @@ export function drawStarfield(ctx, view, { alpha = 1, drift = 0, t = 0, seed = 1
  */
 function cloudSprite(kind, variant, lb) {
   const W = kind === 'ci' ? 384 : 320, H = kind === 'ci' ? 84 : kind === 'st' ? 130 : 186;
-  return lazy(`cloud2|${kind}|${variant}|${lb}`, W, H, (c) => {
+  return lazy(`cloud3|${kind}|${variant}|${lb}`, W, H, (c) => {
     const R = rng(hash(`cloud${kind}${variant}`));
     const D = new Float32Array(W * H);
     const L = bucketLight(lb);
@@ -1745,19 +2172,23 @@ function cloudSprite(kind, variant, lb) {
       for (let i = 0; i < nBig; i++) { const px = W * (0.16 + (i + R() * 0.8) / nBig * 0.68), pr = H * (0.12 + R() * 0.08) * (1 - Math.abs(px / W - 0.5) * 1.1); puffs.push([px, base - pr * 0.7, pr]); }
       for (let i = 0; i < 4; i++) { const px = W * (0.36 + R() * 0.28), pr = H * (0.13 + R() * 0.08); puffs.push([px, base - pr * (1.4 + R() * 0.9), pr]); }
       for (let i = 0; i < 22; i++) { const p = puffs[Math.floor(R() * puffs.length)], a = -Math.PI * (0.1 + R() * 0.8); const pr = p[2] * (0.3 + R() * 0.35); puffs.push([p[0] + Math.cos(a) * p[2] * 0.85, Math.min(base - pr * 0.5, p[1] + Math.sin(a) * p[2] * 0.85), pr]); }
-      const G = 2, gw = W / G, gh = H / G, coarse = new Float32Array(gw * gh);
+      const G = 2, gw = W / G, gh = H / G, coarse = new Float32Array(gw * gh), coarseN = new Float32Array(gw * gh);
       for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
         let d = 0; const X = x * G, Y = y * G;
         for (const p of puffs) { const dx = (X - p[0]) / p[2], dy = (Y - p[1]) / p[2]; const q = dx * dx + dy * dy; if (q < 4) d = Math.max(d, 1 - q * 0.42) + Math.max(0, 0.25 - q * 0.1); }
         coarse[y * gw + x] = d;
+        coarseN[y * gw + x] = pfbm(X / 60, Y / 60, 64, 64, 3, sd + 7); // low-frequency term: coarse grid is enough
       }
+      const bnCol = new Float32Array(W); // base raggedness depends on x only: one evaluation per column
+      for (let x = 0; x < W; x++) bnCol[x] = pfbm(x / 26, 0.5, 32, 1, 3, sd + 11) * 16 + pfbm(x / 7, 0.5, 64, 1, 2, sd + 12) * 5;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const d0 = sample1(coarse, gw, gh, x / G + 0.5, y / G + 0.5);
         const bil = 1 - Math.abs(pfbm(x / 22, y / 22, 64, 64, 4, sd));
-        const n2 = pfbm(x / 60, y / 60, 64, 64, 3, sd + 7);
+        const n2 = sample1(coarseN, gw, gh, x / G + 0.5, y / G + 0.5);
         const edge = sstep(0, 0.12, x / W) * sstep(1, 0.88, x / W) * sstep(0, 0.1, y / H);
-        const bn = pfbm(x / 26, 0.5, 32, 1, 3, sd + 11) * 9 + pfbm(x / 7, 0.5, 64, 1, 2, sd + 12) * 3; // ragged base line
-        D[y * W + x] = (d0 + (bil - 0.6) * 0.55 + n2 * 0.2) * sstep(base + 9 + bn, base - 10 + bn, y) * edge;
+        const bn = bnCol[x]; // ragged, slightly lumpy base
+        const ero = pfbm(x / 9, y / 9, 64, 64, 3, sd + 17); // fine erosion: wispy, fraying margins
+        D[y * W + x] = (d0 + (bil - 0.6) * 0.6 + n2 * 0.22 + ero * 0.22 * (1 - Math.min(1, d0))) * sstep(base + 12 + bn, base - 12 + bn, y) * edge;
       }
     } else if (kind === 'ci') {
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -1775,33 +2206,42 @@ function cloudSprite(kind, variant, lb) {
         const px = W * (0.06 + gx * 0.88), pr = H * (0.1 + R() * 0.16) * (1 - Math.abs(gx - 0.5) * 0.9);
         puffs.push([px, H * (0.62 - R() * 0.22) - pr * 0.3, pr]);
       }
-      const G = 2, gw = W / G, gh = H / G, coarse = new Float32Array(gw * gh);
+      const G = 2, gw = W / G, gh = H / G, coarse = new Float32Array(gw * gh), coarseN = new Float32Array(gw * gh);
       for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
         let d = 0; const X = x * G, Y = y * G;
         for (const p of puffs) { const dx = (X - p[0]) / p[2], dy = (Y - p[1]) / (p[2] * 0.8); const q = dx * dx + dy * dy; if (q < 5) d += Math.exp(-q * 1.5) * 0.55; }
         coarse[y * gw + x] = d;
+        coarseN[y * gw + x] = pfbm(X / 70, Y / 50, 16, 16, 3, sd + 10);
       }
       const base = H * 0.74;
+      const bnCol = new Float32Array(W);
+      for (let x = 0; x < W; x++) bnCol[x] = pfbm(x / 30, 0.5, 32, 1, 3, sd + 13) * 13 + pfbm(x / 8, 0.5, 64, 1, 2, sd + 14) * 4;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const d0 = sample1(coarse, gw, gh, x / G + 0.5, y / G + 0.5);
         const bil = 1 - Math.abs(pfbm(x / 30, y / 24, 32, 32, 4, sd + 9));
-        const n2 = pfbm(x / 70, y / 50, 16, 16, 3, sd + 10);
-        const bn = pfbm(x / 30, 0.5, 32, 1, 3, sd + 13) * 7;
+        const n2 = sample1(coarseN, gw, gh, x / G + 0.5, y / G + 0.5);
+        const bn = bnCol[x];
         const edge = sstep(0, 0.1, x / W) * sstep(1, 0.9, x / W) * sstep(0, 0.12, y / H);
-        D[y * W + x] = (d0 + (bil - 0.55) * 0.4 + n2 * 0.18) * sstep(base + 8 + bn, base - 8 + bn, y) * edge;
+        const ero = pfbm(x / 8, y / 8, 64, 64, 3, sd + 19);
+        D[y * W + x] = (d0 + (bil - 0.55) * 0.5 + n2 * 0.22 + ero * 0.25 * (1 - Math.min(1, d0))) * sstep(base + 10 + bn, base - 10 + bn, y) * edge;
       }
     }
     const img = c.createImageData(W, H), d = img.data;
     const ln = Math.hypot(L.ax, L.ay) || 1, sx = (L.ax / ln) * 3, sy = (L.ay / ln) * 3;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const k = y * W + x, den = D[k];
-      const al = kind === 'cu' ? sstep(0.42, 0.62, den) : kind === 'ci' ? clamp(den * 0.85, 0, 0.75) : sstep(0.3, 0.62, den) * 0.92;
+      const al = kind === 'cu' ? sstep(0.3, 0.7, den) * (0.75 + 0.25 * sstep(0.55, 0.8, den)) : kind === 'ci' ? clamp(den * 0.85, 0, 0.75) : sstep(0.22, 0.66, den) * (0.7 + 0.22 * sstep(0.5, 0.8, den));
       if (al <= 0.004) continue;
       let occ = 0;
       for (let s = 1; s <= 8; s++) { const xx = Math.round(x + sx * s * s * 0.5), yy = Math.round(y + sy * s * s * 0.5); if (xx >= 0 && yy >= 0 && xx < W && yy < H) occ += Math.max(0, D[yy * W + xx] - 0.35); else break; }
       const T = Math.exp(-occ * (kind === 'ci' ? 0.3 : 1.5));
       let lum = 0.36 + 0.68 * T;
-      if (kind === 'cu') lum *= lerp(0.62, 1, sstep(H * 0.84, H * 0.4, y));
+      if (kind === 'st') { lum = 0.34 + 0.72 * T; lum *= lerp(0.62, 1, sstep(H * 0.76, H * 0.36, y)); lum *= 0.9 + 0.15 * (pfbm(x / 16, y / 12, 32, 32, 2, sd + 29) * 0.5 + 0.5); }
+      if (kind === 'cu') { // sunlit cauliflower tops, blue-grey shadowed core and base, billow-scale variation
+        lum = 0.3 + 0.78 * T;
+        lum *= lerp(0.55, 1, sstep(H * 0.86, H * 0.38, y));
+        lum *= 0.9 + 0.16 * (pfbm(x / 14, y / 14, 64, 32, 2, sd + 23) * 0.5 + 0.5);
+      }
       lum += (1 - sstep(0.42, 0.55, den)) * 0.12 * T; // silver lining at thin edges
       lum = clamp(lum, 0, 1.06);
       const o = k * 4;
@@ -2060,12 +2500,14 @@ function terrainTile(world, level, lb) {
     const Hf = new Float32Array(S * S), A = new Float32Array(S * S);
     const P = S / 64; // periodic noise period in lattice cells at base frequency
     const nCr = { mega: 26, macro: 60, fine: 45 }[level];
-    const crR = { mega: [3, 46], macro: [3, 40], fine: [2.5, 26] }[level];
+    const crR = { mega: [3, 46], macro: [3, fam === 'lunar' ? 22 : 40], fine: [2.5, 26] }[level]; // lunar macro: no big crescent shadows (they smear into dark ribbons in perspective)
     const craterK = fam === 'lunar' ? 1 : fam === 'rubble' ? 0.7 : fam === 'mars' ? 0.45 : fam === 'ice' ? 0.25 : fam === 'io' ? 0.08 : 0.06;
     for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
       const k = j * S + i, u = i / 64, v = j / 64;
       const n = pfbm(u, v, P, P, 5, seed), n2 = pfbm(u * 4, v * 4, P * 4, P * 4, 3, seed + 3);
-      Hf[k] = n * 6 + n2 * 1.2;
+      // broad relief stays low on the macro overlay: cast shadows of a smooth fbm height field read as dark
+      // meandering swaths ("painted rivers") once stretched by the perspective; craters carry the relief instead
+      Hf[k] = n * (level !== 'fine' && fam !== 'mars' ? 1.6 : 6) + n2 * 1.2;
       A[k] = n * 0.18 + n2 * 0.08;
       if (fam === 'mars' && level !== 'mega') { // aeolian ripples
         const rip = Math.sin((i + pfbm(u, v, P, P, 3, seed + 5) * 30) * (TAU / (level === 'fine' ? 22 : 14)));
@@ -2076,9 +2518,9 @@ function terrainTile(world, level, lb) {
       if (fam === 'io') { A[k] += sstep(0.1, 0.3, n) * 0.3 - sstep(-0.3, -0.45, n) * 0.4; Hf[k] *= 0.4; }
     }
     const dens = (x, y) => 0.5 + 0.5 * pfbm(x / 64, y / 64, P, P, 2, seed + 21); // 0..1 crater-density mask
-    const want = Math.round(nCr * craterK * (level === 'mega' ? 0.55 : 1.6));
+    const want = Math.round(nCr * craterK * (level === 'mega' ? 0.7 : 2.6));
     for (let i = 0, tries = 0; i < want && tries < want * 6; tries++) {
-      const r = crR[0] * Math.pow(crR[1] / crR[0], Math.pow(R(), level === 'mega' ? 3.2 : 2.6));
+      const r = crR[0] * Math.pow(crR[1] / crR[0], Math.pow(R(), level === 'mega' ? 3.6 : 4.2)); // steep power law: many small, few large
       const cx = R() * S, cy = R() * S;
       if (R() > Math.pow(sstep(0.25, 0.8, dens(cx, cy)), 1.5) * 0.95 + 0.05) continue;
       i++;
@@ -2099,8 +2541,17 @@ function terrainTile(world, level, lb) {
       const pal = mkRamp(look.palette.map((cc, i) => [i / (look.palette.length - 1), cc]));
       const mid = fam === 'lunar' ? 0.55 : fam === 'ice' ? 0.82 : 0.5;
       const AL = new Float32Array(S * S);
-      for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) AL[j * S + i] = pfbm(i / 128, j / 128, S / 128, S / 128, 4, seed + 31);
-      shadeTile(c, S, Hf, A, lb, { relief: 0.2, shadows, ambient: Math.max(ambient, 0.25), colorFn: (k, a, out) => ramp(pal, clamp(mid + a * 1.1 + (fam === 'lunar' || fam === 'rubble' ? AL[k] * 0.28 : AL[k] * 0.16), 0, 1), out) });
+      const lunarAL = fam === 'lunar' || fam === 'rubble';
+      for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+        if (!lunarAL) { AL[j * S + i] = pfbm(i / 128, j / 128, S / 128, S / 128, 4, seed + 31); continue; }
+        // mare / highland albedo: a few broad, lobate patches (2 smooth octaves, domain-warped) plus fine mottling;
+        // no thin thresholded bands (those read as painted rivers once the tile is seen in perspective)
+        const wx = pfbm(i / 64, j / 64, S / 64, S / 64, 2, seed + 41) * 26, wy = pfbm(i / 64 + 3.1, j / 64, S / 64, S / 64, 2, seed + 43) * 26;
+        const big = pfbm((i + wx) / 256, (j + wy) / 256, S / 256, S / 256, 2, seed + 31, 0.35);
+        const mot = pfbm(i / 32, j / 32, S / 32, S / 32, 3, seed + 47);
+        AL[j * S + i] = -sstep(0.08, 0.22, big) * 0.13 + mot * 0.035 + sstep(-0.3, -0.42, big) * 0.05;
+      }
+      shadeTile(c, S, Hf, A, lb, { relief: 0.2, shadows: shadows && !lunarAL, ambient: Math.max(ambient, 0.25), colorFn: (k, a, out) => ramp(pal, clamp(mid + a * 1.1 + (lunarAL ? AL[k] : AL[k] * 0.16), 0, 1), out) });
     } else {
       shadeTile(c, S, Hf, A, lb, { overlay: true, relief: level === 'fine' ? 0.55 : 0.6, shadows, ambient, gloss: fam === 'ice' ? 0.4 : 0 });
     }
@@ -2138,14 +2589,22 @@ function ridgeStrip(kind, colors, lb, seed, haze = 0, hazeColor = '#000000') {
   return lazy(`ridge|${kind}|${colors.join(',')}|${lb}|${seed}|${haze.toFixed(2)}|${hazeColor}`, W, H, (c) => {
     const L0 = bucketLight(lb);
     const prof = new Float32Array(W);
+    const apronH = new Float32Array(W); // mesa: height where the caprock cliff meets its talus apron
     for (let x = 0; x < W; x++) {
       const u = x / 128;
       let h;
       const per = (cells, oct, sd, gain = 0.5) => pfbm((x / W) * cells, 0.5, cells, 1, oct, sd, gain);
       if (kind === 'mesa') {
-        const n = per(5, 4, seed) * 0.5 + 0.5;
-        const plateau = sstep(0.47, 0.5, n) * 0.6 + sstep(0.58, 0.61, n) * 0.3;
-        h = 0.1 + plateau * 0.8 + per(48, 2, seed + 1) * 0.02 + sstep(0.3, 0.5, n) * 0.06;
+        // eroded buttes: a ragged caprock (notched, slightly domed top), a steep cliff band, then a concave talus
+        // apron spreading out to the plain; heights vary from butte to butte
+        const n = per(5, 4, seed) * 0.5 + 0.5 + per(23, 2, seed + 5) * 0.035;
+        const P = 0.55 + 0.4 * (per(3, 2, seed + 9) * 0.5 + 0.5);
+        const apron = Math.pow(sstep(0.36, 0.5, n), 1.8);
+        const cliff = sstep(0.495, 0.512, n);
+        const cap = cliff * (0.03 * per(64, 3, seed + 1) + 0.025 * sstep(0.52, 0.7, n) - 0.04 * Math.pow(Math.max(0, per(31, 2, seed + 3)), 3));
+        const upper = sstep(0.6, 0.63, n) * 0.12 * P; // a second, smaller tier on the biggest buttes
+        h = 0.07 + P * (0.42 * apron + 0.43 * cliff) + cap + upper + per(90, 2, seed + 2) * 0.008;
+        apronH[x] = 0.07 + P * 0.42 * apron;
       } else if (kind === 'dunes') {
         h = 0.2 + 0.22 * Math.pow(0.5 + 0.5 * Math.sin((x / W) * TAU * 9 + per(4, 2, seed) * 3), 1.6) + per(16, 3, seed + 2) * 0.06;
       } else if (kind === 'ice') {
@@ -2184,7 +2643,17 @@ function ridgeStrip(kind, colors, lb, seed, haze = 0, hazeColor = '#000000') {
         const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
         const dif = Math.max(0, nx * lx + ny * ly + nz * lz);
         let lum = amb + (1 - amb) * dif * 1.25;
-        if (kind === 'mesa') lum *= 0.92 + 0.1 * Math.sin(y * 0.6 + NZ[k] * 3); // strata
+        if (kind === 'mesa') {
+          const yr = H - y; // height above the strip base (px)
+          if (yr > apronH[x] * H + 1) { // cliff face: thin sedimentary beds, gently warped, stronger on the caprock
+            const bed = Math.sin(yr * 0.9 + NZ[k] * 5 + x * 0.004) * 0.5 + 0.5;
+            const capK = sstep(top + 1, top + 5, y) * (1 - sstep(top + 5, top + 9, y));
+            lum *= 0.9 + 0.09 * bed - 0.1 * capK + 0.06 * NZ[k];
+          } else { // talus: downslope streaks of debris, darker toward the foot
+            const st = pfbm(x / 4, y / 32, 256, 4, 2, seed + 11) * 0.5 + 0.5;
+            lum *= 0.86 + 0.16 * st + 0.08 * (1 - depthIn);
+          }
+        }
         const t2 = clamp(lum, 0, 1.4);
         let cr, cg, cb;
         if (t2 < 0.7) { const q = t2 / 0.7; cr = lerp(C[0][0] * 0.35, C[0][0], q); cg = lerp(C[0][1] * 0.35, C[0][1], q); cb = lerp(C[0][2] * 0.35, C[0][2], q); }
@@ -2367,14 +2836,17 @@ function drawRocks(ctx, W, H, hor, hc, f, Xoff, world, lb, seed, light, density 
     const phi = (y - hor) / f;
     const fadeIn = sstep(1.1, 2.6, rp);
     // cast shadow on the ground (foreshortened)
-    ctx.globalAlpha = shA * fadeIn * (rp < 3 ? 0.6 : 1);
-    ctx.fillStyle = '#000';
+    // cast shadow: starts under the rock and stretches away from the sun along the ground (the rock covers its
+    // root), umbra a darkened floor colour at ~0.85, never a detached black hole
+    ctx.globalAlpha = Math.min(0.85, shA) * fadeIn * (rp < 3 ? 0.6 : 1);
+    ctx.fillStyle = airless ? 'rgb(16,15,14)' : 'rgb(46,26,16)';
+    const sl = rp * (0.7 + shLen * 0.45);
     ctx.beginPath();
-    ctx.ellipse(x + shDir * rp * (0.4 + shLen * 0.5), y - rp * phi * 0.1, rp * (0.9 + shLen * 0.55), Math.max(0.5, rp * phi * 1.4 + 0.4), 0, 0, TAU);
+    ctx.ellipse(x + shDir * (sl - rp * 0.55), y - Math.max(0.3, rp * phi * 0.2), sl, Math.max(0.5, rp * phi * 0.9 + 0.3), 0, 0, TAU);
     ctx.fill();
-    if (rp > 2.5) { // soft contact shadow / partial burial ring
-      ctx.globalAlpha = 0.35 * fadeIn;
-      ctx.beginPath(); ctx.ellipse(x, y, rp * 1.25, Math.max(0.6, rp * phi * 0.9 + 0.3), 0, 0, TAU); ctx.fill();
+    if (rp > 2.5) { // contact shade right at the base
+      ctx.globalAlpha = 0.22 * fadeIn;
+      ctx.beginPath(); ctx.ellipse(x, y, rp * 0.95, Math.max(0.6, rp * phi * 0.6 + 0.3), 0, 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = fadeIn;
     const spr = rockSprite(world, buf.v[k], lb);
@@ -2399,7 +2871,29 @@ const TERRAIN_RIDGES = {
 };
 
 /** Parallax landing terrain for `world`; groundY = screen y of the touchdown point. */
-export function drawTerrain(ctx, view, world, { altM = 0, pxPerM = 4, groundY, scrollX = 0, t = 0, seed = 1, light = SUN } = {}) {
+const TERR = { sig: '', n: 0, c: null, csig: '' };
+/**
+ * Parallax landing terrain. Once the camera stops moving (hover, touchdown, landed) the finished picture is kept in
+ * an offscreen canvas and blitted, so a static shot costs one drawImage instead of ~100 pattern bands.
+ */
+export function drawTerrain(ctx, view, world, opts = {}) {
+  const W = num(view?.W, 375), H = num(view?.H, 700);
+  if (world === 'earth' || typeof document === 'undefined') return drawTerrainRaw(ctx, view, world, opts);
+  const dpr = devScale(ctx);
+  const sig = [world, W, H, dpr, Math.round(num(opts.groundY) * 2), Math.round(num(opts.pxPerM, 4) * 500), Math.round(num(opts.scrollX) * 2), lightBucket(opts.light || SUN), opts.seed].join('|');
+  if (TERR.c && TERR.csig === sig) { ctx.drawImage(TERR.c, 0, 0, W, H); return; }
+  if (sig !== TERR.sig) { TERR.sig = sig; TERR.n = 0; }
+  if (++TERR.n < 12) return drawTerrainRaw(ctx, view, world, opts);
+  const c = TERR.c && TERR.c.width === Math.round(W * dpr) && TERR.c.height === Math.round(H * dpr) ? TERR.c : makeCanvas(W * dpr, H * dpr);
+  const g = c && c.getContext('2d');
+  if (!g) return drawTerrainRaw(ctx, view, world, opts);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawTerrainRaw(g, view, world, opts);
+  TERR.c = c; TERR.csig = sig;
+  ctx.drawImage(c, 0, 0, W, H);
+}
+
+function drawTerrainRaw(ctx, view, world, { altM = 0, pxPerM = 4, groundY, scrollX = 0, t = 0, seed = 1, light = SUN } = {}) {
   tick();
   const W = num(view?.W, 375), H = num(view?.H, 700);
   const ppm = Math.max(0.05, num(pxPerM, 4));
@@ -2444,7 +2938,7 @@ export function drawTerrain(ctx, view, world, { altM = 0, pxPerM = 4, groundY, s
   const rd = TERRAIN_RIDGES[fam];
   if (rd) {
     const C = [pal[0], pal[Math.min(pal.length - 1, 2)], pal[pal.length - 1]];
-    const hzc = atmo ? cssToHex(sky.horizon) : '#000000';
+    const hzc = atmo ? cssToHex(skyColors(world, 0).horizon) : '#000000'; // fixed key: the strips must not rebuild as the sky darkens with altitude
     const far = ridgeStrip(rd.far, C, lb, hash(world + 'far'), atmo ? 0.55 : 0.0, hzc);
     const mid = ridgeStrip(rd.mid, C, lb, hash(world + 'mid'), atmo ? 0.25 : 0.0, hzc);
     drawStripAtDepth(ctx, W, far, hor, hc, f, 16000, 26000, rd.farH, Xoff);
@@ -2519,21 +3013,26 @@ export function drawGroundShadow(ctx, x, groundY, { widthPx = 30, heightAboveM =
     const airless = !bodyLook(world).atmosphere;
     const a0 = (airless ? 0.86 : world === 'titan' ? 0.25 : 0.5) * (1 - sstep(Hc * 4 + 40, Hc * 8 + 160, hM));
     if (a0 > 0.01) {
-      const x0 = x + dir * hM * cot * ppm, x1 = x + dir * (hM + Hc) * cot * ppm;
+      // the sun is behind-left of the camera: only ~half of the shadow's ground length shows as a sideways run,
+      // the rest recedes toward the viewer (foreshortened); it always starts at the footpads when landed
+      const side = 0.5;
+      const x0 = x + dir * hM * cot * ppm * side, x1 = x + dir * (hM + Hc) * cot * ppm * side;
       const th = Math.max(1, Wc * ppm * 0.16), blur = airless ? 0 : th * 0.8 + hM * 0.02 * ppm;
       ctx.save();
-      ctx.globalAlpha = a0;
-      ctx.fillStyle = '#000';
-      if (blur > 0.5) {
-        const g = ctx.createLinearGradient(0, groundY - th - blur, 0, groundY + th + blur);
-        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = g;
-      }
-      // tapered strip: full craft width at the base end, nose end narrower (ogive / mast)
-      ctx.beginPath();
-      ctx.moveTo(x0, groundY - th - blur); ctx.lineTo(x0 + (x1 - x0) * 0.7, groundY - th - blur);
-      ctx.quadraticCurveTo(x1, groundY - th * 0.4, x1, groundY + 0.5); ctx.quadraticCurveTo(x1, groundY + th * 0.4 + blur, x0 + (x1 - x0) * 0.7, groundY + th + blur);
-      ctx.lineTo(x0, groundY + th + blur); ctx.closePath(); ctx.fill();
+      // the sun is a little behind the camera: the shadow runs away from the sun AND slightly toward the viewer,
+      // so it lies on the ground in perspective (not along the horizon); umbra = darkened regolith, never #000
+      const dy = (x1 - x0) * dir * 0.22;
+      const strip = (grow, alpha) => {
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        const t0 = th + grow, t1 = th * 0.45 + grow;
+        ctx.moveTo(x0, groundY - t0); ctx.lineTo(x0 + (x1 - x0) * 0.7, groundY + dy * 0.7 - t1);
+        ctx.quadraticCurveTo(x1, groundY + dy - t1 * 0.6, x1 + dir * grow, groundY + dy); ctx.quadraticCurveTo(x1, groundY + dy + t1 * 0.6, x0 + (x1 - x0) * 0.7, groundY + dy * 0.7 + t1);
+        ctx.lineTo(x0, groundY + t0); ctx.closePath(); ctx.fill();
+      };
+      ctx.fillStyle = airless ? 'rgb(14,14,16)' : 'rgb(40,22,14)';
+      strip(blur + Math.max(0.8, th * 0.5), a0 * 0.3); // soft penumbra
+      strip(blur * 0.4, a0 * 0.85);
       // contact shade right under the footpads once close
       const near = 1 - sstep(0, 12, hM);
       if (near > 0) { ctx.globalAlpha = 0.55 * near; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, groundY + 0.5, Wc * ppm * 0.6, Math.max(1, th * 0.8), 0, 0, TAU); ctx.fill(); }
@@ -2550,11 +3049,14 @@ export function drawGroundShadow(ctx, x, groundY, { widthPx = 30, heightAboveM =
   const hgt = Math.max(1.2, w * 0.16);
   const airless = !bodyLook(world).atmosphere;
   ctx.save();
-  ctx.translate(x + dx * Math.min(1, hM / 30), groundY + 1);
+  // offset away from the sun even on the ground (the shadow of the body, not just of the footpads)
+  const dx0 = -Math.sign(num(light?.ax, -1)) * Math.max(0.6, num(objHeightM, 2) * 0.45) * ppm / Math.tan(Math.asin(clamp(elev, 0.15, 0.99)));
+  ctx.translate(x + (hM < 30 ? lerp(dx0, dx, hM / 30) : dx), groundY + 1);
   const a = (world === 'titan' ? 0.3 : airless ? 0.78 : 0.55) * fadeK;
   if (airless && hM < 8) {
-    ctx.globalAlpha = a; ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(0, 0, w * 0.55, hgt * 0.55, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgb(12,12,14)';
+    ctx.globalAlpha = a * 0.35; ctx.beginPath(); ctx.ellipse(0, 0, w * 0.62, hgt * 0.7, 0, 0, TAU); ctx.fill();
+    ctx.globalAlpha = a * 0.85; ctx.beginPath(); ctx.ellipse(0, 0, w * 0.55, hgt * 0.55, 0, 0, TAU); ctx.fill();
   } else {
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.6);
     g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.6, `rgba(0,0,0,${a * 0.75})`); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -2683,19 +3185,32 @@ function drawTowerType(ctx, P, Z0, tower, towerH, vR, towerArm, mountH, lb, t) {
     return;
   }
   if (tower === 'tulip') {
-    // Soyuz launch system: four support arms gripping the boosters, two cable masts; open at liftoff
+    // Soyuz launch system: the rocket hangs over the open flame pit in four support trusses ("tulip") that grip
+    // the strap-on boosters' load points; they swing back (open like petals) at liftoff. Service masts retracted.
     const open = 1 - clamp(towerArm, 0, 1);
-    for (const side of [-1, 1]) {
-      const pivot = at(side * (vR + 4.5), 0);
-      const ang = side * open * 1.1;
-      ctx.save(); ctx.translate(pivot.x, pivot.y); ctx.rotate(ang);
-      const len = 16 * s, w = 1.8 * s;
-      const g = ctx.createLinearGradient(-w, 0, w, 0); g.addColorStop(0, lit ? '#9a9ea2' : '#4a4e52'); g.addColorStop(1, lit ? '#4a4e52' : '#9a9ea2');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.moveTo(-w, 0); ctx.lineTo(w * 0.6, 0); ctx.lineTo(-side * 3.2 * s + w * 0.3, -len); ctx.lineTo(-side * 3.2 * s - w * 0.5, -len); ctx.closePath(); ctx.fill();
-      ctx.restore();
-      const m = at(side * (vR + 11), 0);
-      lattice2D(ctx, m.x - 1.2 * s, m.y, 2.4 * s, 30 * s * (0.6 + 0.4 * towerArm), 2.4 * s, steel[0], steel[1], 0.25 * s);
+    const truss = (x0, y0, x1, y1, w, col) => { // lattice truss between two points (screen px), width w px
+      const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1, nx = -dy / l * w / 2, ny = dx / l * w / 2;
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(0.6, w * 0.16);
+      ctx.beginPath(); ctx.moveTo(x0 + nx, y0 + ny); ctx.lineTo(x1 + nx * 0.6, y1 + ny * 0.6); ctx.moveTo(x0 - nx, y0 - ny); ctx.lineTo(x1 - nx * 0.6, y1 - ny * 0.6);
+      const n = Math.max(2, Math.round(l / Math.max(3, w * 1.4)));
+      for (let i = 0; i < n; i++) { const a0 = i / n, a1 = (i + 1) / n, sA = 1 - 0.4 * a0, sB = 1 - 0.4 * a1; ctx.moveTo(x0 + dx * a0 + nx * sA, y0 + dy * a0 + ny * sA); ctx.lineTo(x0 + dx * a1 - nx * sB, y0 + dy * a1 - ny * sB); }
+      ctx.stroke();
+    };
+    for (const depth of [-1, 1]) for (const side of [-1, 1]) {
+      const back = depth < 0;
+      const piv = at(side * (vR + (back ? 3.2 : 4.4)), mountH - 0.5);
+      const ang = side * open * 0.9;
+      const reachX = side * (vR + (back ? 0.4 : 1.25)), reachY = mountH + 15.5;
+      const tx = piv.x + ((reachX * s) - (piv.x - P(0, Z0).x)) * Math.cos(ang) - 0, ty0 = at(0, reachY).y;
+      const L0 = Math.hypot(tx - piv.x, ty0 - piv.y);
+      const a0 = Math.atan2(ty0 - piv.y, tx - piv.x) + ang;
+      const ex = piv.x + Math.cos(a0) * L0, ey = piv.y + Math.sin(a0) * L0;
+      truss(piv.x, piv.y, ex, ey, 1.6 * s, back ? (lit ? '#5d6064' : '#46494d') : (lit ? '#8e9296' : '#5c6064'));
+      if (!back && open < 0.2) { ctx.fillStyle = '#3b3e42'; ctx.fillRect(ex - 0.6 * s, ey - 0.5 * s, 1.2 * s, 1 * s); } // bearing head on the load point
+    }
+    for (const side of [-1, 1]) { // retracted service/cable masts, well clear of the rocket
+      const m = at(side * (vR + 16), 0);
+      lattice2D(ctx, m.x - 1 * s, m.y, 2 * s, 28 * s, 2.4 * s, steel[0], steel[1], 0.22 * s);
     }
     return;
   }
@@ -2764,8 +3279,15 @@ function drawTowerType(ctx, P, Z0, tower, towerH, vR, towerArm, mountH, lb, t) {
     ctx.fillRect(b.x + tw * s / 2 - 0.25 * s, top.y - mh * s, 0.5 * s, mh * s);
     if (tower === 'fss') { // catenary lightning-protection wires from the mast to ground anchors
       const mx = b.x + tw * s / 2, my = top.y - mh * s;
-      ctx.strokeStyle = 'rgba(40,42,46,0.55)'; ctx.lineWidth = 0.6;
-      for (const [ax, az] of [[-150, Z0 + 60], [-60, Z0 + 140]]) { const g = P(ax, az); ctx.beginPath(); ctx.moveTo(mx, my); ctx.quadraticCurveTo((mx + g.x) / 2, (my + g.y) / 2 + 10 * g.s, g.x, g.y); ctx.stroke(); }
+      // thin, sun-lit steel cables: light grey, low contrast, fading with distance (anchors set back into depth)
+      ctx.lineWidth = 0.45;
+      for (const [ax, az] of [[-120, Z0 + 260], [-30, Z0 + 420]]) {
+        const g = P(ax, az);
+        const gr = ctx.createLinearGradient(mx, my, g.x, g.y);
+        gr.addColorStop(0, 'rgba(214,218,222,0.34)'); gr.addColorStop(1, 'rgba(214,218,222,0.05)');
+        ctx.strokeStyle = gr;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.quadraticCurveTo((mx + g.x) / 2, (my + g.y) / 2 + 8 * g.s, g.x, g.y); ctx.stroke();
+      }
     }
     // access / umbilical arms reaching the vehicle
     const stackH = towerH / 1.05;
@@ -2786,7 +3308,17 @@ function drawTowerType(ctx, P, Z0, tower, towerH, vR, towerArm, mountH, lb, t) {
         } else { ctx.quadraticCurveTo(p.x + 2.4 * s, p.y + 5 * s, p.x + 1.8 * s, p.y + 9 * s); ctx.stroke(); }
         continue;
       }
-      if (reach < 0.2) continue;
+      // the crew access arm is attached to the FSS at its real height and swings back ~T-42 min: in every shot we
+      // show (T-30 s onward) it is parked against the tower, seen end-on as a short stub with its white room
+      const armLen = crew && tower === 'fss' ? 2.6 : reach;
+      if (armLen < 0.2) continue;
+      if (crew && tower === 'fss') {
+        const g2 = ctx.createLinearGradient(p.x, 0, p.x + armLen * s, 0);
+        g2.addColorStop(0, '#d8d8d2'); g2.addColorStop(1, '#8e908c');
+        ctx.fillStyle = g2; ctx.fillRect(p.x, p.y - ah * s, armLen * s, ah * s);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(p.x, p.y, armLen * s, Math.max(0.6, 0.3 * s));
+        continue;
+      }
       const g2 = ctx.createLinearGradient(0, p.y - ah * s, 0, p.y);
       g2.addColorStop(0, crew ? '#f2f2ee' : '#9da1a6'); g2.addColorStop(1, crew ? '#a8aaa8' : '#5a5e62');
       ctx.fillStyle = g2; ctx.fillRect(p.x, p.y - ah * s, reach * s, ah * s);
@@ -2856,11 +3388,14 @@ function drawSiteProps(ctx, P, Z0, kind, lb, W) {
   };
   // lightning-protection wires: each mast top runs down to two ground anchors outboard of it (never across the pad)
   const cat = (a, b) => {
-    ctx.strokeStyle = 'rgba(40,42,46,0.45)'; ctx.lineWidth = 0.5;
+    ctx.lineWidth = 0.4;
     for (const m of [a, b]) {
       const side = m.x < W / 2 ? -1 : 1;
-      for (const [dx, dz] of [[60, 40], [25, 110]]) {
+      for (const [dx, dz] of [[40, 160], [15, 300]]) {
         const g = P(m.X + side * dx, m.Z + dz);
+        const gr = ctx.createLinearGradient(m.x, m.y, g.x, g.y);
+        gr.addColorStop(0, 'rgba(214,218,222,0.3)'); gr.addColorStop(1, 'rgba(214,218,222,0.04)');
+        ctx.strokeStyle = gr;
         ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.quadraticCurveTo((m.x + g.x) / 2, (m.y + g.y) / 2 + 6 * g.s, g.x, g.y); ctx.stroke();
       }
     }
@@ -2999,7 +3534,11 @@ export function drawLaunchSite(ctx, view, { style = 'generic', groundY, pxPerM =
     const tw2 = (tower === 'tulip' ? 16 : 9) * s, th = mountH * s * 0.85;
     const g2 = ctx.createLinearGradient(0, gyG - th, 0, gyG);
     g2.addColorStop(0, '#0b0b0c'); g2.addColorStop(1, '#2a2622');
-    ctx.fillStyle = g2; ctx.fillRect(cx - tw2 / 2 + tw2 * 0.6, gyG - th, tw2, th);
+    ctx.fillStyle = g2;
+    if (tower === 'tulip') { // the pit opens right under the rocket: a dark mouth with a sunlit concrete lip
+      ctx.beginPath(); ctx.moveTo(cx - tw2 * 0.5, gy + 0.4 * s); ctx.lineTo(cx + tw2 * 0.5, gy + 0.4 * s); ctx.lineTo(cx + tw2 * 0.36, gyG); ctx.lineTo(cx - tw2 * 0.36, gyG); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(230,226,214,0.55)'; ctx.fillRect(cx - tw2 * 0.5, gy, tw2, Math.max(0.6, 0.4 * s));
+    } else ctx.fillRect(cx - tw2 / 2 + tw2 * 0.6, gyG - th, tw2, th);
     ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(cx - mw * 0.5, gy, mw, Math.max(0.6, 0.3 * s));
   }
   ctx.restore();

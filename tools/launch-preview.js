@@ -130,7 +130,7 @@ function runScene(ctx, opts) {
   const R = createLaunchRenderer({ seed: opts.seed });
   const warm = run.def.padOnly ? 4 : 5;
   const start = Math.max(0, run.key - warm);
-  const end = run.key + Math.max(0, opts.t);
+  const end = Math.max(start, run.key + Math.max(-warm, opts.t));
   // events that already happened before the simulated window: recorded, no fx spawned
   const pre = {};
   run.def.ms.forEach((id, i) => {
@@ -162,7 +162,7 @@ function runScene(ctx, opts) {
     ctx.clearRect(0, 0, opts.w, opts.h);
     if (run.def.window) {
       ctx.fillStyle = '#0f1a33'; ctx.fillRect(0, 0, opts.w, opts.h);
-      const rect = { x: opts.w * 0.06, y: opts.h * 0.05, w: opts.w * 0.88, h: opts.h * 0.5 };
+      const rect = { x: opts.w * 0.04, y: opts.h * 0.03, w: opts.w * 0.92, h: opts.h * 0.74 }; // as large as the game's countdown panel allows
       R.drawPadWindow(ctx, rect, rs);
       ctx.strokeStyle = '#e9e7e1'; ctx.lineWidth = 3; ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
     } else R.draw(ctx, rs);

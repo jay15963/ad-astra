@@ -1,7 +1,7 @@
 // Settings / accessibility screen + app version (so players know the phone has the latest build).
-import { h, card, button, segmented, toast, confirmDialog, sectionTitle } from './components.js';
+import { h, card, button, segmented, toast, confirmDialog, sectionTitle, viewHead } from './components.js';
 
-export const APP_VERSION = '0.4.0';          // keep in sync with package.json "version"
+export const APP_VERSION = '0.5.0';          // keep in sync with package.json "version"
 export const BUILD_DATE = '2026-11-17';      // bump on every deploy
 export const BUILD = '2026.11.17-3';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
 
@@ -24,7 +24,7 @@ export function interventionSecondsOf(settings) {
 function toggleRow(label, hint, value, onChange) {
   const id = `opt-${label.replace(/\W+/g, '-').toLowerCase()}`;
   return h('label', { class: 'toggle-row', for: id },
-    h('div', { class: 'toggle-text' }, h('div', { class: 'toggle-label' }, label), hint ? h('div', { class: 'muted small' }, hint) : null),
+    h('div', { class: 'toggle-text' }, h('div', { class: 'toggle-label' }, label), hint ? h('div', { class: 'toggle-hint' }, hint) : null),
     h('input', { type: 'checkbox', id, class: 'switch', checked: !!value, onchange: (e) => onChange(e.target.checked) }));
 }
 
@@ -36,13 +36,15 @@ export function render(container, store, { onExit, onQuit } = {}) {
   const s = store.settings;
   const set = (patch) => { store.setSettings(patch); applySettings(store.settings); };
 
+  const era = store.data?.scenario?.era || 4;
   container.appendChild(h('div', { class: 'view-pad settings' },
-    h('div', { class: 'view-head' },
-      onExit ? button('Voltar', onExit, { kind: 'ghost', icon: '‹', small: true }) : null,
-      h('h1', { class: 'view-title' }, 'Ajustes')),
+    viewHead('Preferências', {
+      lead: `Era ${era} · A Década Lunar · v${APP_VERSION}`,
+      right: onExit ? button('Voltar', onExit, { kind: 'ghost', icon: 'voltar', small: true }) : null,
+    }),
 
     sectionTitle('Som e toque'),
-    card({},
+    card({ cls: 'settings-group' },
       toggleRow('Som', 'Música de tensão e efeitos sintetizados no lançamento.', s.sound, (v) => set({ sound: v })),
       toggleRow('Vibração', 'Vibra nos marcos do lançamento e nas decisões urgentes.', s.vibrate, (v) => {
         set({ vibrate: v });
@@ -50,7 +52,7 @@ export function render(container, store, { onExit, onQuit } = {}) {
       })),
 
     sectionTitle('Acessibilidade'),
-    card({},
+    card({ cls: 'settings-group' },
       toggleRow('Reduzir movimento', 'Sem animações de contagem, ticker parado, transições curtas.', s.reduceMotion, (v) => set({ reduceMotion: v })),
       toggleRow('Modo daltonismo', 'Azul e laranja no lugar de verde e vermelho, sempre com ícones.', s.colorblind, (v) => set({ colorblind: v })),
       h('div', { class: 'toggle-row col' },
@@ -61,7 +63,7 @@ export function render(container, store, { onExit, onQuit } = {}) {
         }, { cls: 'text-scale' })),
       h('div', { class: 'toggle-row col' },
         h('div', { class: 'toggle-label' }, 'Tempo das intervenções'),
-        h('div', { class: 'muted small' }, 'Quanto tempo você tem para responder a um cartão no lançamento. Sem resposta, a sala mantém o plano.'),
+        h('div', { class: 'toggle-hint' }, 'Quanto tempo você tem para responder a um cartão no lançamento. Sem resposta, a sala mantém o plano.'),
         segmented([{ id: 5, label: '5 s' }, { id: 10, label: '10 s' }, { id: 0, label: 'Sem limite' }], interventionSecondsOf(s), (v) => {
           set({ interventionSeconds: v });
           rerender();
@@ -72,27 +74,28 @@ export function render(container, store, { onExit, onQuit } = {}) {
 
     sectionTitle('Jogo salvo'),
     card({},
-      h('p', { class: 'muted small' }, 'O jogo salva sozinho a cada ação. Fechar o app nunca muda o resultado de um lançamento.'),
-      store.saveError ? h('p', { class: 'warn-text small' }, `Aviso: não foi possível salvar (${store.saveError}).`) : null,
+      h('p', { class: 'muted small', style: { margin: 0 } }, 'O jogo salva sozinho a cada ação. Fechar o app nunca muda o resultado de um lançamento.'),
+      store.saveError ? h('div', { class: 'aviso warn' }, `Aviso: não foi possível salvar (${store.saveError}).`) : null,
       h('div', { class: 'btn-col' },
-        store.state ? button('Exportar save', () => exportSave(store), { kind: 'ghost', icon: '⇩' }) : null,
-        button('Importar save', () => importSave(store), { kind: 'ghost', icon: '⇧' }),
-        onQuit && store.state ? button('Voltar à tela inicial', onQuit, { kind: 'ghost', icon: '⌂' }) : null,
+        store.state ? button('Exportar save', () => exportSave(store), { icon: 'transferir' }) : null,
+        button('Importar save', () => importSave(store), { icon: 'caixa' }),
+        onQuit && store.state ? button('Voltar à tela inicial', onQuit, { icon: 'voltar' }) : null,
         button('Apagar jogo salvo', async () => {
           const ok = await confirmDialog('Apagar o jogo salvo deste aparelho? Não dá para desfazer.', { okLabel: 'Apagar', danger: true, title: 'Apagar save' });
           if (!ok) return;
           store.deleteSave();
           toast('Jogo salvo apagado.', 'warn');
           onQuit?.();
-        }, { kind: 'danger', icon: '🗑' }))),
+        }, { kind: 'danger', icon: 'fechar' }))),
 
     sectionTitle('Sobre'),
     card({ cls: 'about' },
-      h('div', { class: 'about-line' }, h('strong', null, 'Ad Astra'), ` · versão ${APP_VERSION}`),
-      h('div', { class: 'muted small' }, `Build ${BUILD} (${BUILD_DATE.split('-').reverse().join('/')}). Se este número não bater com o anúncio, recarregue a página para pegar a versão nova.`),
+      h('div', { class: 'about-line' }, 'Ad Astra'),
+      h('div', { class: 'muted small' }, 'Se o número do build não bater com o anúncio, recarregue a página para pegar a versão nova.'),
       swStatusLine(),
       h('div', { class: 'muted small' }, 'Corte vertical "Corrida Lunar" (2026 a 2030). Nomes reais usados só como referência histórica; sem logotipos oficiais.'),
-      button('Recarregar app', () => { try { location.reload(); } catch { /* */ } }, { kind: 'ghost', small: true, icon: '↻' }))));
+      h('div', null, button('Recarregar app', () => { try { location.reload(); } catch { /* */ } }, { small: true, icon: 'carregando', iconSize: 16 }))),
+    h('div', { class: 'about-foot' }, `v${APP_VERSION} · build ${BUILD} · ${BUILD_DATE.split('-').reverse().join('/')}`)));
 
   function rerender() {
     container.innerHTML = '';
@@ -139,10 +142,10 @@ function installCard() {
     body.innerHTML = '';
     const ctx = installContext();
     if (install.installed || ctx === 'standalone') {
-      body.append(h('p', { class: 'small' }, '✓ Ad Astra já está instalado neste aparelho. Ele abre em tela cheia e funciona sem internet depois da primeira visita.'));
+      body.append(h('div', { class: 'aviso ok' }, 'Ad Astra já está instalado neste aparelho. Ele abre em tela cheia e funciona sem internet depois da primeira visita.'));
       return;
     }
-    body.append(h('p', { class: 'muted small' }, 'Instale o jogo como um app: ícone na tela inicial, tela cheia sem barra do navegador e jogo offline. O save continua o mesmo.'));
+    body.append(h('p', { class: 'muted small', style: { margin: 0 } }, 'Instale o jogo como um app: ícone na tela inicial, tela cheia sem barra do navegador e jogo offline. O save continua o mesmo.'));
     if (install.prompt) {
       body.append(h('div', { class: 'btn-col' }, button('Instalar app', async () => {
         const ev = install.prompt;
@@ -154,7 +157,7 @@ function installCard() {
           if (choice?.outcome === 'accepted') { install.installed = true; toast('Ad Astra instalado. Procure o ícone na tela inicial.', 'good'); }
         } catch (e) { toast(`Não foi possível instalar: ${e?.message || e}`, 'bad'); }
         draw();
-      }, { kind: 'primary', icon: '⇩' })));
+      }, { kind: 'primary', big: true })));
       return;
     }
     const steps = ctx === 'ios'

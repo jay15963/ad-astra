@@ -421,19 +421,7 @@
             "vac": true,
             "hidden": true
           },
-          "marks": [
-            {
-              "type": "text",
-              "y": 14,
-              "h": 12,
-              "text": "STARSHIP",
-              "vertical": true,
-              "color": "#2a2c30",
-              "size": 1.6,
-              "s": 0.45,
-              "spacing": 0.3
-            }
-          ]
+          "marks": []
         }
       ],
       "fairing": null
@@ -1406,6 +1394,52 @@
       "crewTop": "craft",
       "parts": [
         {
+          "id": "p120Lb",
+          "role": "booster",
+          "x": -3.5,
+          "y": 1.5,
+          "len": 15.5,
+          "d": 3.4,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 3.4
+            },
+            {
+              "len": 3.5,
+              "d": 3.4,
+              "dTop": 0.47600000000000003,
+              "nose": "cone"
+            }
+          ],
+          "depth": -1
+        },
+        {
+          "id": "p120Rb",
+          "role": "booster",
+          "x": 3.5,
+          "y": 1.5,
+          "len": 15.5,
+          "d": 3.4,
+          "mat": "white_paint",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 3.4
+            },
+            {
+              "len": 3.5,
+              "d": 3.4,
+              "dTop": 0.47600000000000003,
+              "nose": "cone"
+            }
+          ],
+          "depth": -1
+        },
+        {
           "id": "core",
           "role": "stage",
           "y": 2.5,
@@ -1823,7 +1857,8 @@
               "h": 1.5,
               "country": "JPN"
             }
-          ]
+          ],
+          "tint": "#efe1cf"
         },
         {
           "id": "srbL",
@@ -1832,7 +1867,7 @@
           "y": 1,
           "len": 15.1,
           "d": 2.5,
-          "mat": "white_paint",
+          "mat": "grey_paint",
           "sep": "boosterSep",
           "segs": [
             {
@@ -1845,7 +1880,8 @@
               "dTop": 0.35000000000000003,
               "nose": "cone"
             }
-          ]
+          ],
+          "tint": "#7d8186"
         },
         {
           "id": "srbR",
@@ -1854,7 +1890,7 @@
           "y": 1,
           "len": 15.1,
           "d": 2.5,
-          "mat": "white_paint",
+          "mat": "grey_paint",
           "sep": "boosterSep",
           "segs": [
             {
@@ -1867,7 +1903,8 @@
               "dTop": 0.35000000000000003,
               "nose": "cone"
             }
-          ]
+          ],
+          "tint": "#7d8186"
         },
         {
           "id": "s2",
@@ -1938,7 +1975,7 @@
         {
           "id": "s200L",
           "role": "booster",
-          "x": -3.8,
+          "x": -3.65,
           "y": 1,
           "len": 25.5,
           "d": 3.2,
@@ -1972,7 +2009,7 @@
         {
           "id": "s200R",
           "role": "booster",
-          "x": 3.8,
+          "x": 3.65,
           "y": 1,
           "len": 25.5,
           "d": 3.2,
@@ -2064,12 +2101,74 @@
       "crewTop": "craft",
       "parts": [
         {
+          "id": "psoBL",
+          "role": "booster",
+          "x": -1.03,
+          "y": 0.6,
+          "len": 13.5,
+          "d": 1,
+          "depth": -1,
+          "mat": "grey_paint",
+          "tint": "#8f9886",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 1
+            },
+            {
+              "len": 1.5,
+              "d": 1,
+              "dTop": 0.14,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 0.8,
+            "bellLen": 0.6,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "psoBR",
+          "role": "booster",
+          "x": 1.03,
+          "y": 0.6,
+          "len": 13.5,
+          "d": 1,
+          "depth": -1,
+          "mat": "grey_paint",
+          "tint": "#8f9886",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 1
+            },
+            {
+              "len": 1.5,
+              "d": 1,
+              "dTop": 0.14,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 0.8,
+            "bellLen": 0.6,
+            "layout": "single"
+          }
+        },
+        {
           "id": "ps1",
           "role": "stage",
           "y": 1,
           "len": 20,
           "d": 2.8,
-          "mat": "white_paint",
+          "mat": "grey_paint",
           "segs": [
             {
               "len": 20,
@@ -2094,20 +2193,23 @@
               "color": "#e86a10",
               "size": 1
             }
-          ]
+          ],
+          "tint": "#6e5a46"
         },
         {
           "id": "psoL",
           "role": "booster",
-          "x": -2.05,
+          "x": -2.0,
           "y": 0.6,
-          "len": 12.5,
+          "len": 13.5,
           "d": 1,
-          "mat": "white_paint",
+          "depth": 0,
+          "mat": "grey_paint",
+          "tint": "#8f9886",
           "sep": "boosterSep",
           "segs": [
             {
-              "len": 11,
+              "len": 12,
               "d": 1
             },
             {
@@ -2128,15 +2230,17 @@
         {
           "id": "psoR",
           "role": "booster",
-          "x": 2.05,
+          "x": 2.0,
           "y": 0.6,
-          "len": 12.5,
+          "len": 13.5,
           "d": 1,
-          "mat": "white_paint",
+          "depth": 0,
+          "mat": "grey_paint",
+          "tint": "#8f9886",
           "sep": "boosterSep",
           "segs": [
             {
-              "len": 11,
+              "len": 12,
               "d": 1
             },
             {
@@ -2186,6 +2290,68 @@
           "len": 3.6,
           "d": 2.8,
           "mat": "carbon_black"
+        },
+        {
+          "id": "psoFL",
+          "role": "booster",
+          "x": -1.03,
+          "y": 0.6,
+          "len": 13.5,
+          "d": 1,
+          "depth": 1,
+          "mat": "grey_paint",
+          "tint": "#8f9886",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 1
+            },
+            {
+              "len": 1.5,
+              "d": 1,
+              "dTop": 0.14,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 0.8,
+            "bellLen": 0.6,
+            "layout": "single"
+          }
+        },
+        {
+          "id": "psoFR",
+          "role": "booster",
+          "x": 1.03,
+          "y": 0.6,
+          "len": 13.5,
+          "d": 1,
+          "depth": 1,
+          "mat": "grey_paint",
+          "tint": "#8f9886",
+          "sep": "boosterSep",
+          "segs": [
+            {
+              "len": 12,
+              "d": 1
+            },
+            {
+              "len": 1.5,
+              "d": 1,
+              "dTop": 0.14,
+              "nose": "cone"
+            }
+          ],
+          "engines": {
+            "n": 1,
+            "prop": "solid",
+            "bellD": 0.8,
+            "bellLen": 0.6,
+            "layout": "single"
+          }
         }
       ],
       "fairing": {
@@ -3706,14 +3872,6 @@
           ],
           "marks": [
             {
-              "type": "window",
-              "y": 1.9,
-              "h": 0.42,
-              "w": 0.38,
-              "n": 2,
-              "spread": 0.55
-            },
-            {
               "type": "patch",
               "y": 0.45,
               "h": 0.9,
@@ -3728,6 +3886,23 @@
               "w": 0.7,
               "s": 0.72,
               "color": "#1d1f22"
+            },
+            {
+              "type": "window",
+              "y": 1.9,
+              "h": 0.38,
+              "w": 0.34,
+              "n": 2,
+              "spread": 0.5,
+              "off": 0.38
+            },
+            {
+              "type": "patch",
+              "y": 1.0,
+              "h": 0.9,
+              "w": 0.8,
+              "s": -0.45,
+              "color": "#cdd0d3"
             }
           ]
         },
@@ -3741,7 +3916,8 @@
           "mat": "white_paint",
           "nose": "blunt"
         }
-      ]
+      ],
+      "hatch": -0.45
     },
     "cargo_dragon": {
       "name": "Cargo Dragon",
@@ -4118,10 +4294,11 @@
       "template": "lander",
       "heightM": 7.5,
       "widthM": 5,
-      "body": "box",
+      "body": "octa",
       "bodyW": 3.6,
       "bodyH": 3,
       "mat": "gold_foil",
+      "foil": "gold_foil",
       "legs": 4,
       "legSpanM": 6.5,
       "cabin": true,
@@ -4131,7 +4308,9 @@
         "prop": "hypergolic",
         "bellD": 1,
         "bellLen": 1.2
-      }
+      },
+      "cabinWindowS": 0.42,
+      "legMat": "bare_aluminium"
     },
     "change7": {
       "name": "Chang'e-7",
@@ -4282,7 +4461,10 @@
           "shroudCyl": 0.3,
           "gridFins": true
         }
-      ]
+      ],
+      "band": "#3a3f46",
+      "logo": "ISRO",
+      "logoColor": "#2a4f9a"
     },
     "chandrayaan4": {
       "name": "Chandrayaan-4",
@@ -4445,18 +4627,18 @@
       "orbital": {
         "len": 2.8,
         "d": 2.25,
-        "mat": "white_paint",
+        "mat": "soyuz_green",
         "arrays": "small"
       },
       "descent": {
         "len": 2.5,
         "d": 2.5,
-        "mat": "white_paint"
+        "mat": "soyuz_green"
       },
       "service": {
         "len": 2.94,
         "d": 2.8,
-        "mat": "white_paint"
+        "mat": "grey_paint"
       },
       "arrays": {
         "type": "pair4",
@@ -4503,7 +4685,7 @@
       "capH": 4.2,
       "mat": "white_paint",
       "ablator": "cnsa",
-      "windows": 3,
+      "windows": 2,
       "chutes": 2,
       "airbags": true,
       "sm": {
@@ -4544,7 +4726,10 @@
           "towerLen": 7,
           "sep": "fairing"
         }
-      ]
+      ],
+      "band": "#2e2a26",
+      "hatch": -0.45,
+      "hatchColor": "#d2d4d6"
     },
     "luna_orbiter": {
       "name": "Luna-26",

@@ -1,8 +1,21 @@
 // Mundo: news feed, actors/rivals with relation bars and tension, treaties/blocs, diplomacy proposals, Tabela da Era.
 import {
   h, raw, card, chip, bar, button, segmented, sectionTitle, emptyState, safePanel, openModal, toast, confirmDialog, attempt,
-  fmtMoney, fmtDate, fmtMonth, fmtIn, TENSION_LABELS, PROPOSAL_LABELS, FIRST_LABELS, newsIcon,
+  fmtMoney, fmtDate, fmtMonth, fmtIn, TENSION_LABELS, PROPOSAL_LABELS, FIRST_LABELS, newsIcon, iconSVG, viewHead, flagPrefix, cleanFlags,
 } from './components.js';
+
+// Mundo's own stylesheet (DESIGN.md: lists, ranking, filters). Linked as soon as this module loads (app boot), so the
+// tab never paints unstyled; the service worker precaches it (it follows new URL(..., import.meta.url)).
+(function linkWorldCss() {
+  try {
+    if (typeof document === 'undefined' || document.querySelector('link[data-world-css]')) return;
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = new URL('./css/world.css', import.meta.url).href;
+    l.setAttribute('data-world-css', '1');
+    document.head.appendChild(l);
+  } catch { /* styles are optional */ }
+})();
 
 // news tags are module-internal (mixed languages); only these are shown to the player, in pt-BR
 const TAG_LABELS = {
@@ -38,9 +51,10 @@ export function render(container, store) {
   const dipl = (st.decisions || []).filter((d) => /^(diplomacy|politics)/.test(String(d.kind)));
   let mapCleanup = null;
   const root = h('div', { class: 'view-pad world' },
-    h('div', { class: 'view-head' }, h('h1', { class: 'view-title' }, 'Mundo'), safePanel(() => tensionChip(store))),
-    safePanel(() => worldMapSection(store, (fn) => { mapCleanup = fn; }), 'O mapa-múndi está fora do ar.'),
-    segmented(SEGS.map((s) => (s.id === 'atores' && dipl.length ? { ...s, badge: dipl.length } : s)), ui.seg, go));
+    viewHead('Cenário internacional', { lead: 'O que rivais, governos e blocos estão fazendo', right: safePanel(() => tensionChip(store)) }),
+    // sub-navigation right under the page head (CSmanager): switching tabs changes the first screen
+    segmented(SEGS.map((s) => (s.id === 'atores' && dipl.length ? { ...s, badge: dipl.length } : s)), ui.seg, go, { cls: 'tabs' }),
+    safePanel(() => worldMapSection(store, (fn) => { mapCleanup = fn; }), 'O mapa-múndi está fora do ar.'));
   container.appendChild(root);
   if (ui.seg === 'atores') root.append(safePanel(() => actorsView(store, dipl), 'Os atores ainda não chegaram ao mundo.'));
   else if (ui.seg === 'tratados') root.append(safePanel(() => treatiesView(store), 'Tratados e blocos em construção.'));
@@ -53,6 +67,9 @@ export function render(container, store) {
 
 const MAP_KEY = 'adastra.worldmap.open';
 let mapOpen = attempt(() => localStorage.getItem(MAP_KEY) !== '0', true);
+// Atores / Tratados / Tabela start with the map collapsed (their list stays on the first screen); opening it there
+// lasts for the session and does not change the saved Notícias preference.
+let mapOpenSub = false;
 
 function worldMapSection(store, setCleanup) {
   const geo = store.tryQuery('geo/state', null);
@@ -60,33 +77,33 @@ function worldMapSection(store, setCleanup) {
   const changed = (geo?.zones || []).filter((z) => z.changedTurn != null).length;
   const blocMoves = (store.state?.geo?.blocChanges || []).filter((c) => c.kind === 'country').length;
   const body = h('div', { class: 'wm-body' });
-  const sec = h('section', { class: ['wm-section', mapOpen && 'open'] });
-  const toggle = () => {
-    mapOpen = !mapOpen;
-    attempt(() => localStorage.setItem(MAP_KEY, mapOpen ? '1' : '0'));
-    sec.classList.toggle('open', mapOpen);
-    head.setAttribute('aria-expanded', String(mapOpen));
-    mount();
+  const onNews = ui.seg === 'noticias';
+  let open = onNews ? mapOpen : mapOpenSub;
+  const setOpen = (v) => {
+    open = v;
+    if (onNews) { mapOpen = v; attempt(() => localStorage.setItem(MAP_KEY, v ? '1' : '0')); } else mapOpenSub = v;
+    sec.classList.toggle('open', v);
+    head.setAttribute('aria-expanded', String(v));
   };
-  const head = h('button', { class: 'wm-head', type: 'button', 'aria-expanded': String(mapOpen), onclick: toggle },
-    h('span', { class: 'wm-head-title' }, '🗺️ Mapa-múndi'),
-    h('span', { class: 'wm-head-chips' },
-      changed ? chip(`${changed} mudança${changed > 1 ? 's' : ''} de controle`, 'warn') : null,
-      blocMoves ? chip(`🏳️ ${blocMoves} mudança${blocMoves > 1 ? 's' : ''} de bloco`, 'muted', { title: `${blocMoves} mudança${blocMoves > 1 ? 's' : ''} de bloco desde o início` }) : null),
-    h('span', { class: 'wm-chev', 'aria-hidden': 'true' }, '▾'));
+  const sec = h('section', { class: ['wm-section', open && 'open'] });
+  const toggle = () => { setOpen(!open); mount(); };
+  const head = h('button', { class: 'wm-head', type: 'button', 'aria-expanded': String(open), onclick: toggle },
+    h('span', { class: 'wm-head-ic', 'aria-hidden': 'true', html: iconSVG('mundo', 18) }),
+    h('span', { class: 'wm-head-text' },
+      h('span', { class: 'wm-head-title' }, 'Mapa-múndi'),
+      // second line (never squeezed against the title / conflict chip): plain counts, neutral
+      changed || blocMoves ? h('span', { class: 'wm-head-sub' },
+        [changed ? `${changed} mudança${changed > 1 ? 's' : ''} de controle` : null,
+          blocMoves ? `${blocMoves} mudança${blocMoves > 1 ? 's' : ''} de bloco` : null].filter(Boolean).join(' · ')) : null),
+    h('span', { class: 'wm-chev', 'aria-hidden': 'true', html: iconSVG('avancar', 16) }));
   // the conflict chip is its own button (outside the collapse toggle): it opens the map on the hottest conflict
   const hottest = (geo?.conflicts || []).slice().sort((a, b) => (b.intensity || 0) - (a.intensity || 0))[0] || null;
   const focusConflict = () => {
     if (!hottest) return;
-    if (!mapOpen) {
-      mapOpen = true;
-      attempt(() => localStorage.setItem(MAP_KEY, '1'));
-      sec.classList.add('open');
-      head.setAttribute('aria-expanded', 'true');
-    }
+    if (!open) setOpen(true);
     mount({ conflictId: hottest.id, zoneIds: hottest.zoneIds, zoneId: hottest.zoneId });
   };
-  const conflictBtn = conflicts ? chip(`⚔ ${conflicts} conflito${conflicts > 1 ? 's' : ''}`, 'bad', {
+  const conflictBtn = conflicts ? chip(`${conflicts} conflito${conflicts > 1 ? 's' : ''}`, 'bad', {
     onclick: (e) => { e.stopPropagation(); focusConflict(); },
   }) : null;
   if (conflictBtn) {
@@ -98,7 +115,7 @@ function worldMapSection(store, setCleanup) {
     try { cleanup?.(); } catch { /* */ }
     cleanup = null;
     body.replaceChildren();
-    if (mapOpen) cleanup = worldmap.render(body, store, { onActor: (id) => openActor(store, id), focus });
+    if (open) cleanup = worldmap.render(body, store, { onActor: (id) => openActor(store, id), focus });
     setCleanup(() => { try { cleanup?.(); } catch { /* */ } });
   }
   sec.append(h('div', { class: 'wm-headrow' }, head, conflictBtn), body);
@@ -111,13 +128,15 @@ function tensionLevel(store) {
   return Math.max(0, Math.min(4, Math.round(Number(w.globalTension) || 0)));
 }
 
+/** 4-step tension meter (segments, not colour alone: the count of filled steps is the level). */
 function tensionDots(level) {
-  return h('span', { class: `tension-dots t${level}`, 'aria-label': `tensão ${level} de 4` }, '●'.repeat(level) + '○'.repeat(4 - level));
+  return h('span', { class: `w-tmeter t${level}`, role: 'img', 'aria-label': `tensão ${level} de 4` },
+    [1, 2, 3, 4].map((i) => h('i', { class: i <= level ? 'on' : null })));
 }
 
 function tensionChip(store) {
   const t = tensionLevel(store);
-  return h('span', { class: `chip tension t${t}` }, tensionDots(t), ` ${TENSION_LABELS[t]}`);
+  return h('span', { class: `chip tension t${t}`, title: `Tensão global ${t} de 4` }, h('span', { class: 'w-tdot', 'aria-hidden': 'true' }), TENSION_LABELS[t]);
 }
 
 // ------------------------------------------------------------------ news
@@ -140,20 +159,31 @@ function newsView(store) {
   const draw = () => {
     out.innerHTML = '';
     const list = all.filter((n) => ui.newsFilter === 'all' ? true : ui.newsFilter === 'big' ? n.importance >= 2 : (n.actors || []).includes(st.playerId));
-    out.append(h('div', { class: 'chip-scroll' }, filters.map((f) => chip(f.label, ui.newsFilter === f.id ? 'accent' : '', {
-      onclick: () => { if (ui.newsFilter === f.id) return; ui.newsFilter = f.id; ui.newsLimit = NEWS_PAGE; draw(); },
-    }))));
-    if (!list.length) { out.append(emptyState('Nenhuma notícia por aqui ainda. O mundo se move a cada semana.', '📰')); return; }
+    const count = (id) => all.filter((n) => id === 'big' ? n.importance >= 2 : id === 'me' ? (n.actors || []).includes(st.playerId) : true).length;
+    out.append(h('div', { class: 'chip-scroll w-filters', role: 'group', 'aria-label': 'Filtrar notícias' }, filters.map((f) => {
+      const on = ui.newsFilter === f.id;
+      const n = f.id === 'all' ? 0 : count(f.id);
+      return h('button', {
+        class: ['chip', 'w-pill', on && 'active'], type: 'button', 'aria-pressed': on ? 'true' : 'false',
+        onclick: () => { if (ui.newsFilter === f.id) return; ui.newsFilter = f.id; ui.newsLimit = NEWS_PAGE; draw(); },
+      }, f.label, n ? h('span', { class: 'w-pill-n' }, n > 99 ? '99+' : String(n)) : null);
+    })));
+    if (!list.length) { out.append(emptyState('Nenhuma notícia por aqui ainda. O mundo se move a cada semana.', 'noticia')); return; }
     const feed = h('div', { class: 'news-feed' });
     out.append(feed);
     let shown = 0;
     let lastTurn = null;
+    let group = null;
     const more = h('div', { class: 'news-more' });
     const appendUpTo = (limit) => {
       for (; shown < Math.min(limit, list.length); shown++) {
         const n = list[shown];
-        if (n.turn !== lastTurn) { feed.append(h('div', { class: 'news-date' }, fmtDate(n.turn, st.startYear))); lastTurn = n.turn; }
-        feed.append(newsItem(st, n, shown >= 8));
+        if (n.turn !== lastTurn || !group) {
+          group = h('div', { class: 'w-list news-list' });
+          feed.append(h('div', { class: 'news-date' }, fmtDate(n.turn, st.startYear)), group);
+          lastTurn = n.turn;
+        }
+        group.append(newsItem(st, n, shown >= 8));
       }
       more.innerHTML = '';
       if (list.length > shown) {
@@ -169,18 +199,21 @@ function newsView(store) {
 
 function newsItem(st, n, offscreen) {
   const actors = (n.actors || []).map((id) => st.actors?.[id]).filter(Boolean);
+  const mine = (n.actors || []).includes(st.playerId);
+  const tags = [...new Set((n.tags || []).map((t) => TAG_LABELS[t]).filter(Boolean))].slice(0, 3);
   return h('article', {
-    class: ['news-item', `imp-${n.importance || 1}`],
+    class: ['news-item', 'w-row', `imp-${n.importance || 1}`, mine && 'mine'],
     // below the first screenful: skip layout/paint until scrolled near (no-op where unsupported)
-    style: offscreen ? { contentVisibility: 'auto', containIntrinsicSize: 'auto 110px' } : null,
+    style: offscreen ? { contentVisibility: 'auto', containIntrinsicSize: 'auto 96px' } : null,
   },
-  h('div', { class: 'news-head' },
-    h('span', { class: 'news-icon', 'aria-hidden': 'true' }, newsIcon(n)),
-    h('h3', { class: 'news-headline' }, n.headline)),
-  n.body ? h('p', { class: 'news-body small' }, n.body) : null,
-  actors.length || n.tags?.length ? h('div', { class: 'chips' },
-    actors.map((a) => chip(`${a.flag || ''} ${a.short || a.name}`.trim(), 'muted')),
-    [...new Set((n.tags || []).map((t) => TAG_LABELS[t]).filter(Boolean))].slice(0, 3).map((t) => chip(`#${t}`, 'muted'))) : null);
+  h('span', { class: 'w-lead news-icon', 'aria-hidden': 'true' }, newsIcon(n)),
+  h('div', { class: 'w-main' },
+    n.importance >= 3 ? h('div', { class: 'w-eyebrow accent' }, 'Destaque') : null,
+    h('h3', { class: 'news-headline' }, cleanFlags(n.headline)),
+    n.body ? h('p', { class: 'news-body' }, n.body) : null,
+    actors.length || tags.length ? h('div', { class: 'chips w-chips' },
+      actors.map((a) => chip(`${flagPrefix(a)}${a.short || a.name}`.trim(), a.id === st.playerId ? 'accent' : '')),
+      tags.map((t) => chip(`#${t}`, 'muted'))) : null));
 }
 
 // ------------------------------------------------------------------ actors
@@ -195,27 +228,37 @@ function actorsView(store, dipl) {
   const others = Object.values(st.actors || {}).filter((a) => a.id !== st.playerId)
     .sort((a, b) => (b.prestige || 0) - (a.prestige || 0));
   const out = h('div');
-  if (dipl.length) out.append(sectionTitle('Na sua mesa'), h('div', { class: 'decision-list' }, sortDecisions(dipl).map((d) => decisionRow(store, d))));
-  if (!others.length) { out.append(emptyState('Nenhum outro ator no mundo ainda.', '🌐')); return out; }
-  out.append(sectionTitle('Rivais e parceiros'));
+  if (dipl.length) out.append(sectionTitle('Na sua mesa', h('span', { class: 'badge' }, String(dipl.length))), h('div', { class: 'decision-list' }, sortDecisions(dipl).map((d) => decisionRow(store, d))));
+  if (!others.length) { out.append(emptyState('Nenhum outro ator no mundo ainda.', 'mundo')); return out; }
+  out.append(sectionTitle('Rivais e parceiros', h('span', { class: 'w-count' }, String(others.length))));
+  const list = h('div', { class: 'w-list actor-list' });
   for (const a of others) {
     const rel = relationOf(store, st.playerId, a.id) || {};
     const t = Math.max(0, Math.min(4, Number(st.tension?.[relKey(st.playerId, a.id)]) || 0));
     const sameBloc = a.bloc && st.actors?.[st.playerId]?.bloc === a.bloc;
-    out.append(card({
-      cls: 'actor-card', onClick: () => openActor(store, a.id), icon: raw(emblemSVG(a, { size: 40 })),
-      title: `${a.flag ? a.flag + ' ' : ''}${a.name}`, subtitle: a.style || (a.kind === 'company' ? 'Empresa' : 'Agência'),
-      right: h('span', { class: `chip tension t${t}`, title: TENSION_LABELS[t] }, tensionDots(t)),
+    const open = () => openActor(store, a.id);
+    list.append(h('div', {
+      class: 'w-row w-row-tap actor-row', role: 'button', tabindex: '0', onclick: open,
+      onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } },
     },
+    h('div', { class: 'w-row-top' },
+      raw(emblemSVG(a, { size: 36 }), 'w-emblem'),
+      h('div', { class: 'w-main' },
+        h('b', { class: 'w-name' }, `${flagPrefix(a)}${a.name}`),
+        h('span', { class: 'w-sub' }, [a.style || (a.kind === 'company' ? 'Empresa' : 'Agência'), !sameBloc && a.bloc ? blocName(store, a.bloc) : null].filter(Boolean).join(' · '))),
+      h('div', { class: 'w-side' },
+        h('span', { class: 'w-pts', title: 'Prestígio' }, String(Math.round(a.prestige || 0)), h('small', null, ' pts')),
+        h('span', { title: TENSION_LABELS[t] }, tensionDots(t))),
+      h('span', { class: 'w-chev', 'aria-hidden': 'true', html: iconSVG('avancar', 16) })),
     h('div', { class: 'rel-bars' },
       bar(rel.trust ?? 0, { min: -100, max: 100, center: true, label: `Confiança ${Math.round(rel.trust ?? 0)}` }),
       bar(rel.rivalry ?? 0, { label: 'Rivalidade', kind: 'bad', key: `riv.${a.id}` }),
       bar(rel.dependence ?? 0, { label: 'Dependência', kind: 'info', key: `dep.${a.id}` })),
-    h('div', { class: 'chips' },
-      sameBloc ? chip('mesmo bloco', 'good') : a.bloc ? chip(blocName(store, a.bloc), 'muted') : null,
-      t > 0 ? chip(TENSION_LABELS[t], t >= 3 ? 'bad' : 'warn') : null,
-      chip(`★ ${Math.round(a.prestige || 0)}`, 'muted'))));
+    sameBloc || t > 0 ? h('div', { class: 'chips w-chips' },
+      sameBloc ? chip('mesmo bloco', 'good') : null,
+      t > 0 ? chip(TENSION_LABELS[t], t >= 3 ? 'bad' : 'warn') : null) : null));
   }
+  out.append(list);
   return out;
 }
 
@@ -242,11 +285,11 @@ function openActor(store, actorId) {
   const treaties = (st.treaties || []).filter((x) => x.status === 'active' && x.parties?.includes(actorId) && x.parties?.includes(me));
   const types = proposalTypes(store, actorId);
   openModal((close) => h('div', { class: 'actor-sheet' },
-    h('div', { class: 'actor-hero' }, raw(emblemSVG(a, { size: 72 })),
-      h('div', null, h('div', { class: 'small muted' }, `${a.country || ''} · ${a.kind === 'company' ? 'empresa' : 'agência'}`), h('p', null, a.style || ''))),
-    h('div', { class: 'stat-grid' },
+    h('div', { class: 'actor-hero' }, raw(emblemSVG(a, { size: 56 })),
+      h('div', null, h('div', { class: 'w-eyebrow' }, `${a.country || ''} · ${a.kind === 'company' ? 'empresa' : 'agência'}`), h('p', null, a.style || ''))),
+    h('div', { class: 'stat-grid w-kpis' },
       stat('Verba/ano', fmtMoney(a.budget)), stat('Prestígio', String(Math.round(a.prestige || 0))),
-      stat('Apoio interno', String(Math.round(a.support ?? 0))), stat('Tensão', TENSION_LABELS[Math.round(t)] || '—')),
+      stat('Apoio interno', String(Math.round(a.support ?? 0))), stat('Tensão', TENSION_LABELS[Math.round(t)] || '—', true)),
     h('div', { class: 'rel-bars' },
       bar(rel.trust ?? 0, { min: -100, max: 100, center: true, label: `Confiança ${Math.round(rel.trust ?? 0)}` }),
       bar(rel.rivalry ?? 0, { label: 'Rivalidade', kind: 'bad' }),
@@ -256,20 +299,23 @@ function openActor(store, actorId) {
     pending.length ? h('div', null, sectionTitle('Propostas em aberto'), pending.map((p) => h('div', { class: 'small' },
       `${p.from === me ? 'Você propôs' : 'Eles propõem'}: ${PROPOSAL_LABELS[p.type] || p.type}${p.expiresTurn != null ? ` · vence ${fmtIn(p.expiresTurn, st.turn)}` : ''}`))) : null,
     sectionTitle('Propor'),
-    t >= 3 ? h('p', { class: 'warn-text small' }, 'Com o conflito neste nível, a outra parte dificilmente aceita algo.') : null,
+    t >= 3 ? h('p', { class: 'aviso bad' }, 'Com o conflito neste nível, a outra parte dificilmente aceita algo.') : null,
     longShotHint(types),
-    h('div', { class: 'proposal-list' }, types.map((pt) => h('button', {
+    h('div', { class: 'proposal-list w-list' }, types.map((pt) => h('button', {
       class: ['proposal-btn', !pt.ok && 'disabled', pt.ok && pt.chance != null && pt.chance < 0.05 && 'long-shot'], type: 'button', disabled: !pt.ok,
       // select, then confirm: a refusal costs trust, so one stray tap must not send anything
       onclick: () => confirmProposal(store, actorId, pt, close),
     },
-    h('span', { class: 'proposal-top' }, h('span', { class: 'proposal-label' }, `${pt.icon ? pt.icon + ' ' : ''}${pt.label}`),
+    // same leading slot as the treaty list: emoji in a 36px circle (DESIGN §2), not inline before the title
+    pt.icon ? h('span', { class: 'card-icon', 'aria-hidden': 'true' }, pt.icon) : null,
+    h('span', { class: 'proposal-main' },
+    h('span', { class: 'proposal-top' }, h('span', { class: 'proposal-label' }, pt.label),
       // a row you cannot send has no odds: its reason says why ("Vocês já são signatários")
       pt.ok && (pt.chanceLabel || pt.chance != null) ? chip(pt.chanceLabel || `${Math.round(pt.chance * 100)}%`, pt.chance >= 0.6 ? 'good' : pt.chance >= 0.3 ? 'warn' : 'bad') : null,
       !pt.ok ? chip(unavailableLabel(pt.reason), 'muted') : null),
     pt.termsText ? h('span', { class: 'tiny' }, pt.termsText) : pt.description ? h('span', { class: 'tiny muted' }, pt.description) : null,
-    !pt.ok && pt.reason ? h('span', { class: 'tiny warn-text' }, pt.reason) : null)))),
-  { title: `${a.flag ? a.flag + ' ' : ''}${a.name}` });
+    !pt.ok && pt.reason ? h('span', { class: 'tiny warn-text' }, pt.reason) : null))))),
+  { title: `${flagPrefix(a)}${a.name}` });
 }
 
 /** Short tag for a proposal you cannot send, from the sim's reason. */
@@ -316,8 +362,9 @@ async function confirmProposal(store, actorId, pt, closeSheet) {
   } else toast(r?.error || 'Proposta não pôde ser enviada.', 'bad');
 }
 
-function stat(label, value) {
-  return h('div', { class: 'stat' }, h('div', { class: 'stat-value' }, value), h('div', { class: 'stat-label' }, label));
+/** KPI tile; word = non-numeric value (set in the sans font, mono is for numbers). */
+function stat(label, value, word = false) {
+  return h('div', { class: 'stat' }, h('div', { class: ['stat-value', word && 'is-word'] }, value), h('div', { class: 'stat-label' }, label));
 }
 
 // ------------------------------------------------------------------ treaties & blocs
@@ -332,7 +379,7 @@ function treatiesView(store) {
   const out = h('div');
 
   out.append(sectionTitle('Blocos'));
-  if (!blocs.length) out.append(emptyState('Nenhum bloco formado.', '🧩'));
+  if (!blocs.length) out.append(emptyState('Nenhum bloco formado.', 'equipe'));
   for (const b of blocs) {
     const members = (b.members || []).map((id) => st.actors?.[id] || { id });
     const inside = b.playerMember ?? (b.members || []).includes(me);
@@ -343,25 +390,25 @@ function treatiesView(store) {
           if (!(await confirmDialog(`Sair de "${b.name}"? Parceiros vão lembrar disso.`, { okLabel: 'Sair', danger: true }))) return;
           const r = store.dispatch({ type: 'diplomacy/leaveBloc', blocId: b.id });
           toast(r?.ok ? (r.message || 'Você saiu do bloco.') : (r?.error || 'Não foi possível sair.'), r?.ok ? 'warn' : 'bad');
-        }, { kind: 'ghost', small: true })
+        }, { kind: 'danger', small: true })
         : h('div', { class: 'btn-row grow' },
-          b.joinChance != null ? h('span', { class: 'small muted' }, `Chance de aceite ${Math.round(b.joinChance * 100)}%`) : h('span'),
+          b.joinChance != null ? h('span', { class: 'small muted' }, `Chance de aceite ${Math.round(b.joinChance * 100)}%${Math.round(b.joinChance * 100) <= 0 ? ' · sem chance agora' : ''}`) : h('span'),
           button('Pedir adesão', () => {
             const r = store.dispatch({ type: 'diplomacy/joinBloc', blocId: b.id });
             if (!r?.ok) toast(r?.error || 'Pedido recusado.', 'bad');
             else toast(r.status === 'rejected' ? `${b.name} recusou sua adesão.` : r.status === 'accepted' ? `Bem-vindo ao bloco ${b.name}!` : (r.message || 'Pedido enviado.'), r.status === 'rejected' ? 'warn' : 'good');
-          }, { kind: 'primary', small: true }))),
+          }, { small: true, disabled: b.joinChance != null && Math.round(b.joinChance * 100) <= 0 }))),
       b.cohesion != null ? bar(b.cohesion, { min: -100, max: 100, center: true, label: `Coesão ${b.cohesion}` }) : null));
   }
 
   const active = treaties.filter((t) => t.status === 'active');
   const past = treaties.filter((t) => t.status !== 'active');
-  out.append(sectionTitle('Tratados em vigor', chip(String(active.length), 'muted')));
-  if (!active.length) out.append(emptyState('Nenhum tratado em vigor.', '📜'));
-  for (const t of active) out.append(treatyCard(store, t));
+  out.append(sectionTitle('Tratados em vigor', h('span', { class: 'w-count' }, String(active.length))));
+  if (!active.length) out.append(emptyState('Nenhum tratado em vigor.', 'transferir'));
+  if (active.length) out.append(h('div', { class: 'w-list treaty-list' }, active.map((t) => treatyCard(store, t))));
   if (past.length) {
     out.append(sectionTitle('Histórico'));
-    for (const t of past.slice(-8).reverse()) out.append(treatyCard(store, t));
+    out.append(h('div', { class: 'w-list treaty-list' }, past.slice(-8).reverse().map((t) => treatyCard(store, t))));
   }
   return out;
 }
@@ -395,27 +442,30 @@ function leagueView(store) {
     (firstsBy[f.actorId] ||= []).push(mid);
   }
   const out = h('div', null,
-    h('p', { class: 'muted small' }, 'Classificação por prestígio. Ser o primeiro num marco vale muito mais do que chegar depois.'));
-  if (!rows.length) { out.append(emptyState('Sem atores na tabela.', '🏆')); return out; }
-  out.append(h('ol', { class: 'league' }, rows.map((r, i) => {
-    const a = st.actors?.[r.actorId] || { id: r.actorId };
-    const n = r.firstsCount ?? firstsBy[r.actorId]?.length ?? 0;
-    return h('li', { class: ['league-row', r.actorId === st.playerId && 'me'] },
-      h('span', { class: 'rank' }, i === 0 ? '🏆' : `${i + 1}º`),
-      raw(emblemSVG(a, { size: 32 }), 'mini-emblem'),
-      h('div', { class: 'league-text' },
-        h('div', { class: 'league-name' }, `${a.flag ? a.flag + ' ' : ''}${a.short || a.name || r.actorId}`),
-        bar(r.prestige || 0, { max: top, key: `lg.${r.actorId}`, kind: r.actorId === st.playerId ? 'accent' : '' })),
-      h('div', { class: 'league-pts' }, h('strong', null, String(Math.round(r.prestige || 0))), n ? h('div', { class: 'tiny muted' }, `${n} primeiro${n > 1 ? 's' : ''}`) : null));
-  })));
-  out.append(sectionTitle('Os Primeiros'));
-  out.append(h('div', { class: 'firsts' }, Object.entries(FIRST_LABELS).filter(([id]) => id !== 'crewed_orbit_national').map(([id, label]) => {
+    h('p', { class: 'w-lead-text' }, 'Classificação por prestígio. Ser o primeiro num marco vale muito mais do que chegar depois.'));
+  if (!rows.length) { out.append(emptyState('Sem atores na tabela.', 'trofeu')); return out; }
+  out.append(h('div', { class: 'w-list league-card' },
+    h('div', { class: 'league-th', 'aria-hidden': 'true' }, h('span', { class: 'rank' }, '#'), h('span', { class: 'league-th-name' }, 'Ator'), h('span', { class: 'league-th-pts' }, 'Prestígio')),
+    h('ol', { class: 'league' }, rows.map((r, i) => {
+      const a = st.actors?.[r.actorId] || { id: r.actorId };
+      const n = r.firstsCount ?? firstsBy[r.actorId]?.length ?? 0;
+      const me = r.actorId === st.playerId;
+      return h('li', { class: ['league-row', me && 'me'] },
+        h('span', { class: ['rank', i < 3 && 'selo', i === 0 && 'gold'] }, `${i + 1}º`),
+        raw(emblemSVG(a, { size: 28 }), 'mini-emblem'),
+        h('div', { class: 'league-text' },
+          h('div', { class: 'league-name' }, `${flagPrefix(a)}${a.short || a.name || r.actorId}`, me ? h('span', { class: 'chip chip-accent league-you' }, 'você') : null),
+          bar(r.prestige || 0, { max: top, key: `lg.${r.actorId}`, kind: me ? 'accent' : '' })),
+        h('div', { class: 'league-pts' }, h('strong', null, String(Math.round(r.prestige || 0))), n ? h('div', { class: 'league-firsts' }, `${n} primeiro${n > 1 ? 's' : ''}`) : null));
+    }))));
+  out.append(sectionTitle('Os primeiros'));
+  out.append(h('div', { class: 'firsts w-list' }, Object.entries(FIRST_LABELS).filter(([id]) => id !== 'crewed_orbit_national').map(([id, label]) => {
     const f = st.firsts?.[id];
     const a = f ? st.actors?.[f.actorId] : null;
     // feats history already saw (Apollo, Luna...) are "do século" in this race
     const hist = st.firstsHistory?.[id] || (f?.era ? {} : null);
     return h('div', { class: ['first-row', f && 'claimed', f?.actorId === st.playerId && 'mine'] },
-      h('span', { class: 'goal-mark', 'aria-hidden': 'true' }, f ? (f.actorId === st.playerId ? '★' : '✓') : '○'),
+      h('span', { class: 'goal-mark w-mark', 'aria-hidden': 'true', html: f ? iconSVG(f.actorId === st.playerId ? 'trofeu' : 'check', 18) : '' }),
       h('span', { class: 'first-label' }, label,
         hist ? h('span', { class: 'tiny muted first-hist' }, ` · ${f ? 'primeiro do século; ' : ''}história: ${hist.mission || hist.holder} (${hist.year})`) : null),
       f ? chip(`${a?.short || f.actorId} · ${fmtMonth(f.turn, st.startYear)}`, f.actorId === st.playerId ? 'good' : 'muted') : chip('em aberto', 'muted'));

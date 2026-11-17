@@ -7,7 +7,7 @@
 // Layout/cadeia são funções puras exportadas (testadas em Node, tests/techtree.test.mjs).
 import {
   h, card, chip, bar, button, emptyState, safePanel, openModal, toast, countUp, attempt, reduceMotion,
-  fmtEffect, fmtNum, fmtIn, fmtMoney,
+  fmtEffect, fmtNum, fmtIn, fmtMoney, icon, iconSVG, viewHead, flagPrefix,
 } from './components.js';
 
 const BRANCH_STYLE = {
@@ -19,8 +19,18 @@ const BRANCH_STYLE = {
   science: { icon: '🔭', color: '#4fb3d9' },
 };
 const STATE_LABELS = { locked: 'Travado', available: 'Disponível', active: 'Em pesquisa', done: 'Concluído', secret: 'Secreto' };
-const STATE_GLYPH = { locked: '🔒', available: '●', active: '◔', done: '✓', secret: '?' };
-const STATE_KIND = { locked: 'muted', available: 'accent', active: 'info', done: 'good', secret: 'warn' };
+const STATE_KIND = { locked: 'muted', available: 'accent', active: 'info', done: 'good', secret: 'muted' };
+// state marks as stroke icons / plain shapes (DESIGN §2: no emoji in labels)
+const ACTIVE_MARK = '<svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5H12z" fill="currentColor" stroke="none"/></svg>';
+function markHTML(s) {
+  if (s === 'done') return iconSVG('check', 12);
+  if (s === 'locked') return iconSVG('cadeado', 12);
+  if (s === 'active') return ACTIVE_MARK;
+  if (s === 'available') return '<i class="tt-pip"></i>';
+  if (s === 'secret') return '?';
+  return '';
+}
+const markOf = (s, cls = '') => h('span', { class: `tt-mark ${cls}`.trim(), 'aria-hidden': 'true', html: markHTML(s) });
 
 /** Geometry of the graph, in world px (scaled by the pan/zoom transform). */
 export const GEOM = { tile: 80, colW: 124, rowH: 96, bandPadT: 28, bandPadB: 10, padL: 14, padT: 6, padR: 22, padB: 10 };
@@ -432,45 +442,53 @@ export function render(container, store) {
   const nodes = treeNodes(store);
   const branches = store.data?.tech?.branches || [];
   container.appendChild(h('div', { class: 'view-pad research tt-page' },
-    h('div', { class: 'view-head' }, h('h1', { class: 'view-title' }, 'Pesquisa')),
+    viewHead('Laboratórios', { lead: researchLead(nodes, branches) }),
     safePanel(() => header(store, nodes), 'Pontos de ciência indisponíveis.'),
     nodes.length ? legend() : null,
     nodes.length ? safePanel(() => treeView(store, nodes, branches), 'A árvore de tecnologia encontrou um problema.')
-      : emptyState('A árvore de tecnologia ainda não chegou desta era.', '🧪')));
+      : emptyState('A árvore de tecnologia ainda não chegou desta era.', 'pesquisa')));
   const ctl = ui.ctl;
   return () => { try { ctl?.destroy(); } catch { /* */ } if (ui.ctl === ctl) ui.ctl = null; };
+}
+
+function researchLead(nodes, branches) {
+  const known = nodes.filter((n) => !n.hidden);
+  if (!known.length) return null;
+  const done = known.filter((n) => n.state === 'done').length;
+  const open = known.filter((n) => n.state === 'available').length;
+  return [branches.length ? `${branches.length} ramos` : null, `${open} ${open === 1 ? 'disponível' : 'disponíveis'}`, `${done} ${done === 1 ? 'concluída' : 'concluídas'}`].filter(Boolean).join(' · ');
 }
 
 function header(store, nodes) {
   const info = pointsInfo(store);
   const active = nodes.filter((n) => n.state === 'active');
   const known = nodes.filter((n) => !n.hidden);
-  return card({ cls: 'science-card' },
-    h('div', { class: 'science-row' },
-      h('div', null, h('div', { class: 'tile-label' }, '🔬 Pontos de ciência'), countUp('research.points', info.points ?? 0, fmtNum, 'tile-value')),
-      h('div', { class: 'right' },
-        info.perWeek != null ? h('div', { class: 'small' }, `+${fmtNum(info.perWeek)}/sem`) : null,
-        info.slots != null ? h('div', { class: 'small muted' }, `${info.active ?? active.length}/${info.slots} projetos simultâneos`) : null,
-        h('div', { class: 'small muted' }, `${known.filter((n) => n.state === 'done').length}/${known.length} tecnologias`))),
+  return card({ cls: 'science-card rs-card' },
+    h('div', { class: 'science-row rs-kpi' },
+      h('div', { class: 'rs-kpi-main' }, h('div', { class: 'rs-eyebrow' }, 'Pontos de ciência'), countUp('research.points', info.points ?? 0, fmtNum, 'rs-value')),
+      h('div', { class: 'rs-kpi-side' },
+        info.perWeek != null ? h('div', { class: 'rs-up' }, `+${fmtNum(info.perWeek)}/sem`) : null,
+        info.slots != null ? h('div', null, h('b', null, `${info.active ?? active.length}/${info.slots}`), ' projetos') : null,
+        h('div', null, h('b', null, `${known.filter((n) => n.state === 'done').length}/${known.length}`), ' tecnologias'))),
     active.length
       ? h('div', { class: 'active-projects' }, active.map((n) => h('button', {
         class: 'tt-proj', type: 'button', 'aria-label': `Abrir ${n.name}`, onclick: () => selectNode(store, n.id, { open: true, center: true }),
       }, progressBar(store, n))))
-      : h('p', { class: 'muted small' }, 'Nenhum projeto em andamento. Toque num nó com contorno brilhante para começar.'));
+      : h('p', { class: 'rs-hint' }, 'Nenhum projeto em andamento. Toque num nó com contorno amarelo para começar.'));
 }
 
 function progressBar(store, n) {
   const eta = n.etaWeeks != null ? ` · ${fmtIn(store.state.turn + n.etaWeeks, store.state.turn)}` : '';
   return bar(fracOf(n) * 100, {
     key: `rs.${n.id}`, label: `${n.name}${n.refining ? ' · refino' : ''}${n.approach === 'bold' ? ' · ousada' : ''}${n.stalled ? ' · parado' : ''}${eta}`,
-    kind: n.approach === 'bold' ? 'warn' : 'accent',
+    kind: n.approach === 'bold' ? 'warn' : 'info',
   });
 }
 
 function legend() {
   return h('div', { class: 'tt-legend', 'aria-label': 'Legenda' },
     ['done', 'active', 'available', 'locked', 'secret'].map((s) =>
-      h('span', { class: `tt-leg ns-${s}` }, h('i', { 'aria-hidden': 'true' }, STATE_GLYPH[s]), STATE_LABELS[s])));
+      h('span', { class: `tt-leg ns-${s}` }, markOf(s), STATE_LABELS[s])));
 }
 
 /**
@@ -512,7 +530,7 @@ function treeView(store, nodes, branches) {
     class: `tt-band${b.x != null ? ' tt-band-col' : ''}`,
     style: { left: `${b.x ?? 0}px`, top: `${b.y}px`, height: `${b.h}px`, width: `${b.w ?? lay.width}px`, '--band': b.color },
     title: b.name,
-  }, h('span', { class: 'tt-band-label' }, h('span', { 'aria-hidden': 'true' }, b.icon), ` ${b.name}`)));
+  }, h('span', { class: 'tt-band-label' }, h('i', { class: 'tt-band-dot', style: { background: b.color }, 'aria-hidden': 'true' }), h('span', { class: 'tt-band-ic', 'aria-hidden': 'true' }, b.icon), h('span', { class: 'tt-band-name' }, b.name))));
   const tiles = {};
   for (const n of nodes) {
     const p = lay.pos[n.id];
@@ -520,14 +538,14 @@ function treeView(store, nodes, branches) {
     tiles[n.id] = tile(store, n, p, G);
   }
   const world = h('div', { class: 'tt-world', style: { width: `${lay.width}px`, height: `${lay.height}px` } }, bands, svg, Object.values(tiles));
-  const zoomBtn = (label, aria, fn) => h('button', { class: 'tt-tool', type: 'button', 'aria-label': aria, title: aria, onclick: fn }, label);
+  const zoomBtn = (ic, aria, fn, extra) => h('button', { class: extra ? 'tt-tool tt-tool-extra' : 'tt-tool', type: 'button', 'aria-label': aria, title: aria, onclick: fn }, icon(ic, 20));
   const vp = h('div', { class: 'tt-viewport', role: 'group', 'aria-label': 'Árvore de tecnologia. Arraste para mover, pince para aproximar.' },
     world,
     h('div', { class: 'tt-tools' },
-      zoomBtn('−', 'Afastar', () => ctl.zoomBy(1 / 1.3)),
-      zoomBtn('+', 'Aproximar', () => ctl.zoomBy(1.3)),
-      zoomBtn('⤢', 'Ver a árvore inteira', () => ctl.fitAll()),
-      zoomBtn('◎', 'Ir para a fronteira', () => ctl.focusFrontier())));
+      zoomBtn('mais', 'Aproximar', () => ctl.zoomBy(1.3)),
+      zoomBtn('menos', 'Afastar', () => ctl.zoomBy(1 / 1.3)),
+      zoomBtn('expandir', 'Ver a árvore inteira', () => ctl.fitAll(), true),
+      zoomBtn('alvo', 'Ir para a fronteira', () => ctl.focusFrontier(), true)));
   const ctl = panZoom(vp, world, lay, nodes);
   ctl.tiles = tiles;
   ctl.edges = edgeEls;
@@ -545,8 +563,8 @@ function tile(store, n, p, G) {
   const rivals = s === 'secret' ? [] : rivalActors(store, n);
   const frac = fracOf(n);
   const R = 15, C = 2 * Math.PI * R;
-  const cost = s === 'done' ? (n.quality != null && n.quality < 1 ? '⚠ falhas' : n.quality > 1 ? '✦ avanço' : 'pronto')
-    : s === 'active' ? `${Math.round(frac * 100)}%` : s === 'secret' ? '' : `${fmtNum(n.science || 0)} 🔬`;
+  const cost = s === 'done' ? (n.quality != null && n.quality < 1 ? 'falhas' : n.quality > 1 ? 'avanço' : 'pronto')
+    : s === 'active' ? `${Math.round(frac * 100)}%` : s === 'secret' ? '' : `${fmtNum(n.science || 0)} pts`;
   const aria = n.hidden ? 'Tecnologia secreta, ainda desconhecida'
     : `${n.name}. ${STATE_LABELS[s] || s}.${s === 'active' ? ` ${Math.round(frac * 100)}%.` : ''}${s !== 'done' ? ` Custa ${fmtNum(n.science || 0)} de ciência.` : ''}${rivals.length ? ` Rivais já têm: ${rivals.map((a) => a.short || a.id).join(', ')}.` : ''}`;
   return h('button', {
@@ -554,7 +572,7 @@ function tile(store, n, p, G) {
     style: { left: `${p.x}px`, top: `${p.y}px`, width: `${G.tile}px`, height: `${G.tile}px`, '--band': (BRANCH_STYLE[n.branch] || {}).color || '#98a3bf' },
     onclick: () => selectNode(store, n.id, { open: true, center: true }),
   },
-  h('span', { class: 'tt-badge', 'aria-hidden': 'true' }, STATE_GLYPH[s] || ''),
+  markOf(s, 'tt-badge'),
   h('span', { class: 'tt-icon', 'aria-hidden': 'true' },
     s === 'active' ? h('span', {
       class: 'tt-ring', html: `<svg viewBox="0 0 36 36" width="32" height="32"><circle cx="18" cy="18" r="${R}" class="tt-ring-bg"/><circle cx="18" cy="18" r="${R}" class="tt-ring-fg" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 18 18)"/></svg>`,
@@ -655,9 +673,10 @@ function jump(store, id) {
 
 function nodeLink(store, n) {
   return h('button', { class: `tt-link ns-${n.state}`, type: 'button', onclick: () => jump(store, n.id) },
-    h('i', { 'aria-hidden': 'true' }, STATE_GLYPH[n.state] || ''),
-    h('span', null, n.hidden ? 'Tecnologia secreta' : n.name || n.id),
-    h('span', { class: 'tt-link-state' }, STATE_LABELS[n.state] || ''));
+    markOf(n.state, 'tt-link-mark'),
+    h('span', { class: 'tt-link-name' }, n.hidden ? 'Tecnologia secreta' : n.name || n.id),
+    h('span', { class: 'tt-link-state' }, STATE_LABELS[n.state] || ''),
+    icon('avancar', 16, 'tt-link-chev'));
 }
 
 function sheetContent(store, n, nodes) {
@@ -667,12 +686,12 @@ function sheetContent(store, n, nodes) {
   const kids = childrenMap(nodes)[n.id] || [];
   const reqs = (n.requires || []).map((r) => byId[r]).filter(Boolean);
   const head = h('div', { class: 'tt-sheet-tags' },
-    chip(`${branch?.icon || bs.icon || '✦'} ${branch?.name || n.branchName || n.branch}`, ''),
-    chip(`${STATE_GLYPH[n.state] || ''} ${STATE_LABELS[n.state] || n.state}`, STATE_KIND[n.state] || 'muted'));
+    chip([h('i', { class: 'tt-band-dot', style: { background: bs.color || '#98a3bf' }, 'aria-hidden': 'true' }), branch?.name || n.branchName || n.branch], ''),
+    chip(STATE_LABELS[n.state] || n.state, STATE_KIND[n.state] || 'muted'));
   if (n.hidden) {
     return h('div', { class: 'node-sheet' }, head,
       h('p', null, 'Ninguém na agência sabe ainda o que existe aqui. Um acontecimento no caminho pode revelar esta pesquisa.'),
-      reqs.length ? h('div', { class: 'tt-sec' }, h('h3', null, 'Ligada a'), reqs.map((r) => nodeLink(store, r))) : null);
+      reqs.length ? h('div', { class: 'tt-sec' }, h('h3', null, 'Ligada a'), h('div', { class: 'tt-links' }, reqs.map((r) => nodeLink(store, r)))) : null);
   }
   const info = attempt(() => pointsInfo(store), {});
   const ap = info.approaches || store.data?.tech?.config?.approaches || {};
@@ -682,10 +701,10 @@ function sheetContent(store, n, nodes) {
   const boldW = n.weeksBold ?? (weeks != null ? Math.max(1, Math.round(weeks / (ap.bold?.speed || 1.65))) : null);
   const costBold = n.costBold ?? (n.cost != null ? Math.round(n.cost * (ap.bold?.costMult || 1.1)) : null);
   const out = h('div', { class: 'node-sheet' }, head,
-    n.description ? h('p', null, n.description) : null,
+    n.description ? h('p', { class: 'tt-desc' }, n.description) : null,
     effectChips(n));
   out.appendChild(h('div', { class: 'tt-facts' },
-    fact('Ciência', `${fmtNum(n.science || 0)} 🔬`, n.state !== 'done' && n.state !== 'active' ? `você tem ${fmtNum(info.points ?? 0)}` : null),
+    fact('Ciência', `${fmtNum(n.science || 0)} pts`, n.state !== 'done' && n.state !== 'active' ? `você tem ${fmtNum(info.points ?? 0)}` : null),
     fact('Verba', n.cost != null ? fmtMoney(n.cost) : '—', n.cost != null && weeks ? `total, pago ao longo do projeto (≈ ${fmtMoney(n.cost / weeks)}/sem)` : 'total, pago ao longo do projeto'),
     fact('Prazo', weeks != null ? `~${weeks} sem` : '—', 'abordagem segura')));
   if (n.state === 'active') {
@@ -695,14 +714,14 @@ function sheetContent(store, n, nodes) {
         const r = store.dispatch({ type: 'research/cancel', nodeId: n.id });
         if (r?.ok) { toast(`Projeto cancelado.${r.refund ? ` ${fmtNum(r.refund)} de ciência devolvidos.` : ''}`, 'warn'); closeSheetAndClear(); }
         else toast(r?.error || 'Não foi possível cancelar.', 'bad');
-      }, { kind: 'danger' }),
+      }, { kind: 'danger', big: true }),
       h('p', { class: 'tiny muted' }, `Cancelar devolve parte da ciência (${Math.round((store.data?.tech?.config?.cancelRefund ?? 0.5) * 100)}%). A verba já gasta não volta.`));
   } else if (n.state === 'done' && n.canRefine) {
     out.append(h('p', { class: 'small' }, 'O projeto terminou com falhas. Refinar recupera o efeito completo.'),
       button('Refinar tecnologia', () => {
         const r = store.dispatch({ type: 'research/refine', nodeId: n.id });
         if (r?.ok) { toast(`Refino iniciado: ${n.name}.`, 'good'); closeSheetAndClear(); } else toast(r?.error || 'Não foi possível refinar.', 'bad');
-      }, { kind: 'primary' }));
+      }, { kind: 'primary', big: true }));
   } else if (n.state === 'available') {
     const slotsFull = info.slots != null && (info.active ?? 0) >= info.slots;
     const noSci = n.canAffordScience === false || (n.canAffordScience == null && (info.points ?? 0) < (n.science || 0));
@@ -714,35 +733,35 @@ function sheetContent(store, n, nodes) {
       else toast(r?.error || 'Não foi possível iniciar.', 'bad');
     };
     // native append() would turn a null into the text "null": only append what exists
-    if (blocked) out.appendChild(h('div', { class: 'warn-text small' }, `⚠ ${blocked}`));
+    if (blocked) out.appendChild(h('div', { class: 'aviso warn tt-note' }, icon('alerta', 14, 'tt-note-ic'), h('span', null, blocked)));
     out.appendChild(
       h('div', { class: 'approach-grid' },
-        approachBtn('safe', '🛡 Segura', weeks, n.cost, ap.safe?.description || 'Sem surpresas. Ideal para o que a missão precisa a tempo.', !!blocked, start),
-        approachBtn('bold', '🎲 Ousada', boldW, costBold, ap.bold?.description || 'Chance de resultado inesperado: um salto ou um tropeço.', !!blocked, start)));
+        approachBtn('safe', 'Segura', weeks, n.cost, ap.safe?.description || 'Sem surpresas. Ideal para o que a missão precisa a tempo.', !!blocked, start),
+        approachBtn('bold', 'Ousada', boldW, costBold, ap.bold?.description || 'Chance de resultado inesperado: um salto ou um tropeço.', !!blocked, start)));
   } else if (n.state === 'locked') {
-    out.appendChild(h('p', { class: 'small tt-locked-note' }, `🔒 Pesquise antes: ${missing.map((r) => r.hidden ? 'uma tecnologia secreta' : r.name).join(', ') || 'os pré-requisitos'}.`));
+    out.appendChild(h('div', { class: 'aviso tt-note tt-locked-note' }, icon('cadeado', 14, 'tt-note-ic'), h('span', null, `Pesquise antes: ${missing.map((r) => r.hidden ? 'uma tecnologia secreta' : r.name).join(', ') || 'os pré-requisitos'}.`)));
   } else if (n.state === 'done') {
-    out.appendChild(h('p', { class: 'small good-text' }, `✓ Concluída${n.quality > 1 ? ', com um avanço inesperado' : ''}. Os efeitos já valem para as suas missões.`));
+    out.appendChild(h('div', { class: 'aviso ok tt-note' }, icon('check', 14, 'tt-note-ic'), h('span', null, `Concluída${n.quality > 1 ? ', com um avanço inesperado' : ''}. Os efeitos já valem para as suas missões.`)));
   }
   if (rivals.length) {
     out.appendChild(h('div', { class: 'tt-rivals-line small muted' },
       rivals.map((a) => h('i', { class: 'tt-dot', style: { background: a.color || 'var(--muted)' }, 'aria-hidden': 'true' })),
-      ` Já dominam: ${rivals.map((a) => `${a.flag ? a.flag + ' ' : ''}${a.short || a.id}`).join(', ')}`));
+      ` Já dominam: ${rivals.map((a) => `${flagPrefix(a)}${a.short || a.id}`).join(', ')}`));
   }
-  if (reqs.length) out.appendChild(h('div', { class: 'tt-sec' }, h('h3', null, 'Requer'), reqs.map((r) => nodeLink(store, r))));
-  if (kids.length) out.appendChild(h('div', { class: 'tt-sec' }, h('h3', null, 'Libera'), kids.map((k) => byId[k]).filter(Boolean).map((k) => nodeLink(store, k))));
+  if (reqs.length) out.appendChild(h('div', { class: 'tt-sec' }, h('h3', null, 'Requer'), h('div', { class: 'tt-links' }, reqs.map((r) => nodeLink(store, r)))));
+  if (kids.length) out.appendChild(h('div', { class: 'tt-sec' }, h('h3', null, 'Libera'), h('div', { class: 'tt-links' }, kids.map((k) => byId[k]).filter(Boolean).map((k) => nodeLink(store, k)))));
   return out;
 }
 
 function fact(label, value, sub) {
-  return h('div', { class: 'tt-fact' }, h('div', { class: 'tiny muted' }, label), h('div', { class: 'tt-fact-v' }, value), sub ? h('div', { class: 'tiny muted' }, sub) : null);
+  return h('div', { class: 'tt-fact' }, h('div', { class: 'tt-fact-l' }, h('span', { class: 'tt-fact-k' }, label), sub ? h('span', { class: 'tt-fact-sub' }, sub) : null), h('div', { class: 'tt-fact-v' }, value));
 }
 
 function approachBtn(kind, title, weeks, cost, desc, disabled, start) {
   return h('button', { class: `approach ${kind}`, type: 'button', disabled, onclick: () => start(kind) },
-    h('div', { class: 'approach-title' }, title),
-    h('div', { class: 'small' }, [weeks != null ? `~${weeks} semanas` : kind === 'bold' ? 'Mais rápida' : 'Mais lenta', cost != null ? fmtMoney(cost) : null].filter(Boolean).join(' · ')),
-    h('div', { class: 'tiny muted' }, desc));
+    h('div', { class: 'approach-head' }, h('span', { class: 'approach-title' }, title), kind === 'bold' ? chip('arriscada', 'warn') : null),
+    h('div', { class: 'approach-stats' }, [weeks != null ? `~${weeks} sem` : kind === 'bold' ? 'Mais rápida' : 'Mais lenta', cost != null ? fmtMoney(cost) : null].filter(Boolean).join(' · ')),
+    h('div', { class: 'approach-desc' }, desc));
 }
 
 // ------------------------------------------------------------------ pan / zoom
@@ -770,7 +789,8 @@ function panZoom(vp, world, lay, nodes) {
   let v = ui.view ? { ...ui.view } : null;
   let raf = 0;
   let destroyed = false;
-  const size = () => ({ w: vp.clientWidth || 360, h: vp.clientHeight || 480 });
+  // the tools float in the bottom-right corner (DESIGN §6), so the whole viewport is usable for fit/centre
+  const size = () => ({ w: Math.max(120, vp.clientWidth || 360), h: vp.clientHeight || 480 });
   const clampV = () => {
     const { w, h: hh } = size();
     v.s = Math.max(MIN, Math.min(MAX, v.s));

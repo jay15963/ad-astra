@@ -40,8 +40,13 @@ function focusOf(rs, hM) {
   } catch { minY = 0; }
   minY = clamp(minY, 0, hM * 0.85);
   const tS = rs?.events?.staging;
-  const b = Number.isFinite(tS) ? smooth((num(rs.t) - tS - 0.6) / 2.4) : 1;
-  return { yLo: minY * b, b, minY };
+  const since = Number.isFinite(tS) ? num(rs.t) - tS : Infinity;
+  const b = Number.isFinite(since) ? smooth((since - 0.6) / 2.4) : 1;
+  // zoom onto the upper stack once the spent stage has fallen well behind (it stays in frame meanwhile);
+  // while it is still close the framing slides up-right so the stage has room below-left
+  const zb = Number.isFinite(since) ? smooth((since - 6.5) / 4.5) : 1;
+  const kB = Number.isFinite(since) ? smooth(since / 1.5) * (1 - smooth((since - 9) / 3)) : 0;
+  return { yLo: minY * b, b, zb, kB, minY };
 }
 
 /** Visual height (m) of the climb used for the ground: metric near the pad, logarithmic above (the
@@ -69,17 +74,24 @@ export function ascentFrame(rs, stackHeightM) {
   const hM = Math.max(5, num(stackHeightM, 50));
   const pad = rs?.mode === 'pad';
   const vis = pad ? 0 : visualClimbM(alt);
-  const base = (H * (pad ? 0.58 : 0.42)) / hM;
+  // one world scale for rocket, tower, pad and smoke: the pad shot (0.58 H) eases into the climb framing (0.42 H)
+  // over the first ~60 visual metres, so nothing jumps at T-0 and the camera zooms out by scaling the whole world
+  const base = (H * (pad ? 0.58 : 0.42 + 0.16 * (1 - smooth(vis / 60)))) / hM;
   const z1 = 1 - 0.5 * smooth(vis / 150);
   const z2 = 1 - 0.22 * clamp(alt / 60, 0, 1);
   const f = focusOf(rs, hM);
   const upper = Math.max(4, hM - (f.minY || 0));
-  const zs = 1 + f.b * clamp((hM / upper - 1) * 0.8, 0, 1.4);
-  const pxPerM = base * z1 * z2 * zs;
+  // after staging the camera closes in on the upper stack: ~120-160 px long on a phone, so the vacuum bell,
+  // interstage and payload adapter read clearly (never zooms out)
+  const pre = base * z1 * z2;
+  const targetPx = clamp(H * 0.19, 110, 165);
+  const ppmUp = Math.max(pre, Math.min(targetPx / upper, (W * 0.55) / upper));
+  const pxPerM = f.minY > 0 ? pre + (ppmUp - pre) * f.zb : pre;
   const tilt = pad ? 0 : gravityTurn(alt);
   // tracked: the middle of the visible stack sits a bit above screen centre
   const yMid = (f.yLo + hM) / 2;
-  const fx = W * 0.5, fy = H * 0.45;
+  const kB = f.kB || 0;
+  const fx = W * (0.5 + 0.16 * kB * Math.sign(Math.sin(tilt) || 1)), fy = H * (0.45 - 0.09 * kB);
   const trackX = fx - Math.sin(tilt) * yMid * pxPerM;
   const trackY = fy + Math.cos(tilt) * yMid * pxPerM;
   const padY = H * 0.84;
