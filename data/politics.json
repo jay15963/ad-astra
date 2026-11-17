@@ -1,0 +1,2236 @@
+{
+  "_doc": "Economia, governos, eleições, escala de tensão 0-4, eventos exógenos e manchetes. Dono: módulo politics (src/sim/politics.js). Dinheiro em US$ milhões; growth/inflation em pontos percentuais ao ano; pct em fração (0.03 = 3%).",
+  "levels": [
+    {
+      "level": 0,
+      "label": "normal",
+      "description": "Relações de rotina."
+    },
+    {
+      "level": 1,
+      "label": "tensão",
+      "description": "Parcerias esfriam."
+    },
+    {
+      "level": 2,
+      "label": "crise",
+      "description": "Sanções e cortes de verba de parcerias."
+    },
+    {
+      "level": 3,
+      "label": "conflito regional",
+      "description": "Rotas, lançadores e parceiros perdidos."
+    },
+    {
+      "level": 4,
+      "label": "guerra aberta",
+      "description": "Programas suspensos e prioridade militar."
+    }
+  ],
+  "priorities": {
+    "crewed_prestige": {
+      "label": "prestígio tripulado: bandeira na Lua antes da China",
+      "cultureBias": 10,
+      "budgetBias": 0.012
+    },
+    "science": {
+      "label": "ciência, robótica e observação da Terra",
+      "cultureBias": -8,
+      "budgetBias": 0
+    },
+    "commercial": {
+      "label": "parcerias comerciais e corte de custos",
+      "cultureBias": 6,
+      "budgetBias": -0.01
+    },
+    "lunar_crewed": {
+      "label": "pouso tripulado na Lua até 2030",
+      "cultureBias": 8,
+      "budgetBias": 0.008
+    },
+    "human_spaceflight": {
+      "label": "voo tripulado nacional e estação própria",
+      "cultureBias": 6,
+      "budgetBias": 0.006
+    },
+    "autonomy": {
+      "label": "autonomia estratégica de acesso ao espaço",
+      "cultureBias": 0,
+      "budgetBias": 0.01
+    },
+    "austerity": {
+      "label": "austeridade fiscal",
+      "cultureBias": -5,
+      "budgetBias": -0.03
+    },
+    "military": {
+      "label": "prioridade militar e satélites de defesa",
+      "cultureBias": 0,
+      "budgetBias": -0.02
+    },
+    "station": {
+      "label": "estação orbital nacional",
+      "cultureBias": 0,
+      "budgetBias": 0
+    },
+    "artemis_partner": {
+      "label": "parceria lunar com os EUA",
+      "cultureBias": 2,
+      "budgetBias": 0.005
+    },
+    "growth": {
+      "label": "crescimento e cadência",
+      "cultureBias": 5,
+      "budgetBias": 0
+    }
+  },
+  "nations": [
+    {
+      "id": "usa",
+      "name": "EUA",
+      "flag": "🇺🇸",
+      "actors": [
+        "nasa",
+        "spacex",
+        "blueorigin"
+      ],
+      "aliases": [
+        "EUA",
+        "US",
+        "USA",
+        "Estados Unidos"
+      ],
+      "system": "presidential",
+      "legislature": "Congresso",
+      "hearingBody": "Congresso",
+      "economy": {
+        "growth": 1.9,
+        "trend": 1.9,
+        "inflation": 2.9,
+        "inflationTarget": 2,
+        "debt": 122,
+        "debtTolerance": 135,
+        "debtDrift": 2,
+        "volatility": 0.6,
+        "weight": 1,
+        "budgetBase": 0.02,
+        "budgetVolatility": 0.03
+      },
+      "factions": [
+        {
+          "id": "gop",
+          "name": "Partido Republicano",
+          "short": "os republicanos",
+          "gov": "governo republicano",
+          "spaceStance": 0.35,
+          "priority": "crewed_prestige",
+          "hawk": 0.65,
+          "art": "o"
+        },
+        {
+          "id": "dem",
+          "name": "Partido Democrata",
+          "short": "os democratas",
+          "gov": "governo democrata",
+          "spaceStance": 0.3,
+          "priority": "science",
+          "hawk": 0.45,
+          "art": "o"
+        }
+      ],
+      "government": {
+        "exec": "gop",
+        "legis": "gop"
+      },
+      "art": "os",
+      "capital": "Washington",
+      "legislatureArt": "o",
+      "hearingBodyArt": "o"
+    },
+    {
+      "id": "china",
+      "name": "China",
+      "flag": "🇨🇳",
+      "actors": [
+        "cnsa"
+      ],
+      "aliases": [
+        "China",
+        "CN"
+      ],
+      "system": "party",
+      "legislature": "Congresso Nacional do Povo",
+      "hearingBody": "Comissão Central do Partido",
+      "economy": {
+        "growth": 4.4,
+        "trend": 4.2,
+        "inflation": 0.6,
+        "inflationTarget": 1.5,
+        "debt": 95,
+        "debtTolerance": 130,
+        "debtDrift": 3,
+        "volatility": 0.45,
+        "weight": 0.9,
+        "budgetBase": 0.035,
+        "budgetVolatility": 0.02
+      },
+      "factions": [
+        {
+          "id": "cpc_core",
+          "name": "PCCh (núcleo dirigente)",
+          "short": "a liderança do PCCh",
+          "gov": "comando do PCCh",
+          "spaceStance": 0.8,
+          "priority": "lunar_crewed",
+          "hawk": 0.65,
+          "art": "o"
+        },
+        {
+          "id": "cpc_econ",
+          "name": "PCCh (ala econômica)",
+          "short": "a ala econômica do PCCh",
+          "gov": "comando econômico do PCCh",
+          "spaceStance": 0.6,
+          "priority": "commercial",
+          "hawk": 0.45,
+          "art": "o"
+        }
+      ],
+      "government": {
+        "exec": "cpc_core",
+        "legis": "cpc_core"
+      },
+      "art": "a",
+      "capital": "Pequim",
+      "legislatureArt": "o",
+      "hearingBodyArt": "a"
+    },
+    {
+      "id": "india",
+      "name": "Índia",
+      "flag": "🇮🇳",
+      "actors": [
+        "isro"
+      ],
+      "aliases": [
+        "Índia",
+        "India",
+        "IN"
+      ],
+      "system": "parliamentary",
+      "legislature": "Lok Sabha",
+      "hearingBody": "comitê parlamentar",
+      "economy": {
+        "growth": 6.4,
+        "trend": 6.3,
+        "inflation": 3.6,
+        "inflationTarget": 4,
+        "debt": 82,
+        "debtTolerance": 95,
+        "debtDrift": 0.3,
+        "volatility": 0.7,
+        "weight": 0.5,
+        "budgetBase": 0.045,
+        "budgetVolatility": 0.035
+      },
+      "factions": [
+        {
+          "id": "nda",
+          "name": "NDA (liderada pelo BJP)",
+          "short": "a NDA",
+          "gov": "governo da NDA",
+          "spaceStance": 0.65,
+          "priority": "human_spaceflight",
+          "hawk": 0.6,
+          "art": "a"
+        },
+        {
+          "id": "india_bloc",
+          "name": "Aliança INDIA (liderada pelo Congresso)",
+          "short": "a Aliança INDIA",
+          "gov": "governo da Aliança INDIA",
+          "spaceStance": 0.45,
+          "priority": "science",
+          "hawk": 0.4,
+          "art": "a"
+        }
+      ],
+      "government": {
+        "exec": "nda",
+        "legis": "nda"
+      },
+      "art": "a",
+      "capital": "Nova Délhi",
+      "legislatureArt": "a",
+      "hearingBodyArt": "o"
+    },
+    {
+      "id": "europe",
+      "name": "Europa",
+      "flag": "🇪🇺",
+      "actors": [
+        "esa"
+      ],
+      "aliases": [
+        "Europa",
+        "EU",
+        "UE"
+      ],
+      "system": "parliamentary",
+      "legislature": "Parlamento Europeu",
+      "hearingBody": "Conselho da ESA",
+      "economy": {
+        "growth": 1.1,
+        "trend": 1.2,
+        "inflation": 2.1,
+        "inflationTarget": 2,
+        "debt": 88,
+        "debtTolerance": 100,
+        "debtDrift": 0.4,
+        "volatility": 0.5,
+        "weight": 0.8,
+        "budgetBase": 0.015,
+        "budgetVolatility": 0.025
+      },
+      "factions": [
+        {
+          "id": "eu_center",
+          "name": "coalizão pró-europeia de centro",
+          "short": "o centro pró-europeu",
+          "gov": "bloco pró-europeu",
+          "spaceStance": 0.4,
+          "priority": "autonomy",
+          "hawk": 0.45,
+          "art": "a"
+        },
+        {
+          "id": "eu_right",
+          "name": "bloco nacional-conservador",
+          "short": "os nacional-conservadores",
+          "gov": "bloco nacional-conservador",
+          "spaceStance": 0.15,
+          "priority": "austerity",
+          "hawk": 0.55,
+          "art": "o"
+        }
+      ],
+      "government": {
+        "exec": "eu_center",
+        "legis": "eu_center"
+      },
+      "art": "a",
+      "capital": "Bruxelas",
+      "legislatureArt": "o",
+      "hearingBodyArt": "o"
+    },
+    {
+      "id": "russia",
+      "name": "Rússia",
+      "flag": "🇷🇺",
+      "actors": [
+        "roscosmos"
+      ],
+      "aliases": [
+        "Rússia",
+        "Russia",
+        "RU"
+      ],
+      "system": "presidential",
+      "legislature": "Duma",
+      "hearingBody": "Duma",
+      "economy": {
+        "growth": 0.9,
+        "trend": 1.1,
+        "inflation": 7.5,
+        "inflationTarget": 5,
+        "debt": 22,
+        "debtTolerance": 40,
+        "debtDrift": 1,
+        "volatility": 0.8,
+        "weight": 0.3,
+        "budgetBase": -0.005,
+        "budgetVolatility": 0.04
+      },
+      "factions": [
+        {
+          "id": "ur",
+          "name": "Rússia Unida",
+          "short": "o Kremlin",
+          "gov": "Kremlin",
+          "spaceStance": 0.3,
+          "priority": "military",
+          "hawk": 0.85,
+          "art": "a"
+        },
+        {
+          "id": "ru_tech",
+          "name": "ala tecnocrata",
+          "short": "os tecnocratas",
+          "gov": "governo tecnocrata",
+          "spaceStance": 0.5,
+          "priority": "station",
+          "hawk": 0.55,
+          "art": "a"
+        }
+      ],
+      "government": {
+        "exec": "ur",
+        "legis": "ur"
+      },
+      "art": "a",
+      "capital": "Moscou",
+      "legislatureArt": "a",
+      "hearingBodyArt": "a"
+    },
+    {
+      "id": "japan",
+      "name": "Japão",
+      "flag": "🇯🇵",
+      "actors": [
+        "jaxa"
+      ],
+      "aliases": [
+        "Japão",
+        "Japan",
+        "JP"
+      ],
+      "system": "parliamentary",
+      "legislature": "Dieta",
+      "hearingBody": "Dieta",
+      "snapElectionPerYear": 0.12,
+      "economy": {
+        "growth": 0.7,
+        "trend": 0.6,
+        "inflation": 2.6,
+        "inflationTarget": 2,
+        "debt": 235,
+        "debtTolerance": 260,
+        "debtDrift": 0.5,
+        "volatility": 0.5,
+        "weight": 0.5,
+        "budgetBase": 0.02,
+        "budgetVolatility": 0.02
+      },
+      "factions": [
+        {
+          "id": "ldp",
+          "name": "Partido Liberal Democrata (PLD)",
+          "short": "o PLD",
+          "gov": "governo do PLD",
+          "spaceStance": 0.55,
+          "priority": "artemis_partner",
+          "hawk": 0.6,
+          "art": "o"
+        },
+        {
+          "id": "cdp",
+          "name": "Partido Democrático Constitucional",
+          "short": "a oposição constitucionalista",
+          "gov": "governo da oposição",
+          "spaceStance": 0.4,
+          "priority": "science",
+          "hawk": 0.35,
+          "art": "o"
+        }
+      ],
+      "government": {
+        "exec": "ldp",
+        "legis": "ldp"
+      },
+      "art": "o",
+      "capital": "Tóquio",
+      "legislatureArt": "a",
+      "hearingBodyArt": "a"
+    }
+  ],
+  "markets": {
+    "spacex": {
+      "nation": "usa",
+      "sentiment": 68,
+      "baseSentiment": 60,
+      "revenueGrowth": 0.2,
+      "firstRoundWeek": 20,
+      "roundEveryWeeks": 52,
+      "founderBacked": false,
+      "gov": "conselho e investidores",
+      "backers": "os investidores",
+      "volatility": 3,
+      "budgetSensitivity": 0.16
+    },
+    "blueorigin": {
+      "nation": "usa",
+      "sentiment": 52,
+      "baseSentiment": 55,
+      "revenueGrowth": 0.05,
+      "firstRoundWeek": 32,
+      "roundEveryWeeks": 52,
+      "founderBacked": true,
+      "gov": "fundador",
+      "backers": "o fundador",
+      "volatility": 2,
+      "budgetSensitivity": 0.08
+    }
+  },
+  "elections": [
+    {
+      "id": "ru_duma_2026",
+      "nation": "russia",
+      "year": 2026,
+      "month": 8,
+      "week": 3,
+      "kind": "legislative",
+      "name": "eleição para a Duma",
+      "base": 0.95,
+      "weight": 0.3,
+      "sensitivity": 0.15,
+      "art": "a"
+    },
+    {
+      "id": "us_midterm_2026",
+      "nation": "usa",
+      "year": 2026,
+      "month": 10,
+      "week": 1,
+      "kind": "legislative",
+      "name": "eleições de meio de mandato nos EUA",
+      "base": 0.38,
+      "weight": 0.7,
+      "art": "as"
+    },
+    {
+      "id": "fr_pres_2027",
+      "nation": "europe",
+      "year": 2027,
+      "month": 3,
+      "week": 2,
+      "kind": "member",
+      "name": "eleição presidencial na França",
+      "base": 0.5,
+      "weight": 0.4,
+      "stanceSwing": 0.08,
+      "art": "a"
+    },
+    {
+      "id": "cn_congress_2027",
+      "nation": "china",
+      "year": 2027,
+      "month": 9,
+      "week": 3,
+      "kind": "congress",
+      "name": "21º Congresso do Partido Comunista",
+      "base": 0.96,
+      "weight": 0.6,
+      "sensitivity": 0.1,
+      "art": "o"
+    },
+    {
+      "id": "jp_upper_2028",
+      "nation": "japan",
+      "year": 2028,
+      "month": 6,
+      "week": 2,
+      "kind": "legislative",
+      "name": "eleição para a Câmara Alta do Japão",
+      "base": 0.55,
+      "weight": 0.5,
+      "art": "a"
+    },
+    {
+      "id": "us_pres_2028",
+      "nation": "usa",
+      "year": 2028,
+      "month": 10,
+      "week": 1,
+      "kind": "executive",
+      "name": "eleição presidencial nos EUA",
+      "base": 0.47,
+      "weight": 1,
+      "art": "a"
+    },
+    {
+      "id": "esa_cm_2028",
+      "nation": "europe",
+      "year": 2028,
+      "month": 10,
+      "week": 4,
+      "kind": "budget_summit",
+      "name": "Conselho Ministerial da ESA",
+      "weight": 0.8,
+      "art": "o"
+    },
+    {
+      "id": "in_general_2029",
+      "nation": "india",
+      "year": 2029,
+      "month": 3,
+      "week": 4,
+      "kind": "executive",
+      "name": "eleições gerais na Índia",
+      "base": 0.6,
+      "weight": 1,
+      "art": "as"
+    },
+    {
+      "id": "eu_parliament_2029",
+      "nation": "europe",
+      "year": 2029,
+      "month": 5,
+      "week": 1,
+      "kind": "executive",
+      "name": "eleições para o Parlamento Europeu",
+      "base": 0.62,
+      "weight": 0.8,
+      "art": "as"
+    },
+    {
+      "id": "de_federal_2029",
+      "nation": "europe",
+      "year": 2029,
+      "month": 8,
+      "week": 4,
+      "kind": "member",
+      "name": "eleição federal na Alemanha",
+      "base": 0.5,
+      "weight": 0.4,
+      "stanceSwing": 0.07,
+      "art": "a"
+    },
+    {
+      "id": "ru_pres_2030",
+      "nation": "russia",
+      "year": 2030,
+      "month": 2,
+      "week": 2,
+      "kind": "executive",
+      "name": "eleição presidencial na Rússia",
+      "base": 0.98,
+      "weight": 0.4,
+      "sensitivity": 0.15,
+      "art": "a"
+    },
+    {
+      "id": "us_midterm_2030",
+      "nation": "usa",
+      "year": 2030,
+      "month": 10,
+      "week": 1,
+      "kind": "legislative",
+      "name": "eleições de meio de mandato nos EUA",
+      "base": 0.4,
+      "weight": 0.7,
+      "art": "as"
+    }
+  ],
+  "electionModel": {
+    "growthEffect": 0.03,
+    "crisisPenalty": 0.1,
+    "inflationPenalty": 0.03,
+    "rallyBonus": 0.05,
+    "min": 0.04,
+    "max": 0.98,
+    "snapLeadWeeks": [
+      5,
+      8
+    ],
+    "announceWeeks": 4
+  },
+  "crises": {
+    "recession": {
+      "label": "recessão",
+      "growthHit": -3,
+      "inflationHit": -0.5,
+      "debtHit": 2.5,
+      "months": [
+        6,
+        14
+      ],
+      "budgetPct": -0.05,
+      "stance": -0.06,
+      "base": 0.0035,
+      "lowGrowth": 0.01,
+      "instability": 0.05
+    },
+    "inflation_shock": {
+      "label": "crise inflacionária",
+      "growthHit": -0.8,
+      "inflationHit": 4,
+      "debtHit": 0.5,
+      "months": [
+        5,
+        12
+      ],
+      "budgetPct": -0.025,
+      "stance": -0.03,
+      "base": 0.0018,
+      "highInflation": 0.006,
+      "instability": 0.04
+    },
+    "debt_crisis": {
+      "label": "crise da dívida",
+      "growthHit": -2,
+      "inflationHit": 1.5,
+      "debtHit": 4,
+      "months": [
+        10,
+        20
+      ],
+      "budgetPct": -0.07,
+      "stance": -0.08,
+      "base": 0.0005,
+      "debtFactor": 0.02,
+      "instability": 0.07
+    },
+    "market_crash": {
+      "label": "crise no mercado",
+      "months": [
+        4,
+        9
+      ],
+      "sentiment": -15,
+      "budgetPct": -0.12
+    }
+  },
+  "tensionModel": {
+    "decay": 0.8,
+    "meanReversion": 0.12,
+    "up": [
+      0.55,
+      0.7,
+      1,
+      1.35
+    ],
+    "down": 0.55,
+    "minDwellWeeks": 8,
+    "rivalryFactor": 0.08,
+    "trustFactor": 0.05,
+    "hawkFactor": 0.08,
+    "noiseScale": 0.3,
+    "levelDrag": [
+      0,
+      0,
+      0,
+      0.05,
+      0.18
+    ],
+    "peaceTreaty": 0.02
+  },
+  "pairs": [
+    {
+      "a": "usa",
+      "b": "china",
+      "initial": [
+        1,
+        2
+      ],
+      "baseline": 1.6,
+      "volatility": 0.35,
+      "places": [
+        "no Estreito de Taiwan",
+        "no Mar do Sul da China",
+        "nas ilhas Filipinas"
+      ],
+      "race": true,
+      "floor": 1
+    },
+    {
+      "a": "usa",
+      "b": "russia",
+      "initial": 2,
+      "baseline": 1.8,
+      "volatility": 0.3,
+      "places": [
+        "no Leste Europeu",
+        "no Ártico",
+        "no Mar Negro"
+      ],
+      "floor": 1
+    },
+    {
+      "a": "europe",
+      "b": "russia",
+      "initial": 2,
+      "baseline": 2,
+      "volatility": 0.32,
+      "places": [
+        "na Ucrânia",
+        "no Báltico",
+        "na fronteira da Polônia"
+      ],
+      "floor": 1
+    },
+    {
+      "a": "china",
+      "b": "india",
+      "initial": 1,
+      "baseline": 1,
+      "volatility": 0.3,
+      "places": [
+        "na fronteira do Himalaia",
+        "em Ladakh",
+        "no Arunachal Pradesh"
+      ],
+      "race": true
+    },
+    {
+      "a": "china",
+      "b": "japan",
+      "initial": [
+        1,
+        2
+      ],
+      "baseline": 1.3,
+      "volatility": 0.3,
+      "places": [
+        "nas ilhas Senkaku",
+        "no Mar do Leste da China"
+      ]
+    },
+    {
+      "a": "japan",
+      "b": "russia",
+      "initial": 1,
+      "baseline": 0.9,
+      "volatility": 0.2,
+      "places": [
+        "nas ilhas Curilas",
+        "no Mar de Okhotsk"
+      ]
+    },
+    {
+      "a": "china",
+      "b": "europe",
+      "initial": 1,
+      "baseline": 0.9,
+      "volatility": 0.25,
+      "places": [
+        "no Mar Báltico",
+        "nas rotas do Mar Vermelho"
+      ]
+    },
+    {
+      "a": "europe",
+      "b": "usa",
+      "initial": [
+        0,
+        1
+      ],
+      "baseline": 0.45,
+      "volatility": 0.25,
+      "places": [
+        "no Atlântico Norte",
+        "na Groenlândia"
+      ]
+    },
+    {
+      "a": "india",
+      "b": "usa",
+      "initial": [
+        0,
+        1
+      ],
+      "baseline": 0.35,
+      "volatility": 0.2,
+      "places": [
+        "no Oceano Índico"
+      ]
+    },
+    {
+      "a": "china",
+      "b": "russia",
+      "initial": 0,
+      "baseline": 0.1,
+      "volatility": 0.12,
+      "places": [
+        "na Ásia Central"
+      ]
+    },
+    {
+      "a": "india",
+      "b": "russia",
+      "initial": 0,
+      "baseline": 0.15,
+      "volatility": 0.12,
+      "places": [
+        "na Ásia Central"
+      ]
+    },
+    {
+      "a": "india",
+      "b": "japan",
+      "initial": 0,
+      "baseline": 0.05,
+      "volatility": 0.1,
+      "places": [
+        "no Oceano Índico"
+      ]
+    },
+    {
+      "a": "europe",
+      "b": "india",
+      "initial": 0,
+      "baseline": 0.15,
+      "volatility": 0.1,
+      "places": [
+        "no Oceano Índico"
+      ]
+    },
+    {
+      "a": "europe",
+      "b": "japan",
+      "initial": 0,
+      "baseline": 0.05,
+      "volatility": 0.1,
+      "places": [
+        "no Pacífico"
+      ]
+    },
+    {
+      "a": "japan",
+      "b": "usa",
+      "initial": 0,
+      "baseline": 0.15,
+      "volatility": 0.15,
+      "places": [
+        "no Pacífico"
+      ]
+    }
+  ],
+  "levelEffects": {
+    "partnershipCutPct": 0.03,
+    "rolloverPartnerPct": -0.02,
+    "raceBonusPct": 0.012,
+    "rolloverConflictPct": -0.03,
+    "warCutPct": 0.08,
+    "rolloverWarPct": -0.07,
+    "warStance": -0.1
+  },
+  "budgetModel": {
+    "growthEffect": 0.008,
+    "stanceEffect": 0.1,
+    "supportEffect": 0.03,
+    "min": -0.25,
+    "max": 0.2,
+    "floorShare": 0.4,
+    "playerCutThreshold": -0.035,
+    "dividedVolatility": 1.5
+  },
+  "demandModel": {
+    "leadWeeks": 22,
+    "minWeeks": 8,
+    "chance": 0.75,
+    "rewardPct": [
+      0.02,
+      0.04
+    ],
+    "failStance": -0.1,
+    "failSupport": -7,
+    "failBudgetPct": -0.04,
+    "okSupport": 6,
+    "okStance": 0.06
+  },
+  "goals": {
+    "any_success": "um lançamento bem-sucedido",
+    "crewed_success": "um voo tripulado bem-sucedido",
+    "lunar_success": "uma missão lunar bem-sucedida",
+    "first": "um marco inédito para a Tabela da Era"
+  },
+  "news": {
+    "perMonth": 4,
+    "hardMax": 6
+  },
+  "templates": {
+    "tension_up_1": [
+      "Relações entre {A} e {B} esfriam",
+      "Clima azeda entre {capA} e {capB}; diplomatas falam em 'momento delicado'",
+      "{A} e {B} trocam acusações e congelam conversas de cooperação",
+      "Atrito entre {A} e {B} deixa parcerias em compasso de espera"
+    ],
+    "tension_up_2": [
+      "Crise entre {A} e {B}: sanções e cortes de verba à vista",
+      "{A} e {B} rompem canais de diálogo; parcerias espaciais na berlinda",
+      "Embaixadores convocados: {A} e {B} entram em crise aberta",
+      "Escalada diplomática entre {capA} e {capB} ameaça projetos conjuntos"
+    ],
+    "tension_up_3": [
+      "Conflito regional {place} opõe {A} e {B}",
+      "Choques {place} levam {A} e {B} ao pior momento em décadas",
+      "{A} e {B} em conflito {place}: rotas e lançadores na mira",
+      "Tiros {place}: crise entre {capA} e {capB} vira conflito armado"
+    ],
+    "tension_up_4": [
+      "Guerra aberta entre {A} e {B}; programas civis suspensos",
+      "{A} e {B} em guerra: agências espaciais recebem ordem de prioridade militar",
+      "Combates {place} se espalham: {A} e {B} cruzam a linha da guerra",
+      "Mundo assiste à guerra entre {A} e {B}; satélites viram alvo estratégico"
+    ],
+    "tension_down_0": [
+      "{A} e {B} normalizam relações",
+      "Degelo completo: {capA} e {capB} voltam à rotina diplomática",
+      "Tensão entre {A} e {B} se dissipa; cooperação volta à mesa"
+    ],
+    "tension_down_1": [
+      "{A} e {B} baixam o tom; crise perde força",
+      "Canais reabertos: {capA} e {capB} saem da crise",
+      "Alívio entre {A} e {B}: sanções começam a ser revistas"
+    ],
+    "tension_down_2": [
+      "Cessar-fogo {place}: {A} e {B} encerram o conflito, mas a crise continua",
+      "Trégua frágil entre {A} e {B}; sanções seguem de pé",
+      "Armas silenciam {place}; {capA} e {capB} negociam sob desconfiança"
+    ],
+    "tension_down_3": [
+      "Guerra entre {A} e {B} recua para conflito localizado",
+      "Armistício parcial entre {A} e {B}; programas civis podem voltar aos poucos",
+      "{capA} e {capB} aceitam corredor de negociação; combates diminuem"
+    ],
+    "level2_partner_cut": [
+      "Crise entre {A} e {B} congela {amount} da parceria {actorA}–{actorB}",
+      "Sanções atingem o espaço: parceria {actorA}–{actorB} perde verba",
+      "Governos cortam fundos da cooperação {actorA}–{actorB}"
+    ],
+    "level3_access": [
+      "Conflito fecha lançadores e estações de rastreio entre {A} e {B}",
+      "Sem acesso: agências {deA} e {deB} perdem rotas e foguetes uma da outra",
+      "Conflito {place} corta o acesso mútuo a bases de lançamento"
+    ],
+    "level4_military": [
+      "Verba espacial desviada para a defesa {emA} e {emB}",
+      "Prioridade militar: {actorA} e {actorB} perdem {pct} da verba civil",
+      "Guerra drena os programas espaciais {deA} e {deB}"
+    ],
+    "election_upcoming": [
+      "{Election}: faltam quatro semanas e o espaço entra no debate",
+      "Campanha esquenta antes {ofElection}; programa espacial vira tema",
+      "Pesquisas apertadas na reta final {ofElection}"
+    ],
+    "election_continuity": [
+      "{party} vence {election} e mantém o rumo do programa espacial",
+      "Continuidade: {party} segue no poder após {election}",
+      "{Election}: vitória {ofParty}; agências respiram aliviadas"
+    ],
+    "election_change": [
+      "Virada {inElection}: {party} assume e promete rever prioridades",
+      "{party} vence {election}; agenda espacial passa a ser {priority}",
+      "Troca de poder após {election}: programa espacial entra em revisão"
+    ],
+    "legislative_hold": [
+      "{party} mantém o controle {ofLegislature} {inElection}",
+      "{Election}: {party} segura a maioria {inLegislature}",
+      "Sem surpresas {inElection}: {legislature} segue nas mãos {ofParty}"
+    ],
+    "legislative_flip": [
+      "{party} toma {legislature} {inElection}; orçamento espacial entra em negociação",
+      "{Election}: {legislature} muda de mãos e o governo perde a maioria",
+      "Governo dividido: {party} vence {election} e controla {legislature}"
+    ],
+    "member_good": [
+      "{Election}: vencedor promete reforçar a ESA",
+      "Resultado {ofElection} anima a indústria espacial europeia",
+      "{Election}: novo governo quer mais autonomia espacial europeia"
+    ],
+    "member_bad": [
+      "{Election}: vitória cética preocupa a ESA",
+      "Resultado {ofElection} ameaça contribuições para a ESA",
+      "{Election}: vencedor fala em cortar 'gastos com o espaço'"
+    ],
+    "congress_continuity": [
+      "{Election} confirma o rumo: espaço segue como prioridade estratégica",
+      "{Election}: liderança reafirma a meta de {priority}",
+      "Continuidade {inElection}; metas espaciais mantidas"
+    ],
+    "congress_change": [
+      "{Election} muda a ênfase: {priority} ganha força",
+      "Surpresa {inElection}: {party} amplia influência sobre o programa espacial",
+      "{Election}: nova linha prioriza {priority}"
+    ],
+    "budget_summit_up": [
+      "{Election} aprova alta de {pct} nas contribuições à ESA",
+      "Europa abre o cofre: {election} fecha com aumento de {pct}",
+      "{Election}: ministros reforçam a ESA em {pct}"
+    ],
+    "budget_summit_down": [
+      "{Election} fecha com corte de {pct} nas contribuições",
+      "Europa aperta o cinto: ESA perde {pct} {inElection}",
+      "{Election}: ministros reduzem a verba da ESA em {pct}"
+    ],
+    "snap_called": [
+      "{N}: governo convoca eleição antecipada",
+      "Eleição antecipada {emN} reabre a disputa pelo orçamento",
+      "Primeiro-ministro dissolve a câmara e {oN} vai às urnas"
+    ],
+    "crisis_recession": [
+      "Recessão {emN}: orçamento espacial sob pressão",
+      "PIB encolhe {emN} e governo fala em cortes",
+      "Economia {deN} entra em recessão; agências temem cortes"
+    ],
+    "crisis_inflation_shock": [
+      "Choque de inflação {emN} corrói verbas públicas",
+      "Preços disparam {emN}; juros sobem e projetos atrasam",
+      "Inflação em alta {emN} encarece contratos espaciais"
+    ],
+    "crisis_debt_crisis": [
+      "Crise da dívida {emN}: governo anuncia austeridade",
+      "Mercados punem {capN}; juros da dívida batem recorde",
+      "Crise fiscal {emN} põe programas não essenciais na mira"
+    ],
+    "crisis_end": [
+      "Economia {deN} deixa a {crisis} para trás",
+      "Fim da {crisis} {emN}; economia volta a respirar",
+      "{capN} supera a {crisis}, mas cicatrizes ficam no orçamento"
+    ],
+    "funding_up": [
+      "{actor} levanta {amount} em nova rodada de investimento",
+      "Investidores apostam alto: {actor} capta {amount}",
+      "Rodada recorde: {actor} soma {amount} em caixa"
+    ],
+    "funding_founder": [
+      "Fundador injeta {amount} na {actor}",
+      "{actor} recebe aporte de {amount} do fundador",
+      "Novo cheque do fundador: {amount} para a {actor}"
+    ],
+    "funding_down": [
+      "Rodada fraca: {actor} capta menos que o esperado e corta custos",
+      "Investidores recuam e {actor} revisa planos",
+      "{actor} enfrenta rodada difícil; avaliação cai"
+    ],
+    "budget_digest": [
+      "Orçamentos espaciais de {year}: {summary}",
+      "Verbas de {year} definidas: {summary}",
+      "Mapa do dinheiro em {year}: {summary}"
+    ],
+    "budget_player_up": [
+      "{actor} terá {amount} em {year} ({pct})",
+      "Verba da {actor} sobe para {amount} em {year} ({pct})",
+      "Boa notícia no orçamento: {actor} recebe {pct} para {year}"
+    ],
+    "budget_player_down": [
+      "Aperto: verba da {actor} cai para {amount} em {year} ({pct})",
+      "{actor} perde verba em {year}: {amount} ({pct})",
+      "Orçamento de {year} encolhe para a {actor} ({pct})"
+    ],
+    "demand_fulfilled": [
+      "Promessa cumprida: {actor} entrega resultado antes {ofElection}",
+      "{actor} chega à reta final {ofElection} com vitória para mostrar",
+      "Resultado na hora certa: {actor} fortalece o governo antes {ofElection}"
+    ],
+    "demand_failed": [
+      "{actor} enfrenta {election} sem o resultado prometido",
+      "Promessa quebrada: governo cobra a direção da {actor} após {election}",
+      "Sem a missão prometida, {actor} vira alvo {inElection}"
+    ],
+    "sputnik_moment": [
+      "Feito da {rival} provoca 'momento Sputnik' {emN}",
+      "{capN} reage ao marco da {rival}: políticos pedem mais verba",
+      "Conquista da {rival} acende alerta {emN}"
+    ],
+    "hearing_news": [
+      "{Body} convoca a direção da {actor} após falha",
+      "Falha leva a {actor} ao banco dos depoentes",
+      "Investigação política: {actor} terá de se explicar"
+    ]
+  },
+  "events": [
+    {
+      "id": "sanctions_package",
+      "target": "pair",
+      "weight": 3,
+      "cooldownMonths": 8,
+      "minLevel": 1,
+      "maxLevel": 3,
+      "levelBias": 0.6,
+      "importance": 2,
+      "pairs": [
+        [
+          "usa",
+          "russia"
+        ],
+        [
+          "europe",
+          "russia"
+        ],
+        [
+          "usa",
+          "china"
+        ],
+        [
+          "europe",
+          "china"
+        ],
+        [
+          "japan",
+          "russia"
+        ],
+        [
+          "japan",
+          "china"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.35,
+        "tension": 1,
+        "tensionChance": 0.35,
+        "maxResult": 3,
+        "econ": [
+          {
+            "who": "b",
+            "growth": -0.3,
+            "inflation": 0.3
+          }
+        ]
+      },
+      "headlines": [
+        "{capA} anuncia novo pacote de sanções contra {oB}",
+        "Sanções {deA} miram bancos e indústria {deB}",
+        "{capB} promete retaliar após sanções {deA}",
+        "Novas sanções {deA} atingem o setor aeroespacial {deB}"
+      ]
+    },
+    {
+      "id": "export_control",
+      "target": "pair",
+      "weight": 3,
+      "cooldownMonths": 6,
+      "minLevel": 0,
+      "maxLevel": 3,
+      "levelBias": 0.4,
+      "importance": 1,
+      "pairs": [
+        [
+          "usa",
+          "china"
+        ],
+        [
+          "japan",
+          "china"
+        ],
+        [
+          "europe",
+          "china"
+        ],
+        [
+          "usa",
+          "russia"
+        ],
+        [
+          "usa",
+          "india"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.3,
+        "econ": [
+          {
+            "who": "b",
+            "growth": -0.2
+          }
+        ],
+        "sentiment": -2
+      },
+      "headlines": [
+        "{capA} amplia controle de exportação de chips e componentes para {oB}",
+        "Lista negra: {capA} veta venda de tecnologia aeroespacial para {oB}",
+        "Controle de exportação {deA} atrasa fornecedores {emB}"
+      ]
+    },
+    {
+      "id": "asat_test",
+      "target": "pair",
+      "weight": 1.2,
+      "cooldownMonths": 14,
+      "minLevel": 1,
+      "maxLevel": 3,
+      "levelBias": 0.5,
+      "importance": 3,
+      "pairs": [
+        [
+          "russia",
+          "usa"
+        ],
+        [
+          "china",
+          "usa"
+        ],
+        [
+          "russia",
+          "europe"
+        ],
+        [
+          "china",
+          "india"
+        ],
+        [
+          "china",
+          "japan"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.45,
+        "tension": 1,
+        "tensionChance": 0.55,
+        "maxResult": 3,
+        "debris": 0.15,
+        "stance": [
+          {
+            "who": "b",
+            "delta": 0.04
+          }
+        ]
+      },
+      "headlines": [
+        "{capA} testa míssil antissatélite e espalha detritos em órbita baixa",
+        "Teste antissatélite {deA} revolta {capB}: 'ato irresponsável'",
+        "Nuvem de detritos após teste {deA} obriga satélites a manobrar"
+      ]
+    },
+    {
+      "id": "debris_incident",
+      "target": "pair",
+      "weight": 1.8,
+      "cooldownMonths": 8,
+      "minLevel": 0,
+      "maxLevel": 4,
+      "levelBias": 0.2,
+      "importance": 2,
+      "pairs": [
+        [
+          "russia",
+          "usa"
+        ],
+        [
+          "china",
+          "usa"
+        ],
+        [
+          "russia",
+          "europe"
+        ],
+        [
+          "china",
+          "japan"
+        ],
+        [
+          "usa",
+          "china"
+        ],
+        [
+          "india",
+          "china"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.22,
+        "debris": 0.08
+      },
+      "headlines": [
+        "Detrito {deA} passa a metros de satélite {deB}; {capB} cobra explicações",
+        "Estágio abandonado {deA} força satélite {deB} a manobrar",
+        "Colisão evitada por pouco: {capB} acusa {capA} de negligência orbital"
+      ]
+    },
+    {
+      "id": "trade_war",
+      "target": "pair",
+      "weight": 2.2,
+      "cooldownMonths": 12,
+      "minLevel": 0,
+      "maxLevel": 3,
+      "levelBias": 0.3,
+      "importance": 2,
+      "pairs": [
+        [
+          "usa",
+          "china"
+        ],
+        [
+          "usa",
+          "europe"
+        ],
+        [
+          "usa",
+          "india"
+        ],
+        [
+          "europe",
+          "china"
+        ],
+        [
+          "usa",
+          "japan"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.3,
+        "econ": [
+          {
+            "who": "both",
+            "growth": -0.4,
+            "inflation": 0.4
+          }
+        ],
+        "sentiment": -4
+      },
+      "headlines": [
+        "Guerra comercial: {capA} impõe tarifas de 25% a produtos {deB}",
+        "{capB} responde às tarifas {deA} e taxa importações",
+        "Disputa tarifária entre {A} e {B} encarece componentes espaciais"
+      ]
+    },
+    {
+      "id": "summit_detente",
+      "target": "pair",
+      "weight": 2.4,
+      "cooldownMonths": 8,
+      "minLevel": 1,
+      "maxLevel": 3,
+      "levelBias": 0.4,
+      "importance": 2,
+      "pairs": "any",
+      "effects": {
+        "pressure": -0.5,
+        "tension": -1,
+        "tensionChance": 0.45
+      },
+      "headlines": [
+        "Cúpula entre {capA} e {capB} termina com aperto de mão e promessas",
+        "Distensão: líderes {deA} e {deB} reabrem canais de diálogo",
+        "{A} e {B} anunciam grupo de trabalho para reduzir tensões"
+      ]
+    },
+    {
+      "id": "arms_control_talks",
+      "target": "pair",
+      "weight": 1.2,
+      "cooldownMonths": 12,
+      "minLevel": 1,
+      "maxLevel": 3,
+      "levelBias": 0.3,
+      "importance": 1,
+      "pairs": [
+        [
+          "usa",
+          "russia"
+        ],
+        [
+          "usa",
+          "china"
+        ],
+        [
+          "europe",
+          "russia"
+        ]
+      ],
+      "effects": {
+        "pressure": -0.4
+      },
+      "headlines": [
+        "{A} e {B} retomam conversas sobre controle de armas no espaço",
+        "Genebra recebe negociadores {deA} e {deB} para tratado antissatélite",
+        "{A} e {B} discutem moratória de testes antissatélite"
+      ]
+    },
+    {
+      "id": "border_skirmish",
+      "target": "pair",
+      "weight": 1.6,
+      "cooldownMonths": 10,
+      "minLevel": 1,
+      "maxLevel": 3,
+      "levelBias": 0.6,
+      "importance": 2,
+      "pairs": [
+        [
+          "china",
+          "india"
+        ],
+        [
+          "china",
+          "japan"
+        ],
+        [
+          "russia",
+          "europe"
+        ],
+        [
+          "russia",
+          "japan"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.5,
+        "tension": 1,
+        "tensionChance": 0.3,
+        "maxResult": 3,
+        "stance": [
+          {
+            "who": "both",
+            "delta": 0.03
+          }
+        ]
+      },
+      "headlines": [
+        "Incidente armado {place} entre forças {deA} e {deB}",
+        "Patrulhas {deA} e {deB} se enfrentam {place}",
+        "Escaramuça {place} deixa feridos e eleva a tensão entre {A} e {B}"
+      ]
+    },
+    {
+      "id": "naval_standoff",
+      "target": "pair",
+      "weight": 1.6,
+      "cooldownMonths": 8,
+      "minLevel": 1,
+      "maxLevel": 3,
+      "levelBias": 0.6,
+      "importance": 2,
+      "pairs": [
+        [
+          "china",
+          "usa"
+        ],
+        [
+          "china",
+          "japan"
+        ],
+        [
+          "russia",
+          "europe"
+        ],
+        [
+          "russia",
+          "usa"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.45,
+        "tension": 1,
+        "tensionChance": 0.2,
+        "maxResult": 3
+      },
+      "headlines": [
+        "Navios {deA} e {deB} em impasse {place}",
+        "Manobras militares {deA} {place} irritam {capB}",
+        "Frotas {deA} e {deB} se encaram {place}; mercados reagem"
+      ]
+    },
+    {
+      "id": "military_buildup",
+      "target": "pair",
+      "weight": 1.4,
+      "cooldownMonths": 10,
+      "minLevel": 2,
+      "maxLevel": 3,
+      "levelBias": 0.8,
+      "importance": 2,
+      "pairs": "any",
+      "effects": {
+        "pressure": 0.4,
+        "econ": [
+          {
+            "who": "both",
+            "inflation": 0.2
+          }
+        ],
+        "stance": [
+          {
+            "who": "both",
+            "delta": -0.03
+          }
+        ]
+      },
+      "headlines": [
+        "{capA} mobiliza tropas e reforça bases perto {deB}",
+        "Corrida armamentista: {A} e {B} ampliam gastos de defesa",
+        "{capA} desloca baterias antiaéreas {place}; {capB} fala em provocação"
+      ]
+    },
+    {
+      "id": "cyberattack_ground",
+      "target": "pair",
+      "weight": 1.6,
+      "cooldownMonths": 8,
+      "minLevel": 1,
+      "maxLevel": 4,
+      "levelBias": 0.5,
+      "importance": 2,
+      "pairs": [
+        [
+          "russia",
+          "europe"
+        ],
+        [
+          "china",
+          "usa"
+        ],
+        [
+          "russia",
+          "usa"
+        ],
+        [
+          "china",
+          "india"
+        ],
+        [
+          "china",
+          "japan"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.3,
+        "stance": [
+          {
+            "who": "b",
+            "delta": 0.02
+          }
+        ]
+      },
+      "headlines": [
+        "Ataque hacker atribuído a {capA} derruba rede de rastreio {deB}",
+        "{capB} acusa {capA} de invadir sistemas de controle de satélites",
+        "Ciberataque contra estação terrena {deB}; suspeitas recaem sobre {capA}"
+      ]
+    },
+    {
+      "id": "spy_scandal",
+      "target": "pair",
+      "weight": 1.4,
+      "cooldownMonths": 10,
+      "minLevel": 0,
+      "maxLevel": 3,
+      "levelBias": 0.4,
+      "importance": 1,
+      "pairs": [
+        [
+          "china",
+          "usa"
+        ],
+        [
+          "russia",
+          "europe"
+        ],
+        [
+          "china",
+          "europe"
+        ],
+        [
+          "russia",
+          "usa"
+        ],
+        [
+          "china",
+          "india"
+        ]
+      ],
+      "effects": {
+        "pressure": 0.25
+      },
+      "headlines": [
+        "Engenheiro é preso {emB} por espionar para {oA}",
+        "{capB} expulsa diplomatas {deA} por espionagem aeroespacial",
+        "Escândalo: satélite {deA} teria espionado bases {deB}"
+      ]
+    },
+    {
+      "id": "sanctions_relief",
+      "target": "pair",
+      "weight": 1.3,
+      "cooldownMonths": 10,
+      "minLevel": 2,
+      "maxLevel": 3,
+      "levelBias": 0.3,
+      "importance": 2,
+      "pairs": "any",
+      "effects": {
+        "pressure": -0.45,
+        "tension": -1,
+        "tensionChance": 0.4,
+        "econ": [
+          {
+            "who": "both",
+            "growth": 0.2
+          }
+        ]
+      },
+      "headlines": [
+        "{capA} alivia sanções contra {oB} em troca de concessões",
+        "Gesto de boa vontade: {capA} libera exportações para {oB}",
+        "{A} e {B} fecham acordo para suspender parte das sanções"
+      ]
+    },
+    {
+      "id": "escalation_war",
+      "target": "pair",
+      "weight": 1.5,
+      "cooldownMonths": 18,
+      "minLevel": 3,
+      "maxLevel": 3,
+      "levelBias": 0.5,
+      "importance": 3,
+      "pairs": "any",
+      "effects": {
+        "pressure": 0.6,
+        "tension": 1,
+        "tensionChance": 0.5,
+        "maxResult": 4,
+        "econ": [
+          {
+            "who": "both",
+            "growth": -1,
+            "inflation": 1
+          }
+        ],
+        "sentiment": -6
+      },
+      "headlines": [
+        "Ofensiva {place}: forças {deA} atacam posições {deB}",
+        "{capB} acusa {capA} de invasão {place}; aliados convocam reunião de emergência",
+        "Mobilização geral: {capA} declara estado de guerra contra {oB}"
+      ]
+    },
+    {
+      "id": "ceasefire_talks",
+      "target": "pair",
+      "weight": 3,
+      "cooldownMonths": 4,
+      "minLevel": 3,
+      "maxLevel": 4,
+      "levelBias": 0.5,
+      "importance": 3,
+      "pairs": "any",
+      "effects": {
+        "pressure": -0.6,
+        "tension": -1,
+        "tensionChance": 0.4
+      },
+      "headlines": [
+        "Mediação internacional leva {A} e {B} à mesa de negociação",
+        "{A} e {B} aceitam trégua humanitária {place}",
+        "Diplomatas anunciam corredor de negociação entre {capA} e {capB}"
+      ]
+    },
+    {
+      "id": "joint_rescue",
+      "target": "pair",
+      "weight": 0.8,
+      "cooldownMonths": 18,
+      "minLevel": 1,
+      "maxLevel": 2,
+      "levelBias": 0.2,
+      "importance": 1,
+      "pairs": "any",
+      "effects": {
+        "pressure": -0.35,
+        "stance": [
+          {
+            "who": "both",
+            "delta": 0.02
+          }
+        ]
+      },
+      "headlines": [
+        "Controladores {deA} e {deB} cooperam para evitar colisão em órbita",
+        "Gesto raro: {capA} ajuda {capB} a recuperar satélite em pane",
+        "Cientistas {deA} e {deB} assinam carta pela cooperação espacial"
+      ]
+    },
+    {
+      "id": "external_war",
+      "target": "global",
+      "weight": 1.2,
+      "cooldownMonths": 18,
+      "importance": 2,
+      "effects": {
+        "econ": [
+          {
+            "who": "all",
+            "inflation": 0.8,
+            "growth": -0.3
+          }
+        ],
+        "pressureAll": 0.12,
+        "sentiment": -3
+      },
+      "headlines": [
+        "Guerra no Oriente Médio dispara o petróleo e assusta mercados",
+        "Conflito no Sahel desloca milhões e pressiona orçamentos europeus",
+        "Crise no Mar Vermelho fecha rotas de comércio; fretes disparam"
+      ]
+    },
+    {
+      "id": "oil_shock",
+      "target": "global",
+      "weight": 1,
+      "cooldownMonths": 20,
+      "importance": 2,
+      "effects": {
+        "econ": [
+          {
+            "who": [
+              "europe",
+              "japan",
+              "india"
+            ],
+            "inflation": 1.5,
+            "growth": -0.6,
+            "crisis": "inflation_shock",
+            "crisisChance": 0.35
+          },
+          {
+            "who": [
+              "russia"
+            ],
+            "growth": 0.6
+          }
+        ],
+        "sentiment": -2
+      },
+      "headlines": [
+        "Choque do petróleo: barril passa de US$ 120",
+        "Cartel corta produção e petróleo dispara; importadores sofrem",
+        "Energia cara volta a assombrar Europa e Ásia"
+      ]
+    },
+    {
+      "id": "stock_crash",
+      "target": "global",
+      "weight": 0.9,
+      "cooldownMonths": 24,
+      "minTurn": 20,
+      "importance": 2,
+      "effects": {
+        "sentiment": -18,
+        "marketCrisis": true,
+        "econ": [
+          {
+            "who": [
+              "usa"
+            ],
+            "growth": -0.7
+          },
+          {
+            "who": "all",
+            "growth": -0.2
+          }
+        ]
+      },
+      "headlines": [
+        "Bolsas despencam; empresas de tecnologia perdem trilhões",
+        "Estoura a bolha da inteligência artificial: Nasdaq cai 30%",
+        "Pânico em Wall Street fecha a torneira do capital de risco"
+      ]
+    },
+    {
+      "id": "tech_boom",
+      "target": "global",
+      "weight": 1.1,
+      "cooldownMonths": 18,
+      "importance": 1,
+      "effects": {
+        "sentiment": 10,
+        "econ": [
+          {
+            "who": [
+              "usa"
+            ],
+            "growth": 0.3
+          }
+        ]
+      },
+      "headlines": [
+        "Euforia no mercado: capital de risco volta a fluir para o espaço",
+        "Investidores disputam startups espaciais; avaliações disparam",
+        "Banda larga por satélite vira febre e anima o setor espacial"
+      ]
+    },
+    {
+      "id": "space_law_agreement",
+      "target": "global",
+      "weight": 0.9,
+      "cooldownMonths": 20,
+      "minGlobal": 1,
+      "importance": 2,
+      "effects": {
+        "pressureAll": -0.3,
+        "debris": -0.1
+      },
+      "headlines": [
+        "ONU aprova regras de tráfego orbital com apoio das potências",
+        "Acordo global sobre detritos espaciais surpreende diplomatas",
+        "Potências assinam código de conduta para a órbita lunar"
+      ]
+    },
+    {
+      "id": "pandemic_shock",
+      "target": "global",
+      "weight": 0.08,
+      "once": true,
+      "minTurn": 40,
+      "importance": 3,
+      "effects": {
+        "econ": [
+          {
+            "who": "all",
+            "growth": -2.5,
+            "crisis": "recession",
+            "crisisChance": 0.85
+          }
+        ],
+        "sentiment": -15,
+        "stance": [
+          {
+            "who": "all",
+            "delta": -0.08
+          }
+        ],
+        "pressureAll": 0.1
+      },
+      "headlines": [
+        "Nova pandemia fecha fronteiras e paralisa a economia mundial",
+        "OMS declara emergência global; lançamentos e fábricas param",
+        "Vírus respiratório se espalha e derruba o PIB mundial"
+      ]
+    },
+    {
+      "id": "political_scandal",
+      "target": "nation",
+      "weight": 1.5,
+      "cooldownMonths": 12,
+      "importance": 1,
+      "nations": [
+        "usa",
+        "india",
+        "europe",
+        "japan"
+      ],
+      "effects": {
+        "incumbent": [
+          {
+            "who": "nation",
+            "delta": -0.08
+          }
+        ],
+        "stance": [
+          {
+            "who": "nation",
+            "delta": -0.03
+          }
+        ]
+      },
+      "headlines": [
+        "Escândalo de corrupção abala o governo {deN}",
+        "{N}: denúncia derruba ministro e enfraquece o governo",
+        "Crise política {emN}: aprovação do governo despenca"
+      ]
+    },
+    {
+      "id": "government_shutdown",
+      "target": "nation",
+      "weight": 2.5,
+      "cooldownMonths": 10,
+      "requiresDivided": true,
+      "importance": 2,
+      "nations": [
+        "usa"
+      ],
+      "effects": {
+        "budgetPct": [
+          {
+            "who": "nation",
+            "pct": -0.015
+          }
+        ],
+        "stance": [
+          {
+            "who": "nation",
+            "delta": -0.04
+          }
+        ]
+      },
+      "headlines": [
+        "Paralisação do governo {emN} congela contratos espaciais",
+        "Sem acordo no Congresso, governo {deN} fecha as portas",
+        "Shutdown {emN} manda engenheiros para casa"
+      ]
+    },
+    {
+      "id": "stimulus_package",
+      "target": "nation",
+      "weight": 1.3,
+      "cooldownMonths": 14,
+      "importance": 1,
+      "nations": "any",
+      "effects": {
+        "econ": [
+          {
+            "who": "nation",
+            "growth": 0.5,
+            "inflation": 0.3
+          }
+        ],
+        "budgetPct": [
+          {
+            "who": "nation",
+            "pct": 0.015
+          }
+        ]
+      },
+      "headlines": [
+        "{capN} lança pacote de estímulo com dinheiro para a indústria espacial",
+        "Plano de investimento {deN} inclui verba para foguetes e satélites",
+        "Política industrial: {capN} aposta no espaço para gerar empregos"
+      ]
+    },
+    {
+      "id": "space_race_speech",
+      "target": "nation",
+      "weight": 1.4,
+      "cooldownMonths": 12,
+      "importance": 1,
+      "nations": [
+        "usa",
+        "china",
+        "india",
+        "russia"
+      ],
+      "effects": {
+        "stance": [
+          {
+            "who": "nation",
+            "delta": 0.08
+          }
+        ]
+      },
+      "headlines": [
+        "Líder {deN} promete 'chegar primeiro' à Lua em discurso inflamado",
+        "{capN} transforma o programa lunar em causa nacional",
+        "Discurso {emN} reacende a corrida espacial"
+      ]
+    },
+    {
+      "id": "currency_crisis",
+      "target": "nation",
+      "weight": 0.8,
+      "cooldownMonths": 24,
+      "importance": 2,
+      "nations": [
+        "russia",
+        "india",
+        "japan"
+      ],
+      "effects": {
+        "econ": [
+          {
+            "who": "nation",
+            "inflation": 2,
+            "growth": -0.5,
+            "crisis": "inflation_shock",
+            "crisisChance": 0.5
+          }
+        ]
+      },
+      "headlines": [
+        "Moeda {deN} despenca e banco central sobe juros",
+        "Fuga de capitais derruba a moeda {deN}",
+        "Desvalorização {emN} encarece peças importadas"
+      ]
+    }
+  ],
+  "decisions": {
+    "election_demand": {
+      "agency": {
+        "title": "Pressão eleitoral",
+        "body": "Faltam cerca de {weeks} semanas para {election}. O {gov} quer {goal} antes da votação e oferece verba extra de {pct}. Se a promessa falhar, a conta vem depois.",
+        "choices": [
+          {
+            "id": "accept",
+            "label": "Prometer o resultado",
+            "preview": "Verba +{pct} já. Cumprir: apoio +6. Falhar: apoio −7 e corte de 4% no ano seguinte."
+          },
+          {
+            "id": "decline",
+            "label": "Não prometer",
+            "preview": "Apoio −3. O governo esfria com a agência."
+          }
+        ]
+      },
+      "company": {
+        "title": "Investidores querem resultado",
+        "body": "A próxima rodada de investimento é em cerca de {weeks} semanas. {backers} querem {goal} antes disso e prometem aporte extra de {pct}.",
+        "choices": [
+          {
+            "id": "accept",
+            "label": "Prometer o resultado",
+            "preview": "Receita +{pct} já. Cumprir: apoio +6. Falhar: apoio −7 e receita −4%."
+          },
+          {
+            "id": "decline",
+            "label": "Não prometer",
+            "preview": "Apoio −3. Os investidores ficam desconfiados."
+          }
+        ]
+      }
+    },
+    "budget_cut": {
+      "agency": {
+        "title": "Corte no orçamento de {year}",
+        "body": "Com {reason}, o {gov} propõe reduzir a verba da agência em {pct} ({amount} por ano). Dá para aceitar, negociar nos bastidores ou brigar em público.",
+        "choices": [
+          {
+            "id": "accept",
+            "label": "Aceitar o corte",
+            "preview": "Verba −{amount}/ano. Apoio +2."
+          },
+          {
+            "id": "negotiate",
+            "label": "Negociar nos bastidores",
+            "preview": "~{chance} de chance de cortar só a metade. Se falhar: corte integral e apoio −2."
+          },
+          {
+            "id": "fight",
+            "label": "Brigar em público",
+            "preview": "Corte cai para {third}/ano. Apoio −6 e o governo esfria."
+          }
+        ]
+      },
+      "company": {
+        "title": "Investidores exigem cortes",
+        "body": "Com {reason}, {backers} querem reduzir a receita destinada ao espaço em {pct} ({amount} por ano) em {year}.",
+        "choices": [
+          {
+            "id": "accept",
+            "label": "Cortar custos",
+            "preview": "Receita −{amount}/ano. Apoio +2."
+          },
+          {
+            "id": "negotiate",
+            "label": "Apresentar novo plano",
+            "preview": "~{chance} de chance de cortar só a metade. Se falhar: corte integral e apoio −2."
+          },
+          {
+            "id": "fight",
+            "label": "Bater o pé",
+            "preview": "Corte cai para {third}/ano. Apoio −6."
+          }
+        ]
+      }
+    },
+    "hearing": {
+      "agency": {
+        "title": "Audiência {inBody}",
+        "body": "Depois da falha de {mission}, {body} convocou a direção da agência para depor. A resposta vai definir quanto apoio sobra.",
+        "choices": [
+          {
+            "id": "own",
+            "label": "Assumir a responsabilidade",
+            "preview": "Reputação +4, apoio −3."
+          },
+          {
+            "id": "review",
+            "label": "Prometer revisão independente",
+            "preview": "Reputação +2, apoio −1. Cultura mais cautelosa (−5)."
+          },
+          {
+            "id": "blame",
+            "label": "Culpar fornecedores",
+            "preview": "Apoio +2, reputação −6."
+          }
+        ]
+      },
+      "company": {
+        "title": "Investigação federal",
+        "body": "Depois da falha de {mission}, a agência reguladora abriu investigação e o Congresso quer ouvir a empresa.",
+        "choices": [
+          {
+            "id": "own",
+            "label": "Cooperar com tudo",
+            "preview": "Reputação +4, apoio −3."
+          },
+          {
+            "id": "review",
+            "label": "Contratar auditoria externa",
+            "preview": "Reputação +2, apoio −1. Cultura mais cautelosa (−5)."
+          },
+          {
+            "id": "blame",
+            "label": "Contestar a investigação",
+            "preview": "Apoio +2, reputação −6."
+          }
+        ]
+      }
+    },
+    "program_review": {
+      "agency": {
+        "title": "Novo governo, novas prioridades",
+        "body": "O {gov} assumiu com outra agenda: {priority}. Ele quer revisar o programa da agência. Alinhar rende verba; resistir custa apoio.",
+        "choices": [
+          {
+            "id": "align",
+            "label": "Alinhar o programa",
+            "preview": "Verba +{pct}, apoio +3, cultura {culture}."
+          },
+          {
+            "id": "compromise",
+            "label": "Buscar meio-termo",
+            "preview": "Verba +1%, apoio +1."
+          },
+          {
+            "id": "defend",
+            "label": "Defender o programa atual",
+            "preview": "Apoio −4, reputação +2."
+          }
+        ]
+      }
+    },
+    "partnership_freeze": {
+      "agency": {
+        "title": "Sanções atingem parceria",
+        "body": "A crise entre {A} e {B} congelou recursos da parceria com {partner}. O governo cortou {amount} da verba ligada ao acordo.",
+        "choices": [
+          {
+            "id": "comply",
+            "label": "Acatar o congelamento",
+            "preview": "Apoio +1, reputação −2."
+          },
+          {
+            "id": "shield",
+            "label": "Remanejar verba e salvar a parceria",
+            "preview": "Recupera {half}/ano. Apoio −3, reputação +2."
+          }
+        ]
+      }
+    },
+    "suspension": {
+      "agency": {
+        "title": "Programas suspensos",
+        "body": "Com {A} e {B} em guerra aberta, o governo suspendeu programas civis e desviou {amount} para a defesa. Missões com parceiros do outro lado estão congeladas.",
+        "choices": [
+          {
+            "id": "comply",
+            "label": "Cumprir as ordens",
+            "preview": "Apoio +4, reputação −2."
+          },
+          {
+            "id": "appeal",
+            "label": "Defender o programa civil",
+            "preview": "~{chance} de recuperar metade da verba (reputação +4). Se falhar: apoio −8."
+          }
+        ]
+      },
+      "partner": {
+        "title": "Parceiro em guerra",
+        "body": "{partner} entrou na guerra entre {A} e {B} e congelou a cooperação. Seu governo pergunta se a agência mantém os laços.",
+        "choices": [
+          {
+            "id": "comply",
+            "label": "Suspender a cooperação",
+            "preview": "Apoio +3, reputação −2."
+          },
+          {
+            "id": "appeal",
+            "label": "Manter canais técnicos abertos",
+            "preview": "~{chance} de chance de reputação +4. Se falhar: apoio −8."
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "lunar_race",
+  "name": "Corrida Lunar",
+  "subtitle": "2026 a 2030",
+  "startYear": 2026,
+  "endYear": 2030,
+  "era": 4,
+  "playableActors": ["nasa", "cnsa", "isro", "esa", "spacex"],
+  "victory": {
+    "description": "Ao fim de 2030, a agência com mais prestígio vence a Tabela da Era.",
+    "goals": [
+      { "id": "crewed_lunar_landing", "label": "Pouso tripulado na Lua" },
+      { "id": "lunar_surface_robotic", "label": "Pouso robótico na Lua" },
+      { "id": "crewed_orbit", "label": "Voo orbital tripulado" }
+    ]
+  }
+}

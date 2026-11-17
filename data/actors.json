@@ -1,0 +1,312 @@
+{
+  "actors": [
+    {
+      "id": "nasa", "name": "NASA (EUA)", "short": "NASA", "kind": "agency", "country": "EUA", "flag": "🇺🇸", "color": "#0072B2",
+      "bloc": "artemis_accords", "budget": 9000, "fixedCostShare": 0.55, "support": 62, "reputation": 72, "culture": 25, "prestige": 0,
+      "style": "Lidera o Artemis e contrata empresas",
+      "description": "Lidera o programa Artemis e o bloco dos Acordos Artemis. Contrata SpaceX e Blue Origin para os pousos lunares.",
+      "capabilities": { "crewed": true, "launchSites": ["Cabo Canaveral", "Kennedy", "Vandenberg", "Wallops"] },
+      "ai": { "cooperation": 0.65, "aggression": 0.45, "riskTolerance": 0.5, "goals": ["crewed_lunar_flyby", "crewed_lunar_landing", "lunar_south_pole_crewed", "lunar_base", "mars_sample_return"] }
+    },
+    {
+      "id": "spacex", "name": "SpaceX", "short": "SpaceX", "kind": "company", "country": "EUA", "flag": "🇺🇸", "color": "#E8E8E8",
+      "bloc": "artemis_accords", "budget": 5000, "fixedCostShare": 0.35, "support": 70, "reputation": 64, "culture": 80, "prestige": 0,
+      "style": "Rápida, arriscada",
+      "description": "Cadência e preço imbatíveis. Starship é o lander tripulado da Artemis III e a aposta para Marte.",
+      "capabilities": { "crewed": true, "launchSites": ["Starbase", "Cabo Canaveral", "Kennedy", "Vandenberg"] },
+      "ai": { "cooperation": 0.45, "aggression": 0.75, "riskTolerance": 0.85, "goals": ["crewed_lunar_landing", "lunar_south_pole_landing", "mars_landing_robotic", "commercial_station"] }
+    },
+    {
+      "id": "blueorigin", "name": "Blue Origin", "short": "Blue Origin", "kind": "company", "country": "EUA", "flag": "🇺🇸", "color": "#56B4E9",
+      "bloc": "artemis_accords", "budget": 2500, "fixedCostShare": 0.45, "support": 60, "reputation": 52, "culture": 35, "prestige": 0,
+      "style": "Paciente, arriscada",
+      "description": "New Glenn e Blue Moon. Disputa o pouso lunar com a SpaceX e sonha com a estação Orbital Reef.",
+      "capabilities": { "crewed": false, "launchSites": ["Cabo Canaveral", "Vandenberg"] },
+      "ai": { "cooperation": 0.55, "aggression": 0.6, "riskTolerance": 0.65, "goals": ["lunar_south_pole_landing", "crewed_lunar_landing", "commercial_station"] }
+    },
+    {
+      "id": "cnsa", "name": "CNSA (China)", "short": "CNSA", "kind": "agency", "country": "China", "flag": "🇨🇳", "color": "#D55E00",
+      "bloc": "ilrs", "budget": 6000, "fixedCostShare": 0.45, "support": 80, "reputation": 60, "culture": 10, "prestige": 0,
+      "style": "Metódica, prazos firmes",
+      "description": "Pouso tripulado até 2030 com Mengzhou e Lanyue, Chang'e-7 e 8 no polo sul e a base lunar ILRS com a Rússia.",
+      "capabilities": { "crewed": true, "launchSites": ["Wenchang", "Jiuquan", "Xichang", "Taiyuan"] },
+      "ai": { "cooperation": 0.45, "aggression": 0.55, "riskTolerance": 0.45, "goals": ["crewed_lunar_landing", "lunar_south_pole_landing", "lunar_resource_demo", "lunar_base", "mars_sample_return"] }
+    },
+    {
+      "id": "isro", "name": "ISRO (Índia)", "short": "ISRO", "kind": "agency", "country": "Índia", "flag": "🇮🇳", "color": "#E69F00",
+      "bloc": "artemis_accords", "budget": 1600, "fixedCostShare": 0.4, "support": 74, "reputation": 62, "culture": 15, "prestige": 0,
+      "style": "Frugal e persistente",
+      "description": "Gaganyaan, a estação BAS e a Lua tripulada em 2040. Faz muito com pouco e rivaliza com a China na Ásia.",
+      "capabilities": { "crewed": false, "launchSites": ["Sriharikota"] },
+      "ai": { "cooperation": 0.7, "aggression": 0.35, "riskTolerance": 0.45, "goals": ["crewed_orbit_national:isro", "national_station", "lunar_sample_return", "lunar_south_pole_landing"] }
+    },
+    {
+      "id": "esa", "name": "ESA (Europa)", "short": "ESA", "kind": "agency", "country": "Europa", "flag": "🇪🇺", "color": "#009E73",
+      "bloc": "artemis_accords", "budget": 3500, "fixedCostShare": 0.5, "support": 58, "reputation": 70, "culture": -35, "prestige": 0,
+      "style": "Consenso lento",
+      "description": "Ciência e parcerias: Módulo de Serviço da Orion, rover Rosalind Franklin e o lander Argonaut. Perdeu a Rússia no ExoMars em 2022.",
+      "capabilities": { "crewed": false, "launchSites": ["Kourou"] },
+      "ai": { "cooperation": 0.85, "aggression": 0.2, "riskTolerance": 0.3, "goals": ["mars_landing_robotic", "lunar_resource_demo", "jupiter_arrival", "lunar_sample_return"] }
+    },
+    {
+      "id": "roscosmos", "name": "Roscosmos (Rússia)", "short": "Roscosmos", "kind": "agency", "country": "Rússia", "flag": "🇷🇺", "color": "#CC79A7",
+      "bloc": "ilrs", "budget": 2200, "fixedCostShare": 0.6, "support": 55, "reputation": 45, "culture": 5, "prestige": 0,
+      "style": "Isolada, orgulhosa",
+      "description": "Planeja a estação ROS e as sondas Luna. Aliada da China no ILRS e cada vez mais isolada do Ocidente.",
+      "capabilities": { "crewed": true, "launchSites": ["Baikonur", "Vostochny", "Plesetsk"] },
+      "ai": { "cooperation": 0.4, "aggression": 0.6, "riskTolerance": 0.55, "goals": ["national_station", "lunar_south_pole_landing", "lunar_base"] }
+    },
+    {
+      "id": "jaxa", "name": "JAXA (Japão)", "short": "JAXA", "kind": "agency", "country": "Japão", "flag": "🇯🇵", "color": "#F0E442",
+      "bloc": "artemis_accords", "budget": 1500, "fixedCostShare": 0.5, "support": 60, "reputation": 74, "culture": -45, "prestige": 0,
+      "style": "Preciso e discreto",
+      "description": "Parceira do programa lunar americano (rover pressurizado em troca de astronautas na Lua) e do LUPEX com a Índia.",
+      "capabilities": { "crewed": false, "launchSites": ["Tanegashima", "Uchinoura"] },
+      "ai": { "cooperation": 0.8, "aggression": 0.2, "riskTolerance": 0.3, "goals": ["lunar_south_pole_landing", "lunar_resource_demo", "lunar_sample_return"] }
+    }
+  ],
+
+  "relations": [
+    { "a": "nasa", "b": "spacex", "trust": 55, "dependence": 70, "rivalry": 15 },
+    { "a": "nasa", "b": "blueorigin", "trust": 45, "dependence": 40, "rivalry": 10 },
+    { "a": "nasa", "b": "esa", "trust": 60, "dependence": 45, "rivalry": 10 },
+    { "a": "nasa", "b": "jaxa", "trust": 65, "dependence": 35, "rivalry": 5 },
+    { "a": "nasa", "b": "isro", "trust": 40, "dependence": 20, "rivalry": 15 },
+    { "a": "nasa", "b": "cnsa", "trust": -55, "dependence": 0, "rivalry": 85 },
+    { "a": "nasa", "b": "roscosmos", "trust": -10, "dependence": 25, "rivalry": 45 },
+    { "a": "spacex", "b": "blueorigin", "trust": 10, "dependence": 0, "rivalry": 70 },
+    { "a": "spacex", "b": "esa", "trust": 25, "dependence": 30, "rivalry": 25 },
+    { "a": "spacex", "b": "jaxa", "trust": 25, "dependence": 10, "rivalry": 10 },
+    { "a": "spacex", "b": "isro", "trust": 15, "dependence": 5, "rivalry": 20 },
+    { "a": "spacex", "b": "cnsa", "trust": -40, "dependence": 0, "rivalry": 55 },
+    { "a": "spacex", "b": "roscosmos", "trust": -35, "dependence": 0, "rivalry": 45 },
+    { "a": "blueorigin", "b": "esa", "trust": 15, "dependence": 0, "rivalry": 10 },
+    { "a": "blueorigin", "b": "jaxa", "trust": 15, "dependence": 0, "rivalry": 5 },
+    { "a": "blueorigin", "b": "isro", "trust": 5, "dependence": 0, "rivalry": 5 },
+    { "a": "blueorigin", "b": "cnsa", "trust": -35, "dependence": 0, "rivalry": 40 },
+    { "a": "blueorigin", "b": "roscosmos", "trust": -25, "dependence": 0, "rivalry": 20 },
+    { "a": "cnsa", "b": "roscosmos", "trust": 45, "dependence": 35, "rivalry": 15 },
+    { "a": "cnsa", "b": "esa", "trust": 5, "dependence": 5, "rivalry": 25 },
+    { "a": "cnsa", "b": "jaxa", "trust": -25, "dependence": 0, "rivalry": 40 },
+    { "a": "cnsa", "b": "isro", "trust": -40, "dependence": 0, "rivalry": 65 },
+    { "a": "esa", "b": "jaxa", "trust": 40, "dependence": 15, "rivalry": 5 },
+    { "a": "esa", "b": "isro", "trust": 30, "dependence": 5, "rivalry": 10 },
+    { "a": "esa", "b": "roscosmos", "trust": -45, "dependence": 5, "rivalry": 30 },
+    { "a": "jaxa", "b": "isro", "trust": 40, "dependence": 15, "rivalry": 10 },
+    { "a": "jaxa", "b": "roscosmos", "trust": -25, "dependence": 0, "rivalry": 15 },
+    { "a": "isro", "b": "roscosmos", "trust": 25, "dependence": 15, "rivalry": 5 }
+  ],
+
+  "blocs": [
+    {
+      "id": "artemis_accords", "name": "Acordos Artemis", "short": "Artemis", "leader": "nasa", "icon": "🌗",
+      "members": ["nasa", "esa", "jaxa", "isro", "spacex", "blueorigin"], "associates": ["spacex", "blueorigin"],
+      "treatyId": "artemis_accords",
+      "description": "Princípios para explorar a Lua com transparência, interoperabilidade e uso de recursos. Liderado pelos EUA; empresas americanas entram como associadas."
+    },
+    {
+      "id": "ilrs", "name": "ILRS (Estação Internacional de Pesquisa Lunar)", "short": "ILRS", "leader": "cnsa", "icon": "🌕",
+      "members": ["cnsa", "roscosmos"], "associates": [],
+      "treatyId": "ilrs_agreement",
+      "description": "Base lunar robótica e depois tripulada no polo sul, liderada pela China com a Rússia."
+    }
+  ],
+
+  "treaties": [
+    {
+      "id": "outer_space_treaty", "type": "peaceful_use", "name": "Tratado do Espaço Exterior",
+      "parties": ["nasa", "cnsa", "isro", "esa", "roscosmos", "jaxa"], "signedTurn": -3068, "status": "active",
+      "terms": { "multilateral": true, "permanent": true, "untilTurn": null, "note": "Base do direito espacial desde 1967: uso pacífico e nenhuma soberania sobre corpos celestes." }
+    },
+    {
+      "id": "artemis_accords", "type": "lunar_resources", "name": "Acordos Artemis",
+      "parties": ["nasa", "esa", "jaxa", "isro"], "signedTurn": -271, "status": "active",
+      "terms": { "multilateral": true, "blocId": "artemis_accords", "untilTurn": null, "note": "Zonas de segurança e uso de recursos lunares." }
+    },
+    {
+      "id": "ilrs_agreement", "type": "mission_partnership", "name": "Acordo ILRS China-Rússia",
+      "parties": ["cnsa", "roscosmos"], "signedTurn": -250, "status": "active",
+      "terms": { "multilateral": true, "blocId": "ilrs", "program": "lunar_base", "untilTurn": null }
+    },
+    {
+      "id": "hls_starship", "type": "mission_partnership", "name": "Contrato HLS Starship",
+      "parties": ["nasa", "spacex"], "signedTurn": -248, "status": "active",
+      "terms": { "program": "lunar_crewed", "lead": "nasa", "untilTurn": 259 }
+    },
+    {
+      "id": "hls_blue_moon", "type": "mission_partnership", "name": "Contrato HLS Blue Moon",
+      "parties": ["nasa", "blueorigin"], "signedTurn": -140, "status": "active",
+      "terms": { "program": "lunar_crewed", "lead": "nasa", "untilTurn": 259 }
+    },
+    {
+      "id": "artemis_iii_docking", "type": "mission_partnership", "name": "Artemis III: teste de acoplagem Starship e Blue Moon",
+      "parties": ["spacex", "blueorigin"], "signedTurn": -20, "status": "active",
+      "terms": { "program": "docking_test", "lead": "spacex", "untilTurn": 104, "note": "Rivais no pouso, parceiras no teste em órbita exigido pela NASA." }
+    },
+    {
+      "id": "iss_integrated_crew", "type": "crew_exchange", "name": "Assentos integrados da ISS",
+      "parties": ["nasa", "roscosmos"], "signedTurn": -180, "status": "active",
+      "terms": { "seats": 1, "untilTurn": 103, "note": "Astronautas em Soyuz e cosmonautas em Crew Dragon." }
+    },
+    {
+      "id": "orion_esm", "type": "cost_sharing", "name": "Módulo de Serviço Europeu da Orion",
+      "parties": ["nasa", "esa"], "signedTurn": -620, "status": "active",
+      "terms": { "share": 0.15, "untilTurn": 259, "note": "A ESA fornece o módulo de serviço em troca de assentos." }
+    },
+    {
+      "id": "artemis_esa_seats", "type": "crew_exchange", "name": "Astronautas europeus na Artemis",
+      "parties": ["nasa", "esa"], "signedTurn": -320, "status": "active",
+      "terms": { "seats": 1, "untilTurn": 259 }
+    },
+    {
+      "id": "artemis_jaxa_rover", "type": "crew_exchange", "name": "Rover pressurizado por assentos lunares",
+      "parties": ["nasa", "jaxa"], "signedTurn": -90, "status": "active",
+      "terms": { "seats": 2, "untilTurn": 259, "note": "O Japão constrói o rover pressurizado; dois japoneses pisam na Lua." }
+    },
+    {
+      "id": "nisar", "type": "mission_partnership", "name": "NISAR",
+      "parties": ["nasa", "isro"], "signedTurn": -600, "status": "active",
+      "terms": { "program": "earth_obs", "untilTurn": 155 }
+    },
+    {
+      "id": "lupex", "type": "mission_partnership", "name": "LUPEX (Chandrayaan-5)",
+      "parties": ["jaxa", "isro"], "signedTurn": -100, "status": "active",
+      "terms": { "program": "lunar_science", "untilTurn": 259 }
+    },
+    {
+      "id": "smile", "type": "mission_partnership", "name": "SMILE (ESA e China)",
+      "parties": ["esa", "cnsa"], "signedTurn": -520, "status": "active",
+      "terms": { "program": "space_weather", "untilTurn": 120, "note": "Raro elo científico entre a Europa e a China." }
+    },
+    {
+      "id": "exomars_russia", "type": "mission_partnership", "name": "ExoMars com a Rússia",
+      "parties": ["esa", "roscosmos"], "signedTurn": -680, "status": "broken", "brokenBy": "esa", "brokenTurn": -198,
+      "terms": { "program": "mars_robotic", "untilTurn": null, "note": "Suspensa em 2022 após a invasão da Ucrânia." }
+    }
+  ],
+
+  "proposalTypes": [
+    {
+      "id": "mission_partnership", "name": "Parceria de missão", "icon": "🤝", "treatyName": "Parceria: {program}",
+      "description": "Programa conjunto: hardware, dados e glória divididos.", "durationWeeks": 156, "allowCompanies": true,
+      "base": 6, "budgetWeight": 12, "cultureWeight": 8, "breakReputation": 8, "multilateral": false
+    },
+    {
+      "id": "cost_sharing", "name": "Divisão de custos", "icon": "💰", "treatyName": "Divisão de custos",
+      "description": "Missões conjuntas ficam mais baratas para os dois lados.", "durationWeeks": 104, "allowCompanies": true,
+      "base": 3, "budgetWeight": 26, "cultureWeight": -8, "breakReputation": 6, "multilateral": false
+    },
+    {
+      "id": "crew_exchange", "name": "Troca de tripulantes", "icon": "🧑‍🚀", "treatyName": "Troca de tripulantes",
+      "description": "Vagas para astronautas do parceiro nos seus voos, e vice-versa.", "durationWeeks": 156, "allowCompanies": true,
+      "base": 1, "budgetWeight": 0, "cultureWeight": 4, "breakReputation": 5, "multilateral": false
+    },
+    {
+      "id": "tech_transfer", "name": "Transferência de tecnologia", "icon": "🔧", "treatyName": "Transferência de tecnologia",
+      "description": "Quem sabe mais ensina; quem aprende fica devendo.", "durationWeeks": 104, "allowCompanies": true,
+      "base": -2, "budgetWeight": 6, "cultureWeight": 0, "breakReputation": 7, "multilateral": false
+    },
+    {
+      "id": "peaceful_use", "name": "Uso pacífico", "icon": "🕊️", "treatyName": "Pacto de uso pacífico",
+      "description": "Compromisso de não militarizar a órbita e a Lua.", "durationWeeks": null, "allowCompanies": false,
+      "base": 4, "budgetWeight": 0, "cultureWeight": -10, "breakReputation": 15, "multilateral": true
+    },
+    {
+      "id": "lunar_resources", "name": "Recursos lunares", "icon": "🌑", "treatyName": "Acordo de recursos lunares",
+      "description": "Regras para zonas de segurança e extração de gelo na Lua.", "durationWeeks": null, "allowCompanies": false,
+      "base": 2, "budgetWeight": 0, "cultureWeight": -4, "breakReputation": 10, "multilateral": true
+    },
+    {
+      "id": "orbital_traffic", "name": "Tráfego orbital", "icon": "🛰️", "treatyName": "Acordo de Tráfego Orbital",
+      "description": "Aviso de manobras e combate ao lixo espacial.", "durationWeeks": null, "allowCompanies": true,
+      "base": 4, "budgetWeight": 0, "cultureWeight": -8, "breakReputation": 8, "multilateral": true
+    },
+    {
+      "id": "join_bloc", "name": "Adesão a bloco", "icon": "🏳️", "treatyName": "Adesão ao bloco",
+      "description": "Entrar num bloco: aliados novos, rivais novos.", "durationWeeks": null, "allowCompanies": true,
+      "base": 0, "budgetWeight": 0, "cultureWeight": 0, "breakReputation": 6, "multilateral": false
+    }
+  ],
+
+  "programs": [
+    { "id": "lunar_crewed", "name": "pouso tripulado na Lua", "milestone": "crewed_lunar_landing", "needsCrewed": true, "appeal": 6 },
+    { "id": "lunar_science", "name": "ciência no polo sul lunar", "milestone": "lunar_south_pole_landing", "needsCrewed": false, "appeal": 5 },
+    { "id": "lunar_base", "name": "base lunar", "milestone": "lunar_base", "needsCrewed": true, "appeal": 4 },
+    { "id": "lunar_ice", "name": "prospecção de gelo lunar", "milestone": "lunar_resource_demo", "needsCrewed": false, "appeal": 4 },
+    { "id": "moon_samples", "name": "retorno de amostras lunares", "milestone": "lunar_sample_return", "needsCrewed": false, "appeal": 4 },
+    { "id": "gateway", "name": "estação em órbita lunar", "milestone": "crewed_lunar_orbit", "needsCrewed": true, "appeal": 3 },
+    { "id": "leo_station", "name": "estação em órbita baixa", "milestone": "commercial_station", "needsCrewed": true, "appeal": 3 },
+    { "id": "mars_robotic", "name": "exploração robótica de Marte", "milestone": "mars_landing_robotic", "needsCrewed": false, "appeal": 4 },
+    { "id": "mars_samples", "name": "retorno de amostras de Marte", "milestone": "mars_sample_return", "needsCrewed": false, "appeal": 4 },
+    { "id": "outer_planets", "name": "sondas a Júpiter e além", "milestone": "jupiter_arrival", "needsCrewed": false, "appeal": 2 },
+    { "id": "docking_test", "name": "teste de acoplagem em órbita", "milestone": null, "needsCrewed": false, "appeal": 2 },
+    { "id": "space_weather", "name": "clima espacial e heliofísica", "milestone": null, "needsCrewed": false, "appeal": 3 },
+    { "id": "earth_obs", "name": "observação da Terra e clima", "milestone": null, "needsCrewed": false, "appeal": 3 },
+    { "id": "deep_space_net", "name": "rede de antenas de espaço profundo", "milestone": null, "needsCrewed": false, "appeal": 2 },
+    { "id": "planetary_defense", "name": "defesa planetária contra asteroides", "milestone": null, "needsCrewed": false, "appeal": 3 }
+  ],
+
+  "milestones": {
+    "crewed_lunar_flyby": "Sobrevoo tripulado da Lua",
+    "crewed_lunar_orbit": "Órbita lunar tripulada",
+    "crewed_lunar_landing": "Pouso tripulado na Lua",
+    "lunar_south_pole_landing": "Pouso no polo sul lunar",
+    "lunar_south_pole_crewed": "Tripulação no polo sul lunar",
+    "lunar_sample_return": "Retorno de amostras lunares",
+    "lunar_resource_demo": "Demonstração de recursos lunares",
+    "lunar_base": "Base lunar",
+    "mars_landing_robotic": "Pouso robótico em Marte",
+    "mars_sample_return": "Amostras de Marte na Terra",
+    "titan_arrival": "Chegada a Titã",
+    "jupiter_arrival": "Chegada a Júpiter",
+    "commercial_station": "Estação comercial",
+    "national_station": "Estação nacional",
+    "crewed_orbit_national": "Voo orbital tripulado próprio"
+  },
+
+  "incidents": [
+    { "id": "payment_delay", "kind": "friction", "requires": "partners", "weight": 3, "budgetDriven": true, "trust": -7, "rivalry": 2, "text": "{a} atrasa sua contribuição para {program}, e {b} reclama em público." },
+    { "id": "credit_dispute", "kind": "friction", "requires": "partners", "weight": 2, "trust": -5, "rivalry": 3, "text": "{a} e {b} discutem quem leva o crédito por {program}." },
+    { "id": "scope_cut", "kind": "friction", "requires": "partners", "weight": 2, "budgetDriven": true, "trust": -6, "rivalry": 1, "text": "{a} corta sua parte em {program}; engenheiros de {b} falam em traição." },
+    { "id": "export_control", "kind": "friction", "requires": "opposing", "weight": 3, "trust": -6, "rivalry": 4, "text": "{a} amplia o controle de exportação de componentes contra {b}." },
+    { "id": "espionage", "kind": "friction", "requires": "rivals", "weight": 2, "trust": -10, "rivalry": 5, "text": "{a} acusa {b} de espionagem industrial no programa lunar." },
+    { "id": "spectrum", "kind": "friction", "requires": "any", "weight": 2, "trust": -4, "rivalry": 3, "text": "{a} e {b} disputam frequências de rádio para a órbita lunar." },
+    { "id": "debris", "kind": "friction", "requires": "any", "weight": 2, "trust": -5, "rivalry": 2, "text": "Estágio de foguete de {b} passa perto de um satélite de {a}, que cobra explicações." },
+    { "id": "landing_zone", "kind": "friction", "requires": "rivals", "weight": 2, "trust": -6, "rivalry": 5, "text": "{a} e {b} reivindicam a mesma região de pouso no polo sul lunar." },
+    { "id": "talent_poach", "kind": "friction", "requires": "companies", "weight": 3, "trust": -5, "rivalry": 4, "text": "{a} contrata engenheiros-chave de {b}, que vai à Justiça." },
+    { "id": "price_war", "kind": "friction", "requires": "companies", "weight": 3, "trust": -4, "rivalry": 5, "text": "{a} derruba o preço de lançamento e tira um cliente de {b}." },
+    { "id": "propaganda", "kind": "friction", "requires": "opposing", "weight": 2, "trust": -4, "rivalry": 3, "text": "TV estatal ligada a {a} ridiculariza o programa de {b}." },
+    { "id": "data_share", "kind": "goodwill", "requires": "any", "weight": 3, "trust": 5, "rivalry": -1, "text": "{a} compartilha dados científicos com {b} sem pedir nada em troca." },
+    { "id": "tracking_help", "kind": "goodwill", "requires": "any", "weight": 2, "trust": 6, "dependence": 2, "text": "{a} oferece antenas de rastreamento para apoiar uma missão de {b}." },
+    { "id": "summit", "kind": "goodwill", "requires": "any", "weight": 3, "trust": 4, "rivalry": -2, "text": "Chefes de {a} e {b} se encontram em congresso e prometem diálogo." },
+    { "id": "joint_test", "kind": "goodwill", "requires": "partners", "weight": 3, "trust": 6, "dependence": 2, "text": "Teste conjunto de {program} sai melhor que o esperado; {a} e {b} comemoram." },
+    { "id": "hotline", "kind": "goodwill", "requires": "rivals", "weight": 2, "trust": 7, "rivalry": -3, "text": "{a} e {b} criam linha direta para evitar colisões em órbita." },
+    { "id": "student_exchange", "kind": "goodwill", "requires": "any", "weight": 2, "trust": 3, "text": "Universidades ligadas a {a} e {b} lançam intercâmbio de engenheiros." },
+    { "id": "rescue_pledge", "kind": "goodwill", "requires": "rivals", "weight": 1, "trust": 8, "rivalry": -2, "text": "{a} promete resgatar tripulantes de {b} em emergência, se puder." }
+  ],
+
+  "texts": {
+    "signed": {
+      "mission_partnership": ["{a} e {b} assinam parceria em {program}.", "{a} e {b} unem forças em {program}.", "Aperto de mãos: {a} e {b} lançam programa conjunto de {program}."],
+      "cost_sharing": ["{a} e {b} vão dividir custos de missões conjuntas ({share} de desconto).", "Orçamento curto aproxima {a} e {b}: custos divididos."],
+      "crew_exchange": ["{a} e {b} acertam troca de tripulantes ({seats} vaga(s) por ano).", "Astronautas de {b} poderão voar com {a}, e vice-versa."],
+      "tech_transfer": ["{giver} vai transferir tecnologia para {receiver}.", "Acordo técnico: {receiver} recebe know-how de {giver}."],
+      "peaceful_use": ["{a} e {b} firmam pacto de uso pacífico do espaço."],
+      "lunar_resources": ["{a} e {b} acertam regras para recursos lunares."],
+      "orbital_traffic": ["{a} e {b} assinam acordo de tráfego orbital."]
+    },
+    "founded": ["Nasce o {treaty}: {parties} assinam.", "{founder} reúne {parties} no {treaty}."],
+    "acceded": ["{a} adere ao {treaty}.", "{a} assina o {treaty}."],
+    "rejected": ["{b} recusa {type} proposta por {a}.", "Sem acordo: {b} diz não a {a} ({type})."],
+    "broken": ["{a} rompe {treaty} com {b}.", "Fim da linha: {a} abandona {treaty} com {b}.", "{a} denuncia {treaty}; {b} fala em quebra de confiança."],
+    "withdrawn": ["{a} se retira do {treaty}.", "{a} abandona o {treaty} e choca os parceiros."],
+    "expired": ["Expira {treaty} entre {parties}.", "{treaty} chega ao fim sem renovação."],
+    "joinedBloc": ["{a} adere ao bloco {bloc}.", "{a} entra para o bloco {bloc}, liderado por {leader}."],
+    "leftBloc": ["{a} deixa o bloco {bloc}.", "Racha no bloco {bloc}: {a} sai."],
+    "leaderChange": ["{a} assume a liderança do bloco {bloc}."],
+    "condolences": ["{b} envia condolências a {a} pela perda de tripulantes.", "Rival, mas solidária: {b} presta homenagem aos mortos de {a}."],
+    "firstRivalry": ["{a} chega primeiro: {milestone}. {b} acelera a resposta."],
+    "jointSuccess": ["Sucesso conjunto aproxima {a} e {b}."],
+    "eraTrophy": ["Troféu da Era: {a} termina em 1º na Tabela da Era com {prestige} pontos."]
+  }
+}

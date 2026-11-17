@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "adastra",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/jay/AppData/Local/Temp/claude/8ec3124799251c0b/ad4e66b1-4a88-4161-a48e-bd80046b9c44/scratchpad/serve.mjs", "C:/Users/jay/Documents/AdAstra", "8130"],
+      "port": 8130
+    }
+  ]
+}

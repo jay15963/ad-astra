@@ -1,0 +1,183 @@
+{
+  "config": {
+    "startPoints": 30,
+    "baseSciencePerWeek": 0.5,
+    "engineerSciencePerWeek": 0.06,
+    "maxProjects": 2,
+    "costScale": {
+      "refBudget": 5000,
+      "min": 0.5,
+      "max": 1.4
+    },
+    "cancelRefund": 0.5,
+    "approaches": {
+      "safe": {
+        "label": "Segura",
+        "description": "Mais lenta e previsível. Sem surpresas.",
+        "speed": 1,
+        "costMult": 1,
+        "weeklyEventChance": 0,
+        "breakthroughChance": 0.04,
+        "flawChance": 0
+      },
+      "bold": {
+        "label": "Ousada",
+        "description": "Cerca de 40% mais rápida, mas os testes podem surpreender, para o bem ou para o mal.",
+        "speed": 1.65,
+        "costMult": 1.1,
+        "weeklyEventChance": 0.035,
+        "leapShare": 0.4,
+        "leapProgress": 0.12,
+        "setbackProgress": 0.2,
+        "pushCostShare": 0.15,
+        "breakthroughChance": 0.2,
+        "flawChance": 0.2
+      }
+    },
+    "quality": {
+      "breakthrough": 1.5,
+      "normal": 1,
+      "flaw": 0.5
+    },
+    "rivals": {
+      "baseSpeed": 0.35,
+      "budgetDivisor": 7000,
+      "maxSpeed": 1.6,
+      "boldCultureThreshold": 30,
+      "announceMinCost": 150
+    }
+  },
+  "effectLabels": {
+    "reliability": {
+      "label": "confiabilidade das missões",
+      "unit": "pp"
+    },
+    "launchCost": {
+      "label": "custo de lançamento",
+      "unit": "pct"
+    },
+    "payload": {
+      "label": "carga útil",
+      "unit": "pct"
+    },
+    "chanceBand": {
+      "label": "precisão da estimativa",
+      "unit": "pctAbs"
+    },
+    "commandPoints": {
+      "label": "ponto(s) de Comando",
+      "unit": "int"
+    },
+    "sciencePerMission": {
+      "label": "ciência por missão",
+      "unit": "pct"
+    },
+    "landingReliability": {
+      "label": "confiabilidade de pouso",
+      "unit": "pp"
+    },
+    "crewSafety": {
+      "label": "sobrevivência da tripulação em falhas",
+      "unit": "pp"
+    },
+    "delayReduction": {
+      "label": "atrasos de cronograma",
+      "unit": "pctNeg"
+    },
+    "sciencePerWeek": {
+      "label": "ciência por semana",
+      "unit": "num"
+    },
+    "researchSlots": {
+      "label": "projeto(s) simultâneo(s)",
+      "unit": "int"
+    },
+    "crewMorale": {
+      "label": "moral da equipe",
+      "unit": "num"
+    },
+    "injuryReduction": {
+      "label": "tempo de recuperação de lesões",
+      "unit": "pctNeg"
+    }
+  },
+  "branches": [
+    {
+      "id": "propulsion",
+      "name": "Propulsão",
+      "icon": "🔥"
+    },
+    {
+      "id": "structures",
+      "name": "Estruturas e materiais",
+      "icon": "🧱"
+    },
+    {
+      "id": "life_support",
+      "name": "Suporte de vida",
+      "icon": "🫁"
+    },
+    {
+      "id": "computing",
+      "name": "Computação e IA",
+      "icon": "🖥️"
+    },
+    {
+      "id": "energy",
+      "name": "Energia",
+      "icon": "⚡"
+    },
+    {
+      "id": "science",
+      "name": "Ciência e observação",
+      "icon": "🔭"
+    }
+  ],
+  "nodes": [
+    {"id": "prop_reuse_ops", "branch": "propulsion", "era": 4, "name": "Reuso rápido de estágios", "description": "Inspeção e reaproveitamento de propulsores em semanas, não meses.", "cost": 140, "science": 25, "weeks": 20, "requires": [], "effects": {"launchCost": -0.06}, "initialFor": ["spacex", "blueorigin"]},
+    {"id": "prop_methalox", "branch": "propulsion", "era": 4, "name": "Motores a metano e oxigênio", "description": "Combustão limpa, reuso mais simples e propelente que um dia pode ser feito em Marte.", "cost": 180, "science": 30, "weeks": 26, "requires": [], "effects": {"payload": 0.04, "reliability": 0.01}, "initialFor": ["spacex", "blueorigin"]},
+    {"id": "prop_throttle", "branch": "propulsion", "era": 4, "name": "Controle fino de empuxo", "description": "Motores que respiram devagar na descida final. Pousos deixam de ser quedas controladas.", "cost": 110, "science": 25, "weeks": 18, "requires": [], "effects": {"landingReliability": 0.04}, "initialFor": ["spacex"]},
+    {"id": "prop_engine_health", "branch": "propulsion", "era": 4, "name": "Saúde dos motores em tempo real", "description": "Sensores e modelos que avisam antes da turbobomba reclamar.", "cost": 130, "science": 30, "weeks": 20, "requires": ["prop_throttle"], "effects": {"reliability": 0.02, "chanceBand": 0.05}},
+    {"id": "prop_cryo_storage", "branch": "propulsion", "era": 4, "name": "Criogenia de longa duração", "description": "Manter oxigênio e metano líquidos por semanas no espaço, sem ferver tudo.", "cost": 220, "science": 45, "weeks": 30, "requires": ["prop_methalox"], "effects": {"payload": 0.04, "landingReliability": 0.02}},
+    {"id": "prop_orbital_refuel", "branch": "propulsion", "era": 4, "name": "Reabastecimento em órbita", "description": "Transferir toneladas de propelente entre naves. A chave para pousar grande na Lua.", "cost": 380, "science": 70, "weeks": 40, "requires": ["prop_cryo_storage"], "effects": {"payload": 0.12, "launchCost": -0.03}},
+    {"id": "prop_electric", "branch": "propulsion", "era": 4, "name": "Propulsão elétrica de alta potência", "description": "Propulsores Hall de dezenas de quilowatts para rebocadores de carga.", "cost": 160, "science": 40, "weeks": 26, "requires": ["en_solar"], "effects": {"payload": 0.04, "sciencePerMission": 0.05}},
+    {"id": "prop_nuclear_thermal", "branch": "propulsion", "era": 4, "name": "Propulsão nuclear térmica", "description": "Hidrogênio aquecido por reator: o dobro da eficiência química. Caro, lento, político.", "cost": 520, "science": 105, "weeks": 52, "requires": ["prop_cryo_storage", "en_fission"], "effects": {"payload": 0.1, "delayReduction": 0.04}},
+    {"id": "str_composites", "branch": "structures", "era": 4, "name": "Tanques compósitos", "description": "Fibra de carbono no lugar do alumínio. Menos massa morta, mais carga.", "cost": 120, "science": 25, "weeks": 22, "requires": [], "effects": {"payload": 0.04, "launchCost": -0.02}},
+    {"id": "str_heatshield", "branch": "structures", "era": 4, "name": "Escudo térmico de nova geração", "description": "Material ablativo que não descasca na reentrada a 11 km/s.", "cost": 150, "science": 30, "weeks": 24, "requires": [], "effects": {"crewSafety": 0.08, "reliability": 0.01}, "initialFor": ["nasa", "spacex", "cnsa"]},
+    {"id": "str_additive", "branch": "structures", "era": 4, "name": "Manufatura aditiva de motores", "description": "Câmaras de combustão impressas em dias. Menos peças, menos espera.", "cost": 140, "science": 30, "weeks": 20, "requires": [], "effects": {"launchCost": -0.04, "delayReduction": 0.08}},
+    {"id": "str_landing_legs", "branch": "structures", "era": 4, "name": "Trem de pouso adaptativo", "description": "Pernas que se ajustam a rochas e crateras na hora do toque.", "cost": 100, "science": 25, "weeks": 16, "requires": ["str_composites"], "effects": {"landingReliability": 0.04}},
+    {"id": "str_radiation", "branch": "structures", "era": 4, "name": "Blindagem contra radiação", "description": "Camadas de polietileno e água que protegem a tripulação de tempestades solares.", "cost": 130, "science": 30, "weeks": 22, "requires": ["str_heatshield"], "effects": {"crewSafety": 0.06}},
+    {"id": "str_orbital_printing", "branch": "structures", "era": 4, "name": "Impressão em órbita", "description": "Peças de reposição fabricadas no espaço, sob demanda.", "cost": 210, "science": 55, "weeks": 30, "requires": ["str_additive"], "effects": {"delayReduction": 0.05, "payload": 0.03}},
+    {"id": "str_regolith", "branch": "structures", "era": 4, "name": "Construção com regolito", "description": "Sinterizar poeira lunar em placas de pouso e abrigos. O primeiro tijolo de uma base.", "cost": 260, "science": 70, "weeks": 36, "requires": ["str_orbital_printing", "sci_isru"], "effects": {"landingReliability": 0.03, "sciencePerMission": 0.05, "delayReduction": 0.04}},
+    {"id": "ls_closed_loop", "branch": "life_support", "era": 4, "name": "Suporte de vida em circuito fechado", "description": "Reciclar 98% da água e do ar. Cada litro poupado é carga útil.", "cost": 140, "science": 30, "weeks": 24, "requires": [], "effects": {"crewSafety": 0.04, "reliability": 0.005}, "initialFor": ["nasa", "roscosmos"]},
+    {"id": "ls_abort", "branch": "life_support", "era": 4, "name": "Sistema de escape aprimorado", "description": "Torre e motores de aborto que tiram a cápsula de qualquer fase da subida.", "cost": 170, "science": 30, "weeks": 24, "requires": ["str_heatshield"], "effects": {"crewSafety": 0.12}},
+    {"id": "ls_suits", "branch": "life_support", "era": 4, "name": "Trajes de superfície", "description": "Trajes flexíveis para caminhar horas no polo sul, com poeira e frio extremo.", "cost": 160, "science": 40, "weeks": 26, "requires": ["ls_closed_loop"], "effects": {"landingReliability": 0.02, "crewSafety": 0.04}},
+    {"id": "ls_medicine", "branch": "life_support", "era": 4, "name": "Medicina de voo longo", "description": "Protocolos contra perda óssea, radiação e emergências longe de casa.", "cost": 110, "science": 30, "weeks": 20, "requires": [], "effects": {"crewSafety": 0.04, "injuryReduction": 0.3}},
+    {"id": "ls_psych", "branch": "life_support", "era": 4, "name": "Suporte psicológico de missão", "description": "Acompanhamento de equipes e famílias. Gente descansada erra menos.", "cost": 60, "science": 15, "weeks": 12, "requires": [], "effects": {"crewMorale": 6}},
+    {"id": "ls_habitat", "branch": "life_support", "era": 4, "name": "Habitat inflável", "description": "Módulos que viajam dobrados e se abrem em salas inteiras.", "cost": 240, "science": 55, "weeks": 32, "requires": ["ls_closed_loop"], "effects": {"sciencePerMission": 0.08, "crewSafety": 0.02}},
+    {"id": "ls_cultivation", "branch": "life_support", "era": 4, "name": "Cultivo em baixa gravidade", "description": "Alface, trigo anão e um pouco de verde para quem passa meses longe.", "cost": 120, "science": 40, "weeks": 26, "requires": ["ls_habitat"], "effects": {"sciencePerMission": 0.06, "crewMorale": 4}},
+    {"id": "comp_fault_tolerant", "branch": "computing", "era": 4, "name": "Software tolerante a falhas", "description": "Computadores redundantes que votam entre si e sobrevivem a bits trocados por radiação.", "cost": 120, "science": 25, "weeks": 20, "requires": [], "effects": {"reliability": 0.02}, "initialFor": ["nasa", "esa", "jaxa"]},
+    {"id": "comp_autonomy_gnc", "branch": "computing", "era": 4, "name": "Navegação autônoma de pouso", "description": "Câmeras e lidar escolhem sozinhos o ponto seguro nos últimos 500 metros.", "cost": 140, "science": 30, "weeks": 22, "requires": [], "effects": {"landingReliability": 0.04}, "initialFor": ["cnsa", "jaxa", "isro"]},
+    {"id": "comp_digital_twin", "branch": "computing", "era": 4, "name": "Gêmeo digital da missão", "description": "Uma cópia virtual da nave que roda milhares de cenários antes de cada voo.", "cost": 150, "science": 40, "weeks": 22, "requires": ["comp_fault_tolerant"], "effects": {"chanceBand": 0.1, "reliability": 0.01}},
+    {"id": "comp_mission_ai", "branch": "computing", "era": 4, "name": "IA na sala de controle", "description": "Um assistente que lê telemetria mais rápido que qualquer humano e sugere respostas.", "cost": 200, "science": 55, "weeks": 28, "requires": ["comp_digital_twin"], "effects": {"commandPoints": 1, "chanceBand": 0.05}},
+    {"id": "comp_predictive", "branch": "computing", "era": 4, "name": "Manutenção preditiva", "description": "Prever qual peça vai falhar no próximo voo e trocá-la antes.", "cost": 170, "science": 45, "weeks": 24, "requires": ["comp_digital_twin"], "effects": {"reliability": 0.02, "delayReduction": 0.08}},
+    {"id": "comp_robotics", "branch": "computing", "era": 4, "name": "Robótica de superfície", "description": "Rovers e braços que trabalham enquanto a tripulação dorme.", "cost": 160, "science": 40, "weeks": 26, "requires": ["comp_autonomy_gnc"], "effects": {"sciencePerMission": 0.1, "landingReliability": 0.01}},
+    {"id": "comp_optical_comms", "branch": "computing", "era": 4, "name": "Comunicação óptica a laser", "description": "Vídeo em alta definição da Lua e cem vezes mais dados por passagem.", "cost": 130, "science": 30, "weeks": 20, "requires": [], "effects": {"sciencePerMission": 0.08, "chanceBand": 0.03}},
+    {"id": "en_solar", "branch": "energy", "era": 4, "name": "Painéis solares de alta eficiência", "description": "Células multijunção enroláveis: mais watts por quilo.", "cost": 90, "science": 15, "weeks": 16, "requires": [], "effects": {"sciencePerMission": 0.04, "payload": 0.02}, "initialFor": ["nasa", "esa", "cnsa"]},
+    {"id": "en_batteries", "branch": "energy", "era": 4, "name": "Baterias para a noite lunar", "description": "Sobreviver a 14 dias de escuridão a 170 graus negativos.", "cost": 120, "science": 30, "weeks": 22, "requires": ["en_solar"], "effects": {"landingReliability": 0.02, "sciencePerMission": 0.04}},
+    {"id": "en_power_mgmt", "branch": "energy", "era": 4, "name": "Gestão inteligente de energia", "description": "Cortar cargas certas na hora certa quando um painel falha.", "cost": 80, "science": 25, "weeks": 14, "requires": [], "effects": {"reliability": 0.01, "chanceBand": 0.03}},
+    {"id": "en_fission", "branch": "energy", "era": 4, "name": "Reator de fissão de superfície", "description": "Dez quilowatts contínuos em qualquer cratera, dia ou noite.", "cost": 320, "science": 75, "weeks": 40, "requires": ["en_batteries"], "effects": {"sciencePerMission": 0.08, "landingReliability": 0.02, "sciencePerWeek": 0.3}},
+    {"id": "sci_labs", "branch": "science", "era": 4, "name": "Rede de laboratórios associados", "description": "Universidades e institutos analisando seus dados em tempo integral.", "cost": 90, "science": 15, "weeks": 16, "requires": [], "effects": {"sciencePerWeek": 0.8}, "initialFor": ["nasa", "esa", "jaxa", "cnsa"]},
+    {"id": "sci_program_office", "branch": "science", "era": 4, "name": "Escritório de programas de P&D", "description": "Gestão de portfólio para tocar mais projetos ao mesmo tempo sem perder o fio.", "cost": 100, "science": 30, "weeks": 18, "requires": ["sci_labs"], "effects": {"researchSlots": 1}},
+    {"id": "sci_space_weather", "branch": "science", "era": 4, "name": "Previsão de clima espacial", "description": "Ver a tempestade solar sair do Sol com horas de antecedência.", "cost": 90, "science": 25, "weeks": 16, "requires": [], "effects": {"crewSafety": 0.04, "delayReduction": 0.04, "reliability": 0.005}},
+    {"id": "sci_sample_curation", "branch": "science", "era": 4, "name": "Curadoria de amostras", "description": "Salas limpas e protocolos para que cada grama de rocha conte uma história.", "cost": 110, "science": 25, "weeks": 18, "requires": ["sci_labs"], "effects": {"sciencePerMission": 0.15}},
+    {"id": "sci_lunar_prospect", "branch": "science", "era": 4, "name": "Prospecção de gelo no polo sul", "description": "Mapas de nêutrons e radar das crateras de sombra eterna.", "cost": 150, "science": 40, "weeks": 24, "requires": ["sci_sample_curation"], "effects": {"landingReliability": 0.03, "sciencePerMission": 0.05}},
+    {"id": "sci_isru", "branch": "science", "era": 4, "name": "Uso de recursos in situ", "description": "Extrair oxigênio e água do regolito. Viver do que a Lua oferece.", "cost": 280, "science": 70, "weeks": 36, "requires": ["sci_lunar_prospect"], "effects": {"payload": 0.04, "sciencePerMission": 0.06}},
+    {"id": "sec_echo_analysis", "branch": "science", "era": 4, "name": "Análise do sinal periódico", "description": "O padrão se repete a cada 41 horas. Alguém precisa entender por quê.", "cost": 120, "science": 60, "weeks": 20, "requires": [], "effects": {"sciencePerWeek": 0.6, "sciencePerMission": 0.1}, "secret": true, "unlockedBy": "echo_signal"},
+    {"id": "sec_anomaly_alloy", "branch": "structures", "era": 4, "name": "Liga da amostra anômala", "description": "A microestrutura da amostra não bate com nenhum processo conhecido. Copiá-la parece possível.", "cost": 200, "science": 75, "weeks": 28, "requires": [], "effects": {"reliability": 0.02, "payload": 0.03}, "secret": true, "unlockedBy": "anomaly_sample"},
+    {"id": "sec_reverse_engineering", "branch": "propulsion", "era": 4, "name": "Engenharia reversa de dados rivais", "description": "Os arquivos que chegaram por um canal discreto mostram como o rival barateou seus motores.", "cost": 90, "science": 25, "weeks": 14, "requires": [], "effects": {"launchCost": -0.04, "reliability": 0.005}, "secret": true, "unlockedBy": "rival_data_leak"},
+    {"id": "sec_lava_tubes", "branch": "science", "era": 4, "name": "Mapeamento de tubos de lava", "description": "Cavernas naturais sob a superfície: abrigo pronto contra radiação e micrometeoritos.", "cost": 160, "science": 55, "weeks": 22, "requires": [], "effects": {"sciencePerMission": 0.1, "crewSafety": 0.03, "landingReliability": 0.02}, "secret": true, "unlockedBy": "lava_tube_found"},
+    {"id": "sec_beamed_power", "branch": "energy", "era": 4, "name": "Energia transmitida por laser", "description": "Iluminar um rover no fundo de uma cratera escura a partir da borda.", "cost": 240, "science": 70, "weeks": 30, "requires": ["en_batteries"], "effects": {"landingReliability": 0.02, "sciencePerMission": 0.06}, "secret": true, "unlockedBy": "beamed_power_insight"},
+    {"id": "sec_phoenix_protocol", "branch": "life_support", "era": 4, "name": "Protocolo Fênix", "description": "Depois da perda, a agência revisa cada válvula e cada procedimento de aborto. Nunca mais.", "cost": 150, "science": 30, "weeks": 20, "requires": [], "effects": {"crewSafety": 0.12, "reliability": 0.01, "crewMorale": 3}, "secret": true, "unlockedBy": "crew_tragedy", "revealedBySignal": "crew/died"}
+  ]
+}

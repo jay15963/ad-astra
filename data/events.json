@@ -1,0 +1,1508 @@
+{
+  "milestones": {
+    "crewed_lunar_flyby": "Sobrevoo lunar tripulado",
+    "crewed_lunar_orbit": "Órbita lunar tripulada",
+    "crewed_lunar_landing": "Pouso tripulado na Lua",
+    "lunar_south_pole_landing": "Pouso no polo sul da Lua",
+    "lunar_south_pole_crewed": "Tripulação no polo sul da Lua",
+    "lunar_sample_return": "Retorno de amostras lunares",
+    "lunar_resource_demo": "Uso de recursos lunares",
+    "lunar_base": "Base lunar",
+    "mars_landing_robotic": "Pouso robótico em Marte",
+    "mars_sample_return": "Amostras de Marte na Terra",
+    "titan_arrival": "Chegada a Titã",
+    "jupiter_arrival": "Chegada a Júpiter",
+    "commercial_station": "Estação comercial em órbita",
+    "national_station": "Estação nacional em órbita",
+    "crewed_orbit_national": "Primeiro voo orbital tripulado próprio"
+  },
+  "album": {
+    "firstSuccess": { "title": "Primeiro sucesso", "headline": "{mission} cumpre tudo o que prometeu", "rarity": "rare", "kind": "mission" },
+    "firstCrewed": { "title": "Todos em casa", "headline": "{mission}: a tripulação volta bem", "rarity": "epic", "kind": "mission" },
+    "firstLunar": { "title": "A Lua ao alcance", "headline": "{mission} chega à Lua", "rarity": "epic", "kind": "mission" },
+    "lunarCrewed": { "title": "Gente perto da Lua", "headline": "{mission} completa o voo tripulado", "rarity": "epic", "kind": "mission" },
+    "nearMiss": { "title": "Por um fio", "headline": "{mission} termina com a tripulação viva, contra as chances", "rarity": "rare", "kind": "near_miss" },
+    "comeback": { "title": "A volta por cima", "headline": "Depois das falhas, {mission} recoloca {actor} no jogo", "rarity": "rare", "kind": "comeback" },
+    "first": { "title": "Os Primeiros: {milestone}", "headline": "{actor} chega antes de todos: {milestone}", "rarity": "legendary", "kind": "first" },
+    "memorial": { "title": "Em memória de {person}", "headline": "{person} deu a vida pela exploração em {year}", "rarity": "rare", "kind": "memorial" },
+    "legend": { "title": "Lenda: {person}", "headline": "{person} entra para a história de {actor}", "rarity": "epic", "kind": "legend" },
+    "treaty": { "title": "Assinatura histórica", "headline": "{actor} assina um novo acordo internacional", "rarity": "common", "kind": "diplomacy" },
+    "eraEnd": { "title": "Fim da Corrida Lunar: {pos}º lugar", "headline": "{actor} fecha a década em {pos}º na Tabela da Era", "rarity": "epic", "kind": "era" }
+  },
+  "events": [
+    {
+      "id": "eng_sells_plans",
+      "kind": "narrative",
+      "title": "Downloads à meia-noite",
+      "text": "A segurança interna rastreou downloads noturnos: {person} copiou os desenhos do trem de pouso para um pendrive pessoal. Um e-mail mostra conversas com um recrutador ligado à {rival}. Pode ser traição. Pode ser só um currículo mal pensado.",
+      "portrait": "crew",
+      "subject": "engineer",
+      "trigger": { "minTurn": 8 },
+      "weight": 8,
+      "cooldownWeeks": 78,
+      "once": true,
+      "chain": { "id": "leak", "step": 1 },
+      "choices": [
+        { "id": "confront", "label": "Conversar a portas fechadas com {person}", "preview": "Pode salvar a lealdade, mas os desenhos já saíram.",
+          "effects": [ { "crew": "subject", "field": "loyalty", "delta": 15 }, { "crew": "subject", "field": "morale", "delta": -5 }, { "flag": "leak_confronted" }, { "schedule": "leak_2", "inWeeks": 6 } ] },
+        { "id": "sting", "label": "Plantar desenhos falsos e esperar", "preview": "Se a {rival} usar os dados, você terá a prova.", "requires": { "culture": ">10" },
+          "effects": [ { "cash": -15 }, { "relation": "rival", "field": "trust", "delta": -10 }, { "flag": "leak_sting" }, { "schedule": "leak_2", "inWeeks": 6 } ] },
+        { "id": "fire", "label": "Demitir e acionar a justiça", "preview": "Mensagem dura para a equipe e para o rival.",
+          "effects": [ { "crewStatus": "left" }, { "actor": "player", "field": "reputation", "delta": 2 }, { "crew": "random", "field": "morale", "delta": -6 }, { "relation": "rival", "field": "trust", "delta": -15 }, { "schedule": "leak_2", "inWeeks": 6 }, { "news": "{actor} demite engenheiro acusado de vazar projeto à {rival}", "importance": 2 } ] }
+      ]
+    },
+    {
+      "id": "leak_2",
+      "kind": "narrative",
+      "title": "O trem de pouso da {rival}",
+      "text": "Seis semanas depois, um protótipo da {rival} exibe um trem de pouso parecido demais com o seu. A imprensa técnica já comparou as fotos lado a lado. Os advogados dizem que há caso. Os engenheiros dizem que o melhor processo é correr mais rápido.",
+      "portrait": "actor",
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "leak", "step": 2 },
+      "choices": [
+        { "id": "proof", "label": "Publicar a prova dos desenhos falsos", "preview": "A armadilha funcionou: o rival copiou até os erros.", "requires": { "flag": "leak_sting" },
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 5 }, { "actor": "rival", "field": "reputation", "delta": -8 }, { "relation": "rival", "field": "trust", "delta": -15 }, { "tension": "rival", "delta": 1 }, { "news": "Prova: {rival} copiou projeto de {actor}, com erros plantados e tudo", "importance": 3 } ] },
+        { "id": "sue", "label": "Processar formalmente", "preview": "Anos de tribunal e manchetes.",
+          "effects": [ { "cash": -20 }, { "actor": "rival", "field": "reputation", "delta": -3 }, { "relation": "rival", "field": "trust", "delta": -10 }, { "actor": "player", "field": "support", "delta": 2 } ] },
+        { "id": "redesign", "label": "Redesenhar e seguir em frente", "preview": "Custa caro, mas a próxima versão será melhor.",
+          "effects": [ { "cash": -30 }, { "science": 10 }, { "actor": "player", "field": "culture", "delta": 3 } ] }
+      ]
+    },
+    {
+      "id": "whistleblower",
+      "kind": "narrative",
+      "title": "A válvula aprovada no grito",
+      "text": "{person} protocolou um relatório interno: os testes de qualificação de uma válvula de {mission} foram aprovados com dados incompletos. O gerente do programa garante que a margem é suficiente e que adiar custa caro. Cópias do relatório já circulam por três caixas de e-mail.",
+      "portrait": "crew",
+      "subject": "engineer",
+      "trigger": { "minTurn": 6 },
+      "weight": 10,
+      "cooldownWeeks": 52,
+      "chain": { "id": "whistle", "step": 1 },
+      "choices": [
+        { "id": "audit", "label": "Auditoria independente", "preview": "Atrasa e custa, mas a dúvida some.",
+          "effects": [ { "cash": -25 }, { "missionRisk": -0.03 }, { "crew": "subject", "field": "loyalty", "delta": 10 }, { "actor": "player", "field": "support", "delta": -2 } ] },
+        { "id": "trust_manager", "label": "Confiar no gerente do programa", "preview": "O relatório não vai desaparecer só porque você o ignorou.",
+          "effects": [ { "missionRisk": 0.02 }, { "crew": "subject", "field": "morale", "delta": -15 }, { "flag": "whistle_ignored" }, { "schedule": "whistle_2", "inWeeks": 5 } ] },
+        { "id": "promote", "label": "Pôr {person} à frente da segurança", "preview": "Uma agência cautelosa premia quem aponta o problema.", "requires": { "culture": "<0" },
+          "effects": [ { "crew": "subject", "field": "loyalty", "delta": 15 }, { "crew": "subject", "field": "skill", "delta": 4 }, { "missionRisk": -0.02 }, { "cash": -10 }, { "actor": "player", "field": "culture", "delta": -4 } ] }
+      ]
+    },
+    {
+      "id": "whistle_2",
+      "kind": "narrative",
+      "title": "A denúncia vazou",
+      "text": "Um jornal publicou o relatório de {person} com a manchete “Válvula aprovada no grito”. Comissões do governo pedem explicações sobre {mission}, e os astronautas querem ouvir a verdade de você, não da imprensa.",
+      "portrait": "crew",
+      "trigger": { "requiresFlags": ["whistle_ignored"] },
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "chain": { "id": "whistle", "step": 2 },
+      "choices": [
+        { "id": "admit", "label": "Assumir o erro e refazer o teste", "preview": "Dói hoje, protege amanhã.",
+          "effects": [ { "cash": -30 }, { "actor": "player", "field": "support", "delta": -3 }, { "actor": "player", "field": "reputation", "delta": 4 }, { "missionRisk": -0.03 }, { "flag": "whistle_ignored", "value": false } ] },
+        { "id": "deny", "label": "Negar e defender o processo", "preview": "Se algo falhar, ninguém vai esquecer esta entrevista.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -6 }, { "actor": "player", "field": "reputation", "delta": -6 }, { "crew": "random", "field": "morale", "delta": -10 }, { "news": "{actor} nega falhas em teste de válvula apesar de relatório interno", "importance": 2 } ] },
+        { "id": "thank", "label": "Agradecer publicamente a {person}", "preview": "Transforma o escândalo em exemplo.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 3 }, { "crew": "subject", "field": "loyalty", "delta": 12 }, { "actor": "player", "field": "culture", "delta": -3 }, { "missionRisk": -0.01 } ] }
+      ]
+    },
+    {
+      "id": "union_strike",
+      "kind": "narrative",
+      "title": "Greve na plataforma",
+      "text": "O sindicato dos técnicos de solo cruzou os braços: querem adicional pelos turnos de madrugada nas contagens regressivas. Sem eles, nenhum foguete sai da plataforma. A imprensa já conta os dias e os fornecedores perguntam se mantêm as entregas.",
+      "portrait": null,
+      "trigger": { "minTurn": 4 },
+      "weight": 9,
+      "cooldownWeeks": 60,
+      "choices": [
+        { "id": "accept", "label": "Aceitar o acordo inteiro", "preview": "Paz na plataforma, rombo no caixa.",
+          "effects": [ { "cash": -35 }, { "actor": "player", "field": "support", "delta": 1 }, { "crew": "random", "field": "morale", "delta": 5 } ] },
+        { "id": "middle", "label": "Negociar um meio-termo", "preview": "Ninguém sai feliz, mas todos voltam.",
+          "effects": [ { "cash": -15 }, { "actor": "player", "field": "support", "delta": -2 } ] },
+        { "id": "contractors", "label": "Contratar terceirizados", "preview": "Mais barato agora, mais caro na reputação.",
+          "effects": [ { "cash": -10 }, { "actor": "player", "field": "reputation", "delta": -4 }, { "actor": "player", "field": "culture", "delta": 4 }, { "flag": "strike_breakers" }, { "news": "{actor} contrata terceirizados para furar greve na plataforma", "importance": 2 } ] }
+      ]
+    },
+    {
+      "id": "celebrity_seat",
+      "kind": "narrative",
+      "title": "Uma estrela quer voar",
+      "text": "Um ator com 200 milhões de seguidores oferece uma fortuna por um assento numa missão tripulada, com transmissão ao vivo de tudo. Os astronautas torcem o nariz. O departamento de marketing já desenhou a camiseta.",
+      "portrait": null,
+      "trigger": { "minTurn": 10, "condition": { "hasRole": "astronaut" } },
+      "weight": 7,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "sell", "label": "Vender o assento", "preview": "Dinheiro e audiência; os astronautas se sentem trocados.",
+          "effects": [ { "cash": 60 }, { "actor": "player", "field": "support", "delta": 6 }, { "actor": "player", "field": "reputation", "delta": -4 }, { "crew": "random", "field": "morale", "delta": -10 }, { "flag": "celebrity_flyer" } ] },
+        { "id": "ambassador", "label": "Oferecer o papel de embaixador em terra", "preview": "Parte da audiência, nenhum assento.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 3 }, { "cash": 10 } ] },
+        { "id": "refuse", "label": "Recusar com elegância", "preview": "A equipe agradece.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 2 }, { "crew": "random", "field": "morale", "delta": 5 } ] }
+      ]
+    },
+    {
+      "id": "media_scandal",
+      "kind": "narrative",
+      "title": "O bolo em forma de foguete",
+      "text": "Uma reportagem mostra as notas de um jantar de gala para patrocinadores: lagosta, champanhe e um bolo em forma de foguete. Foi pago, legalmente, com verba de divulgação. Mas a foto do bolo está em todos os telejornais da noite.",
+      "portrait": null,
+      "trigger": { "minTurn": 6 },
+      "weight": 8,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "apologize", "label": "Pedir desculpas e devolver o valor", "preview": "O assunto morre rápido.",
+          "effects": [ { "cash": -5 }, { "actor": "player", "field": "support", "delta": -1 }, { "actor": "player", "field": "reputation", "delta": 1 } ] },
+        { "id": "defend", "label": "Defender: patrocinadores pagam missões", "preview": "Os patrocinadores gostam; o público, não.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -4 }, { "cash": 15 } ] },
+        { "id": "fire_comms", "label": "Demitir o diretor de comunicação", "preview": "Um bode expiatório resolve a manchete, não a cultura.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 1 }, { "actor": "player", "field": "reputation", "delta": -2 }, { "crew": "random", "field": "loyalty", "delta": -5 } ] }
+      ]
+    },
+    {
+      "id": "family_letters",
+      "kind": "narrative",
+      "title": "Uma carta escrita à mão",
+      "text": "O filho mais novo de {person} mandou uma carta para o centro de treinamento: “Você volta para o meu aniversário?”. A carta ficou presa no quadro da sala de simulação. Desde então, {person} treina em silêncio e é sempre a última pessoa a sair.",
+      "portrait": "crew",
+      "subject": "astronaut",
+      "trigger": { "minTurn": 3 },
+      "weight": 10,
+      "cooldownWeeks": 40,
+      "choices": [
+        { "id": "home", "label": "Liberar uma semana em casa", "preview": "Volta mais leve, um pouco fora de ritmo.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": 15 }, { "crew": "subject", "field": "skill", "delta": -2 }, { "crew": "subject", "field": "loyalty", "delta": 5 } ] },
+        { "id": "video", "label": "Levar um vídeo da família na próxima missão", "preview": "Pequeno gesto, grande história.",
+          "effects": [ { "cash": -3 }, { "crew": "subject", "field": "morale", "delta": 8 }, { "actor": "player", "field": "support", "delta": 2 } ] },
+        { "id": "schedule", "label": "Manter o cronograma", "preview": "O treino não espera, a saudade também não.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": -10 }, { "crew": "subject", "field": "skill", "delta": 3 } ] }
+      ]
+    },
+    {
+      "id": "burnout",
+      "kind": "narrative",
+      "title": "Dormindo no escritório",
+      "text": "{person} dorme no escritório há três semanas. Os simuladores nunca rodaram tão bem, mas hoje cedo um erro bobo de conversão de unidades quase entrou na versão final do software de voo. A equipe pede que alguém intervenha antes que seja tarde.",
+      "portrait": "crew",
+      "subject": ["engineer", "flight_director"],
+      "trigger": { "minTurn": 5 },
+      "weight": 9,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "vacation", "label": "Férias obrigatórias", "preview": "Duas semanas sem o melhor cérebro da sala.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": 15 }, { "crew": "subject", "field": "loyalty", "delta": 5 }, { "science": -4 } ] },
+        { "id": "hire", "label": "Reforçar a equipe com contratações", "preview": "Divide o peso, custa caro.",
+          "effects": [ { "cash": -20 }, { "crew": "subject", "field": "morale", "delta": 10 }, { "science": 5 } ] },
+        { "id": "let_work", "label": "Deixar trabalhar", "preview": "O resultado vem. O preço também.",
+          "effects": [ { "science": 10 }, { "crew": "subject", "field": "morale", "delta": -15 }, { "crew": "subject", "field": "loyalty", "delta": -5 } ] }
+      ]
+    },
+    {
+      "id": "intern_laser",
+      "kind": "narrative",
+      "title": "A estagiária e a cratera escura",
+      "text": "Uma estagiária do laboratório de energia apresentou, num café, uma ideia simples: iluminar um rover no fundo de uma cratera escura com um laser instalado na borda ensolarada. Os veteranos riram. Depois pararam de rir e pegaram papel.",
+      "portrait": null,
+      "trigger": { "minTurn": 12 },
+      "weight": 8,
+      "cooldownWeeks": 52,
+      "once": true,
+      "choices": [
+        { "id": "fund", "label": "Financiar um estudo de viabilidade", "preview": "Abre um caminho de pesquisa secreto.",
+          "effects": [ { "cash": -15 }, { "science": 10 }, { "flag": "beamed_power_insight" } ] },
+        { "id": "patent", "label": "Patentear e licenciar", "preview": "Dinheiro agora; a ideia continua sua.",
+          "effects": [ { "cash": 20 }, { "actor": "player", "field": "reputation", "delta": -1 }, { "flag": "beamed_power_insight" } ] },
+        { "id": "shelve", "label": "Arquivar: foco no cronograma", "preview": "A estagiária vai lembrar disso.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": -3 }, { "crew": "random", "field": "morale", "delta": -3 } ] }
+      ]
+    },
+    {
+      "id": "supplier_bankrupt",
+      "kind": "narrative",
+      "title": "O único fornecedor de válvulas",
+      "text": "A pequena empresa que fabrica as válvulas criogênicas da sua frota pediu recuperação judicial. São 40 funcionários e o único lote qualificado do mundo. A {rival} já sondou a compra da fábrica, discretamente, pelos advogados.",
+      "portrait": null,
+      "trigger": { "minTurn": 10 },
+      "weight": 8,
+      "cooldownWeeks": 104,
+      "choices": [
+        { "id": "buy", "label": "Comprar a empresa", "preview": "A cadeia de suprimentos fica em casa.",
+          "effects": [ { "cash": -60 }, { "actor": "player", "field": "reputation", "delta": 2 }, { "relation": "rival", "field": "rivalry", "delta": 5 }, { "flag": "owns_valve_supplier" } ] },
+        { "id": "prepay", "label": "Antecipar pagamentos", "preview": "Compra tempo, não resolve.",
+          "effects": [ { "cash": -25 }, { "flag": "supplier_saved" } ] },
+        { "id": "requalify", "label": "Qualificar outro fornecedor", "preview": "Meses de testes, mas sem dependência.",
+          "effects": [ { "cash": -15 }, { "science": 5 }, { "actor": "player", "field": "support", "delta": -1 } ] },
+        { "id": "let_rival", "label": "Deixar a {rival} comprar", "preview": "Seu foguete passa a depender do rival.",
+          "effects": [ { "relation": "rival", "field": "dependence", "delta": 12 }, { "actor": "player", "field": "reputation", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "school_contest",
+      "kind": "narrative",
+      "title": "O nome do rover",
+      "text": "Mais de 300 mil crianças mandaram nomes para o próximo rover. O mais votado, de longe, é “Rovinho Rodinha”. O segundo é o nome de uma professora de ciências que morreu no ano passado, sugerido pela turma inteira dela.",
+      "portrait": null,
+      "trigger": { "minTurn": 8 },
+      "weight": 7,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "popular", "label": "Respeitar o voto popular", "preview": "As crianças comemoram; os cientistas suspiram.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 5 }, { "actor": "player", "field": "reputation", "delta": -1 }, { "actor": "player", "field": "culture", "delta": 2 } ] },
+        { "id": "teacher", "label": "Homenagear a professora", "preview": "Uma história que o país inteiro vai contar.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 3 }, { "actor": "player", "field": "reputation", "delta": 2 }, { "album": "Um rover com nome de professora", "rarity": "common" } ] },
+        { "id": "jury", "label": "Um júri técnico decide", "preview": "Sério, previsível, esquecível.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -2 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "cyberattack",
+      "kind": "narrative",
+      "title": "Às 3h17 da manhã",
+      "text": "O sistema de agendamento da rede de antenas começou a apagar arquivos sozinho. A equipe isolou a rede a tempo, mas os rastros apontam para servidores usados antes por grupos ligados à {rival}. Ninguém consegue provar nada, e todo mundo tem certeza.",
+      "portrait": null,
+      "trigger": { "minTurn": 12 },
+      "weight": 7,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "accuse", "label": "Acusar publicamente", "preview": "O público aplaude; os diplomatas gelam.",
+          "effects": [ { "tension": "rival", "delta": 1 }, { "actor": "player", "field": "support", "delta": 3 }, { "relation": "rival", "field": "trust", "delta": -15 }, { "news": "{actor} acusa {rival} de ataque cibernético à rede de antenas", "importance": 3 } ] },
+        { "id": "harden", "label": "Investir em ciberdefesa", "preview": "Caro e invisível, como toda boa defesa.",
+          "effects": [ { "cash": -30 }, { "flag": "cyber_hardened" }, { "actor": "player", "field": "reputation", "delta": 2 } ] },
+        { "id": "quiet", "label": "Tratar em silêncio pela diplomacia", "preview": "O recado chega sem manchete.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": -5 }, { "actor": "player", "field": "reputation", "delta": 1 }, { "cash": -5 } ] }
+      ]
+    },
+    {
+      "id": "documentary",
+      "kind": "narrative",
+      "title": "Câmeras na sala de controle",
+      "text": "Uma plataforma de streaming quer filmar um ano inteiro na agência: sala de controle, treinos, reuniões de orçamento. Pagam bem e prometem “não editar para criar drama”. Toda série promete isso.",
+      "portrait": null,
+      "trigger": { "minTurn": 4 },
+      "weight": 8,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "full", "label": "Acesso total", "preview": "Fama e dinheiro; a equipe se sente vigiada.",
+          "effects": [ { "cash": 40 }, { "actor": "player", "field": "support", "delta": 6 }, { "crew": "random", "field": "morale", "delta": -8 }, { "flag": "documentary" } ] },
+        { "id": "partial", "label": "Acesso controlado", "preview": "Menos drama, menos audiência.",
+          "effects": [ { "cash": 15 }, { "actor": "player", "field": "support", "delta": 3 } ] },
+        { "id": "refuse", "label": "Recusar", "preview": "A sala de controle continua um lugar sagrado.",
+          "effects": [ { "crew": "random", "field": "morale", "delta": 3 }, { "actor": "player", "field": "reputation", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "astronaut_viral",
+      "kind": "narrative",
+      "title": "“A Lua não tem dono”",
+      "text": "Numa entrevista, {person} disse que “a Lua não pertence a bloco nenhum” e criticou a política de recursos lunares do próprio governo. O vídeo tem milhões de visualizações: metade aplaudindo, metade pedindo demissão.",
+      "portrait": "crew",
+      "subject": "astronaut",
+      "trigger": { "minTurn": 10 },
+      "weight": 7,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "defend", "label": "Defender a liberdade de expressão", "preview": "A equipe confia em você; o governo, menos.",
+          "effects": [ { "crew": "subject", "field": "loyalty", "delta": 10 }, { "actor": "player", "field": "support", "delta": -3 }, { "actor": "player", "field": "reputation", "delta": 3 } ] },
+        { "id": "retract", "label": "Pedir retratação pública", "preview": "O governo respira; {person} engole em seco.",
+          "effects": [ { "crew": "subject", "field": "loyalty", "delta": -10 }, { "crew": "subject", "field": "morale", "delta": -10 }, { "actor": "player", "field": "support", "delta": 2 } ] },
+        { "id": "campaign", "label": "Transformar em campanha: “Lua para todos”", "preview": "Ousado, popular e arriscado nas mesas de negociação.", "requires": { "culture": ">15" },
+          "effects": [ { "actor": "player", "field": "support", "delta": 4 }, { "actor": "player", "field": "culture", "delta": 4 }, { "crew": "subject", "field": "morale", "delta": 8 }, { "relation": "rival", "field": "trust", "delta": 3 } ] }
+      ]
+    },
+    {
+      "id": "rival_poaching",
+      "kind": "narrative",
+      "title": "A {rival} quer {person}",
+      "text": "Um headhunter da {rival} ofereceu a {person} o dobro do salário e o comando de um programa de pouso. A proposta tem prazo de sete dias e chegou, de propósito, na semana do seu briefing de orçamento.",
+      "portrait": "crew",
+      "subject": ["flight_director", "engineer"],
+      "trigger": { "minTurn": 8 },
+      "weight": 9,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "match", "label": "Cobrir a oferta", "preview": "Fica, mas o resto da equipe sabe o valor.",
+          "effects": [ { "cash": -20 }, { "crew": "subject", "field": "loyalty", "delta": 15 }, { "crew": "random", "field": "morale", "delta": -3 } ] },
+        { "id": "command", "label": "Oferecer o comando de uma missão", "preview": "Ambição atendida sem dinheiro.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": 10 }, { "crew": "subject", "field": "ambition", "delta": -10 }, { "actor": "player", "field": "culture", "delta": 2 } ] },
+        { "id": "let_go", "label": "Deixar ir, com festa de despedida", "preview": "Você perde talento e ganha um amigo do outro lado.",
+          "effects": [ { "crewStatus": "left" }, { "relation": "rival", "field": "trust", "delta": 5 }, { "actor": "player", "field": "reputation", "delta": 2 }, { "crew": "random", "field": "morale", "delta": -5 } ] }
+      ]
+    },
+    {
+      "id": "espionage_offer",
+      "kind": "narrative",
+      "title": "Um pacote anônimo",
+      "text": "Um ex-funcionário da {rival} oferece, por um preço modesto, a planilha completa de custos e testes do motor principal deles. Os arquivos parecem autênticos. Seu diretor jurídico ficou pálido; seu engenheiro-chefe, curioso.",
+      "portrait": "actor",
+      "trigger": { "minTurn": 14 },
+      "weight": 7,
+      "cooldownWeeks": 104,
+      "once": true,
+      "chain": { "id": "spy", "step": 1 },
+      "choices": [
+        { "id": "buy", "label": "Comprar os arquivos", "preview": "Abre pesquisa secreta. Compras assim costumam deixar rastro.",
+          "effects": [ { "cash": -10 }, { "flag": "rival_data_leak" }, { "actor": "player", "field": "culture", "delta": 5 }, { "schedule": "spy_exposed", "inWeeks": 14 } ] },
+        { "id": "warn", "label": "Avisar a {rival}", "preview": "Um favor que eles não vão esquecer.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 15 }, { "actor": "player", "field": "reputation", "delta": 4 } ] },
+        { "id": "destroy", "label": "Recusar e destruir o contato", "preview": "Mãos limpas, nenhum ganho.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 1 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "spy_exposed",
+      "kind": "narrative",
+      "title": "Os recibos da {rival}",
+      "text": "Um jornal da {rival} publicou recibos: sua agência comprou documentos internos deles. Ninguém sabe quem negociou, mas todos sabem quem assinou o pagamento. O embaixador quer uma resposta até o fim do dia.",
+      "portrait": "actor",
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "spy", "step": 2 },
+      "choices": [
+        { "id": "deny", "label": "Negar tudo", "preview": "Funciona até a próxima prova.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": -6 }, { "relation": "rival", "field": "trust", "delta": -20 }, { "tension": "rival", "delta": 1 } ] },
+        { "id": "apologize", "label": "Admitir e pedir desculpas", "preview": "Humilhante, mas fecha a ferida.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": -3 }, { "relation": "rival", "field": "trust", "delta": -5 }, { "actor": "player", "field": "support", "delta": -4 } ] },
+        { "id": "scapegoat", "label": "Demitir o intermediário", "preview": "A equipe percebe quem paga a conta.",
+          "effects": [ { "crew": "random", "field": "morale", "delta": -10 }, { "actor": "player", "field": "reputation", "delta": -4 }, { "relation": "rival", "field": "trust", "delta": -10 } ] }
+      ]
+    },
+    {
+      "id": "rival_disinfo",
+      "kind": "narrative",
+      "title": "O vídeo que não aconteceu",
+      "text": "Perfis automatizados espalham que seu último teste “explodiu e foi abafado”. É mentira, mas o vídeo editado já tem milhões de visualizações. Analistas apontam a mesma rede usada antes em campanhas a favor da {rival}.",
+      "portrait": null,
+      "trigger": { "minTurn": 10 },
+      "weight": 8,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "telemetry", "label": "Publicar a telemetria completa", "preview": "Transparência vence boato, devagar.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 4 }, { "actor": "player", "field": "support", "delta": 2 }, { "flag": "open_telemetry" } ] },
+        { "id": "retaliate", "label": "Responder na mesma moeda", "preview": "Satisfatório. Perigoso.", "requires": { "culture": ">20" },
+          "effects": [ { "actor": "player", "field": "support", "delta": 3 }, { "actor": "player", "field": "reputation", "delta": -5 }, { "relation": "rival", "field": "rivalry", "delta": 10 }, { "tension": "rival", "delta": 1 } ] },
+        { "id": "ignore", "label": "Ignorar", "preview": "Boatos sem resposta viram verdade para alguns.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -4 } ] }
+      ]
+    },
+    {
+      "id": "rival_failure",
+      "kind": "narrative",
+      "title": "Fumaça sobre o oceano",
+      "text": "O lançamento da {rival} terminou em fumaça sobre o oceano. Os primeiros relatórios falam em falha de propulsão. Seus engenheiros assistiram em silêncio na sala do café; vários têm amigos do outro lado.",
+      "portrait": "actor",
+      "trigger": { "signal": "mission/resolved", "signalWhere": { "actor": "rival", "outcome": ["catastrophic", "recoverable"] }, "chance": 0.5 },
+      "weight": 10,
+      "cooldownWeeks": 30,
+      "choices": [
+        { "id": "help", "label": "Oferecer ajuda na investigação", "preview": "Gesto raro numa corrida.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 12 }, { "actor": "player", "field": "reputation", "delta": 3 }, { "cash": -5 } ] },
+        { "id": "exploit", "label": "Anunciar sua próxima data no mesmo dia", "preview": "Política pura. Funciona, e eles vão lembrar.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 4 }, { "relation": "rival", "field": "rivalry", "delta": 10 }, { "actor": "player", "field": "reputation", "delta": -2 } ] },
+        { "id": "study", "label": "Estudar a falha em silêncio", "preview": "A falha deles ensina você também.",
+          "effects": [ { "science": 8 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "rival_first",
+      "kind": "narrative",
+      "title": "A {rival} chegou primeiro",
+      "text": "A notícia chegou no meio da reunião de diretoria: a {rival} cravou um marco que você queria. O governo pergunta por que pagou caro para ficar em segundo. Os engenheiros mais jovens querem acelerar tudo; os veteranos pedem calma.",
+      "portrait": "actor",
+      "trigger": { "signal": "first", "signalWhere": { "actor": "rival" }, "chance": 0.5 },
+      "weight": 10,
+      "cooldownWeeks": 40,
+      "choices": [
+        { "id": "accelerate", "label": "Acelerar o programa", "preview": "Mais ousadia, mais risco.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": 6 }, { "actor": "player", "field": "support", "delta": 2 }, { "crew": "random", "field": "morale", "delta": -5 } ] },
+        { "id": "congratulate", "label": "Parabenizar e propor cooperação", "preview": "Elegante; parte do público acha fraco.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 10 }, { "actor": "player", "field": "reputation", "delta": 3 }, { "actor": "player", "field": "support", "delta": -2 } ] },
+        { "id": "next_goal", "label": "Mirar no próximo marco", "preview": "Investir onde ainda dá para ser primeiro.",
+          "effects": [ { "science": 10 }, { "cash": -15 }, { "actor": "player", "field": "prestige", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "rival_safety_zone",
+      "kind": "narrative",
+      "title": "Zona de segurança em Shackleton",
+      "text": "A {rival} declarou uma “zona de segurança” de 50 km em torno do seu futuro local de pouso, perto da cratera Shackleton. Diz que é para evitar a poeira levantada por pousos vizinhos. Fica, por coincidência, em cima do gelo mais rico do polo sul.",
+      "portrait": "actor",
+      "trigger": { "minTurn": 40 },
+      "weight": 9,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "protest", "label": "Protestar na ONU", "preview": "Direito internacional é lento, mas fica registrado.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": -10 }, { "actor": "player", "field": "reputation", "delta": 3 }, { "tension": "rival", "delta": 1 } ] },
+        { "id": "coordinate", "label": "Negociar coordenação de pousos", "preview": "Divide o polo, mas evita acidentes.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 8 }, { "actor": "player", "field": "reputation", "delta": 2 }, { "flag": "landing_coordination" } ] },
+        { "id": "own_zone", "label": "Declarar a sua zona também", "preview": "Bandeira contra bandeira.", "requires": { "culture": ">10" },
+          "effects": [ { "tension": "rival", "delta": 1 }, { "actor": "player", "field": "support", "delta": 4 }, { "relation": "rival", "field": "rivalry", "delta": 10 }, { "news": "{actor} declara zona de segurança própria no polo sul lunar", "importance": 3 } ] }
+      ]
+    },
+    {
+      "id": "rival_data_swap",
+      "kind": "narrative",
+      "title": "Dados entre dois cafés",
+      "text": "Engenheiros da {rival} propõem, informalmente, trocar dados de reentrada de cápsulas: os deles pelos seus. É o tipo de acordo que diplomatas levam anos para assinar. Eles querem fazer no próximo congresso, entre dois cafés.",
+      "portrait": "actor",
+      "trigger": { "minTurn": 16 },
+      "weight": 7,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "accept", "label": "Aceitar a troca", "preview": "Ciência rápida; o governo vai desconfiar.",
+          "effects": [ { "science": 15 }, { "relation": "rival", "field": "trust", "delta": 10 }, { "actor": "player", "field": "support", "delta": -2 } ] },
+        { "id": "official", "label": "Oficializar pela via diplomática", "preview": "Mais lento, mais seguro.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 4 }, { "actor": "player", "field": "reputation", "delta": 2 }, { "science": 5 } ] },
+        { "id": "refuse", "label": "Recusar", "preview": "O muro continua de pé.",
+          "effects": [ { "relation": "rival", "field": "rivalry", "delta": 5 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "budget_hearing",
+      "kind": "narrative",
+      "title": "Cinco minutos para defender a Lua",
+      "text": "A comissão de orçamento quer saber, em cinco minutos, por que a Lua vale mais que hospitais. Um parlamentar da oposição trouxe um gráfico com o custo de cada lançamento convertido em escolas. O seu discurso foi escrito ontem à noite.",
+      "portrait": null,
+      "trigger": { "actors": ["nasa", "cnsa", "isro", "esa", "roscosmos", "jaxa"], "minTurn": 20 },
+      "weight": 9,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "promise", "label": "Prometer um marco em 12 meses", "preview": "Mais verba, e uma promessa que vai ser cobrada.",
+          "effects": [ { "actor": "player", "field": "budget", "delta": 150 }, { "actor": "player", "field": "support", "delta": 3 }, { "actor": "player", "field": "culture", "delta": 3 }, { "flag": "promised_milestone" } ] },
+        { "id": "jobs", "label": "Mostrar os empregos e a ciência", "preview": "Argumento sólido, aplauso morno.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 2 }, { "actor": "player", "field": "budget", "delta": 50 } ] },
+        { "id": "accept_cut", "label": "Aceitar um corte com dignidade", "preview": "Parceiros respeitam; o caixa sente.",
+          "effects": [ { "actor": "player", "field": "budget", "delta": -100 }, { "actor": "player", "field": "reputation", "delta": 3 }, { "actor": "player", "field": "support", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "investor_call",
+      "kind": "narrative",
+      "title": "Menos Lua, mais satélites",
+      "text": "Os investidores querem que a próxima rodada de capital venha com menos Lua e mais satélites de banda larga. O diretor financeiro mostra que um único contrato de constelação paga três testes de pouso. A engenharia ameaça uma rebelião silenciosa.",
+      "portrait": null,
+      "trigger": { "actors": ["spacex", "blueorigin"], "minTurn": 12 },
+      "weight": 10,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "satellites", "label": "Priorizar satélites", "preview": "Caixa cheio, sonho adiado.",
+          "effects": [ { "cash": 80 }, { "actor": "player", "field": "culture", "delta": -5 }, { "crew": "random", "field": "morale", "delta": -8 } ] },
+        { "id": "moon", "label": "Defender a Lua", "preview": "Os investidores vão cobrar resultados.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -5 }, { "actor": "player", "field": "culture", "delta": 5 }, { "actor": "player", "field": "prestige", "delta": 2 } ] },
+        { "id": "balance", "label": "Vender a capacidade ociosa", "preview": "Um pouco de cada.",
+          "effects": [ { "cash": 30 }, { "crew": "random", "field": "morale", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "election_pressure",
+      "kind": "narrative",
+      "title": "Novo governo, novas prioridades",
+      "text": "A eleição trouxe ao poder uma coalizão que fala em “eficiência espacial”. O novo ministro quer uma reunião na segunda-feira. Você tem uma hora para convencer quem nunca viu um foguete de perto.",
+      "portrait": null,
+      "trigger": { "signal": "election", "signalWhere": { "actor": "player" }, "chance": 0.9 },
+      "weight": 10,
+      "cooldownWeeks": 26,
+      "choices": [
+        { "id": "launch_visit", "label": "Convidar o ministro para um lançamento", "preview": "Ninguém sai igual de uma contagem regressiva.",
+          "effects": [ { "cash": -5 }, { "actor": "player", "field": "support", "delta": 6 } ] },
+        { "id": "self_cut", "label": "Apresentar um plano de cortes voluntário", "preview": "Perde verba, ganha confiança.",
+          "effects": [ { "actor": "player", "field": "budget", "delta": -80 }, { "actor": "player", "field": "support", "delta": 4 }, { "actor": "player", "field": "reputation", "delta": 2 } ] },
+        { "id": "scientists", "label": "Mobilizar a comunidade científica", "preview": "Pressão de fora, ressentimento de dentro.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 3 }, { "actor": "player", "field": "support", "delta": 2 }, { "actor": "player", "field": "budget", "delta": -20 } ] }
+      ]
+    },
+    {
+      "id": "minister_contract",
+      "kind": "narrative",
+      "title": "Uma fábrica na cidade natal",
+      "text": "Um político influente quer que a próxima fábrica de tanques seja construída na cidade natal dele, longe dos seus fornecedores e sem estrada decente. Em troca, garante sua verba no ano eleitoral. Ninguém escreveu isso em papel.",
+      "portrait": null,
+      "trigger": { "minTurn": 15 },
+      "weight": 8,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "accept", "label": "Aceitar o acordo", "preview": "Verba garantida, logística ruim, reputação em risco.",
+          "effects": [ { "actor": "player", "field": "budget", "delta": 120 }, { "cash": -40 }, { "actor": "player", "field": "reputation", "delta": -4 }, { "flag": "pork_factory" } ] },
+        { "id": "refuse", "label": "Recusar", "preview": "Você fez um inimigo poderoso.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -5 }, { "actor": "player", "field": "reputation", "delta": 3 } ] },
+        { "id": "visitor_center", "label": "Contraproposta: um centro de visitantes", "preview": "Dá a ele uma inauguração, não uma fábrica.",
+          "effects": [ { "cash": -15 }, { "actor": "player", "field": "support", "delta": 2 }, { "actor": "player", "field": "budget", "delta": 40 } ] }
+      ]
+    },
+    {
+      "id": "head_of_state_visit",
+      "kind": "narrative",
+      "title": "Helicóptero na plataforma",
+      "text": "O chefe de governo quer visitar a plataforma na semana do lançamento, com comitiva, imprensa e helicóptero. A segurança pede para fechar o centro por dois dias. A equipe de solo quer saber se o foguete espera pelo discurso.",
+      "portrait": null,
+      "trigger": { "minTurn": 6 },
+      "weight": 7,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "host", "label": "Receber a visita", "preview": "Foto histórica, equipe estressada.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 6 }, { "cash": -8 }, { "crew": "random", "field": "morale", "delta": -5 } ] },
+        { "id": "after", "label": "Sugerir uma visita depois do voo", "preview": "Prudente; o gabinete não gostou.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -2 }, { "crew": "random", "field": "morale", "delta": 4 } ] },
+        { "id": "schools", "label": "Transmitir a visita para escolas", "preview": "Transforma vaidade em educação.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 4 }, { "actor": "player", "field": "reputation", "delta": 1 }, { "cash": -12 } ] }
+      ]
+    },
+    {
+      "id": "sanctions_component",
+      "kind": "narrative",
+      "title": "Um chip sob suspeita",
+      "text": "Um chip de controle de motor que você usa há anos tem uma peça feita por um fornecedor ligado à {rival}. Com a tensão atual, o governo quer trocá-lo, mesmo qualificado e testado em dezenas de voos. Requalificar custa meses.",
+      "portrait": null,
+      "trigger": { "minTurn": 8, "condition": { "tension": ">=1" } },
+      "weight": 10,
+      "cooldownWeeks": 104,
+      "choices": [
+        { "id": "replace", "label": "Substituir o componente", "preview": "Caro, mas ninguém poderá acusar você.",
+          "effects": [ { "cash": -40 }, { "actor": "player", "field": "reputation", "delta": 2 }, { "actor": "player", "field": "support", "delta": 2 }, { "relation": "rival", "field": "dependence", "delta": -10 } ] },
+        { "id": "waiver", "label": "Pedir uma isenção", "preview": "O governo vai lembrar que você pediu.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -4 }, { "relation": "rival", "field": "dependence", "delta": 5 } ] },
+        { "id": "stockpile", "label": "Estocar o que der antes do embargo", "preview": "Compra tempo e irrita os dois lados.",
+          "effects": [ { "cash": -20 }, { "flag": "chip_stockpile" }, { "relation": "rival", "field": "trust", "delta": -5 } ] }
+      ]
+    },
+    {
+      "id": "military_payload",
+      "kind": "narrative",
+      "title": "O sensor sem ficha técnica",
+      "text": "A Defesa quer embarcar um “sensor de pesquisa” no próximo lançamento. Não informa a massa exata nem o que ele mede. Paga bem e promete apoio no orçamento. Os parceiros internacionais, e a {rival}, vão fazer perguntas.",
+      "portrait": null,
+      "trigger": { "minTurn": 20 },
+      "weight": 7,
+      "cooldownWeeks": 104,
+      "choices": [
+        { "id": "accept", "label": "Aceitar a carga", "preview": "Dinheiro e verba; confiança internacional em queda.",
+          "effects": [ { "cash": 50 }, { "actor": "player", "field": "budget", "delta": 60 }, { "actor": "player", "field": "reputation", "delta": -6 }, { "relation": "rival", "field": "trust", "delta": -10 }, { "flag": "military_cargo" } ] },
+        { "id": "refuse", "label": "Recusar", "preview": "Independência custa caro em Brasília, Pequim ou Washington.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -4 }, { "actor": "player", "field": "reputation", "delta": 3 } ] },
+        { "id": "transparent", "label": "Aceitar com ficha técnica pública", "preview": "Só uma agência respeitada consegue impor isso.", "requires": { "reputation": ">50" },
+          "effects": [ { "cash": 30 }, { "actor": "player", "field": "reputation", "delta": -1 }, { "actor": "player", "field": "support", "delta": 2 } ] }
+      ]
+    },
+    {
+      "id": "public_poll",
+      "kind": "narrative",
+      "title": "54% acham que é desperdício",
+      "text": "Uma pesquisa nacional mostra que 54% acham que a agência gasta demais. A pergunta foi mal formulada, mas manchete não liga para metodologia. O time de comunicação propõe três caminhos e um deles envolve você de capacete.",
+      "portrait": null,
+      "trigger": { "minTurn": 10, "condition": { "support": "<45" } },
+      "weight": 12,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "schools", "label": "Turnê pelas escolas", "preview": "Lento e sincero.",
+          "effects": [ { "cash": -10 }, { "actor": "player", "field": "support", "delta": 5 } ] },
+        { "id": "open_costs", "label": "Abrir os dados de custo", "preview": "Mostra que cada lançamento custa menos que um estádio.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 4 }, { "actor": "player", "field": "support", "delta": 2 } ] },
+        { "id": "bold", "label": "Anunciar um feito ousado", "preview": "Agora vai ter de cumprir.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": 6 }, { "actor": "player", "field": "support", "delta": 4 }, { "flag": "bold_promise" } ] }
+      ]
+    },
+    {
+      "id": "south_pole_ice",
+      "kind": "narrative",
+      "title": "O mapa do gelo",
+      "text": "Um radar orbital entregou o mapa mais detalhado já feito do gelo nas crateras do polo sul: concentrações de até 5% em massa em dois pontos. Quem pousar primeiro ali escolhe o melhor terreno. Por enquanto, os dados são só seus.",
+      "portrait": null,
+      "trigger": { "minTurn": 16 },
+      "weight": 10,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "publish", "label": "Publicar abertamente", "preview": "Ciência para todos, vantagem para ninguém.",
+          "effects": [ { "science": 10 }, { "actor": "player", "field": "reputation", "delta": 6 }, { "relation": "rival", "field": "trust", "delta": 5 }, { "flag": "ice_map" } ] },
+        { "id": "keep", "label": "Guardar por seis meses", "preview": "Vantagem real, e o risco de alguém descobrir.",
+          "effects": [ { "science": 20 }, { "actor": "player", "field": "reputation", "delta": -2 }, { "actor": "player", "field": "culture", "delta": 3 }, { "flag": "ice_secret" }, { "flag": "ice_map" } ] },
+        { "id": "sell", "label": "Licenciar para mineradoras", "preview": "Dinheiro agora, críticas depois.",
+          "effects": [ { "cash": 40 }, { "actor": "player", "field": "reputation", "delta": -3 }, { "flag": "ice_map" } ] }
+      ]
+    },
+    {
+      "id": "dust_1",
+      "kind": "narrative",
+      "title": "Poeira que não sai",
+      "text": "Nos testes em câmara de vácuo, o simulante de regolito grudou nas juntas dos trajes e riscou a lente da câmera do lander em menos de dez horas. A poeira lunar é afiada como vidro moído e carregada de eletricidade estática.",
+      "portrait": null,
+      "trigger": { "minTurn": 10 },
+      "weight": 9,
+      "cooldownWeeks": 104,
+      "once": true,
+      "chain": { "id": "dust", "step": 1 },
+      "choices": [
+        { "id": "program", "label": "Criar um programa de mitigação", "preview": "Caro agora; pode virar produto depois.",
+          "effects": [ { "cash": -30 }, { "science": 10 }, { "flag": "dust_program" }, { "schedule": "dust_2", "inWeeks": 12 } ] },
+        { "id": "replace_parts", "label": "Aceitar o desgaste e trocar peças", "preview": "Barato hoje. A conta chega na superfície.",
+          "effects": [ { "cash": -10 }, { "flag": "dust_ignored" }, { "schedule": "dust_2", "inWeeks": 12 } ] },
+        { "id": "electrostatic", "label": "Pesquisar um escudo eletrostático", "preview": "Aposta ousada em física.", "requires": { "culture": ">0" },
+          "effects": [ { "science": 15 }, { "cash": -20 }, { "actor": "player", "field": "culture", "delta": 3 }, { "flag": "dust_program" }, { "schedule": "dust_2", "inWeeks": 12 } ] }
+      ]
+    },
+    {
+      "id": "dust_2",
+      "kind": "narrative",
+      "title": "O relatório da poeira",
+      "text": "Os resultados chegaram: as juntas dos trajes duram metade do previsto em contato com regolito. Se a equipe investiu antes, há uma solução pronta; se não, o prazo aperta. A {rival} pediu, discretamente, para ver os dados.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "chain": { "id": "dust", "step": 2 },
+      "choices": [
+        { "id": "license", "label": "Licenciar a tecnologia anti-poeira", "preview": "O investimento se paga.", "requires": { "flag": "dust_program" },
+          "effects": [ { "cash": 30 }, { "actor": "player", "field": "reputation", "delta": 4 }, { "album": "A guerra contra a poeira", "rarity": "common" } ] },
+        { "id": "emergency", "label": "Trajes novos às pressas", "preview": "Caro e apressado.",
+          "effects": [ { "cash": -40 }, { "crew": "random", "field": "morale", "delta": 5 } ] },
+        { "id": "share", "label": "Compartilhar os dados com a {rival}", "preview": "A poeira é inimiga de todos.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 10 }, { "science": 5 } ] }
+      ]
+    },
+    {
+      "id": "lander_anomaly",
+      "kind": "narrative",
+      "title": "A perna que amorteceu menos",
+      "text": "No teste de queda do módulo de pouso, uma das pernas amorteceu 30% menos que o previsto. O modelo de computador não previu nada. Pode ser o sensor, pode ser a liga, pode ser o próprio modelo. A equipe quer uma decisão antes do próximo teste.",
+      "portrait": null,
+      "trigger": { "minTurn": 14 },
+      "weight": 9,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "retest", "label": "Refazer toda a campanha de testes", "preview": "Meses e milhões, mas resposta certa.",
+          "effects": [ { "cash": -35 }, { "science": 8 }, { "actor": "player", "field": "reputation", "delta": 1 } ] },
+        { "id": "patch_model", "label": "Corrigir o modelo e seguir", "preview": "Rápido. Torça para que seja o sensor.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": 4 }, { "science": 3 }, { "flag": "lander_doubt" } ] },
+        { "id": "experts", "label": "Chamar especialistas de fora", "preview": "Olhos novos, custo moderado.",
+          "effects": [ { "cash": -15 }, { "science": 5 }, { "actor": "player", "field": "reputation", "delta": 2 } ] }
+      ]
+    },
+    {
+      "id": "accords_ceremony",
+      "kind": "narrative",
+      "title": "Mais três assinaturas",
+      "text": "Mais três países vão assinar os Acordos Artemis numa cerimônia em Washington. Você foi convidado a discursar e, nos bastidores, a apoiar a adesão de um país que tem um porto espacial equatorial cobiçado por todos os blocos.",
+      "portrait": null,
+      "trigger": { "minTurn": 8, "maxTurn": 200, "condition": { "bloc": "artemis_accords" } },
+      "weight": 8,
+      "cooldownWeeks": 104,
+      "choices": [
+        { "id": "sponsor", "label": "Discursar e apadrinhar o novo membro", "preview": "Prestígio no bloco, irritação do outro lado.",
+          "effects": [ { "actor": "player", "field": "prestige", "delta": 3 }, { "actor": "player", "field": "reputation", "delta": 4 }, { "relation": "cnsa", "field": "rivalry", "delta": 5 }, { "news": "{actor} apadrinha novos signatários dos Acordos Artemis", "importance": 2 } ] },
+        { "id": "discreet", "label": "Enviar uma delegação discreta", "preview": "Presente, sem holofote.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 1 }, { "relation": "cnsa", "field": "trust", "delta": 3 } ] },
+        { "id": "criticize", "label": "Usar o palco para pedir uso pacífico", "preview": "Corajoso. Washington não gosta de surpresas.", "requires": { "culture": "<10" },
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 3 }, { "actor": "player", "field": "support", "delta": -2 }, { "relation": "nasa", "field": "trust", "delta": -8 }, { "relation": "cnsa", "field": "trust", "delta": 8 } ] }
+      ]
+    },
+    {
+      "id": "ilrs_invite",
+      "kind": "narrative",
+      "title": "Um lugar na mesa da ILRS",
+      "text": "A {rival} convidou sua agência para um grupo de trabalho da Estação Internacional de Pesquisa Lunar: dados do polo sul e um lugar na mesa de uma base que talvez fique pronta antes da Artemis. Washington mandou dizer que está “acompanhando com interesse”.",
+      "portrait": "actor",
+      "rival": ["cnsa"],
+      "trigger": { "actors": ["isro", "esa", "jaxa"], "minTurn": 20 },
+      "weight": 9,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "observer", "label": "Aceitar como observador", "preview": "Dados novos, sobrancelhas erguidas em Washington.",
+          "effects": [ { "relation": "cnsa", "field": "trust", "delta": 12 }, { "relation": "nasa", "field": "trust", "delta": -10 }, { "science": 10 }, { "flag": "ilrs_observer" }, { "news": "{actor} aceita participar como observadora da ILRS", "importance": 3 } ] },
+        { "id": "decline", "label": "Recusar educadamente", "preview": "Fidelidade ao bloco, porta fechada.",
+          "effects": [ { "relation": "nasa", "field": "trust", "delta": 5 }, { "relation": "cnsa", "field": "trust", "delta": -3 } ] },
+        { "id": "leverage", "label": "Usar o convite para negociar verba", "preview": "Jogo duplo, para quem tem reputação.", "requires": { "reputation": ">45" },
+          "effects": [ { "actor": "player", "field": "budget", "delta": 60 }, { "relation": "cnsa", "field": "trust", "delta": -5 }, { "relation": "nasa", "field": "trust", "delta": -3 }, { "flag": "ilrs_leverage" } ] }
+      ]
+    },
+    {
+      "id": "ilrs_partner_delay",
+      "kind": "narrative",
+      "title": "Os módulos que não chegam",
+      "text": "Os módulos de energia que a {rival} prometeu para a estação lunar de pesquisa estão dois anos atrasados; o orçamento deles foi engolido por outras prioridades. Seus engenheiros dizem que conseguem fazer sozinhos, mais caro e mais rápido.",
+      "portrait": "actor",
+      "rival": ["roscosmos"],
+      "trigger": { "actors": ["cnsa"], "minTurn": 30 },
+      "weight": 9,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "take_over", "label": "Assumir o módulo", "preview": "Controle total, conta total.",
+          "effects": [ { "cash": -60 }, { "science": 5 }, { "relation": "rival", "field": "dependence", "delta": -10 }, { "actor": "player", "field": "prestige", "delta": 2 } ] },
+        { "id": "wait", "label": "Esperar o parceiro", "preview": "Lealdade tem prazo?",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 8 }, { "actor": "player", "field": "culture", "delta": -3 } ] },
+        { "id": "open_slot", "label": "Oferecer a vaga a outro país", "preview": "Novos parceiros, velho aliado magoado.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": -12 }, { "actor": "player", "field": "reputation", "delta": 3 } ] }
+      ]
+    },
+    {
+      "id": "station_guest",
+      "kind": "narrative",
+      "title": "Um convidado na estação",
+      "text": "Um país parceiro quer enviar o primeiro astronauta dele à sua estação orbital no ano que vem. É prestígio diplomático puro, mas ocupa um assento que seus próprios astronautas esperam há anos.",
+      "portrait": null,
+      "trigger": { "actors": ["cnsa"], "minTurn": 10 },
+      "weight": 9,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "accept", "label": "Aceitar e treinar o convidado", "preview": "Amigos lá fora, frustração aqui dentro.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 5 }, { "crew": "random", "field": "morale", "delta": -5 }, { "actor": "player", "field": "prestige", "delta": 2 } ] },
+        { "id": "delay", "label": "Adiar para 2029", "preview": "Ninguém fica feliz, ninguém fica bravo.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": -2 }, { "crew": "random", "field": "morale", "delta": 3 } ] },
+        { "id": "charge", "label": "Cobrar pelo assento", "preview": "Diplomacia com recibo.",
+          "effects": [ { "cash": 40 }, { "actor": "player", "field": "reputation", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "vyommitra",
+      "kind": "narrative",
+      "title": "O robô que virou meme",
+      "text": "O robô humanoide do voo de teste mandou de volta horas de dados de bordo, e uma piada de engenheiro gravada no áudio virou meme nacional. O povo pede o próximo voo já com gente. A equipe de segurança pede mais um teste.",
+      "portrait": null,
+      "trigger": { "actors": ["isro"], "minTurn": 6, "maxTurn": 120 },
+      "weight": 10,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "more_tests", "label": "Mais um teste não tripulado", "preview": "Frugal e persistente, como sempre.",
+          "effects": [ { "cash": -30 }, { "actor": "player", "field": "reputation", "delta": 3 }, { "actor": "player", "field": "culture", "delta": -5 } ] },
+        { "id": "rush", "label": "Antecipar o voo tripulado", "preview": "O país inteiro vai assistir.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": 6 }, { "actor": "player", "field": "support", "delta": 5 }, { "flag": "crewed_rush" } ] },
+        { "id": "tour", "label": "Levar o robô em turnê", "preview": "Meme vira apoio.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 4 }, { "cash": 5 } ] }
+      ]
+    },
+    {
+      "id": "iss_1",
+      "kind": "narrative",
+      "title": "Os últimos anos da ISS",
+      "text": "Uma rachadura microscópica voltou a vazar ar no túnel de um módulo antigo da ISS. Os engenheiros dizem que a estação aguenta até 2030, se ninguém abusar. Duas empresas querem acoplar módulos comerciais antes do fim, e o governo quer saber quem paga a reentrada.",
+      "portrait": null,
+      "trigger": { "actors": ["nasa", "esa", "jaxa"], "minTurn": 110 },
+      "weight": 10,
+      "cooldownWeeks": 104,
+      "once": true,
+      "chain": { "id": "iss", "step": 1 },
+      "choices": [
+        { "id": "extend", "label": "Estender as operações ao máximo", "preview": "Mais ciência, mais risco e mais conta.",
+          "effects": [ { "cash": -40 }, { "science": 15 }, { "flag": "iss_extend" }, { "schedule": "iss_2", "inWeeks": 26 } ] },
+        { "id": "commercial", "label": "Acelerar a transição comercial", "preview": "Economiza agora; as empresas ganham poder.",
+          "effects": [ { "cash": 20 }, { "actor": "player", "field": "reputation", "delta": -2 }, { "flag": "iss_commercial" }, { "schedule": "iss_2", "inWeeks": 26 } ] },
+        { "id": "seal", "label": "Selar o módulo e seguir", "preview": "Solução de engenheiro: menor dano possível.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": -3 }, { "crew": "random", "field": "morale", "delta": -3 }, { "schedule": "iss_2", "inWeeks": 26 } ] }
+      ]
+    },
+    {
+      "id": "iss_2",
+      "kind": "narrative",
+      "title": "O destino do laboratório",
+      "text": "Chegou a hora de decidir o que fazer com o maior laboratório já posto em órbita. Museus querem peças, empresas querem os módulos novos e o público quer ver a reentrada ao vivo. Seja qual for a escolha, vai virar história.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "chain": { "id": "iss", "step": 2 },
+      "choices": [
+        { "id": "museums", "label": "Reservar peças para museus", "preview": "Uma escotilha em cada capital.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 4 }, { "cash": -5 }, { "album": "Adeus, ISS", "rarity": "rare" } ] },
+        { "id": "sell_modules", "label": "Vender módulos a uma estação comercial", "preview": "A ISS continua viva, em pedaços.", "requires": { "flag": "iss_commercial" },
+          "effects": [ { "cash": 40 }, { "actor": "player", "field": "reputation", "delta": 2 } ] },
+        { "id": "broadcast", "label": "Transmitir a reentrada", "preview": "Uma última grande audiência.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 3 }, { "actor": "player", "field": "prestige", "delta": 2 }, { "news": "{actor} anuncia transmissão ao vivo da despedida da ISS", "importance": 2 } ] }
+      ]
+    },
+    {
+      "id": "iss_deorbit_vehicle",
+      "kind": "narrative",
+      "title": "O rebocador do fim",
+      "text": "A NASA quer que você construa o veículo que vai empurrar a ISS para o Pacífico em 2031. Contrato bilionário, prazo apertado e zero margem: se falhar, 400 toneladas caem onde não deviam.",
+      "portrait": null,
+      "trigger": { "actors": ["spacex"], "minTurn": 30 },
+      "weight": 10,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "accept", "label": "Aceitar o contrato", "preview": "Dinheiro e responsabilidade enormes.",
+          "effects": [ { "cash": 150 }, { "actor": "player", "field": "culture", "delta": -3 }, { "crew": "random", "field": "morale", "delta": -4 }, { "relation": "nasa", "field": "dependence", "delta": 10 } ] },
+        { "id": "refuse", "label": "Recusar: foco na Lua", "preview": "A NASA vai procurar outro.",
+          "effects": [ { "relation": "nasa", "field": "trust", "delta": -10 }, { "actor": "player", "field": "culture", "delta": 3 }, { "actor": "player", "field": "support", "delta": 2 } ] },
+        { "id": "partner", "label": "Aceitar com um sócio europeu", "preview": "Divide o lucro e o risco.",
+          "effects": [ { "relation": "esa", "field": "trust", "delta": 10 }, { "cash": 70 } ] }
+      ]
+    },
+    {
+      "id": "commercial_station",
+      "kind": "narrative",
+      "title": "Aluga-se: rack de laboratório",
+      "text": "Uma empresa de estações privadas oferece dois racks de laboratório e uma vaga de astronauta por ano, a preço de lançamento. Diz que o módulo voa em 2027. Diz isso desde 2024.",
+      "portrait": null,
+      "trigger": { "actors": ["nasa", "isro", "esa", "spacex", "jaxa", "blueorigin"], "minTurn": 12 },
+      "weight": 8,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "long", "label": "Assinar contrato de longo prazo", "preview": "Ciência garantida, se o módulo voar.",
+          "effects": [ { "cash": -45 }, { "science": 12 }, { "flag": "commercial_station_partner" } ] },
+        { "id": "lab_only", "label": "Assinar só o laboratório", "preview": "Aposta pequena.",
+          "effects": [ { "cash": -15 }, { "science": 5 } ] },
+        { "id": "wait", "label": "Esperar o módulo voar", "preview": "Prudência que ninguém vai notar.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": -2 }, { "actor": "player", "field": "reputation", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "lunar_time",
+      "kind": "narrative",
+      "title": "Que horas são na Lua?",
+      "text": "Os parceiros precisam de um padrão de tempo lunar: relógios na Lua andam 56 microssegundos por dia mais rápido. Dois padrões competem, um do seu lado e outro da {rival}. Quem define o relógio define a infraestrutura das próximas décadas.",
+      "portrait": null,
+      "trigger": { "minTurn": 25 },
+      "weight": 7,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "lead", "label": "Liderar o padrão do seu bloco", "preview": "Influência técnica, rivalidade política.",
+          "effects": [ { "cash": -10 }, { "actor": "player", "field": "reputation", "delta": 3 }, { "relation": "rival", "field": "rivalry", "delta": 5 } ] },
+        { "id": "joint", "label": "Propor padrão único com a {rival}", "preview": "Um relógio para todos, críticas em casa.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 10 }, { "actor": "player", "field": "reputation", "delta": 3 }, { "actor": "player", "field": "support", "delta": -2 }, { "flag": "lunar_time_joint" } ] },
+        { "id": "technicians", "label": "Deixar os técnicos resolverem", "preview": "Sem política, sem pressa.",
+          "effects": [ { "science": 3 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "relay_satellite",
+      "kind": "narrative",
+      "title": "Capacidade sobrando no lado oculto",
+      "text": "Seu satélite de retransmissão no lado oculto tem capacidade sobrando. A {rival} pede para usar 20% dela durante a próxima missão de pouso. Recusar parece mesquinho; aceitar significa conhecer os horários e a telemetria deles.",
+      "portrait": "actor",
+      "trigger": { "minTurn": 30 },
+      "weight": 7,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "lend", "label": "Ceder a capacidade", "preview": "Boa vizinhança orbital.",
+          "effects": [ { "cash": 15 }, { "relation": "rival", "field": "trust", "delta": 12 }, { "actor": "player", "field": "reputation", "delta": 2 } ] },
+        { "id": "trade", "label": "Ceder em troca de dados de pouso", "preview": "Negócio é negócio.",
+          "effects": [ { "science": 12 }, { "relation": "rival", "field": "trust", "delta": 4 } ] },
+        { "id": "refuse", "label": "Recusar", "preview": "Eles terão de se virar.",
+          "effects": [ { "relation": "rival", "field": "rivalry", "delta": 6 }, { "actor": "player", "field": "support", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "helium3",
+      "kind": "narrative",
+      "title": "A febre do hélio-3",
+      "text": "Uma startup promete minerar hélio-3 na Lua para reatores de fusão que ainda não existem. A ação dela triplicou em um mês. Querem seu logotipo no material de investidores e oferecem participação. Seus físicos riem; seus contadores, não.",
+      "portrait": null,
+      "trigger": { "minTurn": 18 },
+      "weight": 6,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "equity", "label": "Aceitar a participação", "preview": "Dinheiro fácil e uma bolha com seu nome.",
+          "effects": [ { "cash": 35 }, { "actor": "player", "field": "reputation", "delta": -4 }, { "actor": "player", "field": "culture", "delta": 3 } ] },
+        { "id": "refuse", "label": "Recusar", "preview": "Ciência séria não vende ilusão.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 2 } ] },
+        { "id": "real_science", "label": "Exigir uma parceria científica real", "preview": "Se querem seu nome, que paguem medições.",
+          "effects": [ { "science": 6 }, { "cash": 10 } ] }
+      ]
+    },
+    {
+      "id": "sample_anomaly",
+      "kind": "narrative",
+      "title": "O grão que não bate",
+      "text": "Um grão de uma amostra lunar guardada há décadas mostra uma microestrutura metálica que nenhum processo natural conhecido explica. Pode ser contaminação do laboratório. Pode ser outra coisa. A química responsável pediu que ninguém diga a palavra “artificial”.",
+      "portrait": null,
+      "trigger": { "minTurn": 30 },
+      "weight": 6,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "secret_study", "label": "Estudo sigiloso", "preview": "Abre pesquisa secreta, longe dos jornais.",
+          "effects": [ { "cash": -15 }, { "science": 10 }, { "flag": "anomaly_sample" } ] },
+        { "id": "open_case", "label": "Publicar como caso em aberto", "preview": "Abre pesquisa secreta e uma onda de teorias.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 3 }, { "science": 5 }, { "flag": "anomaly_sample" }, { "news": "Amostra lunar antiga intriga cientistas de {actor}", "importance": 2 } ] },
+        { "id": "contamination", "label": "Classificar como contaminação", "preview": "Encerra o assunto. Talvez cedo demais.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": -3 }, { "actor": "player", "field": "reputation", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "lava_tube",
+      "kind": "narrative",
+      "title": "Uma claraboia na Lua",
+      "text": "Imagens de alta resolução mostram um poço de 100 metros na região de Marius Hills, com o que parece ser a entrada de um tubo de lava. Um abrigo natural contra radiação e micrometeoritos. Quem mapear primeiro pode reivindicar o melhor lugar para uma base.",
+      "portrait": null,
+      "trigger": { "minTurn": 22 },
+      "weight": 7,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "study", "label": "Priorizar o estudo", "preview": "Abre pesquisa secreta.",
+          "effects": [ { "science": 12 }, { "cash": -10 }, { "flag": "lava_tube_found" } ] },
+        { "id": "announce", "label": "Anunciar com festa", "preview": "Abre pesquisa secreta e chama atenção dos rivais.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 4 }, { "actor": "player", "field": "prestige", "delta": 2 }, { "flag": "lava_tube_found" }, { "news": "{actor} encontra possível entrada de tubo de lava na Lua", "importance": 3 } ] },
+        { "id": "sell", "label": "Vender as imagens a empresas", "preview": "Outros vão explorar.",
+          "effects": [ { "cash": 20 }, { "actor": "player", "field": "reputation", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "apollo_heritage",
+      "kind": "narrative",
+      "title": "Pegadas que ninguém pode pisar",
+      "text": "Um grupo internacional pede que os sítios das Apollo sejam protegidos como patrimônio, com zona de exclusão para pousos. Historiadores aplaudem. Uma empresa de turismo lunar ameaça processar. O seu voto pode decidir a proposta.",
+      "portrait": null,
+      "trigger": { "minTurn": 20 },
+      "weight": 6,
+      "cooldownWeeks": 104,
+      "once": true,
+      "choices": [
+        { "id": "protect", "label": "Apoiar a proteção", "preview": "A história agradece.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 4 }, { "actor": "player", "field": "support", "delta": 2 }, { "actor": "player", "field": "culture", "delta": -2 } ] },
+        { "id": "against", "label": "Votar contra", "preview": "O lobby do turismo lembra dos amigos.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": 3 }, { "cash": 10 }, { "actor": "player", "field": "reputation", "delta": -3 } ] },
+        { "id": "regulated", "label": "Propor visitação regulada", "preview": "Meio-termo que agrada a quase todos.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 2 }, { "actor": "player", "field": "support", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "debris_alert",
+      "kind": "narrative",
+      "title": "120 metros",
+      "text": "O radar avisa: um fragmento de um antigo teste antissatélite vai passar a 120 metros de um dos seus satélites daqui a seis horas. Manobrar gasta combustível e encurta a vida útil. Não manobrar é apostar. Os dados mais precisos são da {rival}.",
+      "portrait": null,
+      "trigger": { "minTurn": 6 },
+      "weight": 6,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "maneuver", "label": "Manobrar", "preview": "Seguro e caro.",
+          "effects": [ { "cash": -8 }, { "actor": "player", "field": "reputation", "delta": 1 } ] },
+        { "id": "gamble", "label": "Apostar na margem", "preview": "Operadores vizinhos vão reclamar.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": 3 }, { "actor": "player", "field": "reputation", "delta": -1 } ] },
+        { "id": "ask_rival", "label": "Pedir os dados à {rival}", "preview": "Uma ligação que ninguém esperava.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 6 }, { "cash": -2 } ] }
+      ]
+    },
+    {
+      "id": "suit_delay",
+      "kind": "narrative",
+      "title": "Falta uma vedação de luva",
+      "text": "O fornecedor dos trajes de superfície avisou que o segundo lote atrasa quatro meses: falta uma vedação de luva que só uma fábrica no mundo produz. Sem traje, não há caminhada lunar, e sem caminhada, não há foto.",
+      "portrait": null,
+      "trigger": { "minTurn": 30, "condition": { "hasRole": "astronaut" } },
+      "weight": 7,
+      "cooldownWeeks": 104,
+      "choices": [
+        { "id": "rush", "label": "Pagar por produção acelerada", "preview": "Resolve com dinheiro.",
+          "effects": [ { "cash": -30 }, { "actor": "player", "field": "reputation", "delta": 1 } ] },
+        { "id": "test_suits", "label": "Usar trajes de teste", "preview": "Funciona no papel. Os astronautas não gostam.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": 5 }, { "crew": "random", "field": "morale", "delta": -6 } ] },
+        { "id": "own_seal", "label": "Desenvolver a vedação em casa", "preview": "Mais lento, mas a dependência acaba.",
+          "effects": [ { "science": 6 }, { "cash": -15 } ] }
+      ]
+    },
+    {
+      "id": "recovery_donor",
+      "kind": "narrative",
+      "title": "Para quem continua tentando",
+      "text": "Depois das últimas falhas, chegou à agência um cheque de um doador anônimo com um bilhete escrito à mão: “Para quem continua tentando.” O valor cobre um teste completo. A imprensa já quer saber quem é.",
+      "portrait": null,
+      "tags": ["recovery"],
+      "trigger": { "minTurn": 4, "condition": { "failStreak": ">=1" } },
+      "weight": 10,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "public", "label": "Aceitar e agradecer em público", "preview": "O gesto vira notícia boa.",
+          "effects": [ { "cash": 40 }, { "actor": "player", "field": "support", "delta": 4 } ] },
+        { "id": "quiet", "label": "Aceitar em silêncio", "preview": "A equipe lê o bilhete no mural.",
+          "effects": [ { "cash": 40 }, { "crew": "random", "field": "morale", "delta": 8 } ] },
+        { "id": "scholarship", "label": "Repassar para bolsas de engenharia", "preview": "Plantar para colher em dez anos.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 4 }, { "actor": "player", "field": "support", "delta": 3 } ] }
+      ]
+    },
+    {
+      "id": "recovery_rally",
+      "kind": "narrative",
+      "title": "Ninguém foi mandado ficar",
+      "text": "Depois de mais uma noite de relatório de falha, a equipe ficou. Alguém pediu pizza, alguém pôs a curva de telemetria no projetor, e às 4h da manhã havia uma lista de vinte correções no quadro. Ninguém foi mandado ficar.",
+      "portrait": null,
+      "tags": ["recovery"],
+      "trigger": { "condition": { "failStreak": ">=2" } },
+      "weight": 10,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "plan", "label": "Transformar a lista em plano", "preview": "A falha vira método.",
+          "effects": [ { "science": 15 }, { "crew": "random", "field": "morale", "delta": 10 } ] },
+        { "id": "rest", "label": "Mandar todos para casa", "preview": "Gente descansada erra menos.",
+          "effects": [ { "crew": "random", "field": "morale", "delta": 15 }, { "crew": "random", "field": "loyalty", "delta": 5 } ] },
+        { "id": "share", "label": "Mostrar o momento ao público", "preview": "A foto do quadro viraliza.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 5 }, { "crew": "random", "field": "morale", "delta": 5 } ] }
+      ]
+    },
+    {
+      "id": "recovery_partner",
+      "kind": "narrative",
+      "title": "A {rival} estende a mão",
+      "text": "Depois da sequência de falhas, a {rival} ofereceu engenheiros e um banco de testes de motor por três meses, sem custo. Há quem chame de generosidade. Há quem chame de espionagem com crachá de visitante.",
+      "portrait": "actor",
+      "tags": ["recovery"],
+      "trigger": { "condition": { "failStreak": ">=2" } },
+      "weight": 10,
+      "cooldownWeeks": 78,
+      "choices": [
+        { "id": "accept", "label": "Aceitar a ajuda", "preview": "Recupera rápido e passa a dever um favor.",
+          "effects": [ { "science": 12 }, { "relation": "rival", "field": "trust", "delta": 12 }, { "relation": "rival", "field": "dependence", "delta": 10 } ] },
+        { "id": "data_only", "label": "Aceitar só os dados", "preview": "Ajuda sem visitantes.",
+          "effects": [ { "science": 6 }, { "relation": "rival", "field": "trust", "delta": 5 } ] },
+        { "id": "pride", "label": "Recusar com orgulho", "preview": "A equipe gosta do recado.",
+          "effects": [ { "crew": "random", "field": "morale", "delta": 5 }, { "actor": "player", "field": "culture", "delta": 3 } ] }
+      ]
+    },
+    {
+      "id": "recovery_review",
+      "kind": "narrative",
+      "title": "O relatório da comissão",
+      "text": "Uma comissão independente concluiu a revisão das falhas recentes: os erros foram de processo, não de pessoas, e o plano de correção é sólido. O relatório pode ser lido como absolvição ou como lista de tarefas. Depende de quem lê.",
+      "portrait": null,
+      "tags": ["recovery"],
+      "trigger": { "condition": { "failStreak": ">=3" } },
+      "weight": 12,
+      "cooldownWeeks": 52,
+      "choices": [
+        { "id": "publish", "label": "Publicar o relatório inteiro", "preview": "Transparência recupera confiança.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 6 }, { "actor": "player", "field": "support", "delta": 3 } ] },
+        { "id": "apply", "label": "Aplicar todas as recomendações", "preview": "Custa, mas a equipe melhora.",
+          "effects": [ { "cash": -20 }, { "science": 10 }, { "crew": "random", "field": "skill", "delta": 5 } ] },
+        { "id": "budget", "label": "Usar o relatório para pedir verba", "preview": "O governo gosta de planos com prazo.",
+          "effects": [ { "actor": "player", "field": "budget", "delta": 80 }, { "actor": "player", "field": "support", "delta": 2 } ] }
+      ]
+    },
+    {
+      "id": "failure_inquiry",
+      "kind": "narrative",
+      "title": "Inquérito: {mission}",
+      "text": "O governo abriu um inquérito sobre a perda de {mission}. Você vai depor ao vivo, diante das câmeras. A equipe técnica pede uma coisa só: que ninguém seja jogado aos leões antes do relatório final.",
+      "portrait": null,
+      "trigger": { "signal": "mission/resolved", "signalWhere": { "actor": "player", "outcome": ["catastrophic"] }, "chance": 0.9 },
+      "weight": 10,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "own_it", "label": "Assumir a responsabilidade", "preview": "Custa apoio, ganha a equipe.",
+          "effects": [ { "actor": "player", "field": "support", "delta": -3 }, { "actor": "player", "field": "reputation", "delta": 5 }, { "crew": "random", "field": "loyalty", "delta": 10 } ] },
+        { "id": "supplier", "label": "Apontar o fornecedor", "preview": "Indenização e um parceiro a menos.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 2 }, { "actor": "player", "field": "reputation", "delta": -4 }, { "cash": 20 } ] },
+        { "id": "time", "label": "Pedir tempo para a investigação técnica", "preview": "A verdade demora; a política, não.",
+          "effects": [ { "science": 8 }, { "actor": "player", "field": "support", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "success_party",
+      "kind": "narrative",
+      "title": "Depois de {mission}",
+      "text": "{mission} deu certo e a agência está em festa. O telefone não para: patrocinadores, ministros, programas de TV. A diretoria de voo pede só uma coisa: que ninguém esqueça a lista de pendências que apareceu no meio do caminho.",
+      "portrait": null,
+      "trigger": { "signal": "mission/resolved", "signalWhere": { "actor": "player", "outcome": ["total"] }, "chance": 0.35 },
+      "weight": 10,
+      "cooldownWeeks": 26,
+      "choices": [
+        { "id": "media", "label": "Fazer a turnê de mídia", "preview": "Apoio sobe; a equipe fica sem você.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 5 }, { "cash": 10 }, { "crew": "random", "field": "morale", "delta": -3 } ] },
+        { "id": "bonus", "label": "Dar um bônus para a equipe", "preview": "Quem fez, merece.",
+          "effects": [ { "cash": -15 }, { "crew": "random", "field": "morale", "delta": 10 }, { "crew": "random", "field": "loyalty", "delta": 5 } ] },
+        { "id": "back_to_work", "label": "Voltar ao trabalho", "preview": "Sucesso também tem lições.",
+          "effects": [ { "science": 6 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "legacy_letter",
+      "kind": "narrative",
+      "title": "Carta da família de {person}",
+      "text": "A família de {person} escreveu à agência. Não pede indenização nem culpados: quer saber se o trabalho vai continuar, e se alguém vai contar aos netos o que aconteceu de verdade naquele dia.",
+      "portrait": "crew",
+      "trigger": { "signal": "crew/died", "signalWhere": { "actor": "player" }, "chance": 1 },
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "choices": [
+        { "id": "truth", "label": "Prometer transparência total", "preview": "O relatório será público, doa a quem doer.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 5 }, { "actor": "player", "field": "support", "delta": 2 }, { "flag": "crew_tragedy" }, { "schedule": "leg_3", "inWeeks": 30 } ] },
+        { "id": "name_mission", "label": "Dar o nome à próxima missão", "preview": "A equipe voa por alguém.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 4 }, { "crew": "random", "field": "morale", "delta": 8 }, { "flag": "crew_tragedy" }, { "schedule": "leg_3", "inWeeks": 30 } ] },
+        { "id": "fund", "label": "Criar um fundo para a família", "preview": "Discreto e concreto.",
+          "effects": [ { "cash": -15 }, { "crew": "random", "field": "loyalty", "delta": 10 }, { "flag": "crew_tragedy" }, { "schedule": "leg_3", "inWeeks": 30 } ] }
+      ]
+    },
+    {
+      "id": "leg_1",
+      "kind": "narrative",
+      "title": "A última janela de {person}",
+      "text": "{person} passou no último ciclo de exames com resultados que ainda impressionam os médicos, mas os anos pesam. Numa conversa de corredor, perguntou se haveria lugar para mais uma missão ou se era hora de passar o capacete adiante.",
+      "portrait": "crew",
+      "subject": "astronaut",
+      "trigger": { "minTurn": 30 },
+      "weight": 9,
+      "cooldownWeeks": 104,
+      "once": true,
+      "chain": { "id": "legacy", "step": 1 },
+      "choices": [
+        { "id": "mentor", "label": "Convidar para mentorar a nova turma", "preview": "A experiência fica na casa.",
+          "effects": [ { "crew": "subject", "field": "loyalty", "delta": 10 }, { "crew": "subject", "field": "morale", "delta": 5 }, { "flag": "legacy_mentor" }, { "schedule": "leg_2_mentor", "inWeeks": 12 } ] },
+        { "id": "last_flight", "label": "Garantir um último voo", "preview": "Uma despedida em grande estilo, se der certo.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": 15 }, { "crew": "subject", "field": "ambition", "delta": 5 }, { "flag": "legacy_lastflight" }, { "schedule": "leg_2_flight", "inWeeks": 16 } ] },
+        { "id": "retire", "label": "Aposentadoria com honras", "preview": "Uma cerimônia, uma vaga aberta.",
+          "effects": [ { "crewStatus": "left" }, { "actor": "player", "field": "support", "delta": 3 }, { "album": "A despedida de {person}", "rarity": "rare" }, { "schedule": "leg_3", "inWeeks": 40 } ] }
+      ]
+    },
+    {
+      "id": "leg_2_mentor",
+      "kind": "narrative",
+      "title": "O caderno de {person}",
+      "text": "Os novatos chamam de “o caderno”: trezentas páginas escritas à mão por {person}, com tudo o que os manuais não dizem, do cheiro de um vazamento ao silêncio antes de um aborto. Uma editora quer publicar.",
+      "portrait": "crew",
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "legacy", "step": 2 },
+      "choices": [
+        { "id": "publish", "label": "Publicar para todos", "preview": "O mundo aprende com {person}.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 5 }, { "actor": "player", "field": "support", "delta": 3 }, { "science": 5 }, { "schedule": "leg_3", "inWeeks": 26 } ] },
+        { "id": "internal", "label": "Manter como manual interno", "preview": "Vantagem que fica em casa.",
+          "effects": [ { "crew": "random", "field": "skill", "delta": 6 }, { "crew": "random", "field": "skill", "delta": 4 }, { "schedule": "leg_3", "inWeeks": 26 } ] },
+        { "id": "partners", "label": "Traduzir e trocar com parceiros", "preview": "Conhecimento como moeda diplomática.", "requires": { "reputation": ">40" },
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 3 }, { "science": 10 }, { "schedule": "leg_3", "inWeeks": 26 } ] }
+      ]
+    },
+    {
+      "id": "leg_2_flight",
+      "kind": "narrative",
+      "title": "Uma última vez",
+      "text": "{person} voltou ao simulador com a disciplina de quem começa. A turma jovem, que cresceu vendo essa pessoa na TV, agora disputa o lugar ao lado no voo. A imprensa já chama de “a missão da despedida”.",
+      "portrait": "crew",
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "legacy", "step": 2 },
+      "choices": [
+        { "id": "commander", "label": "Dar o comando a {person}", "preview": "A última palavra na cabine.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": 10 }, { "actor": "player", "field": "support", "delta": 3 }, { "crew": "random", "field": "morale", "delta": -4 }, { "schedule": "leg_3", "inWeeks": 26 } ] },
+        { "id": "specialist", "label": "Voar como especialista, sem comando", "preview": "Espaço para a nova geração liderar.",
+          "effects": [ { "crew": "subject", "field": "skill", "delta": 3 }, { "crew": "random", "field": "morale", "delta": 5 }, { "schedule": "leg_3", "inWeeks": 26 } ] },
+        { "id": "rethink", "label": "Repensar por risco médico", "preview": "Prudente, e uma conversa difícil.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": -15 }, { "actor": "player", "field": "culture", "delta": -3 }, { "schedule": "leg_3", "inWeeks": 30 } ] }
+      ]
+    },
+    {
+      "id": "leg_3",
+      "kind": "narrative",
+      "title": "O nome na porta",
+      "text": "Uma universidade quer batizar o novo laboratório de simulação lunar com o nome de {person}. A família pediu uma cerimônia simples. Os alunos querem pintar na parede a frase que {person} repetia antes de cada treino.",
+      "portrait": "crew",
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "legacy", "step": 3 },
+      "choices": [
+        { "id": "simple", "label": "Cerimônia simples", "preview": "Como a família pediu.",
+          "effects": [ { "crew": "subject", "field": "loyalty", "delta": 10 }, { "actor": "player", "field": "support", "delta": 2 }, { "album": "Laboratório {person}", "rarity": "epic" } ] },
+        { "id": "scholarship", "label": "Criar uma bolsa com o nome", "preview": "O nome volta em cada nova turma.",
+          "effects": [ { "cash": -20 }, { "actor": "player", "field": "reputation", "delta": 4 }, { "flag": "legacy_scholarship" }, { "album": "Bolsa {person}", "rarity": "epic" } ] },
+        { "id": "exhibit", "label": "Exposição itinerante", "preview": "O país inteiro conhece a história.",
+          "effects": [ { "actor": "player", "field": "support", "delta": 5 }, { "cash": -10 }, { "album": "A história de {person}", "rarity": "epic" } ] }
+      ]
+    },
+    {
+      "id": "eco_1",
+      "kind": "narrative",
+      "title": "Um pulso a cada 41 horas",
+      "text": "O radiotelescópio experimental no lado oculto da Lua, longe do ruído da Terra, registrou um pulso fraco que se repete a cada 41 horas. Não vem de nenhum satélite catalogado. A equipe de plantão já descartou três explicações e não tem a quarta.",
+      "portrait": null,
+      "trigger": { "minTurn": 26 },
+      "weight": 14,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "eco", "step": 1 },
+      "choices": [
+        { "id": "observe", "label": "Pedir mais semanas de observação", "preview": "Abre pesquisa secreta. A equipe vai precisar decidir o que contar.",
+          "effects": [ { "science": 5 }, { "flag": "echo_signal" }, { "schedule": "eco_2", "inWeeks": 6 } ] },
+        { "id": "experts", "label": "Chamar especialistas externos", "preview": "Mais olhos, mais bocas.",
+          "effects": [ { "cash": -10 }, { "science": 8 }, { "flag": "echo_signal" }, { "flag": "eco_experts" }, { "schedule": "eco_2", "inWeeks": 6 } ] },
+        { "id": "dismiss", "label": "Descartar como ruído", "preview": "Fim do assunto, se ninguém mais estiver ouvindo.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": -3 }, { "flag": "eco_dismissed" }, { "schedule": "eco_3_claim", "inWeeks": 20 } ] }
+      ]
+    },
+    {
+      "id": "eco_2",
+      "kind": "narrative",
+      "title": "Divulgar ou esconder?",
+      "text": "Semanas de dados confirmam: o pulso é real, periódico e parece vir de baixo do horizonte lunar, não do céu. A sala se dividiu. Metade quer publicar amanhã. A outra metade lembra que, se for erro, a agência vira piada; e se não for, alguém vai querer controlar a informação.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "eco", "step": 2 },
+      "choices": [
+        { "id": "publish", "label": "Publicar com cautela", "preview": "O mundo vai olhar para a Lua de novo, e para você.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 5 }, { "actor": "player", "field": "support", "delta": 3 }, { "flag": "eco_public" }, { "schedule": "eco_3_claim", "inWeeks": 8 }, { "news": "{actor} relata sinal periódico captado no lado oculto da Lua", "importance": 3 } ] },
+        { "id": "secret", "label": "Manter em sigilo", "preview": "Tempo para entender. Segredos vazam.",
+          "effects": [ { "science": 10 }, { "flag": "eco_secret" }, { "schedule": "eco_3_leak", "inWeeks": 10 } ] },
+        { "id": "partners", "label": "Compartilhar só com parceiros de confiança", "preview": "Um segredo dividido com poucos.", "requires": { "reputation": ">40" },
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 2 }, { "science": 6 }, { "flag": "eco_partners" }, { "schedule": "eco_3_leak", "inWeeks": 10 } ] }
+      ]
+    },
+    {
+      "id": "eco_3_leak",
+      "kind": "narrative",
+      "title": "Alguém mais está ouvindo",
+      "text": "Num congresso, um engenheiro da {rival} perguntou sobre “pulsos de 41 horas”. Ele não deveria saber. Ou o sigilo vazou, ou a {rival} tem o próprio instrumento apontado para o mesmo lugar. Nos dois casos, o segredo tem prazo de validade.",
+      "portrait": "actor",
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "eco", "step": 3 },
+      "choices": [
+        { "id": "joint", "label": "Propor estudo conjunto à {rival}", "preview": "Dois instrumentos veem melhor que um.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 12 }, { "science": 6 }, { "flag": "eco_joint" }, { "schedule": "eco_4", "inWeeks": 10 } ] },
+        { "id": "race", "label": "Publicar antes deles", "preview": "Primeiro a falar, primeiro na história.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 2 }, { "actor": "player", "field": "prestige", "delta": 3 }, { "flag": "eco_public" }, { "schedule": "eco_4", "inWeeks": 10 }, { "news": "{actor} divulga sinal lunar misterioso e cita detecção paralela", "importance": 3 } ] },
+        { "id": "deny", "label": "Negar tudo", "preview": "O segredo continua seu, e a desconfiança cresce.",
+          "effects": [ { "relation": "rival", "field": "rivalry", "delta": 10 }, { "relation": "rival", "field": "trust", "delta": -8 }, { "flag": "eco_secret" }, { "schedule": "eco_4", "inWeeks": 10 } ] }
+      ]
+    },
+    {
+      "id": "eco_3_claim",
+      "kind": "narrative",
+      "title": "A {rival} anuncia o sinal",
+      "text": "A {rival} convocou uma entrevista coletiva e anunciou “um sinal periódico anômalo no lado oculto da Lua”. Os dados deles são piores que os seus, mas chegaram primeiro às câmeras. Seus astrônomos estão furiosos; seus diplomatas, pensativos.",
+      "portrait": "actor",
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "eco", "step": 3 },
+      "choices": [
+        { "id": "show_data", "label": "Mostrar seus dados anteriores", "preview": "A verdade é sua; a manchete, deles.",
+          "effects": [ { "actor": "player", "field": "reputation", "delta": 3 }, { "relation": "rival", "field": "rivalry", "delta": 10 }, { "science": 5 }, { "flag": "echo_signal" }, { "schedule": "eco_4", "inWeeks": 8 } ] },
+        { "id": "collaborate", "label": "Parabenizar e colaborar", "preview": "Grandeza de quem perdeu a corrida.",
+          "effects": [ { "relation": "rival", "field": "trust", "delta": 12 }, { "actor": "player", "field": "reputation", "delta": 2 }, { "flag": "eco_joint" }, { "flag": "echo_signal" }, { "schedule": "eco_4", "inWeeks": 8 } ] },
+        { "id": "silence", "label": "Ficar em silêncio", "preview": "Observar quem sabe mais.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": -3 }, { "actor": "player", "field": "support", "delta": -2 }, { "flag": "echo_signal" }, { "schedule": "eco_4", "inWeeks": 12 } ] }
+      ]
+    },
+    {
+      "id": "eco_4",
+      "kind": "narrative",
+      "title": "Olhar de perto",
+      "text": "O sinal continua, pontual como um relógio. Uma segunda missão poderia levar um receptor até a origem, numa cratera do lado oculto. Custa caro, não garante manchete e pode não encontrar nada. Ou pode encontrar a primeira peça de algo muito maior.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 0,
+      "once": true,
+      "chain": { "id": "eco", "step": 4 },
+      "choices": [
+        { "id": "fund", "label": "Financiar a missão de verificação", "preview": "A primeira peça do Eco pode ser sua.",
+          "effects": [ { "cash": -80 }, { "science": 25 }, { "flag": "eco_first_piece" }, { "album": "O primeiro Eco", "rarity": "legendary" }, { "news": "{actor} confirma: o sinal lunar vem de uma cratera do lado oculto", "importance": 3 } ] },
+        { "id": "joint", "label": "Missão conjunta com a {rival}", "preview": "Divide o custo e a descoberta.", "requires": { "flag": "eco_joint" },
+          "effects": [ { "cash": -40 }, { "science": 20 }, { "relation": "rival", "field": "trust", "delta": 10 }, { "tension": "rival", "delta": -1 }, { "flag": "eco_first_piece" }, { "album": "O primeiro Eco", "rarity": "legendary" } ] },
+        { "id": "secret", "label": "Missão secreta", "preview": "Só você saberá o que há lá embaixo.", "requires": { "flag": "eco_secret" },
+          "effects": [ { "cash": -60 }, { "science": 30 }, { "actor": "player", "field": "culture", "delta": 4 }, { "flag": "eco_first_piece" }, { "flag": "eco_hidden" }, { "album": "O Eco guardado", "rarity": "legendary" } ] },
+        { "id": "archive", "label": "Arquivar e monitorar de longe", "preview": "Algumas portas ficam fechadas por gerações.",
+          "effects": [ { "science": 5 }, { "actor": "player", "field": "culture", "delta": -2 }, { "flag": "eco_archived" } ] }
+      ]
+    },
+    {
+      "id": "eco_whisper",
+      "kind": "narrative",
+      "title": "Uma carta sem remetente",
+      "text": "Chegou pelo correio comum, endereçada a você: uma folha datilografada com uma única linha, “Vocês não são os primeiros a ouvir. — C.S.”. O papel é antigo. O laboratório não encontrou digitais. A equipe do sinal pede para ver a carta.",
+      "portrait": null,
+      "trigger": { "requiresFlags": ["eco_first_piece"] },
+      "weight": 12,
+      "cooldownWeeks": 0,
+      "once": true,
+      "choices": [
+        { "id": "team", "label": "Entregar à equipe do sinal", "preview": "Mais uma peça na mesa.",
+          "effects": [ { "science": 8 }, { "flag": "silence_college_contact" } ] },
+        { "id": "vault", "label": "Guardar no cofre", "preview": "Algumas cartas é melhor não responder.",
+          "effects": [ { "actor": "player", "field": "culture", "delta": -2 }, { "flag": "silence_letter_kept" } ] },
+        { "id": "trace", "label": "Tentar rastrear o remetente", "preview": "Detetives particulares não são baratos.",
+          "effects": [ { "cash": -10 }, { "flag": "silence_college_traced" }, { "album": "C.S.", "rarity": "epic" } ] }
+      ]
+    },
+    {
+      "id": "op_solar_storm",
+      "kind": "operation",
+      "title": "Tempestade solar a caminho",
+      "text": "Uma ejeção de massa coronal deixou o Sol há 14 horas e vai cruzar a trajetória de {mission}. Os painéis e os computadores de bordo aguentam, provavelmente. Se houver gente a bordo, ela precisa de abrigo agora.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "safe_mode", "label": "Modo de proteção: desligar sistemas", "preview": "Perde dados, protege a nave.",
+          "effects": [ { "missionRisk": -0.02 }, { "science": -3 } ] },
+        { "id": "keep_science", "label": "Manter os experimentos ligados", "preview": "Dados raros de uma tempestade, a um preço.",
+          "effects": [ { "missionRisk": 0.03 }, { "science": 10 } ] },
+        { "id": "forecast", "label": "Usar a previsão de clima espacial para desviar", "preview": "Pesquisa que paga na hora certa.", "requires": { "tech": "sci_space_weather" },
+          "effects": [ { "missionRisk": -0.03 }, { "science": 4 } ] }
+      ]
+    },
+    {
+      "id": "op_micrometeoroid",
+      "kind": "operation",
+      "title": "Um grão de areia a 20 km/s",
+      "text": "Um pico de aceleração de milésimos de segundo e uma queda de pressão num tanque secundário: algo do tamanho de um grão de areia atravessou a blindagem de {mission}. O vazamento é lento. Lento não quer dizer inofensivo.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "isolate", "label": "Isolar o tanque", "preview": "Para o vazamento, perde margem de combustível.",
+          "effects": [ { "missionRisk": 0.01 }, { "science": 2 } ] },
+        { "id": "transfer", "label": "Transferir o combustível agora", "preview": "Manobra delicada, a equipe em terra vira a noite.",
+          "effects": [ { "missionRisk": -0.01 }, { "cash": -5 } ] },
+        { "id": "experts", "label": "Chamar especialistas externos", "preview": "Mais cabeças, mais custo.",
+          "effects": [ { "cash": -10 }, { "missionRisk": -0.02 }, { "actor": "player", "field": "reputation", "delta": 1 } ] }
+      ]
+    },
+    {
+      "id": "op_software_glitch",
+      "kind": "operation",
+      "title": "Reinicialização sem motivo",
+      "text": "O computador principal de {mission} reiniciou sozinho duas vezes em seis horas. O reserva assumiu sem problemas, mas ninguém sabe por quê. Um patch enviado em voo resolve, se o diagnóstico estiver certo.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "patch_now", "label": "Enviar o patch agora", "preview": "Testado em um dia. Ousado.",
+          "effects": [ { "missionRisk": -0.01 }, { "actor": "player", "field": "culture", "delta": 3 } ] },
+        { "id": "twin", "label": "Testar no gêmeo digital antes", "preview": "Uma semana de simulação, quase certeza.", "requires": { "tech": "comp_digital_twin" },
+          "effects": [ { "missionRisk": -0.03 }, { "cash": -3 } ] },
+        { "id": "backup", "label": "Seguir no computador reserva", "preview": "Sem reserva do reserva.",
+          "effects": [ { "missionRisk": 0.02 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "op_comm_blackout",
+      "kind": "operation",
+      "title": "Dezenove horas de silêncio",
+      "text": "A rede de antenas perdeu contato com {mission} por 19 horas. Quando o sinal voltou, a telemetria mostrou que a nave entrou sozinha em modo de segurança. Está tudo bem, por enquanto, mas parte dos dados do período se perdeu.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 10,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "rent", "label": "Alugar antenas da {rival}", "preview": "Cobertura extra, segredos compartilhados.",
+          "effects": [ { "cash": -10 }, { "missionRisk": -0.02 }, { "relation": "rival", "field": "dependence", "delta": 5 } ] },
+        { "id": "autonomy", "label": "Confiar na autonomia de bordo", "preview": "A nave já provou que sabe se cuidar.",
+          "effects": [ { "missionRisk": 0.01 }, { "science": 4 } ] },
+        { "id": "rebuild", "label": "Priorizar a reconstrução dos dados", "preview": "A ciência primeiro.",
+          "effects": [ { "science": 6 }, { "missionRisk": 0.01 }, { "cash": -3 } ] }
+      ]
+    },
+    {
+      "id": "op_sensor_drift",
+      "kind": "operation",
+      "title": "Meio grau fora",
+      "text": "O rastreador de estrelas de {mission} está lendo meio grau fora do esperado, e piorando. Na chegada, meio grau pode virar quilômetros. A equipe de navegação propõe recalibrar usando a própria Lua como referência.",
+      "portrait": null,
+      "trigger": { "destinations": ["cislunar", "lunar_orbit", "lunar_surface", "lunar_south_pole"] },
+      "weight": 10,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "recalibrate", "label": "Recalibrar com a Lua", "preview": "Horas de trabalho fino, mais precisão.",
+          "effects": [ { "missionRisk": -0.03 }, { "cash": -4 } ] },
+        { "id": "spare", "label": "Trocar para o sensor reserva", "preview": "Resolve, se o reserva estiver bom.",
+          "effects": [ { "missionRisk": -0.01 }, { "science": 2 } ] },
+        { "id": "ignore", "label": "Deixar para a aproximação final", "preview": "Talvez o desvio pare sozinho.",
+          "effects": [ { "missionRisk": 0.03 }, { "actor": "player", "field": "culture", "delta": 2 } ] }
+      ]
+    },
+    {
+      "id": "op_thermal",
+      "kind": "operation",
+      "title": "Válvula esfriando",
+      "text": "Uma válvula da linha de oxidante de {mission} está esfriando abaixo do limite. Se congelar, a manobra de chegada fica sem um dos motores. Os aquecedores resolvem, mas consomem a energia que os experimentos usam.",
+      "portrait": null,
+      "trigger": {},
+      "weight": 9,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "heaters", "label": "Aquecedores no máximo", "preview": "Motor seguro, experimentos desligados.",
+          "effects": [ { "missionRisk": -0.03 }, { "science": -5 } ] },
+        { "id": "roll", "label": "Girar a nave para pegar sol", "preview": "Solução elegante, ganho parcial.",
+          "effects": [ { "missionRisk": -0.01 }, { "cash": -2 } ] },
+        { "id": "accept", "label": "Aceitar o risco", "preview": "Mais ciência, menos margem.",
+          "effects": [ { "missionRisk": 0.03 }, { "science": 5 } ] }
+      ]
+    },
+    {
+      "id": "op_crew_illness",
+      "kind": "operation",
+      "title": "{person} passa mal a bordo",
+      "text": "{person} acordou com febre e tontura a dois dias da chegada. O médico em terra suspeita de uma infecção comum, agravada pela microgravidade. Há antibióticos a bordo, mas cada mão faz falta na chegada.",
+      "portrait": "crew",
+      "subject": "astronaut",
+      "trigger": { "crewed": true },
+      "weight": 9,
+      "cooldownWeeks": 12,
+      "choices": [
+        { "id": "rest", "label": "Repouso total", "preview": "A tripulação se divide em menos mãos.",
+          "effects": [ { "crew": "subject", "field": "morale", "delta": 5 }, { "missionRisk": 0.02 } ] },
+        { "id": "medicate", "label": "Medicar e manter na escala", "preview": "A missão primeiro.",
+          "effects": [ { "missionRisk": -0.01 }, { "crew": "subject", "field": "morale", "delta": -12 } ] },
+        { "id": "telemed", "label": "Telemedicina com especialista", "preview": "Tratamento preciso à distância.", "requires": { "tech": "ls_medicine" },
+          "effects": [ { "missionRisk": -0.02 }, { "crew": "subject", "field": "morale", "delta": 5 } ] }
+      ]
+    },
+    {
+      "id": "op_impact_flash",
+      "kind": "operation",
+      "title": "Um clarão no lado noturno",
+      "text": "A câmera de navegação de {mission} captou, por acaso, o clarão de um meteoroide atingindo o lado noturno da Lua. Apontar os instrumentos para lá gasta combustível de atitude, mas dados assim valem ouro.",
+      "portrait": null,
+      "trigger": { "destinations": ["cislunar", "lunar_orbit", "lunar_surface", "lunar_south_pole"] },
+      "weight": 8,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "point", "label": "Apontar tudo para lá", "preview": "Ciência rara, margem menor.",
+          "effects": [ { "science": 15 }, { "missionRisk": 0.01 } ] },
+        { "id": "camera", "label": "Só registrar com a câmera", "preview": "A imagem vai rodar o mundo.",
+          "effects": [ { "science": 5 }, { "actor": "player", "field": "support", "delta": 2 } ] },
+        { "id": "plan", "label": "Manter o plano de voo", "preview": "Disciplina acima de tudo.",
+          "effects": [ { "missionRisk": -0.01 }, { "actor": "player", "field": "culture", "delta": -2 } ] }
+      ]
+    },
+    {
+      "id": "op_landing_rocks",
+      "kind": "operation",
+      "title": "Rochas no local de pouso",
+      "text": "As imagens mais recentes do orbitador mostram blocos de rocha do tamanho de carros espalhados pelo local de pouso de {mission}. Há um ponto alternativo a dois quilômetros, mais plano, porém mais escuro e mais frio.",
+      "portrait": null,
+      "trigger": { "destinations": ["lunar_surface", "lunar_south_pole"] },
+      "weight": 10,
+      "cooldownWeeks": 8,
+      "choices": [
+        { "id": "alternate", "label": "Mudar para o ponto alternativo", "preview": "Pouso mais seguro, ciência menor.",
+          "effects": [ { "missionRisk": -0.02 }, { "science": -5 } ] },
+        { "id": "original", "label": "Manter o alvo original", "preview": "O melhor terreno científico, se pousar.",
+          "effects": [ { "missionRisk": 0.03 }, { "science": 8 } ] },
+        { "id": "autonomous", "label": "Deixar o pouso autônomo escolher", "preview": "O computador vê cada pedra.", "requires": { "tech": "comp_autonomy_gnc" },
+          "effects": [ { "missionRisk": -0.03 }, { "actor": "player", "field": "culture", "delta": 2 } ] }
+      ]
+    }
+  ]
+}

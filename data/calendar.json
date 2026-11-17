@@ -1,0 +1,1531 @@
+{
+  "_comment": "Calendário vivo 2026-2030. As datas oficiais vivem SÓ aqui (meses em base 1). planned = plano publicado até 17/nov/2026. delay = distribuição de atraso a partir do histórico real do programa: slipChance por revisão trimestral (só nos ~2 anos antes do voo), meanMonths/sdMonths por escorregão, maxMonths = teto do atraso acumulado, cancelChance opcional por revisão. launches = lançamentos do mesmo veículo por missão. refly = em caso de falha o dono repete o voo. historicalOutcome: resultado real, respeitado quando truthLayer = 'fato'. importance 1-3 controla o destaque das notícias. client = empresa contratada quando o dono no jogo é outro.",
+  "monthBase": 1,
+  "news": {
+    "delayed": "{name} adiada para {date}",
+    "delayedBody": "Nova revisão de cronograma: mais {weeks} de atraso. Plano original: {planned}.",
+    "windowMissed": "{name} perde a janela e fica para {date}",
+    "windowMissedBody": "O destino só fica alcançável de novo na próxima janela.",
+    "prereqWait": "{name} aguarda {prereq}",
+    "prereqWaitBody": "Sem o voo anterior não há como seguir. Nova meta: {date}.",
+    "prereqFailed": "{name} revista depois do fracasso de {prereq}",
+    "grounded": "{name} adiada: frota do {vehicle} em solo",
+    "suspended": "{name} suspensa por causa do conflito",
+    "suspendedBody": "Com a guerra, o governo desviou verba e pessoal. Retomada prevista para {date}.",
+    "cancelled": "{name} cancelada",
+    "cancelledBody": "O programa não sobreviveu à revisão de prioridades.",
+    "launched": "{owner} lança {name}",
+    "launchedBody": "Lançamento nominal no {vehicle}. Chegada prevista para {date}.",
+    "success": "{name}: sucesso!",
+    "partial": "{name}: sucesso parcial",
+    "failed": "{name} fracassa",
+    "lostCrew": "Tragédia: tripulação da {name} perdida",
+    "lostCrewBody": "{owner} suspende todos os voos tripulados enquanto investiga.",
+    "first": "{owner} é o primeiro: {milestone}",
+    "reflight": "{owner} vai repetir {name}: nova data {date}",
+    "bgFailure": "Falha do {vehicle} perde carga comercial",
+    "bgFailureBody": "Frota em solo por cerca de {weeks} para investigação.",
+    "bgTestFailure": "{vehicle} explode em voo de teste",
+    "bgMilestone": "{vehicle} chega ao {n}º voo",
+    "bgQuarter": "Balanço do trimestre: {summary}",
+    "debut": "Estreia do {vehicle}: o novo foguete entra no catálogo"
+  },
+  "milestoneLabels": {
+    "crewed_lunar_flyby": "sobrevoo lunar tripulado",
+    "crewed_lunar_orbit": "órbita lunar tripulada",
+    "crewed_lunar_landing": "pouso tripulado na Lua",
+    "lunar_south_pole_landing": "pouso no polo sul lunar",
+    "lunar_south_pole_crewed": "humanos no polo sul lunar",
+    "lunar_surface_robotic": "pouso robótico na Lua",
+    "lunar_sample_return": "amostras lunares trazidas à Terra",
+    "lunar_resource_demo": "uso de recursos lunares",
+    "lunar_base": "base lunar",
+    "mars_landing_robotic": "pouso robótico em Marte",
+    "mars_sample_return": "amostras de Marte",
+    "titan_arrival": "chegada a Titã",
+    "jupiter_arrival": "chegada a Júpiter",
+    "commercial_station": "estação comercial em órbita",
+    "national_station": "nova estação nacional",
+    "crewed_orbit_national": "voo orbital tripulado próprio"
+  },
+  "missions": [
+    {
+      "id": "artemis2",
+      "name": "Artemis II",
+      "owner": "nasa",
+      "partners": [
+        "esa"
+      ],
+      "type": "crewed",
+      "destination": "cislunar",
+      "vehicleId": "sls_b1",
+      "spacecraftId": "orion",
+      "crewed": true,
+      "crewSize": 4,
+      "planned": {
+        "year": 2026,
+        "month": 4
+      },
+      "truthLayer": "fato",
+      "historicalOutcome": "total",
+      "delay": {
+        "slipChance": 0,
+        "meanMonths": 0,
+        "sdMonths": 0,
+        "maxMonths": 0
+      },
+      "prerequisites": [],
+      "milestone": "crewed_lunar_flyby",
+      "importance": 3,
+      "statusNov2026": "Realizada: lançada em 1º de abril, amerissagem em 10 de abril.",
+      "source": "https://spacepolicyonline.com/?p=88152",
+      "description": "Quatro astronautas (três da NASA e um canadense) dão a volta na Lua na Orion, o primeiro voo humano além da órbita baixa desde 1972. Estava prevista para setembro de 2025."
+    },
+    {
+      "id": "blue_moon_pathfinder",
+      "name": "Blue Moon Mk1 Pathfinder",
+      "owner": "blueorigin",
+      "partners": [
+        "nasa"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "new_glenn",
+      "spacecraftId": "blue_moon_mk1",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 3
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 3,
+        "sdMonths": 2.5,
+        "maxMonths": 24
+      },
+      "prerequisites": [],
+      "milestone": "lunar_south_pole_landing",
+      "importance": 2,
+      "refly": true,
+      "statusNov2026": "Primeiro lander da Blue Origin, previsto para o início de 2026 no New Glenn.",
+      "source": "https://cislunarspace.cn/en/space-news/2026/04/2026-04-29-artemis-hls-starship-blue-origin-delay/",
+      "description": "Demonstração do lander de carga Blue Moon Mk1 perto do polo sul, ensaio para o lander tripulado Mk2 e para a entrega do rover VIPER."
+    },
+    {
+      "id": "starship_v3_debut",
+      "name": "Estreia da Starship V3",
+      "owner": "spacex",
+      "partners": [],
+      "type": "cargo",
+      "destination": "leo",
+      "vehicleId": "starship",
+      "spacecraftId": "starship_cargo",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 3
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 2,
+        "sdMonths": 1.5,
+        "maxMonths": 12
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "refly": true,
+      "statusNov2026": "Terceira geração da Starship, com motores Raptor 3, prevista para o primeiro semestre de 2026.",
+      "source": "https://www.analyticsinsight.net/news/spacex-delays-2026-mars-mission-shifts-starship-focus-to-nasa-moon-landing",
+      "description": "Primeiro voo da Starship maior e mais potente, base para os tanques e para o lander HLS."
+    },
+    {
+      "id": "starliner1",
+      "name": "Starliner-1 (carga)",
+      "owner": "nasa",
+      "partners": [],
+      "client": "Boeing",
+      "type": "cargo",
+      "destination": "iss",
+      "vehicleId": "atlas_v",
+      "spacecraftId": "starliner",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 4
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 18,
+        "cancelChance": 0.03
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Convertido em voo só de carga depois dos problemas do teste tripulado de 2024; contrato da Boeing reduzido.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "A Starliner tenta provar que corrigiu os propulsores antes de voltar a levar pessoas."
+    },
+    {
+      "id": "gaganyaan_g1",
+      "name": "Gaganyaan G1",
+      "owner": "isro",
+      "partners": [],
+      "type": "cargo",
+      "destination": "leo",
+      "vehicleId": "lvm3",
+      "spacecraftId": "gaganyaan",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 3
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 3,
+        "sdMonths": 2.5,
+        "maxMonths": 18
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "refly": true,
+      "statusNov2026": "Primeiro voo orbital não tripulado, com a robô Vyommitra; escorregou de dez/2025.",
+      "source": "https://www.businesstoday.in/science/story/crewed-moon-landing-by-2040-gaganyaan-in-2027-isro-outlines-roadmap-for-next-space-frontier-498336-2025-10-15",
+      "description": "A Índia testa em órbita a cápsula que um dia levará seus gaganautas: suporte de vida, reentrada e resgate no mar."
+    },
+    {
+      "id": "haven1",
+      "name": "Haven-1",
+      "owner": "spacex",
+      "partners": [],
+      "client": "Vast",
+      "type": "station",
+      "destination": "leo",
+      "vehicleId": "falcon9",
+      "spacecraftId": "haven1",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 5
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [],
+      "milestone": "commercial_station",
+      "importance": 2,
+      "statusNov2026": "A Vast adiou a estreia de 2025 para 2026; disputa com Axiom e Starlab a sucessão da ISS.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "Primeira estação comercial independente, lançada pela SpaceX para a Vast num único Falcon 9."
+    },
+    {
+      "id": "im3",
+      "name": "IM-3",
+      "owner": "nasa",
+      "partners": [],
+      "client": "Intuitive Machines",
+      "type": "lander",
+      "destination": "lunar_surface",
+      "vehicleId": "falcon9",
+      "spacecraftId": "nova_c",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 6
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Terceiro Nova-C, rumo ao redemoinho magnético de Reiner Gamma (CLPS).",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "Depois de dois pousos tombados, a Intuitive Machines tenta ficar de pé."
+    },
+    {
+      "id": "vast_crew1",
+      "name": "Vast-1 (tripulação na Haven-1)",
+      "owner": "spacex",
+      "partners": [],
+      "client": "Vast",
+      "type": "crewed",
+      "destination": "leo",
+      "vehicleId": "falcon9",
+      "spacecraftId": "crew_dragon",
+      "crewed": true,
+      "crewSize": 4,
+      "planned": {
+        "year": 2026,
+        "month": 7
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [
+        "haven1"
+      ],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Primeira visita de duas semanas, semanas depois do lançamento da estação.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "Quatro pessoas inauguram a Haven-1 numa Crew Dragon."
+    },
+    {
+      "id": "griffin1",
+      "name": "Griffin-1",
+      "owner": "nasa",
+      "partners": [],
+      "client": "Astrobotic",
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "falconheavy",
+      "spacecraftId": "griffin",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 7
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 4,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Lander da Astrobotic com o rover FLIP, rumo à região de Nobile, perto do polo sul.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "A segunda chance da Astrobotic depois da perda do Peregrine em 2024."
+    },
+    {
+      "id": "change7",
+      "name": "Chang'e-7",
+      "owner": "cnsa",
+      "partners": [
+        "roscosmos"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "long_march_5",
+      "spacecraftId": "change7",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 8
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.2,
+        "meanMonths": 2,
+        "sdMonths": 1.5,
+        "maxMonths": 12
+      },
+      "prerequisites": [],
+      "milestone": "lunar_south_pole_landing",
+      "importance": 3,
+      "statusNov2026": "Lançamento adiado em 23 de agosto por tempestade tropical; nova data a confirmar.",
+      "source": "https://www.natureworldnews.com/articles/73200/20260826/change-7-launch-postponed-tropical-storm-narra.htm",
+      "description": "Orbitador, lander, rover e um saltador que entra nas crateras de sombra eterna atrás de gelo. Leva instrumentos de sete países."
+    },
+    {
+      "id": "gaganyaan_g2",
+      "name": "Gaganyaan G2",
+      "owner": "isro",
+      "partners": [],
+      "type": "cargo",
+      "destination": "leo",
+      "vehicleId": "lvm3",
+      "spacecraftId": "gaganyaan",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 3,
+        "sdMonths": 2.5,
+        "maxMonths": 24
+      },
+      "prerequisites": [
+        "gaganyaan_g1"
+      ],
+      "milestone": null,
+      "importance": 1,
+      "refly": true,
+      "statusNov2026": "Segundo voo não tripulado, depende do resultado do G1.",
+      "source": "https://www.businesstoday.in/science/story/crewed-moon-landing-by-2040-gaganyaan-in-2027-isro-outlines-roadmap-for-next-space-frontier-498336-2025-10-15",
+      "description": "Repete o perfil completo, agora com os sistemas de aborto em modo real."
+    },
+    {
+      "id": "starship_prop_transfer",
+      "name": "Starship: transferência de propelente",
+      "owner": "spacex",
+      "partners": [
+        "nasa"
+      ],
+      "type": "cargo",
+      "destination": "leo",
+      "vehicleId": "starship",
+      "spacecraftId": "starship_tanker",
+      "crewed": false,
+      "launches": 2,
+      "planned": {
+        "year": 2026,
+        "month": 10
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 2.5,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [
+        "starship_v3_debut"
+      ],
+      "milestone": null,
+      "importance": 2,
+      "refly": true,
+      "statusNov2026": "Demonstração exigida pela NASA antes do pouso tripulado; sem data firme.",
+      "source": "https://cislunarspace.cn/en/space-news/2026/04/2026-04-29-artemis-hls-starship-blue-origin-delay/",
+      "description": "Duas Starships se acoplam em órbita e trocam toneladas de propelente criogênico. Sem isso não há pouso lunar americano."
+    },
+    {
+      "id": "mmx",
+      "name": "MMX",
+      "owner": "jaxa",
+      "partners": [
+        "esa"
+      ],
+      "type": "probe",
+      "destination": "mars_orbit",
+      "vehicleId": "h3",
+      "spacecraftId": "mmx",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 10
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.3,
+        "meanMonths": 2,
+        "sdMonths": 2,
+        "maxMonths": 26,
+        "windowDiscipline": 0.9
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "Prevista para a janela de Marte de 2026 no H3, que voltou a voar depois da falha de dez/2025.",
+      "source": "https://www.wikiwand.com/en/articles/List_of_planned_future_spaceflight_launches",
+      "description": "O Japão vai a Fobos buscar amostras da lua marciana e trazê-las de volta em 2031."
+    },
+    {
+      "id": "blue_ghost2",
+      "name": "Blue Ghost Missão 2",
+      "owner": "nasa",
+      "partners": [
+        "esa"
+      ],
+      "client": "Firefly",
+      "type": "lander",
+      "destination": "lunar_surface",
+      "vehicleId": "falcon9",
+      "spacecraftId": "blue_ghost",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 11
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Pouso no lado oculto, com o satélite retransmissor europeu Lunar Pathfinder.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "A Firefly tenta repetir o pouso perfeito de 2025, agora onde a Terra não se vê."
+    },
+    {
+      "id": "mengzhou_leo_test",
+      "name": "Mengzhou: voo de teste à Tiangong",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "cargo",
+      "destination": "leo",
+      "vehicleId": "long_march_10a",
+      "spacecraftId": "mengzhou",
+      "crewed": false,
+      "planned": {
+        "year": 2026,
+        "month": 11
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.25,
+        "meanMonths": 2,
+        "sdMonths": 1.5,
+        "maxMonths": 12
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "refly": true,
+      "statusNov2026": "Estreia do Longa Marcha 10A com a Mengzhou sem tripulação.",
+      "source": "https://news.cgtn.com/news/2026-04-24/China-Space-Day-How-far-have-we-come-toward-a-manned-lunar-landing--1MBhqOD8nQs/share_amp.html",
+      "description": "A nova cápsula lunar chinesa estreia em órbita baixa e se acopla à Tiangong."
+    },
+    {
+      "id": "gaganyaan_g3",
+      "name": "Gaganyaan G3",
+      "owner": "isro",
+      "partners": [],
+      "type": "cargo",
+      "destination": "leo",
+      "vehicleId": "lvm3",
+      "spacecraftId": "gaganyaan",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 2
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 3,
+        "sdMonths": 2.5,
+        "maxMonths": 24
+      },
+      "prerequisites": [
+        "gaganyaan_g2"
+      ],
+      "milestone": null,
+      "importance": 1,
+      "refly": true,
+      "statusNov2026": "Último voo de qualificação antes de levar pessoas.",
+      "source": "https://www.businesstoday.in/science/story/crewed-moon-landing-by-2040-gaganyaan-in-2027-isro-outlines-roadmap-for-next-space-frontier-498336-2025-10-15",
+      "description": "O ensaio geral do voo tripulado indiano."
+    },
+    {
+      "id": "axiom_ax5",
+      "name": "Ax-5",
+      "owner": "spacex",
+      "partners": [],
+      "client": "Axiom Space",
+      "type": "crewed",
+      "destination": "iss",
+      "vehicleId": "falcon9",
+      "spacecraftId": "crew_dragon",
+      "crewed": true,
+      "crewSize": 4,
+      "planned": {
+        "year": 2027,
+        "month": 2
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.35,
+        "meanMonths": 2,
+        "sdMonths": 1.5,
+        "maxMonths": 12
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Quinta missão privada da Axiom à ISS.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "Astronautas privados e de agências menores passam duas semanas na ISS."
+    },
+    {
+      "id": "im4",
+      "name": "IM-4",
+      "owner": "nasa",
+      "partners": [],
+      "client": "Intuitive Machines",
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "falcon9",
+      "spacecraftId": "nova_c",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 4
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Entrega CLPS ao polo sul com satélites retransmissores.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "Mais um Nova-C, agora no terreno mais difícil da Lua."
+    },
+    {
+      "id": "artemis3",
+      "name": "Artemis III",
+      "owner": "nasa",
+      "partners": [
+        "spacex",
+        "blueorigin",
+        "esa"
+      ],
+      "type": "crewed",
+      "destination": "leo",
+      "vehicleId": "sls_b1",
+      "spacecraftId": "orion",
+      "crewed": true,
+      "crewSize": 4,
+      "planned": {
+        "year": 2027,
+        "month": 6
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.35,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 20
+      },
+      "prerequisites": [
+        "artemis2"
+      ],
+      "milestone": null,
+      "importance": 3,
+      "statusNov2026": "Meta da reestruturação de fevereiro de 2026: teste em órbita terrestre com trajes e landers.",
+      "source": "https://www.theregister.com/2026/03/02/nasa_artemis_reshuffle/",
+      "description": "A Orion se encontra em órbita baixa com os landers da SpaceX e da Blue Origin para testar acoplamento e trajes antes de qualquer pouso."
+    },
+    {
+      "id": "xuntian",
+      "name": "Telescópio Xuntian",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "satellite",
+      "destination": "leo",
+      "vehicleId": "long_march_5",
+      "spacecraftId": "xuntian",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 6
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.25,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 18
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Escorregou de 2024 para 2027.",
+      "source": "https://www.wikiwand.com/en/articles/List_of_planned_future_spaceflight_launches",
+      "description": "Telescópio de campo largo com espelho de 2 metros, vizinho da Tiangong."
+    },
+    {
+      "id": "cz10_maiden",
+      "name": "Voo inaugural do Longa Marcha 10",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "cargo",
+      "destination": "cislunar",
+      "vehicleId": "long_march_10",
+      "spacecraftId": "generic_cargo",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 6
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.2,
+        "meanMonths": 2,
+        "sdMonths": 1.5,
+        "maxMonths": 12
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "refly": true,
+      "statusNov2026": "Testes estáticos do primeiro estágio feitos em 2025; voo inaugural previsto para 2027.",
+      "source": "https://news.cgtn.com/news/2026-04-24/China-Space-Day-How-far-have-we-come-toward-a-manned-lunar-landing--1MBhqOD8nQs/share_amp.html",
+      "description": "O foguete lunar chinês estreia mandando um simulador de massa rumo à Lua."
+    },
+    {
+      "id": "space_rider",
+      "name": "Space Rider",
+      "owner": "esa",
+      "partners": [],
+      "type": "cargo",
+      "destination": "leo",
+      "vehicleId": "vega_c",
+      "spacecraftId": "space_rider",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 5,
+        "sdMonths": 3,
+        "maxMonths": 30
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Primeiro voo orbital do miniônibus europeu.",
+      "source": "https://www.wikiwand.com/en/articles/List_of_planned_future_spaceflight_launches",
+      "description": "Dois meses em órbita e pouso automático numa pista: a Europa aprende a trazer coisas de volta."
+    },
+    {
+      "id": "gaganyaan_h1",
+      "name": "Gaganyaan H1",
+      "owner": "isro",
+      "partners": [],
+      "type": "crewed",
+      "destination": "leo",
+      "vehicleId": "lvm3",
+      "spacecraftId": "gaganyaan",
+      "crewed": true,
+      "crewSize": 3,
+      "planned": {
+        "year": 2027,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 30
+      },
+      "prerequisites": [
+        "gaganyaan_g3"
+      ],
+      "milestone": "crewed_orbit_national",
+      "importance": 3,
+      "statusNov2026": "Meta de 2027, depois dos voos não tripulados. O programa estava planejado para 2022.",
+      "source": "https://www.businesstoday.in/science/story/crewed-moon-landing-by-2040-gaganyaan-in-2027-isro-outlines-roadmap-for-next-space-frontier-498336-2025-10-15",
+      "description": "A Índia vira a quarta nação a pôr gente em órbita com nave própria."
+    },
+    {
+      "id": "ros_first_module",
+      "name": "ROS: primeiro módulo",
+      "owner": "roscosmos",
+      "partners": [],
+      "type": "station",
+      "destination": "leo",
+      "vehicleId": "angara_a5",
+      "spacecraftId": "ros_module",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 12
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.55,
+        "meanMonths": 6,
+        "sdMonths": 4,
+        "maxMonths": 48,
+        "cancelChance": 0.02
+      },
+      "prerequisites": [],
+      "milestone": "national_station",
+      "importance": 2,
+      "statusNov2026": "Plano oficial de 2027 para o primeiro bloco; a Rússia promete deixar a ISS depois de 2028.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "A Rússia começa a montar sua própria estação em órbita polar."
+    },
+    {
+      "id": "luna26",
+      "name": "Luna-26",
+      "owner": "roscosmos",
+      "partners": [],
+      "type": "probe",
+      "destination": "lunar_orbit",
+      "vehicleId": "soyuz2",
+      "spacecraftId": "luna_orbiter",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 5,
+        "sdMonths": 4,
+        "maxMonths": 48
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Orbitador previsto para 2027; o programa lunar russo atrasou mais de uma década.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "A Rússia volta à órbita lunar para mapear pontos de pouso do ILRS."
+    },
+    {
+      "id": "viper_delivery",
+      "name": "VIPER no Blue Moon",
+      "owner": "nasa",
+      "partners": [
+        "blueorigin"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "new_glenn",
+      "spacecraftId": "blue_moon_mk1",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 10
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 24
+      },
+      "prerequisites": [
+        "blue_moon_pathfinder"
+      ],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "O rover cancelado em 2024 ganhou carona num Blue Moon Mk1 da Blue Origin.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "O rover VIPER volta da gaveta para caçar gelo no polo sul."
+    },
+    {
+      "id": "starship_hls_demo",
+      "name": "Starship HLS: pouso de demonstração",
+      "owner": "spacex",
+      "partners": [
+        "nasa"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "starship",
+      "spacecraftId": "starship_hls",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 10
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 24
+      },
+      "prerequisites": [
+        "starship_prop_transfer"
+      ],
+      "milestone": null,
+      "importance": 3,
+      "refly": true,
+      "statusNov2026": "Os landers não ficam prontos antes do fim de 2027.",
+      "source": "https://cislunarspace.cn/en/space-news/2026/04/2026-04-29-artemis-hls-starship-blue-origin-delay/",
+      "description": "Uma Starship sem tripulação tenta pousar na Lua depois de uma dezena de voos-tanque."
+    },
+    {
+      "id": "tiangong_expansion",
+      "name": "Tiangong: módulo de expansão",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "station",
+      "destination": "leo",
+      "vehicleId": "long_march_5",
+      "spacecraftId": "tiangong_module",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 11
+      },
+      "truthLayer": "projecao",
+      "delay": {
+        "slipChance": 0.3,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 24
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "Expansão anunciada, sem data oficial.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "A estação chinesa cresce enquanto a ISS se aproxima do fim."
+    },
+    {
+      "id": "chandrayaan4",
+      "name": "Chandrayaan-4",
+      "owner": "isro",
+      "partners": [],
+      "type": "lander",
+      "destination": "lunar_surface",
+      "vehicleId": "lvm3",
+      "spacecraftId": "chandrayaan4",
+      "crewed": false,
+      "launches": 2,
+      "planned": {
+        "year": 2027,
+        "month": 12
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 5,
+        "sdMonths": 4,
+        "maxMonths": 36
+      },
+      "prerequisites": [],
+      "milestone": "lunar_sample_return",
+      "importance": 2,
+      "statusNov2026": "Aprovada em 2024; meta de 2027.",
+      "source": "https://www.businesstoday.in/science/story/crewed-moon-landing-by-2040-gaganyaan-in-2027-isro-outlines-roadmap-for-next-space-frontier-498336-2025-10-15",
+      "description": "Dois lançamentos, acoplamento em órbita lunar e amostras do ponto Shiv Shakti de volta à Terra."
+    },
+    {
+      "id": "gateway_ppe_halo",
+      "name": "Gateway: PPE e HALO",
+      "owner": "nasa",
+      "partners": [
+        "esa",
+        "jaxa"
+      ],
+      "type": "station",
+      "destination": "lunar_orbit",
+      "vehicleId": "falconheavy",
+      "spacecraftId": "gateway_ppe_halo",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 12
+      },
+      "truthLayer": "projecao",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 5,
+        "sdMonths": 4,
+        "maxMonths": 36,
+        "cancelChance": 0.03
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "Sobreviveu a propostas de cancelamento; cronograma incerto após a reestruturação do Artemis.",
+      "source": "https://www.theregister.com/2026/03/02/nasa_artemis_reshuffle/",
+      "description": "Os dois primeiros módulos da estação lunar sobem juntos num Falcon Heavy."
+    },
+    {
+      "id": "artemis4",
+      "name": "Artemis IV",
+      "owner": "nasa",
+      "partners": [
+        "spacex",
+        "esa",
+        "jaxa"
+      ],
+      "type": "crewed",
+      "destination": "lunar_south_pole",
+      "vehicleId": "sls_b1",
+      "spacecraftId": "orion",
+      "secondarySpacecraftId": "starship_hls",
+      "crewed": true,
+      "crewSize": 4,
+      "planned": {
+        "year": 2028,
+        "month": 2
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 24
+      },
+      "prerequisites": [
+        "artemis3",
+        "starship_hls_demo"
+      ],
+      "milestone": "crewed_lunar_landing",
+      "importance": 3,
+      "statusNov2026": "Primeiro pouso tripulado do programa; os landers não ficam prontos antes do fim de 2027.",
+      "source": "https://cislunarspace.cn/en/space-news/2026/04/2026-04-29-artemis-hls-starship-blue-origin-delay/",
+      "description": "Dois astronautas descem ao polo sul na Starship HLS enquanto a Orion espera em órbita. Os primeiros passos na Lua desde 1972."
+    },
+    {
+      "id": "blue_moon_mk2_demo",
+      "name": "Blue Moon Mk2: pouso de demonstração",
+      "owner": "blueorigin",
+      "partners": [
+        "nasa"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "new_glenn",
+      "spacecraftId": "blue_moon_mk2",
+      "crewed": false,
+      "launches": 2,
+      "planned": {
+        "year": 2028,
+        "month": 6
+      },
+      "truthLayer": "projecao",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 5,
+        "sdMonths": 3,
+        "maxMonths": 30
+      },
+      "prerequisites": [
+        "blue_moon_pathfinder"
+      ],
+      "milestone": null,
+      "importance": 2,
+      "refly": true,
+      "statusNov2026": "Demonstração sem tripulação exigida antes do Artemis V.",
+      "source": "https://cislunarspace.cn/en/space-news/2026/04/2026-04-29-artemis-hls-starship-blue-origin-delay/",
+      "description": "O lander tripulado da Blue Origin desce vazio, reabastecido por um rebocador cislunar."
+    },
+    {
+      "id": "dragonfly",
+      "name": "Dragonfly",
+      "owner": "nasa",
+      "partners": [],
+      "type": "probe",
+      "destination": "titan",
+      "vehicleId": "falconheavy",
+      "spacecraftId": "dragonfly",
+      "crewed": false,
+      "planned": {
+        "year": 2028,
+        "month": 7
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.2,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 24,
+        "windowDiscipline": 0.9
+      },
+      "prerequisites": [],
+      "milestone": "titan_arrival",
+      "importance": 2,
+      "statusNov2026": "Lançamento planejado para julho de 2028, chegada a Titã em 2034.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "Um helicóptero nuclear do tamanho de um carro vai voar sobre as dunas de Titã."
+    },
+    {
+      "id": "bas1",
+      "name": "BAS-1",
+      "owner": "isro",
+      "partners": [],
+      "type": "station",
+      "destination": "leo",
+      "vehicleId": "lvm3",
+      "spacecraftId": "bas_module",
+      "crewed": false,
+      "planned": {
+        "year": 2028,
+        "month": 6
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 5,
+        "sdMonths": 4,
+        "maxMonths": 36
+      },
+      "prerequisites": [],
+      "milestone": "national_station",
+      "importance": 2,
+      "statusNov2026": "Primeiro módulo da estação indiana previsto para 2028; estação completa em 2035.",
+      "source": "https://www.businesstoday.in/science/story/crewed-moon-landing-by-2040-gaganyaan-in-2027-isro-outlines-roadmap-for-next-space-frontier-498336-2025-10-15",
+      "description": "A Bharatiya Antariksh Station começa com um módulo automático em órbita baixa."
+    },
+    {
+      "id": "luna27",
+      "name": "Luna-27",
+      "owner": "roscosmos",
+      "partners": [
+        "cnsa"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "angara_a5",
+      "spacecraftId": "luna_lander",
+      "crewed": false,
+      "planned": {
+        "year": 2028,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 5,
+        "sdMonths": 4,
+        "maxMonths": 48
+      },
+      "prerequisites": [
+        "luna26"
+      ],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "Lander pesado com broca; depende do orbitador Luna-26.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "A Rússia tenta apagar a queda da Luna-25 com um lander maior no polo sul."
+    },
+    {
+      "id": "lupex",
+      "name": "LUPEX (Chandrayaan-5)",
+      "owner": "jaxa",
+      "partners": [
+        "isro"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "h3",
+      "spacecraftId": "lupex",
+      "crewed": false,
+      "planned": {
+        "year": 2028,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.4,
+        "meanMonths": 5,
+        "sdMonths": 4,
+        "maxMonths": 30
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "Missão conjunta Japão-Índia, prevista para 2028.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "Rover japonês, lander indiano e uma pergunta: quanta água existe no polo sul?"
+    },
+    {
+      "id": "change8",
+      "name": "Chang'e-8",
+      "owner": "cnsa",
+      "partners": [
+        "roscosmos"
+      ],
+      "type": "lander",
+      "destination": "lunar_south_pole",
+      "vehicleId": "long_march_5",
+      "spacecraftId": "change8",
+      "crewed": false,
+      "planned": {
+        "year": 2028,
+        "month": 10
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.2,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 14
+      },
+      "prerequisites": [
+        "change7"
+      ],
+      "milestone": "lunar_resource_demo",
+      "importance": 2,
+      "statusNov2026": "Planejada para 2028 a 2029: teste de uso de recursos lunares.",
+      "source": "https://news.cgtn.com/news/2026-04-24/China-Space-Day-How-far-have-we-come-toward-a-manned-lunar-landing--1MBhqOD8nQs/share_amp.html",
+      "description": "A China tenta imprimir tijolos de regolito: o embrião da base ILRS."
+    },
+    {
+      "id": "rosalind_franklin",
+      "name": "Rosalind Franklin (ExoMars)",
+      "owner": "esa",
+      "partners": [
+        "nasa"
+      ],
+      "type": "lander",
+      "destination": "mars_surface",
+      "vehicleId": "falconheavy",
+      "spacecraftId": "rosalind_franklin",
+      "crewed": false,
+      "planned": {
+        "year": 2028,
+        "month": 11
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.25,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 26,
+        "windowDiscipline": 0.92
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 3,
+      "statusNov2026": "Lançamento planejado para a janela de 2028, com lançador e motores de pouso da NASA.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "O rover europeu que ficou pronto em 2022 e perdeu a carona russa finalmente parte para Marte."
+    },
+    {
+      "id": "tianwen3",
+      "name": "Tianwen-3",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "lander",
+      "destination": "mars_surface",
+      "vehicleId": "long_march_5",
+      "spacecraftId": "tianwen3",
+      "crewed": false,
+      "launches": 2,
+      "planned": {
+        "year": 2028,
+        "month": 11
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.15,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 26,
+        "windowDiscipline": 0.95
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 3,
+      "statusNov2026": "Lançamento planejado para 2028; amostras na Terra por volta de 2031.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "Dois Longa Marcha 5 levam lander e orbitador: a China quer ser a primeira a trazer Marte para casa."
+    },
+    {
+      "id": "artemis5",
+      "name": "Artemis V",
+      "owner": "nasa",
+      "partners": [
+        "blueorigin",
+        "esa",
+        "jaxa"
+      ],
+      "type": "crewed",
+      "destination": "lunar_south_pole",
+      "vehicleId": "sls_b1",
+      "spacecraftId": "orion",
+      "secondarySpacecraftId": "blue_moon_mk2",
+      "crewed": true,
+      "crewSize": 4,
+      "planned": {
+        "year": 2028,
+        "month": 11
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 5,
+        "sdMonths": 3,
+        "maxMonths": 30
+      },
+      "prerequisites": [
+        "artemis4",
+        "blue_moon_mk2_demo"
+      ],
+      "milestone": null,
+      "importance": 3,
+      "statusNov2026": "Meta de fevereiro de 2026: segundo pouso, agora com o lander da Blue Origin.",
+      "source": "https://www.theregister.com/2026/03/02/nasa_artemis_reshuffle/",
+      "description": "Segundo pouso do programa, com o Blue Moon Mk2 e um astronauta japonês ou europeu na tripulação."
+    },
+    {
+      "id": "starship_mars_cargo",
+      "name": "Starship rumo a Marte",
+      "owner": "spacex",
+      "partners": [],
+      "type": "cargo",
+      "destination": "mars_surface",
+      "vehicleId": "starship",
+      "spacecraftId": "starship_cargo",
+      "crewed": false,
+      "launches": 2,
+      "planned": {
+        "year": 2028,
+        "month": 12
+      },
+      "truthLayer": "especulacao",
+      "delay": {
+        "slipChance": 0.6,
+        "meanMonths": 6,
+        "sdMonths": 6,
+        "maxMonths": 30,
+        "cancelChance": 0.06
+      },
+      "prerequisites": [
+        "starship_prop_transfer"
+      ],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "A SpaceX adiou os planos de Marte de 2026 e não se comprometeu com a janela de 2028.",
+      "source": "https://www.analyticsinsight.net/news/spacex-delays-2026-mars-mission-shifts-starship-focus-to-nasa-moon-landing",
+      "description": "Duas Starships de carga tentam o primeiro pouso de uma nave gigante em Marte."
+    },
+    {
+      "id": "starlab",
+      "name": "Starlab",
+      "owner": "nasa",
+      "partners": [
+        "esa",
+        "spacex"
+      ],
+      "client": "Voyager / Airbus",
+      "type": "station",
+      "destination": "leo",
+      "vehicleId": "starship",
+      "spacecraftId": "starlab",
+      "crewed": false,
+      "planned": {
+        "year": 2029,
+        "month": 6
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 5,
+        "sdMonths": 4,
+        "maxMonths": 30
+      },
+      "prerequisites": [],
+      "milestone": "commercial_station",
+      "importance": 2,
+      "statusNov2026": "Disputa a sucessão da ISS; lançamento único numa Starship.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "Uma estação inteira sobe de uma vez no porão de uma Starship."
+    },
+    {
+      "id": "axiom_station_module",
+      "name": "Módulo Axiom na ISS",
+      "owner": "nasa",
+      "partners": [],
+      "client": "Axiom Space",
+      "type": "station",
+      "destination": "iss",
+      "vehicleId": "falcon9",
+      "spacecraftId": "axiom_module",
+      "crewed": false,
+      "planned": {
+        "year": 2027,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.45,
+        "meanMonths": 4,
+        "sdMonths": 3,
+        "maxMonths": 30
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 1,
+      "statusNov2026": "A Axiom reordenou seus módulos para lançar primeiro o de energia (PPTM).",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "Primeiro módulo da futura estação Axiom acopla na ISS."
+    },
+    {
+      "id": "tianwen4",
+      "name": "Tianwen-4",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "probe",
+      "destination": "jupiter",
+      "vehicleId": "long_march_5",
+      "spacecraftId": "tianwen4",
+      "crewed": false,
+      "planned": {
+        "year": 2029,
+        "month": 9
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.2,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 26,
+        "windowDiscipline": 0.95
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "Planejada para 2029: Júpiter e a lua Calisto.",
+      "source": "https://en.wikipedia.org/wiki/List_of_proposed_Solar_System_probes",
+      "description": "A primeira sonda chinesa ao Sistema Solar exterior."
+    },
+    {
+      "id": "china_lunar_rehearsal",
+      "name": "Ensaio lunar Mengzhou-Lanyue",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "lander",
+      "destination": "lunar_surface",
+      "vehicleId": "long_march_10",
+      "spacecraftId": "lanyue",
+      "secondarySpacecraftId": "mengzhou",
+      "crewed": false,
+      "launches": 2,
+      "planned": {
+        "year": 2028,
+        "month": 10
+      },
+      "truthLayer": "projecao",
+      "delay": {
+        "slipChance": 0.2,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 14
+      },
+      "prerequisites": [
+        "cz10_maiden",
+        "mengzhou_leo_test"
+      ],
+      "milestone": null,
+      "importance": 2,
+      "refly": true,
+      "statusNov2026": "Ensaio sem tripulação esperado antes do pouso tripulado.",
+      "source": "https://www.aol.com/articles/factbox-chinas-crewed-lunar-programme-114353660.html",
+      "description": "Dois Longa Marcha 10, encontro em órbita lunar, pouso e decolagem do Lanyue vazio."
+    },
+    {
+      "id": "china_crewed_landing",
+      "name": "Pouso tripulado chinês na Lua",
+      "owner": "cnsa",
+      "partners": [],
+      "type": "crewed",
+      "destination": "lunar_surface",
+      "vehicleId": "long_march_10",
+      "spacecraftId": "lanyue",
+      "secondarySpacecraftId": "mengzhou",
+      "crewed": true,
+      "crewSize": 3,
+      "launches": 2,
+      "planned": {
+        "year": 2029,
+        "month": 11
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.15,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 14
+      },
+      "prerequisites": [
+        "china_lunar_rehearsal"
+      ],
+      "milestone": "crewed_lunar_landing",
+      "importance": 3,
+      "statusNov2026": "Meta oficial reafirmada: pouso até 2030.",
+      "source": "https://www.aol.com/articles/factbox-chinas-crewed-lunar-programme-114353660.html",
+      "description": "Mengzhou e Lanyue sobem em dois Longa Marcha 10; dois taikonautas descem enquanto o terceiro espera em órbita."
+    },
+    {
+      "id": "orbital_reef_core",
+      "name": "Orbital Reef: núcleo",
+      "owner": "blueorigin",
+      "partners": [],
+      "type": "station",
+      "destination": "leo",
+      "vehicleId": "new_glenn",
+      "spacecraftId": "orbital_reef",
+      "crewed": false,
+      "planned": {
+        "year": 2030,
+        "month": 6
+      },
+      "truthLayer": "projecao",
+      "delay": {
+        "slipChance": 0.5,
+        "meanMonths": 8,
+        "sdMonths": 5,
+        "maxMonths": 48,
+        "cancelChance": 0.03
+      },
+      "prerequisites": [],
+      "milestone": "commercial_station",
+      "importance": 1,
+      "statusNov2026": "Cronograma vago; disputa a sucessão da ISS.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "O parque empresarial orbital da Blue Origin e da Sierra Space começa pelo núcleo."
+    },
+    {
+      "id": "iss_deorbit",
+      "name": "Fim da ISS: veículo de reentrada",
+      "owner": "nasa",
+      "partners": [
+        "esa",
+        "jaxa",
+        "roscosmos"
+      ],
+      "type": "cargo",
+      "destination": "iss",
+      "vehicleId": "falconheavy",
+      "spacecraftId": "usdv",
+      "crewed": false,
+      "planned": {
+        "year": 2030,
+        "month": 10
+      },
+      "truthLayer": "plano_oficial",
+      "delay": {
+        "slipChance": 0.3,
+        "meanMonths": 3,
+        "sdMonths": 2,
+        "maxMonths": 12
+      },
+      "prerequisites": [],
+      "milestone": null,
+      "importance": 2,
+      "statusNov2026": "Planejado: fim da ISS em 2030, com reentrada controlada em 2031 por veículo da SpaceX.",
+      "source": "https://orbitalintel.pages.dev/space-station-race",
+      "description": "O rebocador da SpaceX acopla na ISS para empurrá-la ao Pacífico Sul. Fim de 30 anos de presença contínua."
+    }
+  ]
+}

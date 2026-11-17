@@ -1,0 +1,190 @@
+{
+  "_comment": "Destinos (vocabulário fixo). route = trechos do mapa de metrô com delta-v em km/s. window: periodWeeks/phaseTurn/openWeeks em turnos (turno 0 = 1a semana de 2026); Marte abre em out/2026 e nov/2028. arrivalMilestones: marcos da cena de chegada (pFail base, faixa de anomalia, pesos de tipo de falha, frases de rádio); crewedOnly = só em missões tripuladas. firsts: marco 'Os Primeiros' ganho no sucesso (crewed_orbit_national vira crewed_orbit_national:<ator>).",
+  "monthBase": 1,
+  "routeNodes": [
+    { "id": "earth", "name": "Terra" },
+    { "id": "leo", "name": "Órbita baixa" },
+    { "id": "sso", "name": "Órbita polar" },
+    { "id": "iss", "name": "ISS" },
+    { "id": "gto", "name": "Transferência geoestacionária" },
+    { "id": "tli", "name": "Injeção translunar" },
+    { "id": "lunar_orbit", "name": "Órbita lunar" },
+    { "id": "lunar_surface", "name": "Superfície lunar" },
+    { "id": "lunar_south_pole", "name": "Polo sul lunar" },
+    { "id": "tmi", "name": "Injeção trans-Marte" },
+    { "id": "mars_orbit", "name": "Órbita de Marte" },
+    { "id": "mars_surface", "name": "Superfície de Marte" },
+    { "id": "jupiter", "name": "Júpiter" },
+    { "id": "titan", "name": "Titã" }
+  ],
+  "destinations": [
+    {
+      "id": "leo", "name": "Órbita baixa da Terra", "short": "LEO", "body": "earth", "kind": "orbit", "capacityKey": "leo", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }],
+      "transitWeeks": 0, "window": null, "arrivalMilestones": [],
+      "firsts": { "crewed": "crewed_orbit_national" },
+      "description": "Onde tudo começa: 400 km de altitude, 90 minutos por volta."
+    },
+    {
+      "id": "sso", "name": "Órbita heliossíncrona", "short": "SSO", "body": "earth", "kind": "orbit", "capacityKey": "leo", "capacityFactor": 0.75,
+      "route": [{ "from": "earth", "to": "sso", "dv": 9.8 }],
+      "transitWeeks": 0, "window": null, "arrivalMilestones": [], "firsts": {},
+      "description": "Órbita polar que passa sempre à mesma hora local: a favorita da observação da Terra."
+    },
+    {
+      "id": "iss", "name": "Estação Espacial Internacional", "short": "ISS", "body": "earth", "kind": "station", "capacityKey": "leo", "capacityFactor": 0.9,
+      "availableUntil": { "year": 2030, "month": 12 },
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "iss", "dv": 0.2 }],
+      "transitWeeks": 0, "window": null, "arrivalMilestones": [],
+      "firsts": { "crewed": "crewed_orbit_national" },
+      "description": "Inclinação de 51,6 graus, um pouco mais cara que a órbita baixa padrão. Aposentadoria prevista para o fim de 2030."
+    },
+    {
+      "id": "gto", "name": "Transferência geoestacionária", "short": "GTO", "body": "earth", "kind": "orbit", "capacityKey": "gto", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "gto", "dv": 2.4 }],
+      "transitWeeks": 0, "window": null, "arrivalMilestones": [], "firsts": {},
+      "description": "Rumo aos 36 mil km da órbita geoestacionária, o mercado dos satélites de comunicação."
+    },
+    {
+      "id": "cislunar", "name": "Sobrevoo lunar", "short": "Cislunar", "body": "moon", "kind": "flyby", "capacityKey": "tli", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }],
+      "transitWeeks": 1, "window": null,
+      "arrivalMilestones": [
+        { "id": "lunar_flyby", "label": "Sobrevoo lunar", "pFail": 0.01, "anomalyBand": 0.05,
+          "failureWeights": { "propulsion": 0.15, "structure": 0.1, "software": 0.35, "human": 0.1, "environment": 0.3 },
+          "radio": ["Perdemos o sinal atrás da Lua, como previsto.", "Sinal de volta! Eles estão vendo o lado oculto."] },
+        { "id": "return_burn", "label": "Queima de retorno", "pFail": 0.015, "anomalyBand": 0.05, "crewedOnly": true,
+          "failureWeights": { "propulsion": 0.6, "structure": 0.1, "software": 0.2, "human": 0.1, "environment": 0 },
+          "radio": ["Motor do módulo de serviço aceso.", "Trajetória de retorno confirmada, rumo à Terra."] },
+        { "id": "reentry", "label": "Reentrada", "pFail": 0.02, "anomalyBand": 0.06, "crewedOnly": true,
+          "failureWeights": { "propulsion": 0, "structure": 0.6, "software": 0.1, "human": 0.05, "environment": 0.25 },
+          "radio": ["Interface de entrada a 11 km/s.", "Apagão de plasma... aguardando.", "Temos sinal! Paraquedas de arrasto abertos."] },
+        { "id": "splashdown", "label": "Amerissagem", "pFail": 0.005, "anomalyBand": 0.03, "crewedOnly": true,
+          "failureWeights": { "propulsion": 0, "structure": 0.4, "software": 0.1, "human": 0.1, "environment": 0.4 },
+          "radio": ["Três paraquedas principais.", "Amerissagem! Equipe de resgate a caminho."] }
+      ],
+      "firsts": { "crewed": "crewed_lunar_flyby" },
+      "description": "Trajetória de retorno livre em volta da Lua: o caminho do Artemis II e da Apollo 8."
+    },
+    {
+      "id": "lunar_orbit", "name": "Órbita lunar", "short": "Órbita lunar", "body": "moon", "kind": "orbit", "capacityKey": "tli", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }, { "from": "tli", "to": "lunar_orbit", "dv": 0.9 }],
+      "transitWeeks": 1, "window": null,
+      "arrivalMilestones": [
+        { "id": "loi", "label": "Inserção em órbita lunar", "pFail": 0.02, "anomalyBand": 0.06,
+          "failureWeights": { "propulsion": 0.55, "structure": 0.05, "software": 0.3, "human": 0.1, "environment": 0 },
+          "radio": ["Queima de inserção começando atrás da Lua.", "Sinal reacquirido. Estamos em órbita lunar!"] }
+      ],
+      "firsts": { "crewed": "crewed_lunar_orbit" },
+      "description": "Órbita baixa (LLO) ou halo quase retilínea (NRHO), porta de entrada para a superfície."
+    },
+    {
+      "id": "lunar_surface", "name": "Superfície lunar", "short": "Lua", "body": "moon", "kind": "surface", "capacityKey": "tli", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }, { "from": "tli", "to": "lunar_orbit", "dv": 0.9 }, { "from": "lunar_orbit", "to": "lunar_surface", "dv": 1.9 }],
+      "transitWeeks": 1, "window": null,
+      "arrivalMilestones": [
+        { "id": "loi", "label": "Inserção em órbita lunar", "pFail": 0.02, "anomalyBand": 0.06,
+          "failureWeights": { "propulsion": 0.55, "structure": 0.05, "software": 0.3, "human": 0.1, "environment": 0 },
+          "radio": ["Queima de inserção nominal.", "Órbita lunar confirmada."] },
+        { "id": "descent", "label": "Descida motorizada", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.45, "structure": 0.05, "software": 0.35, "human": 0.1, "environment": 0.05 },
+          "radio": ["Início da descida motorizada.", "Radar de altitude travado.", "Quatro mil pés, descendo bem."] },
+        { "id": "hazard_avoidance", "label": "Desvio de obstáculos", "pFail": 0.04, "anomalyBand": 0.1,
+          "failureWeights": { "propulsion": 0.1, "structure": 0.05, "software": 0.45, "human": 0.2, "environment": 0.2 },
+          "radio": ["Pedras no ponto previsto, desviando.", "Novo ponto escolhido, combustível ok."] },
+        { "id": "touchdown", "label": "Toque no solo", "pFail": 0.03, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.15, "structure": 0.4, "software": 0.15, "human": 0.1, "environment": 0.2 },
+          "radio": ["Luz de contato!", "Motor desligado. Pousamos."] }
+      ],
+      "firsts": { "crewed": "crewed_lunar_landing", "robotic": "lunar_surface_robotic" },
+      "description": "Planícies equatoriais e de média latitude, iluminadas e conhecidas desde a Apollo."
+    },
+    {
+      "id": "lunar_south_pole", "name": "Polo sul lunar", "short": "Polo sul", "body": "moon", "kind": "surface", "capacityKey": "tli", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }, { "from": "tli", "to": "lunar_orbit", "dv": 0.9 }, { "from": "lunar_orbit", "to": "lunar_south_pole", "dv": 2.1 }],
+      "transitWeeks": 1, "window": null,
+      "arrivalMilestones": [
+        { "id": "loi", "label": "Inserção em órbita lunar", "pFail": 0.02, "anomalyBand": 0.06,
+          "failureWeights": { "propulsion": 0.55, "structure": 0.05, "software": 0.3, "human": 0.1, "environment": 0 },
+          "radio": ["Queima de inserção nominal.", "Órbita polar confirmada."] },
+        { "id": "descent", "label": "Descida motorizada", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.45, "structure": 0.05, "software": 0.35, "human": 0.1, "environment": 0.05 },
+          "radio": ["Descida iniciada sobre a cratera Shackleton.", "Sombras longas no radar óptico."] },
+        { "id": "hazard_avoidance", "label": "Desvio de obstáculos", "pFail": 0.06, "anomalyBand": 0.12,
+          "failureWeights": { "propulsion": 0.1, "structure": 0.05, "software": 0.4, "human": 0.2, "environment": 0.25 },
+          "radio": ["Inclinação do terreno acima do limite!", "Sol rasante, câmeras saturando... novo alvo."] },
+        { "id": "touchdown", "label": "Toque no solo", "pFail": 0.04, "anomalyBand": 0.1,
+          "failureWeights": { "propulsion": 0.15, "structure": 0.4, "software": 0.15, "human": 0.1, "environment": 0.2 },
+          "radio": ["Contato! Verificando a inclinação...", "De pé no polo sul."] }
+      ],
+      "firsts": { "crewed": "lunar_south_pole_crewed", "robotic": "lunar_south_pole_landing" },
+      "description": "Gelo nas crateras de sombra eterna e picos quase sempre iluminados: o terreno mais disputado da década."
+    },
+    {
+      "id": "mars_orbit", "name": "Órbita de Marte", "short": "Órbita marciana", "body": "mars", "kind": "orbit", "capacityKey": "mars", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tmi", "dv": 3.6 }, { "from": "tmi", "to": "mars_orbit", "dv": 2.1 }],
+      "transitWeeks": 30, "window": { "periodWeeks": 112, "phaseTurn": 39, "openWeeks": 12 },
+      "arrivalMilestones": [
+        { "id": "moi", "label": "Inserção em órbita de Marte", "pFail": 0.05, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.55, "structure": 0.05, "software": 0.3, "human": 0.05, "environment": 0.05 },
+          "radio": ["Vinte minutos de atraso no sinal. Só podemos esperar.", "Queima completa! Capturados por Marte."] }
+      ],
+      "firsts": {},
+      "description": "Uma janela a cada cerca de 26 meses. Perder a janela custa mais de dois anos."
+    },
+    {
+      "id": "mars_surface", "name": "Superfície de Marte", "short": "Marte", "body": "mars", "kind": "surface", "capacityKey": "mars", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tmi", "dv": 3.6 }, { "from": "tmi", "to": "mars_orbit", "dv": 0.8 }, { "from": "mars_orbit", "to": "mars_surface", "dv": 1.0 }],
+      "transitWeeks": 32, "window": { "periodWeeks": 112, "phaseTurn": 39, "openWeeks": 12 },
+      "arrivalMilestones": [
+        { "id": "entry", "label": "Entrada atmosférica", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0, "structure": 0.5, "software": 0.2, "human": 0.05, "environment": 0.25 },
+          "radio": ["Entrada a 5,8 km/s. Começam os sete minutos de terror.", "Escudo térmico no pico de temperatura."] },
+        { "id": "parachute", "label": "Paraquedas supersônico", "pFail": 0.05, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0, "structure": 0.55, "software": 0.25, "human": 0.05, "environment": 0.15 },
+          "radio": ["Paraquedas aberto!", "Escudo térmico ejetado, radar procurando o chão."] },
+        { "id": "powered_descent", "label": "Descida motorizada", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.45, "structure": 0.05, "software": 0.4, "human": 0.05, "environment": 0.05 },
+          "radio": ["Motores de descida acesos.", "Navegação por terreno: alvo seguro encontrado."] },
+        { "id": "touchdown", "label": "Toque no solo", "pFail": 0.03, "anomalyBand": 0.07,
+          "failureWeights": { "propulsion": 0.15, "structure": 0.4, "software": 0.2, "human": 0.05, "environment": 0.2 },
+          "radio": ["Toque confirmado!", "Estamos seguros em Marte."] }
+      ],
+      "firsts": { "robotic": "mars_landing_robotic" },
+      "description": "Atmosfera fina demais para frear e grossa demais para ignorar."
+    },
+    {
+      "id": "jupiter", "name": "Sistema de Júpiter", "short": "Júpiter", "body": "jupiter", "kind": "orbit", "capacityKey": "outer", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "jupiter", "dv": 6.3 }],
+      "transitWeeks": 300, "window": { "periodWeeks": 57, "phaseTurn": 20, "openWeeks": 8 },
+      "arrivalMilestones": [
+        { "id": "joi", "label": "Inserção em órbita de Júpiter", "pFail": 0.05, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.05, "software": 0.25, "human": 0, "environment": 0.2 },
+          "radio": ["Atravessando os cinturões de radiação.", "Queima de captura completa. Júpiter nos segurou."] }
+      ],
+      "firsts": { "robotic": "jupiter_arrival" },
+      "description": "Cerca de seis anos de viagem com ajudas gravitacionais. Radiação brutal perto do planeta."
+    },
+    {
+      "id": "titan", "name": "Titã", "short": "Titã", "body": "saturn", "kind": "surface", "capacityKey": "outer", "capacityFactor": 1,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "titan", "dv": 7.3 }],
+      "transitWeeks": 312, "window": { "periodWeeks": 54, "phaseTurn": 22, "openWeeks": 4 },
+      "arrivalMilestones": [
+        { "id": "entry", "label": "Entrada na atmosfera de Titã", "pFail": 0.03, "anomalyBand": 0.07,
+          "failureWeights": { "propulsion": 0, "structure": 0.5, "software": 0.2, "human": 0, "environment": 0.3 },
+          "radio": ["Entrada na névoa laranja.", "Desaceleração dentro do previsto."] },
+        { "id": "parachute", "label": "Paraquedas", "pFail": 0.03, "anomalyBand": 0.07,
+          "failureWeights": { "propulsion": 0, "structure": 0.5, "software": 0.2, "human": 0, "environment": 0.3 },
+          "radio": ["Paraquedas aberto, descida lenta em ar denso."] },
+        { "id": "rotor_flight", "label": "Transição para voo", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.4, "structure": 0.2, "software": 0.3, "human": 0, "environment": 0.1 },
+          "radio": ["Liberado do paraquedas. Rotores girando!", "Voo autônomo estável."] },
+        { "id": "touchdown", "label": "Pouso nas dunas", "pFail": 0.03, "anomalyBand": 0.07,
+          "failureWeights": { "propulsion": 0.1, "structure": 0.4, "software": 0.3, "human": 0, "environment": 0.2 },
+          "radio": ["Contato com o solo de Titã.", "Primeira imagem chegando, uma hora e meia depois."] }
+      ],
+      "firsts": { "robotic": "titan_arrival" },
+      "description": "Uma lua com lagos de metano e ar mais denso que o da Terra. Chegada só na década de 2030."
+    }
+  ]
+}

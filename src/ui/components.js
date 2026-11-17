@@ -1,0 +1,403 @@
+// Small DOM component kit + pt-BR formatters for the Ad Astra UI.
+// DOM is only touched inside functions (never at import time), so the formatters
+// can be imported and tested in Node.
+
+import { formatTurnLong, formatTurn, weeksToText } from '../core/time.js';
+
+// ---------------------------------------------------------------- formatters
+
+const nf1 = (v) => v.toFixed(1).replace('.', ',');
+
+/** US$ millions -> "US$ 1,2 bi" / "US$ 350 mi" / "−US$ 20 mi". */
+export function fmtMoney(m) {
+  if (m == null || !Number.isFinite(Number(m))) return 'US$ —';
+  const v = Number(m);
+  const sign = v < 0 ? '−' : '';
+  const a = Math.abs(v);
+  if (a >= 1000) {
+    const b = a / 1000;
+    return `${sign}US$ ${b >= 100 ? Math.round(b) : nf1(b).replace(/,0$/, '')} bi`;
+  }
+  if (a >= 10 || a === 0) return `${sign}US$ ${Math.round(a)} mi`;
+  return `${sign}US$ ${nf1(a).replace(/,0$/, '')} mi`;
+}
+
+/** Signed money delta: "+US$ 20 mi". */
+export function fmtMoneyDelta(m) {
+  if (!Number.isFinite(Number(m))) return '';
+  return (m > 0 ? '+' : '') + fmtMoney(m);
+}
+
+/** 0..1 -> "62%". Accepts 0..100 values as well when > 1. */
+export function fmtPct(p, digits = 0) {
+  if (p == null || !Number.isFinite(Number(p))) return '—';
+  let v = Number(p);
+  if (Math.abs(v) <= 1) v *= 100;
+  return `${digits ? v.toFixed(digits).replace('.', ',') : Math.round(v)}%`;
+}
+
+/** Chance band: "62 a 78%". */
+export function fmtBand(low, high) {
+  if (low == null || high == null) return '—';
+  const l = Math.round((low <= 1 ? low * 100 : low));
+  const hh = Math.round((high <= 1 ? high * 100 : high));
+  return l === hh ? `${l}%` : `${l} a ${hh}%`;
+}
+
+export function fmtNum(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  return Math.round(Number(n)).toLocaleString('pt-BR');
+}
+
+/** turn -> "sem 14 · abr/2026" */
+export function fmtDate(turn, startYear = 2026) {
+  if (turn == null || !Number.isFinite(Number(turn))) return '—';
+  return formatTurnLong(turn, startYear);
+}
+export function fmtMonth(turn, startYear = 2026) {
+  if (turn == null || !Number.isFinite(Number(turn))) return '—';
+  return formatTurn(turn, startYear);
+}
+/** relative weeks: "em 3 sem", "agora", "há 2 meses" */
+export function fmtIn(turn, now) {
+  if (turn == null || !Number.isFinite(Number(turn))) return '—';
+  const d = Math.round(turn - now);
+  if (d === 0) return 'esta semana';
+  return d > 0 ? `em ${weeksToText(d)}` : `há ${weeksToText(-d)}`;
+}
+
+/** Escape text for innerHTML. */
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ---------------------------------------------------------------- labels (pt-BR)
+
+export const TYPE_LABELS = {
+  satellite: 'Satélite', probe: 'Sonda', crewed: 'Tripulada', cargo: 'Carga', station: 'Estação', lander: 'Pouso',
+};
+export const TYPE_ICONS = { satellite: '🛰️', probe: '🔭', crewed: '👩‍🚀', cargo: '📦', station: '🏗️', lander: '🌘' };
+export const STATUS_LABELS = {
+  planning: 'Em planejamento', scheduled: 'Agendada', launch: 'No pátio', transit: 'Em trânsito', arrival: 'Chegando',
+  operations: 'Em operação', done: 'Concluída', cancelled: 'Cancelada',
+};
+export const OUTCOME_TEXT = {
+  total: 'Sucesso total', partial: 'Sucesso parcial', recoverable: 'Falha recuperável', catastrophic: 'Falha catastrófica',
+};
+export const STRATEGY_LABELS = { conservative: 'Conservadora', balanced: 'Equilibrada', aggressive: 'Agressiva' };
+export const ROLE_LABELS = { engineer: 'Engenheira(o)', flight_director: 'Diretor(a) de voo', astronaut: 'Astronauta' };
+export const TRUTH_LABELS = { fato: 'Fato', plano_oficial: 'Plano oficial', projecao: 'Projeção', especulacao: 'Especulação' };
+export const TENSION_LABELS = ['Normal', 'Tensão', 'Crise', 'Conflito regional', 'Guerra aberta'];
+export const EFFECT_LABELS = {
+  reliability: 'Confiabilidade', launchCost: 'Custo de lançamento', payload: 'Carga útil', chanceBand: 'Precisão da estimativa',
+  commandPoints: 'Pontos de Comando', sciencePerMission: 'Ciência por missão', landingReliability: 'Confiabilidade de pouso',
+  crewSafety: 'Segurança da tripulação', delayReduction: 'Redução de atrasos',
+};
+export const PROPOSAL_LABELS = {
+  mission_partnership: 'Parceria de missão', cost_sharing: 'Divisão de custos', crew_exchange: 'Troca de tripulantes',
+  tech_transfer: 'Transferência de tecnologia', peaceful_use: 'Tratado de uso pacífico', lunar_resources: 'Recursos lunares',
+  orbital_traffic: 'Tráfego orbital', join_bloc: 'Adesão a bloco',
+};
+
+// "Os Primeiros" — fixed milestone vocabulary from ARCHITECTURE.md
+export const FIRST_LABELS = {
+  crewed_lunar_flyby: 'Sobrevoo lunar tripulado', crewed_lunar_orbit: 'Órbita lunar tripulada', crewed_lunar_landing: 'Pouso tripulado na Lua',
+  lunar_south_pole_landing: 'Pouso no polo sul lunar', lunar_south_pole_crewed: 'Tripulação no polo sul', lunar_sample_return: 'Amostras lunares trazidas',
+  lunar_resource_demo: 'Uso de recursos lunares', lunar_base: 'Base lunar', mars_landing_robotic: 'Pouso robótico em Marte',
+  mars_sample_return: 'Amostras de Marte', titan_arrival: 'Chegada a Titã', jupiter_arrival: 'Chegada a Júpiter',
+  commercial_station: 'Estação comercial', national_station: 'Estação nacional', crewed_orbit_national: 'Voo orbital tripulado próprio',
+};
+
+/** "+5% Confiabilidade" style text for a tech effect. */
+export function fmtEffect(key, value) {
+  const label = EFFECT_LABELS[key] || key;
+  if (key === 'commandPoints') return `${value > 0 ? '+' : ''}${value} ${label}`;
+  const pct = Math.round(value * 100);
+  return `${pct > 0 ? '+' : ''}${pct}% ${label}`;
+}
+
+// ---------------------------------------------------------------- DOM helpers
+
+/**
+ * Hyperscript: h('div', {class:'x', onclick: fn, style:{...}, html:'<b>raw</b>'}, child, [children]).
+ * Strings become text nodes; null/false/undefined are skipped.
+ */
+export function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  if (props && (typeof props !== 'object' || props instanceof Node || Array.isArray(props))) {
+    children.unshift(props);
+    props = null;
+  }
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class' || k === 'className') el.className = Array.isArray(v) ? v.filter(Boolean).join(' ') : v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'html') el.innerHTML = v;
+    else if (k === 'dataset') Object.assign(el.dataset, v);
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (v === true) el.setAttribute(k, '');
+    else el.setAttribute(k, String(v));
+  }
+  append(el, children);
+  return el;
+}
+
+function append(el, children) {
+  for (const c of children) {
+    if (c == null || c === false || c === true) continue;
+    if (Array.isArray(c)) append(el, c);
+    else if (c instanceof Node) el.appendChild(c);
+    else el.appendChild(document.createTextNode(String(c)));
+  }
+}
+
+/** Raw HTML/SVG string into an element. */
+export function raw(html, cls = '') {
+  return h('span', { class: cls, html });
+}
+
+export function card({ title, subtitle, icon, cls, onClick, right } = {}, ...children) {
+  const head = title || icon || right
+    ? h('div', { class: 'card-head' },
+      icon ? h('span', { class: 'card-icon', 'aria-hidden': 'true' }, icon instanceof Node ? icon : String(icon)) : null,
+      h('div', { class: 'card-titles' },
+        title ? h('div', { class: 'card-title' }, title) : null,
+        subtitle ? h('div', { class: 'card-sub' }, subtitle) : null),
+      right || null)
+    : null;
+  const props = { class: ['card', cls, onClick && 'tappable'] };
+  if (onClick) {
+    props.onclick = onClick;
+    props.role = 'button';
+    props.tabindex = '0';
+    props.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); } };
+  }
+  return h('div', props, head, children);
+}
+
+/** kind: '' | 'good' | 'bad' | 'warn' | 'info' | 'muted' | 'accent' */
+export function chip(text, kind = '', props = {}) {
+  return h(props.onclick ? 'button' : 'span', { ...props, class: ['chip', kind && `chip-${kind}`, props.class] }, text);
+}
+
+const barCache = new Map();
+/**
+ * Progress/relation bar. value in [min,max]. `key` keeps the previous value so the bar
+ * animates from old to new across re-renders ("barras enchem").
+ */
+export function bar(value, { min = 0, max = 100, kind = '', label, key, showValue = false, center = false } = {}) {
+  const v = Number.isFinite(Number(value)) ? Number(value) : 0;
+  const frac = Math.max(0, Math.min(1, (v - min) / ((max - min) || 1)));
+  const fill = h('div', { class: ['bar-fill', kind && `bar-${kind}`] });
+  const track = h('div', { class: ['bar', center && 'bar-center'], role: 'meter', 'aria-valuemin': min, 'aria-valuemax': max, 'aria-valuenow': Math.round(v), 'aria-label': label || '' }, fill);
+  if (center) {
+    // diverging bar (e.g. trust -100..100) grows from the middle
+    const mid = (0 - min) / ((max - min) || 1);
+    const left = Math.min(mid, frac), width = Math.abs(frac - mid);
+    fill.style.left = `${left * 100}%`;
+    fill.style.width = `${width * 100}%`;
+    fill.classList.add(frac >= mid ? 'pos' : 'neg');
+  } else {
+    const prev = key != null ? barCache.get(key) : undefined;
+    if (prev != null && prev !== frac && !reduceMotion()) {
+      fill.style.width = `${prev * 100}%`;
+      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = `${frac * 100}%`; }));
+    } else fill.style.width = `${frac * 100}%`;
+    if (key != null) barCache.set(key, frac);
+  }
+  if (!label && !showValue) return track;
+  return h('div', { class: 'bar-row' },
+    label ? h('span', { class: 'bar-label' }, label) : null,
+    track,
+    showValue ? h('span', { class: 'bar-value' }, String(Math.round(v))) : null);
+}
+
+export function button(label, onClick, { kind = '', disabled = false, icon, title, cls, small } = {}) {
+  return h('button', {
+    class: ['btn', kind && `btn-${kind}`, small && 'btn-small', cls], type: 'button', disabled: !!disabled, title, 'aria-label': title || null,
+    onclick: (e) => { if (!e.currentTarget.disabled) onClick?.(e); }, // live state: callers may toggle .disabled later
+  }, icon ? h('span', { class: 'btn-icon', 'aria-hidden': 'true' }, icon) : null, label);
+}
+
+/** Segmented control: options [{id,label,badge?}] */
+export function segmented(options, active, onChange, { cls } = {}) {
+  return h('div', { class: ['segmented', cls], role: 'tablist' },
+    options.map((o) => h('button', {
+      class: ['seg', o.id === active && 'active'], type: 'button', role: 'tab', 'aria-selected': o.id === active ? 'true' : 'false',
+      onclick: () => onChange(o.id),
+    }, o.label, o.badge ? h('span', { class: 'badge' }, String(o.badge)) : null)));
+}
+
+/** ▲ / ▼ / ■ with good/bad meaning (never color alone). */
+export function trend(delta, { goodWhenUp = true, format = (d) => String(Math.round(d)), threshold = 0.5 } = {}) {
+  if (delta == null || !Number.isFinite(delta) || Math.abs(delta) < threshold) {
+    return h('span', { class: 'trend flat', title: 'estável', 'aria-label': 'estável' });
+  }
+  const up = delta > 0;
+  const good = up === goodWhenUp;
+  return h('span', { class: ['trend', up ? 'up' : 'down', good ? 'good' : 'bad'], title: up ? 'subiu' : 'caiu' },
+    `${up ? '▲' : '▼'} ${format(Math.abs(delta))}`);
+}
+
+export function emptyState(text, icon = '✦') {
+  return h('div', { class: 'empty' }, h('div', { class: 'empty-icon', 'aria-hidden': 'true' }, icon), h('p', null, text));
+}
+
+export function sectionTitle(text, right) {
+  return h('div', { class: 'section-title' }, h('h2', null, text), right || null);
+}
+
+/** Tiny SVG sparkline element from numbers. */
+export function sparkline(values, { w = 80, h: hh = 22, cls = '' } = {}) {
+  return raw(sparklineSVG(values, w, hh), ['spark', cls].join(' '));
+}
+export function sparklineSVG(values, w = 80, hh = 22) {
+  const vals = (values || []).filter((v) => Number.isFinite(v));
+  if (vals.length < 2) return `<svg width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}" aria-hidden="true"></svg>`;
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const span = hi - lo || 1;
+  const pts = vals.map((v, i) => `${((i / (vals.length - 1)) * (w - 2) + 1).toFixed(1)},${(hh - 2 - ((v - lo) / span) * (hh - 4)).toFixed(1)}`);
+  const last = pts[pts.length - 1].split(',');
+  return `<svg width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(' ')}"/><circle cx="${last[0]}" cy="${last[1]}" r="2.2" fill="currentColor"/></svg>`;
+}
+
+// ---------------------------------------------------------------- motion
+
+export function reduceMotion() {
+  try { return document.body.classList.contains('reduce-motion'); } catch { return true; }
+}
+
+const countCache = new Map();
+/**
+ * Number that counts up/down from the last displayed value for `key` ("números contam").
+ * format(n) -> string.
+ */
+export function countUp(key, value, format = fmtNum, cls = 'num') {
+  const el = h('span', { class: cls });
+  const to = Number(value);
+  const from = countCache.get(key);
+  countCache.set(key, to);
+  if (!Number.isFinite(to)) { el.textContent = format(value); return el; }
+  if (from == null || format(from) === format(to) || reduceMotion()) { el.textContent = format(to); return el; }
+  el.textContent = format(from);
+  el.classList.add(to > from ? 'pulse-up' : 'pulse-down');
+  const ms = 650, t0 = performance.now();
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / ms);
+    const e = 1 - Math.pow(1 - k, 3);
+    el.textContent = format(from + (to - from) * e);
+    if (k < 1) requestAnimationFrame(step);
+    else el.textContent = format(to);
+  };
+  requestAnimationFrame(step);
+  return el;
+}
+
+// ---------------------------------------------------------------- overlays
+
+function overlayRoot() {
+  let r = document.getElementById('overlay-root');
+  if (!r) { r = h('div', { id: 'overlay-root' }); document.body.appendChild(r); }
+  return r;
+}
+
+const modalStack = [];
+/**
+ * Bottom-sheet modal. content: Node | (close) => Node.
+ * opts: { title, cls, dismissable = true, onClose }
+ * Returns close().
+ */
+export function openModal(content, { title, cls, dismissable = true, onClose } = {}) {
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    const i = modalStack.indexOf(close);
+    if (i >= 0) modalStack.splice(i, 1);
+    backdrop.classList.add('closing');
+    document.removeEventListener('keydown', onKey);
+    setTimeout(() => backdrop.remove(), reduceMotion() ? 0 : 180);
+    try { onClose?.(); } catch (e) { console.error(e); }
+  };
+  const onKey = (e) => { if (e.key === 'Escape' && dismissable && modalStack[modalStack.length - 1] === close) close(); };
+  let body;
+  try { body = typeof content === 'function' ? content(close) : content; } catch (e) {
+    console.error(e);
+    body = fallbackPanel('Não foi possível abrir este cartão.', e);
+  }
+  const sheet = h('div', { class: ['modal', cls], role: 'dialog', 'aria-modal': 'true', 'aria-label': title || 'Janela' },
+    h('div', { class: 'modal-grab', 'aria-hidden': 'true' }),
+    title || dismissable ? h('div', { class: 'modal-head' },
+      title ? h('h2', { class: 'modal-title' }, title) : h('span'),
+      dismissable ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Fechar', onclick: close }, '✕') : null) : null,
+    h('div', { class: 'modal-body' }, body));
+  const backdrop = h('div', { class: 'modal-backdrop', onclick: (e) => { if (e.target === backdrop && dismissable) close(); } }, sheet);
+  overlayRoot().appendChild(backdrop);
+  document.addEventListener('keydown', onKey);
+  modalStack.push(close);
+  setTimeout(() => sheet.querySelector('button:not(.icon-btn), [tabindex="0"]')?.focus?.({ preventScroll: true }), 30);
+  return close;
+}
+
+export function closeAllModals() {
+  for (const c of modalStack.slice().reverse()) c();
+}
+
+/** Yes/no confirmation sheet. Resolves true/false. */
+export function confirmDialog(text, { okLabel = 'Confirmar', cancelLabel = 'Cancelar', danger = false, title = 'Confirmar' } = {}) {
+  return new Promise((resolve) => {
+    let answered = false;
+    const close = openModal((close) => h('div', { class: 'confirm' },
+      h('p', null, text),
+      h('div', { class: 'btn-row' },
+        button(cancelLabel, () => { answered = true; resolve(false); close(); }, { kind: 'ghost' }),
+        button(okLabel, () => { answered = true; resolve(true); close(); }, { kind: danger ? 'danger' : 'primary' }))),
+    { title, onClose: () => { if (!answered) resolve(false); } });
+    void close;
+  });
+}
+
+let toastBox = null;
+/** Short floating message. kind: info | good | bad | warn */
+export function toast(text, kind = 'info', ms = 2800) {
+  try {
+    if (!toastBox || !toastBox.isConnected) {
+      toastBox = h('div', { class: 'toasts', role: 'status', 'aria-live': 'polite' });
+      document.body.appendChild(toastBox);
+    }
+    const t = h('div', { class: ['toast', `toast-${kind}`] }, text);
+    toastBox.appendChild(t);
+    while (toastBox.children.length > 3) toastBox.firstChild.remove();
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, ms);
+  } catch (e) { console.warn('toast', text, e); }
+}
+
+// ---------------------------------------------------------------- robustness
+
+/** Friendly placeholder shown when a panel fails (another module still in construction). */
+export function fallbackPanel(text = 'Este painel ainda está em construção.', err) {
+  if (err) console.warn('[Ad Astra] painel:', err);
+  return h('div', { class: 'fallback' },
+    h('span', { class: 'fallback-icon', 'aria-hidden': 'true' }, '🛠️'),
+    h('div', null, h('div', null, text), err ? h('small', { class: 'muted' }, String(err.message || err).slice(0, 120)) : null));
+}
+
+/** Run fn() -> Node; any exception becomes a small fallback card. */
+export function safePanel(fn, text) {
+  try {
+    const n = fn();
+    return n == null ? null : n;
+  } catch (e) {
+    return fallbackPanel(text, e);
+  }
+}
+
+/** Call fn and return its value or `fallback` on error (for queries). */
+export function attempt(fn, fallback) {
+  try {
+    const v = fn();
+    return v === undefined ? fallback : v;
+  } catch {
+    return fallback;
+  }
+}

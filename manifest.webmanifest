@@ -1,0 +1,17 @@
+{
+  "name": "Ad Astra — Corrida Lunar",
+  "short_name": "Ad Astra",
+  "description": "Dirija uma agência espacial na corrida lunar de 2026 a 2030. No dia do lançamento, tudo o que você decidiu vira torcida.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "categories": ["games", "simulation"],
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

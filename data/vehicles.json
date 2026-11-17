@@ -1,0 +1,226 @@
+{
+  "_comment": "Catálogo de lançadores. Meses em base 1 (1 = janeiro). history = voos orbitais reais até o fim de 2025. capacity em toneladas (0 = não alcança). access: open (mercado, menos embargo/tensão >= 3), bloc (operador, bloco e parceiros de tratado), own (só o operador). tensionActor = ator cuja tensão governa o acesso quando o operador não é um ator do jogo. backgroundPerYear = voos comerciais/de rotina simulados em agregado (sem contar os itens do calendário).",
+  "monthBase": 1,
+  "vehicles": [
+    {
+      "id": "falcon9", "name": "Falcon 9", "operator": "spacex", "provider": "SpaceX", "country": "EUA", "class": "medium",
+      "availableFrom": { "year": 2010, "month": 6 }, "truthLayer": "fato",
+      "costM": 70, "cadencePerYear": 170, "backgroundPerYear": 165,
+      "history": { "flights": 583, "failures": 2, "firstFlight": 2010 },
+      "reusable": true, "crewRated": true, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 3,
+      "capacity": { "leo": 17.5, "gto": 5.5, "tli": 3.5, "mars": 2.5, "outer": 0 },
+      "notes": "O burro de carga da década: primeiro estágio pousa e voa de novo em semanas. Leva a Crew Dragon e a Cargo Dragon."
+    },
+    {
+      "id": "falconheavy", "name": "Falcon Heavy", "operator": "spacex", "provider": "SpaceX", "country": "EUA", "class": "heavy",
+      "availableFrom": { "year": 2018, "month": 2 }, "truthLayer": "fato",
+      "costM": 120, "cadencePerYear": 4, "backgroundPerYear": 1,
+      "history": { "flights": 11, "failures": 0, "firstFlight": 2018 },
+      "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 10,
+      "capacity": { "leo": 57, "gto": 18, "tli": 15, "mars": 16, "outer": 3.5 },
+      "notes": "Três núcleos de Falcon 9. Lançou a Europa Clipper e a Psyche; escolhido para Dragonfly, Gateway e Griffin."
+    },
+    {
+      "id": "starship", "name": "Starship", "operator": "spacex", "provider": "SpaceX", "country": "EUA", "class": "superheavy",
+      "availableFrom": { "year": 2026, "month": 1 }, "truthLayer": "plano_oficial",
+      "costM": 100, "cadencePerYear": 25, "backgroundPerYear": 10,
+      "backgroundByYear": { "2026": 8, "2027": 14, "2028": 22, "2029": 30, "2030": 38 },
+      "history": { "flights": 11, "failures": 5, "firstFlight": 2023 },
+      "estimatedReliability": 0.86, "historyWeight": 0.4, "backgroundKind": "test", "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 6,
+      "capacity": { "leo": 100, "gto": 21, "tli": 30, "mars": 25, "outer": 5 },
+      "notes": "Totalmente reutilizável, ainda em testes. Capacidade além da órbita baixa depende de reabastecimento em órbita com vários voos-tanque."
+    },
+    {
+      "id": "sls_b1", "name": "SLS Block 1", "operator": "nasa", "provider": "NASA / Boeing", "country": "EUA", "class": "superheavy",
+      "availableFrom": { "year": 2022, "month": 11 }, "truthLayer": "fato",
+      "costM": 2500, "cadencePerYear": 1, "backgroundPerYear": 0,
+      "history": { "flights": 1, "failures": 0, "firstFlight": 2022 },
+      "estimatedReliability": 0.93, "reusable": false, "crewRated": true, "access": "bloc", "embargo": [], "standDownWeeks": 52,
+      "capacity": { "leo": 95, "gto": 0, "tli": 27, "mars": 0, "outer": 0 },
+      "notes": "Foguete do Artemis, descartável e caro (cerca de US$ 2,5 bi por voo, segundo a auditoria da NASA). Leva a Orion à Lua."
+    },
+    {
+      "id": "sls_b1b", "name": "SLS Block 1B", "operator": "nasa", "provider": "NASA / Boeing", "country": "EUA", "class": "superheavy",
+      "availableFrom": { "year": 2029, "month": 6 }, "truthLayer": "projecao",
+      "costM": 2800, "cadencePerYear": 1, "backgroundPerYear": 0,
+      "history": { "flights": 0, "failures": 0 },
+      "estimatedReliability": 0.88, "reusable": false, "crewRated": true, "access": "bloc", "embargo": [], "standDownWeeks": 52,
+      "capacity": { "leo": 105, "gto": 0, "tli": 38, "mars": 0, "outer": 0 },
+      "notes": "Versão com o estágio superior EUS. Futuro incerto depois da reestruturação do Artemis em 2026."
+    },
+    {
+      "id": "new_glenn", "name": "New Glenn", "operator": "blueorigin", "provider": "Blue Origin", "country": "EUA", "class": "heavy",
+      "availableFrom": { "year": 2025, "month": 1 }, "truthLayer": "fato",
+      "costM": 100, "cadencePerYear": 12, "backgroundPerYear": 5,
+      "backgroundByYear": { "2026": 4, "2027": 7, "2028": 10, "2029": 12, "2030": 14 },
+      "history": { "flights": 2, "failures": 0, "firstFlight": 2025 },
+      "estimatedReliability": 0.9, "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 14,
+      "capacity": { "leo": 45, "gto": 13, "tli": 9, "mars": 6, "outer": 2 },
+      "notes": "Primeiro estágio reutilizável que pousa no mar. Estreou em 2025 e lançou a ESCAPADE; leva o Blue Moon."
+    },
+    {
+      "id": "vulcan", "name": "Vulcan Centaur", "operator": "ula", "provider": "United Launch Alliance", "tensionActor": "nasa", "country": "EUA", "class": "heavy",
+      "availableFrom": { "year": 2024, "month": 1 }, "truthLayer": "fato",
+      "costM": 110, "cadencePerYear": 12, "backgroundPerYear": 8,
+      "history": { "flights": 4, "failures": 0, "firstFlight": 2024 },
+      "estimatedReliability": 0.94, "reusable": false, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 16,
+      "capacity": { "leo": 27, "gto": 14, "tli": 12, "mars": 9, "outer": 3 },
+      "notes": "Sucessor do Atlas V, com motores BE-4. Foco em cargas militares e no Dream Chaser."
+    },
+    {
+      "id": "atlas_v", "name": "Atlas V", "operator": "ula", "provider": "United Launch Alliance", "tensionActor": "nasa", "country": "EUA", "class": "medium",
+      "availableFrom": { "year": 2002, "month": 8 }, "availableUntil": { "year": 2030, "month": 6 }, "truthLayer": "fato",
+      "costM": 150, "cadencePerYear": 6, "backgroundPerYear": 5,
+      "history": { "flights": 104, "failures": 1, "firstFlight": 2002 },
+      "reusable": false, "crewRated": true, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 16,
+      "capacity": { "leo": 18.8, "gto": 8.9, "tli": 6, "mars": 4.5, "outer": 1 },
+      "notes": "Veterano confiável, em despedida: os últimos voos levam satélites Kuiper e a Starliner."
+    },
+    {
+      "id": "electron", "name": "Electron", "operator": "rocketlab", "provider": "Rocket Lab", "tensionActor": "nasa", "country": "EUA / Nova Zelândia", "class": "small",
+      "availableFrom": { "year": 2018, "month": 1 }, "truthLayer": "fato",
+      "costM": 8.5, "cadencePerYear": 22, "backgroundPerYear": 20,
+      "history": { "flights": 79, "failures": 4, "firstFlight": 2017 },
+      "reusable": false, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 8,
+      "capacity": { "leo": 0.3, "gto": 0, "tli": 0.04, "mars": 0, "outer": 0 },
+      "notes": "Pequeno e frequente. Já mandou a CAPSTONE para a órbita lunar."
+    },
+    {
+      "id": "neutron", "name": "Neutron", "operator": "rocketlab", "provider": "Rocket Lab", "tensionActor": "nasa", "country": "EUA", "class": "medium",
+      "availableFrom": { "year": 2026, "month": 9 }, "truthLayer": "projecao",
+      "costM": 55, "cadencePerYear": 6, "backgroundPerYear": 3,
+      "backgroundByYear": { "2026": 1, "2027": 3, "2028": 5, "2029": 7, "2030": 9 },
+      "history": { "flights": 0, "failures": 0 },
+      "estimatedReliability": 0.86, "reusable": true, "crewRated": false, "access": "open", "embargo": ["cnsa", "roscosmos"], "standDownWeeks": 14,
+      "capacity": { "leo": 13, "gto": 1.5, "tli": 1.5, "mars": 1.2, "outer": 0 },
+      "notes": "Médio reutilizável da Rocket Lab. A estreia escorregou de 2024 para 2026."
+    },
+    {
+      "id": "ariane6", "name": "Ariane 64", "operator": "esa", "provider": "Arianespace", "country": "Europa", "class": "heavy",
+      "availableFrom": { "year": 2024, "month": 7 }, "truthLayer": "fato",
+      "costM": 115, "cadencePerYear": 9, "backgroundPerYear": 7,
+      "history": { "flights": 6, "failures": 0, "firstFlight": 2024 },
+      "estimatedReliability": 0.94, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos"], "standDownWeeks": 18,
+      "capacity": { "leo": 21.6, "gto": 11.5, "tli": 8.6, "mars": 6, "outer": 2 },
+      "notes": "Acesso autônomo da Europa ao espaço. Cadência subindo devagar; a versão de quatro boosters leva cargas pesadas."
+    },
+    {
+      "id": "vega_c", "name": "Vega C", "operator": "esa", "provider": "Avio", "country": "Europa", "class": "small",
+      "availableFrom": { "year": 2022, "month": 7 }, "truthLayer": "fato",
+      "costM": 45, "cadencePerYear": 4, "backgroundPerYear": 3,
+      "history": { "flights": 6, "failures": 1, "firstFlight": 2022 },
+      "estimatedReliability": 0.9, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos"], "standDownWeeks": 30,
+      "capacity": { "leo": 3.3, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "Lançador leve europeu. Voltou a voar em dez/2024 depois da falha de 2022. Levará o Space Rider."
+    },
+    {
+      "id": "h3", "name": "H3", "operator": "jaxa", "provider": "JAXA / Mitsubishi", "country": "Japão", "class": "medium",
+      "availableFrom": { "year": 2024, "month": 2 }, "truthLayer": "fato",
+      "costM": 50, "cadencePerYear": 6, "backgroundPerYear": 4,
+      "history": { "flights": 7, "failures": 2, "firstFlight": 2023 },
+      "estimatedReliability": 0.92, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 24,
+      "capacity": { "leo": 15, "gto": 6.5, "tli": 4.5, "mars": 4.2, "outer": 0.5 },
+      "notes": "Sucessor do H-IIA. Falhou na estreia (2023) e no voo F8 (dez/2025). Leva a HTV-X e a sonda MMX."
+    },
+    {
+      "id": "lvm3", "name": "LVM3", "operator": "isro", "provider": "ISRO", "country": "Índia", "class": "medium",
+      "availableFrom": { "year": 2017, "month": 6 }, "truthLayer": "fato",
+      "costM": 50, "cadencePerYear": 4, "backgroundPerYear": 2,
+      "history": { "flights": 8, "failures": 0, "firstFlight": 2017 },
+      "estimatedReliability": 0.94, "reusable": false, "crewRated": true, "access": "open", "embargo": ["cnsa"], "standDownWeeks": 26,
+      "capacity": { "leo": 10, "gto": 4.2, "tli": 3.9, "mars": 2.5, "outer": 0 },
+      "notes": "Levou a Chandrayaan-3 à Lua. A versão HLVM3, qualificada para pessoas, leva a Gaganyaan."
+    },
+    {
+      "id": "pslv", "name": "PSLV", "operator": "isro", "provider": "ISRO / NSIL", "country": "Índia", "class": "small",
+      "availableFrom": { "year": 1993, "month": 9 }, "truthLayer": "fato",
+      "costM": 25, "cadencePerYear": 5, "backgroundPerYear": 4,
+      "history": { "flights": 63, "failures": 3, "firstFlight": 1993 },
+      "reusable": false, "crewRated": false, "access": "open", "embargo": ["cnsa"], "standDownWeeks": 20,
+      "capacity": { "leo": 3.8, "gto": 1.4, "tli": 1.3, "mars": 1.3, "outer": 0 },
+      "notes": "Barato e versátil: lançou a Mangalyaan e a Chandrayaan-1. Falhou em maio de 2025 (C61)."
+    },
+    {
+      "id": "long_march_5", "name": "Longa Marcha 5", "operator": "cnsa", "provider": "CASC", "country": "China", "class": "heavy",
+      "availableFrom": { "year": 2016, "month": 11 }, "truthLayer": "fato",
+      "costM": 150, "cadencePerYear": 6, "backgroundPerYear": 3,
+      "history": { "flights": 18, "failures": 1, "firstFlight": 2016 },
+      "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 30,
+      "capacity": { "leo": 25, "gto": 14, "tli": 8.2, "mars": 5, "outer": 3 },
+      "notes": "Pesado chinês: Tianwen-1, Chang'e-5 e -6, módulos da Tiangong. Leva Chang'e-7 e -8 e as Tianwen-3 e -4."
+    },
+    {
+      "id": "long_march_7", "name": "Longa Marcha 7", "operator": "cnsa", "provider": "CASC", "country": "China", "class": "medium",
+      "availableFrom": { "year": 2016, "month": 6 }, "truthLayer": "fato",
+      "costM": 80, "cadencePerYear": 6, "backgroundPerYear": 5,
+      "history": { "flights": 26, "failures": 1, "firstFlight": 2016 },
+      "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 20,
+      "capacity": { "leo": 14, "gto": 7, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "Abastece a Tiangong com os cargueiros Tianzhou."
+    },
+    {
+      "id": "long_march_3b", "name": "Longa Marcha 3B", "operator": "cnsa", "provider": "CASC", "country": "China", "class": "medium",
+      "availableFrom": { "year": 1996, "month": 2 }, "truthLayer": "fato",
+      "costM": 70, "cadencePerYear": 12, "backgroundPerYear": 12,
+      "history": { "flights": 112, "failures": 3, "firstFlight": 1996 },
+      "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 16,
+      "capacity": { "leo": 11.5, "gto": 5.5, "tli": 3.8, "mars": 0, "outer": 0 },
+      "notes": "Cavalo de batalha para órbita geoestacionária. Lançou Chang'e-3 e -4."
+    },
+    {
+      "id": "long_march_2f", "name": "Longa Marcha 2F", "operator": "cnsa", "provider": "CASC", "country": "China", "class": "medium",
+      "availableFrom": { "year": 1999, "month": 11 }, "truthLayer": "fato",
+      "costM": 90, "cadencePerYear": 3, "backgroundPerYear": 2,
+      "history": { "flights": 28, "failures": 0, "firstFlight": 1999 },
+      "reusable": false, "crewRated": true, "access": "own", "embargo": [], "standDownWeeks": 30,
+      "capacity": { "leo": 8.4, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "Leva as Shenzhou à Tiangong. Nunca falhou, mas em nov/2025 precisou lançar uma Shenzhou vazia de emergência."
+    },
+    {
+      "id": "long_march_10a", "name": "Longa Marcha 10A", "operator": "cnsa", "provider": "CASC", "country": "China", "class": "medium",
+      "availableFrom": { "year": 2026, "month": 11 }, "truthLayer": "plano_oficial", "debutCalendarId": "mengzhou_leo_test",
+      "costM": 120, "cadencePerYear": 2, "backgroundPerYear": 0,
+      "history": { "flights": 0, "failures": 0 },
+      "estimatedReliability": 0.88, "reusable": true, "crewRated": true, "access": "own", "embargo": [], "standDownWeeks": 30,
+      "capacity": { "leo": 14, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "Versão de um núcleo do Longa Marcha 10, para levar a Mengzhou à Tiangong."
+    },
+    {
+      "id": "long_march_10", "name": "Longa Marcha 10", "operator": "cnsa", "provider": "CASC", "country": "China", "class": "superheavy",
+      "availableFrom": { "year": 2027, "month": 6 }, "truthLayer": "plano_oficial", "debutCalendarId": "cz10_maiden",
+      "costM": 300, "cadencePerYear": 3, "backgroundPerYear": 0,
+      "history": { "flights": 0, "failures": 0 },
+      "estimatedReliability": 0.87, "reusable": false, "crewRated": true, "access": "own", "embargo": [], "standDownWeeks": 36,
+      "capacity": { "leo": 70, "gto": 0, "tli": 27, "mars": 0, "outer": 0 },
+      "notes": "Três núcleos, feito para a Lua: dois lançamentos (Mengzhou e Lanyue) por pouso tripulado. Testes estáticos em 2025."
+    },
+    {
+      "id": "zhuque3", "name": "Zhuque-3", "operator": "landspace", "provider": "LandSpace", "tensionActor": "cnsa", "country": "China", "class": "medium",
+      "availableFrom": { "year": 2026, "month": 1 }, "truthLayer": "fato",
+      "costM": 40, "cadencePerYear": 6, "backgroundPerYear": 3,
+      "backgroundByYear": { "2026": 2, "2027": 4, "2028": 6, "2029": 8, "2030": 10 },
+      "history": { "flights": 1, "failures": 0, "firstFlight": 2025 },
+      "estimatedReliability": 0.85, "reusable": true, "crewRated": false, "access": "bloc", "embargo": ["nasa", "spacex", "blueorigin"], "standDownWeeks": 16,
+      "capacity": { "leo": 18, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "Metano e aço inoxidável: a resposta privada chinesa ao Falcon 9. Chegou à órbita na estreia em dez/2025."
+    },
+    {
+      "id": "soyuz2", "name": "Soyuz-2", "operator": "roscosmos", "provider": "Roscosmos / Progress", "country": "Rússia", "class": "medium",
+      "availableFrom": { "year": 2004, "month": 11 }, "truthLayer": "fato",
+      "costM": 50, "cadencePerYear": 15, "backgroundPerYear": 13,
+      "history": { "flights": 165, "failures": 6, "firstFlight": 2004 },
+      "reusable": false, "crewRated": true, "access": "bloc", "embargo": ["esa", "jaxa"], "standDownWeeks": 12,
+      "capacity": { "leo": 8.2, "gto": 3.2, "tli": 2, "mars": 1.5, "outer": 0 },
+      "notes": "Herdeiro do R-7 de Gagarin. Leva as Soyuz MS e Progress à ISS e lançou a Luna-25."
+    },
+    {
+      "id": "angara_a5", "name": "Angara A5", "operator": "roscosmos", "provider": "Roscosmos / Khrunichev", "country": "Rússia", "class": "heavy",
+      "availableFrom": { "year": 2014, "month": 12 }, "truthLayer": "fato",
+      "costM": 100, "cadencePerYear": 2, "backgroundPerYear": 1,
+      "history": { "flights": 4, "failures": 1, "firstFlight": 2014 },
+      "estimatedReliability": 0.86, "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["esa", "jaxa", "nasa", "spacex", "blueorigin"], "standDownWeeks": 30,
+      "capacity": { "leo": 24.5, "gto": 5.4, "tli": 5, "mars": 3, "outer": 0 },
+      "notes": "Pesado russo, em produção lenta. Escolhido para os módulos da estação ROS e a Luna-27."
+    }
+  ]
+}

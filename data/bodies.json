@@ -1,0 +1,452 @@
+{
+  "version": 1,
+  "notes": "Layout esquemático (não está em escala). Unidades de mundo arbitrárias; Sol na origem. orbit.angle0 em graus (anti-horário, 0 = direita) no turno 0. display.radius em unidades de mundo; display.minPx/maxPx limitam o tamanho na tela.",
+  "levels": [
+    {
+      "id": "earth_moon",
+      "name": "Terra-Lua",
+      "short": "Terra-Lua",
+      "focus": "earth",
+      "span": 104,
+      "frame": [
+        "earth",
+        "moon"
+      ]
+    },
+    {
+      "id": "inner",
+      "name": "Sistema interno",
+      "short": "Interno",
+      "focus": "sun",
+      "span": 1060
+    },
+    {
+      "id": "solar",
+      "name": "Sistema solar",
+      "short": "Solar",
+      "focus": "sun",
+      "span": 2760
+    }
+  ],
+  "stations": {
+    "earth": "Terra",
+    "launch": "Plataforma",
+    "surface": "Superfície",
+    "leo": "Órbita baixa",
+    "sso": "Órbita polar",
+    "gto": "Transferência geo",
+    "geo": "Geoestacionária",
+    "iss": "ISS",
+    "tli": "Injeção translunar",
+    "cislunar": "Espaço cislunar",
+    "nrho": "Órbita halo (NRHO)",
+    "lunar_orbit": "Órbita lunar",
+    "lunar_surface": "Superfície lunar",
+    "lunar_south_pole": "Polo Sul lunar",
+    "tmi": "Injeção para Marte",
+    "mars_transfer": "Transferência Marte",
+    "mars_orbit": "Órbita de Marte",
+    "mars_surface": "Superfície de Marte",
+    "jupiter_transfer": "Rumo a Júpiter",
+    "jupiter": "Júpiter",
+    "saturn_transfer": "Rumo a Saturno",
+    "titan": "Titã",
+    "escape": "Escape da Terra",
+    "heliocentric": "Órbita solar"
+  },
+  "milestoneLabels": {
+    "crewed_lunar_flyby": "Primeiro sobrevoo lunar tripulado da era",
+    "crewed_lunar_orbit": "Órbita lunar tripulada",
+    "crewed_lunar_landing": "Pouso tripulado na Lua",
+    "lunar_south_pole_landing": "Pouso no Polo Sul lunar",
+    "lunar_south_pole_crewed": "Pessoas no Polo Sul lunar",
+    "lunar_sample_return": "Amostras lunares trazidas",
+    "lunar_resource_demo": "Demonstração de recursos lunares",
+    "lunar_base": "Base lunar",
+    "mars_landing_robotic": "Pouso robótico em Marte",
+    "mars_sample_return": "Amostras de Marte trazidas",
+    "titan_arrival": "Chegada a Titã",
+    "jupiter_arrival": "Chegada a Júpiter",
+    "commercial_station": "Estação comercial",
+    "national_station": "Estação nacional",
+    "crewed_orbit_national": "Voo orbital tripulado próprio"
+  },
+  "bodies": [
+    {
+      "id": "sun",
+      "name": "Sol",
+      "reference": true,
+      "fog": "known",
+      "parent": null,
+      "orbit": null,
+      "display": {
+        "radius": 46,
+        "minPx": 9,
+        "maxPx": 64,
+        "color": "#ffd166",
+        "glow": "#ff9f1c",
+        "ring": null
+      },
+      "ficha": {
+        "tipo": "Estrela anã amarela (G2V)",
+        "gravidade": "28 g na superfície visível",
+        "atmosfera": "Coroa de plasma a milhões de graus",
+        "recursos": [
+          "Energia solar abundante até o cinturão de asteroides"
+        ],
+        "perigos": [
+          "Tempestades solares",
+          "Ejeções de massa coronal que atingem tripulações fora da magnetosfera"
+        ],
+        "historia": "Referência do mapa. Toda janela de lançamento nasce do alinhamento dos planetas em volta dele. Os meteorologistas espaciais vigiam cada erupção antes de um voo tripulado."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "earth",
+      "name": "Terra",
+      "fog": "known",
+      "parent": "sun",
+      "orbit": {
+        "radius": 300,
+        "periodWeeks": 52,
+        "angle0": 205
+      },
+      "display": {
+        "radius": 8,
+        "minPx": 8,
+        "maxPx": 64,
+        "color": "#3a86ff",
+        "land": "#2a9d8f",
+        "atmosphere": "#8ecae6",
+        "ring": null
+      },
+      "ficha": {
+        "tipo": "Planeta rochoso, casa",
+        "gravidade": "1 g (9,8 m/s²)",
+        "atmosfera": "Nitrogênio e oxigênio, 1 atm",
+        "recursos": [
+          "Indústria e pessoas",
+          "Bases de lançamento",
+          "Mercado de satélites"
+        ],
+        "perigos": [
+          "Lixo espacial em órbita baixa",
+          "Clima nas bases",
+          "Política"
+        ],
+        "historia": "Ponto de partida de tudo. A órbita baixa está lotada de constelações comerciais, e a ISS vive seus últimos anos antes da troca por estações privadas."
+      },
+      "milestones": [
+        "commercial_station",
+        "national_station",
+        "crewed_orbit_national"
+      ],
+      "destinations": [
+        {
+          "id": "leo",
+          "anchor": "ring",
+          "r": 11,
+          "angle": 150,
+          "label": "Órbita baixa"
+        },
+        {
+          "id": "iss",
+          "anchor": "ring",
+          "r": 11.8,
+          "angle": 20,
+          "label": "ISS"
+        },
+        {
+          "id": "sso",
+          "anchor": "ring",
+          "r": 13,
+          "angle": 315,
+          "tilt": 0.35,
+          "label": "Órbita polar"
+        },
+        {
+          "id": "gto",
+          "anchor": "ring",
+          "r": 19,
+          "angle": 200,
+          "label": "Transferência geo"
+        }
+      ]
+    },
+    {
+      "id": "moon",
+      "name": "Lua",
+      "fog": "fog",
+      "parent": "earth",
+      "orbit": {
+        "radius": 37,
+        "periodWeeks": null,
+        "angle0": 64,
+        "note": "fixa no esquema para facilitar o toque"
+      },
+      "display": {
+        "radius": 3.4,
+        "minPx": 6,
+        "maxPx": 40,
+        "color": "#c9c9c9",
+        "dark": "#8d8d8d",
+        "ring": null
+      },
+      "ficha": {
+        "tipo": "Satélite natural rochoso",
+        "gravidade": "0,17 g (1,6 m/s²)",
+        "atmosfera": "Praticamente nenhuma (exosfera)",
+        "recursos": [
+          "Gelo de água nas crateras do Polo Sul",
+          "Regolito para construção",
+          "Hélio-3 (especulativo)",
+          "Luz solar quase contínua nas bordas polares"
+        ],
+        "perigos": [
+          "Poeira abrasiva e eletrostática",
+          "Noite de 14 dias",
+          "Radiação sem magnetosfera",
+          "Terreno polar com sombras profundas"
+        ],
+        "historia": "Doze pessoas caminharam aqui entre 1969 e 1972. Em 2026 a Artemis II voltou a levar gente até lá, e Estados Unidos e China correm pelo Polo Sul, onde está o gelo.",
+        "descoberta": "As primeiras imagens chegam com sombras longas no Polo Sul. Há gelo onde o Sol nunca bate. O mapa da Lua deixa de ser um disco cinza e vira terreno."
+      },
+      "milestones": [
+        "crewed_lunar_flyby",
+        "crewed_lunar_orbit",
+        "crewed_lunar_landing",
+        "lunar_south_pole_landing",
+        "lunar_south_pole_crewed",
+        "lunar_sample_return",
+        "lunar_resource_demo",
+        "lunar_base"
+      ],
+      "destinations": [
+        {
+          "id": "cislunar",
+          "anchor": "lagrange",
+          "from": "earth",
+          "f": 0.8,
+          "label": "Espaço cislunar"
+        },
+        {
+          "id": "lunar_orbit",
+          "anchor": "ring",
+          "r": 4.6,
+          "angle": 200,
+          "label": "Órbita lunar"
+        },
+        {
+          "id": "lunar_surface",
+          "anchor": "surface",
+          "angle": 20,
+          "label": "Superfície lunar"
+        },
+        {
+          "id": "lunar_south_pole",
+          "anchor": "surface",
+          "angle": 270,
+          "label": "Polo Sul lunar"
+        }
+      ]
+    },
+    {
+      "id": "mars",
+      "name": "Marte",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 470,
+        "periodWeeks": 98,
+        "angle0": 250,
+        "syncWindow": [
+          "mars_orbit",
+          "mars_surface"
+        ],
+        "leadDeg": 44
+      },
+      "display": {
+        "radius": 5,
+        "minPx": 7,
+        "maxPx": 56,
+        "color": "#e76f51",
+        "dark": "#9c4a35",
+        "ring": null
+      },
+      "ficha": {
+        "tipo": "Planeta rochoso",
+        "gravidade": "0,38 g (3,7 m/s²)",
+        "atmosfera": "CO₂ fina, 0,6% da pressão da Terra",
+        "recursos": [
+          "Gelo de água no subsolo",
+          "CO₂ para produzir combustível no local",
+          "Ciência: sinais de vida antiga"
+        ],
+        "perigos": [
+          "Tempestades de poeira globais",
+          "Pouso difícil: ar fino demais para frear, grosso demais para ignorar",
+          "Radiação na viagem",
+          "Comunicação com atraso de até 22 min"
+        ],
+        "historia": "Só Estados Unidos e China pousaram e operaram aqui. As janelas abrem a cada 26 meses; perder uma custa mais de dois anos de espera.",
+        "descoberta": "O sinal chega com 12 minutos de atraso. Uma planície vermelha, pedras, e o céu cor de caramelo. Marte deixa de ser um ponto no mapa."
+      },
+      "milestones": [
+        "mars_landing_robotic",
+        "mars_sample_return"
+      ],
+      "destinations": [
+        {
+          "id": "mars_orbit",
+          "anchor": "ring",
+          "r": 8,
+          "angle": 120,
+          "label": "Órbita de Marte"
+        },
+        {
+          "id": "mars_surface",
+          "anchor": "surface",
+          "angle": 330,
+          "label": "Superfície de Marte"
+        }
+      ]
+    },
+    {
+      "id": "jupiter",
+      "name": "Júpiter",
+      "fog": "fog",
+      "far": true,
+      "parent": "sun",
+      "orbit": {
+        "radius": 880,
+        "periodWeeks": 617,
+        "angle0": 95
+      },
+      "display": {
+        "radius": 22,
+        "minPx": 9,
+        "maxPx": 60,
+        "color": "#e0b07a",
+        "bands": "#b5835a",
+        "dark": "#7a5c40",
+        "ring": null
+      },
+      "ficha": {
+        "tipo": "Gigante gasoso",
+        "gravidade": "2,5 g no topo das nuvens",
+        "atmosfera": "Hidrogênio e hélio, tempestades do tamanho da Terra",
+        "recursos": [
+          "Luas geladas com oceanos (Europa, Ganimedes)",
+          "Assistência gravitacional"
+        ],
+        "perigos": [
+          "Cinturões de radiação intensos",
+          "Viagem de 5 a 6 anos",
+          "Pouca luz solar para painéis"
+        ],
+        "historia": "Juno orbita desde 2016. Europa Clipper e JUICE estão a caminho e chegam por volta de 2030 e 2031. Fora do alcance da Corrida Lunar, mas no horizonte.",
+        "descoberta": "As bandas de nuvens se mexem em tempo real nas imagens. A radiação já castiga a eletrônica, mas a sonda segue viva."
+      },
+      "milestones": [
+        "jupiter_arrival"
+      ],
+      "destinations": [
+        {
+          "id": "jupiter",
+          "anchor": "ring",
+          "r": 32,
+          "angle": 200,
+          "label": "Júpiter"
+        }
+      ]
+    },
+    {
+      "id": "saturn",
+      "name": "Saturno",
+      "fog": "fog",
+      "far": true,
+      "parent": "sun",
+      "orbit": {
+        "radius": 1250,
+        "periodWeeks": 1532,
+        "angle0": 330
+      },
+      "display": {
+        "radius": 18,
+        "minPx": 8,
+        "maxPx": 54,
+        "color": "#e9c46a",
+        "dark": "#8a7440",
+        "ring": "#d4bf8a"
+      },
+      "ficha": {
+        "tipo": "Gigante gasoso com anéis",
+        "gravidade": "1,07 g no topo das nuvens",
+        "atmosfera": "Hidrogênio e hélio",
+        "recursos": [
+          "Titã: metano, etano e química orgânica",
+          "Encélado: gêiseres de água"
+        ],
+        "perigos": [
+          "Viagem de 7 anos ou mais",
+          "Partículas dos anéis",
+          "Luz solar fraca"
+        ],
+        "historia": "A Cassini mergulhou em Saturno em 2017. A Dragonfly, um drone para Titã, deve partir no fim da década e chegar nos anos 2030.",
+        "descoberta": "Os anéis aparecem de lado, finos como uma lâmina. Ao fundo, a névoa laranja de Titã."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "titan",
+      "name": "Titã",
+      "fog": "fog",
+      "far": true,
+      "parent": "saturn",
+      "orbit": {
+        "radius": 34,
+        "periodWeeks": null,
+        "angle0": 55
+      },
+      "display": {
+        "radius": 3,
+        "minPx": 5,
+        "maxPx": 24,
+        "color": "#f4a261",
+        "dark": "#8f5e38",
+        "ring": null
+      },
+      "ficha": {
+        "tipo": "Lua de Saturno com atmosfera densa",
+        "gravidade": "0,14 g (1,35 m/s²)",
+        "atmosfera": "Nitrogênio, 1,5 atm, névoa de metano",
+        "recursos": [
+          "Lagos de metano e etano",
+          "Química pré-biótica",
+          "Voo fácil: ar denso, gravidade baixa"
+        ],
+        "perigos": [
+          "-179 °C",
+          "Comunicação com atraso de mais de 1 hora",
+          "Superfície pouco mapeada"
+        ],
+        "historia": "A Huygens pousou em 2005 e mandou 72 minutos de dados. É o único mundo além da Terra com chuva, rios e mares na superfície.",
+        "descoberta": "Por trás da névoa, contornos escuros: mares de metano. Titã tem praias."
+      },
+      "milestones": [
+        "titan_arrival"
+      ],
+      "destinations": [
+        {
+          "id": "titan",
+          "anchor": "surface",
+          "angle": 90,
+          "label": "Titã"
+        }
+      ]
+    }
+  ]
+}

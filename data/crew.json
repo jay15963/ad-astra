@@ -1,0 +1,174 @@
+{
+  "cultures": ["american", "chinese", "indian", "european", "russian", "japanese"],
+  "actorCulture": {
+    "nasa": "american", "spacex": "american", "blueorigin": "american",
+    "cnsa": "chinese", "isro": "indian", "esa": "european",
+    "roscosmos": "russian", "jaxa": "japanese"
+  },
+  "surnameFirst": ["chinese"],
+  "firstNames": {
+    "american": ["Abigail", "Brooke", "Camila", "Dana", "Erin", "Gabrielle", "Harper", "Jada", "Kendra", "Lauren", "Maya", "Nadia", "Paige", "Rosalind", "Tessa", "Valerie", "Whitney", "Yolanda",
+                 "Aaron", "Brandon", "Calvin", "Dominic", "Emmett", "Grant", "Isaiah", "Jamal", "Kyle", "Luis", "Mason", "Noah", "Owen", "Preston", "Quentin", "Russell", "Silas", "Wesley"],
+    "chinese": ["Xiaomei", "Yuting", "Shuhua", "Meilin", "Ruoxi", "Wanqing", "Jiayi", "Huimin", "Lixia", "Suyin", "Qingyi", "Yanru", "Mingzhu", "Xinyue", "Lanfang", "Peiyu",
+                "Zhiyuan", "Wenbo", "Hongyu", "Junjie", "Haoran", "Tianyi", "Jianguo", "Weiming", "Zixuan", "Chenglong", "Yifan", "Boyang", "Kaiwen", "Rui", "Shengli", "Dawei"],
+    "indian": ["Ananya", "Kavya", "Deepa", "Meera", "Ishita", "Priyanka", "Lakshmi", "Nandini", "Riya", "Sunita", "Tanvi", "Aditi", "Gauri", "Shreya", "Pooja", "Divya",
+               "Arjun", "Vikram", "Rohan", "Siddharth", "Farhan", "Karthik", "Aditya", "Nikhil", "Pranav", "Rahul", "Varun", "Imran", "Sanjay", "Harish", "Manoj", "Tejas"],
+    "european": ["Ingrid", "Élodie", "Clara", "Sofia", "Annika", "Giulia", "Marta", "Lena", "Agnieszka", "Freya", "Inès", "Katrin", "Lucía", "Mirela", "Saoirse", "Johanna",
+                 "Matteo", "Klaus", "Lukas", "Javier", "Henrik", "Pieter", "Théo", "Stefan", "Tomasz", "Niklas", "Raúl", "Emil", "Bastien", "Dario", "Florian", "Oskar"],
+    "russian": ["Anastasia", "Darya", "Ekaterina", "Irina", "Ksenia", "Lyudmila", "Marina", "Natalya", "Olesya", "Polina", "Svetlana", "Vera", "Yulia", "Zoya", "Alina", "Galina",
+                "Aleksei", "Boris", "Dmitri", "Fyodor", "Grigori", "Ilya", "Konstantin", "Lev", "Maksim", "Nikolai", "Pavel", "Roman", "Stepan", "Timur", "Vadim", "Yegor"],
+    "japanese": ["Akiko", "Chiharu", "Emi", "Haruka", "Kaori", "Mayu", "Nanami", "Rin", "Sayaka", "Tomoko", "Yui", "Ayane", "Mizuki", "Natsuki", "Sakura", "Hinata",
+                 "Daichi", "Haruto", "Itsuki", "Kenta", "Masaru", "Naoki", "Ren", "Ryota", "Shota", "Takumi", "Yusuke", "Kazuki", "Sora", "Hiroto", "Kenji", "Tatsuya"]
+  },
+  "femaleNames": {
+    "american": ["Abigail", "Brooke", "Camila", "Dana", "Erin", "Gabrielle", "Harper", "Jada", "Kendra", "Lauren", "Maya", "Nadia", "Paige", "Rosalind", "Tessa", "Valerie", "Whitney", "Yolanda"],
+    "chinese": ["Xiaomei", "Yuting", "Shuhua", "Meilin", "Ruoxi", "Wanqing", "Jiayi", "Huimin", "Lixia", "Suyin", "Qingyi", "Yanru", "Mingzhu", "Xinyue", "Lanfang", "Peiyu"],
+    "indian": ["Ananya", "Kavya", "Deepa", "Meera", "Ishita", "Priyanka", "Lakshmi", "Nandini", "Riya", "Sunita", "Tanvi", "Aditi", "Gauri", "Shreya", "Pooja", "Divya"],
+    "european": ["Ingrid", "Élodie", "Clara", "Sofia", "Annika", "Giulia", "Marta", "Lena", "Agnieszka", "Freya", "Inès", "Katrin", "Lucía", "Mirela", "Saoirse", "Johanna"],
+    "russian": ["Anastasia", "Darya", "Ekaterina", "Irina", "Ksenia", "Lyudmila", "Marina", "Natalya", "Olesya", "Polina", "Svetlana", "Vera", "Yulia", "Zoya", "Alina", "Galina"],
+    "japanese": ["Akiko", "Chiharu", "Emi", "Haruka", "Kaori", "Mayu", "Nanami", "Rin", "Sayaka", "Tomoko", "Yui", "Ayane", "Mizuki", "Natsuki", "Sakura", "Hinata"]
+  },
+  "lastNames": {
+    "american": ["Whitfield", "Calloway", "Ocampo", "Brennan", "Hollister", "Pruitt", "Delgado", "Ashby", "Kimura-Lane", "Merriweather", "Thornbury", "Galloway", "Fairbanks", "Okonjo", "Vance", "Castellanos", "Redding", "Sutherland", "Lockhart", "Abernathy", "Prescott", "Marlowe", "Harrington", "Boateng", "Wexler"],
+    "chinese": ["Lin", "Gao", "Tang", "Zheng", "Qiao", "Han", "Du", "Ma", "Pan", "Xu", "Luo", "Shen", "Fang", "Cao", "Yuan", "Kong", "Lu", "Xiao", "Wei", "Song", "Guo", "Jin", "Bai", "Qian", "Hou"],
+    "indian": ["Iyer", "Menon", "Kulkarni", "Bhatia", "Joshi", "Rathore", "Desai", "Rao", "Qureshi", "Chatterjee", "Banerjee", "Pillai", "Reddy", "Gokhale", "Natarajan", "Malhotra", "Sengupta", "Thakur", "Venkatesh", "Dutta", "Srinivasan", "Kapoor", "Ghosh", "Patil", "Hegde"],
+    "european": ["Halvorsen", "Ferraro", "Marchand", "Brenner", "Almeida", "Vermeer", "Moreau", "Ortega", "Lindqvist", "Kowalska", "De Smet", "Hoffmann", "Rinaldi", "Castaño", "Nyberg", "Dubois", "Kessler", "Van Dijk", "Novák", "Lombardi", "Ferreira", "Aalto", "Lefèvre", "Brandstätter", "Moretti"],
+    "russian": ["Belyaev", "Volkov", "Sokolov", "Morozov", "Lebedev", "Kuznetsov", "Orlov", "Zaitsev", "Golubev", "Fedorov", "Vinogradov", "Semyonov", "Karpov", "Zhukov", "Gromov", "Komarovsky", "Polyakov", "Sorokin", "Tarasov", "Yermakov", "Belov", "Krylov", "Medvedko", "Rybakov", "Ustinov"],
+    "japanese": ["Takahashi", "Nakamura", "Kobayashi", "Watanabe", "Ito", "Kato", "Yoshida", "Sasaki", "Matsumoto", "Inoue", "Kimura", "Hayashi", "Shimizu", "Ishikawa", "Ogawa", "Fujita", "Okada", "Hasegawa", "Murakami", "Kondo", "Ishii", "Sakamoto", "Endo", "Aoki", "Fujii"]
+  },
+  "roles": {
+    "engineer": { "label": "Engenheira(o)", "labelF": "Engenheira", "labelM": "Engenheiro", "salaryM": 0.06, "share": 0.4 },
+    "flight_director": { "label": "Diretor(a) de voo", "labelF": "Diretora de voo", "labelM": "Diretor de voo", "salaryM": 0.09, "share": 0.2 },
+    "astronaut": { "label": "Astronauta", "labelF": "Astronauta", "labelM": "Astronauta", "salaryM": 0.07, "share": 0.4 }
+  },
+  "traits": [
+    { "id": "cabeca_fria", "name": "Cabeça fria", "description": "Não perde a calma quando a telemetria fica vermelha. Menos risco de anomalia.", "effects": { "missionDelta": 0.015, "band": 0.03 }, "weight": 3 },
+    { "id": "perfeccionista", "name": "Perfeccionista", "description": "Revisa tudo três vezes. Estimativas mais precisas, mas projetos andam mais devagar.", "effects": { "band": 0.08, "missionDelta": 0.005, "researchSpeed": -0.1, "trainWeeks": 1 }, "weight": 3 },
+    { "id": "ambicioso", "name": "Ambição", "description": "Quer o próximo grande voo, e quer agora. Aprende rápido, mas pode aceitar a oferta de um rival.", "effects": { "xpGain": 0.25, "leaveChance": 1.5, "ambition": 25 }, "weight": 3 },
+    { "id": "veterano", "name": "Veterania", "description": "Já viu de tudo. Mais acertos na hora crítica e um ponto de Comando extra como diretor(a) de voo.", "effects": { "missionDelta": 0.02, "commandPointsFD": 1, "xpGain": -0.3, "retireChance": 0.5 }, "weight": 2 },
+    { "id": "supersticioso", "name": "Superstição", "description": "Amuletos, rituais e a mesma meia de sempre. A moral oscila com cada resultado.", "effects": { "band": -0.02, "moraleSwing": 1.6 }, "weight": 2 },
+    { "id": "lider_nato", "name": "Liderança nata", "description": "As pessoas seguem. Eleva a moral de quem trabalha ao lado e rende Comando como comandante.", "effects": { "teamMorale": 4, "commandPointsCmd": 1 }, "weight": 2 },
+    { "id": "piloto_testes", "name": "Piloto de testes", "description": "Horas de voo em protótipos. Melhor nos pousos e manobras manuais.", "effects": { "landingDelta": 0.03, "injuryChance": 0.05 }, "weight": 2 },
+    { "id": "inventivo", "name": "Inventividade", "description": "Acha o atalho que ninguém viu. Acelera a pesquisa.", "effects": { "researchSpeed": 0.15 }, "weight": 3 },
+    { "id": "metodico", "name": "Método", "description": "Checklists antes de tudo. Faixa de chance mais estreita, evolução mais lenta.", "effects": { "band": 0.05, "missionDelta": 0.01, "xpGain": -0.1 }, "weight": 3 },
+    { "id": "impulsivo", "name": "Impulsividade", "description": "Decide rápido, às vezes rápido demais. Comando extra, mas risco maior.", "effects": { "missionDelta": -0.015, "band": -0.03, "commandPoints": 1 }, "weight": 2 },
+    { "id": "leal", "name": "Lealdade", "description": "Veste a camisa da agência. Quase nunca aceita propostas de rivais.", "effects": { "loyaltyTarget": 20, "leaveChance": 0.2 }, "weight": 3 },
+    { "id": "carismatico", "name": "Carisma", "description": "A câmera adora. Sucessos com essa pessoa rendem apoio público.", "effects": { "supportOnSuccess": 1, "ambition": 10 }, "weight": 2 },
+    { "id": "saude_fragil", "name": "Saúde frágil", "description": "Corpo cobra a conta: mais lesões e aposentadoria mais cedo.", "effects": { "injuryChance": 0.12, "retireChance": 0.8, "survival": -0.05 }, "weight": 1 },
+    { "id": "resistente", "name": "Resistência", "description": "Aguenta força-g, frio e fome. Mais chance de sobreviver ao pior.", "effects": { "survival": 0.12, "injuryChance": -0.08 }, "weight": 2 },
+    { "id": "mentor", "name": "Mentoria", "description": "Ensina quem voa junto. Novatos na mesma missão ganham experiência extra.", "effects": { "mentorXp": 0.4, "teamMorale": 2 }, "weight": 2 },
+    { "id": "workaholic", "name": "Vício em trabalho", "description": "A última luz acesa no prédio. Acelera projetos, mas a moral desgasta.", "effects": { "researchSpeed": 0.1, "moraleDrift": -1.5 }, "weight": 2 },
+    { "id": "avesso_midia", "name": "Avesso aos holofotes", "description": "Odeia entrevistas. A moral quase não oscila com a imprensa.", "effects": { "moraleSwing": 0.5, "ambition": -15 }, "weight": 2 },
+    { "id": "calculista", "name": "Frieza de cálculo", "description": "Pensa em probabilidades. Estimativas melhores e Comando mais bem gasto.", "effects": { "band": 0.04, "missionDelta": 0.005 }, "weight": 2 },
+    { "id": "pe_quente", "name": "Pé-quente", "description": "As coisas costumam dar certo perto dela(e). Ninguém sabe explicar.", "effects": { "missionDelta": 0.01, "survival": 0.08 }, "weight": 1 },
+    { "id": "teimoso", "name": "Teimosia", "description": "Não larga o osso. Raramente vai embora, mas discute com a sala de controle.", "effects": { "missionDelta": -0.005, "loyaltyTarget": 10, "commandPoints": -1 }, "weight": 2 },
+    { "id": "intuicao", "name": "Intuição de voo", "description": "Sente o problema antes do sensor. Um ponto de Comando extra.", "effects": { "commandPoints": 1, "band": 0.01 }, "weight": 2 },
+    { "id": "ex_militar", "name": "Ex-militar", "description": "Disciplina de esquadrão. Lealdade alta e procedimentos firmes.", "effects": { "band": 0.02, "loyaltyTarget": 10, "missionDelta": 0.005 }, "weight": 2 },
+    { "id": "cientista_campo", "name": "Cientista de campo", "description": "Sabe o que vale trazer de volta. Missões rendem mais ciência.", "effects": { "scienceBonus": 6 }, "weight": 2 }
+  ],
+  "portraitParts": {
+    "skin": 6, "hair": 10, "hairColor": 6, "eyes": 5, "brows": 4, "mouth": 5, "accessory": 6, "suit": 4, "bg": 6,
+    "cultureSkin": { "american": [0, 5], "chinese": [1, 3], "indian": [2, 4], "european": [0, 2], "russian": [0, 1], "japanese": [1, 2] },
+    "cultureHairColor": { "american": [0, 5], "chinese": [0, 1], "indian": [0, 1], "european": [0, 5], "russian": [0, 4], "japanese": [0, 1] },
+    "roleSuit": { "engineer": 1, "flight_director": 2, "astronaut": 0 }
+  },
+  "config": {
+    "maxRoster": 18,
+    "market": { "perWeek": 2, "visibleWeeks": 4, "foreignShare": 0.2, "starChance": 0.06, "legacyChance": 0.15, "signingWeeks": 10 },
+    "training": { "weeks": 4, "costWeeks": 12, "skillGain": [3, 7] },
+    "fireSeverenceWeeks": 8,
+    "xp": { "base": 10, "total": 8, "partial": 4, "recoverable": 2, "catastrophic": 5, "engineer": 2 },
+    "morale": { "baseline": 60, "total": 8, "partial": 3, "recoverable": -5, "catastrophic": -15, "death": -20 },
+    "deathChance": 0.85,
+    "injury": { "recoverable": 0.15, "catastrophic": 0.5, "weekly": 0.0008, "weeks": [4, 16] },
+    "poach": { "loyaltyBelow": 50, "ambitionAbove": 55, "weeklyChance": 0.006, "counterRaise": 0.4, "counterLoyalty": 25, "counterBonusWeeks": 6, "walkoutLoyalty": 12 },
+    "retire": { "checkEvery": 13, "age": 60, "astronautAge": 54, "chance": 0.12 },
+    "legend": { "missions": 4, "successes": 3, "fdSuccesses": 4, "destinations": ["lunar_surface", "lunar_south_pole", "lunar_orbit", "mars_surface", "mars_orbit"] },
+    "failureCause": {
+      "propulsion": "Falha de propulsão",
+      "structure": "Falha estrutural",
+      "software": "Falha de software",
+      "human": "Erro humano",
+      "environment": "Condições ambientais"
+    }
+  },
+  "relations": {
+    "f": ["Filha", "Sobrinha", "Irmã", "Neta"],
+    "m": ["Filho", "Sobrinho", "Irmão", "Neto"]
+  },
+  "bioTemplates": {
+    "engineer": [
+      "Veio da indústria de {field} e trouxe {quirk}.",
+      "Doutorado em {field}; ficou famosa(o) por {quirk}.",
+      "Começou consertando radares e chegou a {field}. Conhecida(o) por {quirk}."
+    ],
+    "flight_director": [
+      "Dez anos de console antes de assumir a sala. Conhecida(o) por {quirk}.",
+      "Saiu da equipe de {field} para a cadeira principal. Fama de {quirk}.",
+      "Treinou controladores por anos; cultiva {quirk}."
+    ],
+    "astronaut": [
+      "Ex-piloto de testes com passagem por {field}. Leva {quirk} em todo treino.",
+      "Médica(o) e mergulhador(a), especialista em {field}. Fama de {quirk}.",
+      "Geóloga(o) de campo que trocou desertos por crateras. Conhecida(o) por {quirk}."
+    ],
+    "fields": ["propulsão líquida", "sistemas de guiagem", "aviônica", "materiais compósitos", "geologia planetária", "robótica", "medicina aeroespacial", "telecomunicações", "dinâmica orbital", "suporte de vida"],
+    "quirks": ["um caderno de anotações à mão", "piadas ruins no rádio", "café forte às 4h da manhã", "nunca levantar a voz", "decorar cada checklist", "um bonsai na mesa", "corridas de madrugada", "perguntas que ninguém quer ouvir", "o silêncio antes de decidir", "uma foto da família no bolso"]
+  },
+  "roster": {
+    "nasa": [
+      { "id": "nasa_calloway", "name": "Ruth Calloway", "gender": "f", "role": "flight_director", "skill": 82, "experience": 60, "missions": 6, "successes": 6, "age": 56, "traits": ["veterano", "cabeca_fria"], "loyalty": 85, "ambition": 30, "morale": 70, "bio": "Comandou o console de voo em trinta lançamentos de carga. Fala pouco e nunca erra o tom." },
+      { "id": "nasa_boyd", "name": "Terrence Boyd", "gender": "m", "role": "flight_director", "skill": 64, "experience": 15, "age": 41, "traits": ["ambicioso", "calculista"], "loyalty": 55, "ambition": 75, "morale": 65, "bio": "Promovido cedo depois de salvar um satélite com um comando improvisado. Quer a cadeira principal." },
+      { "id": "nasa_whitfield", "name": "Dana Whitfield", "gender": "f", "role": "engineer", "skill": 74, "experience": 30, "age": 48, "traits": ["perfeccionista"], "loyalty": 70, "ambition": 40, "morale": 60, "bio": "Responsável pelo escudo térmico da cápsula. Ainda guarda as fotos das rachaduras de 2022." },
+      { "id": "nasa_ocampo", "name": "Marcus Ocampo", "gender": "m", "role": "engineer", "skill": 66, "experience": 18, "age": 37, "traits": ["inventivo", "workaholic"], "loyalty": 60, "ambition": 55, "morale": 58, "bio": "Engenheiro de propulsão que dorme no prédio em semana de teste estático." },
+      { "id": "nasa_ramancole", "name": "Priya Raman-Cole", "gender": "f", "role": "engineer", "skill": 70, "experience": 22, "age": 44, "traits": ["metodico", "mentor"], "loyalty": 75, "ambition": 35, "morale": 62, "bio": "Arquiteta de software de voo. Formou metade da equipe de aviônica atual." },
+      { "id": "nasa_hart", "name": "Caleb Hart", "gender": "m", "role": "astronaut", "skill": 78, "experience": 40, "missions": 2, "successes": 2, "age": 49, "traits": ["lider_nato", "ex_militar"], "loyalty": 80, "ambition": 50, "morale": 72, "bio": "Coronel aposentado, duas temporadas na estação. Escolhido para liderar o próximo pouso." },
+      { "id": "nasa_reyes", "name": "Naomi Reyes", "gender": "f", "role": "astronaut", "skill": 72, "experience": 20, "missions": 1, "successes": 1, "age": 42, "traits": ["cientista_campo", "resistente"], "loyalty": 68, "ambition": 60, "morale": 66, "bio": "Geóloga que estudou crateras de impacto no Ártico. Sonha com o polo sul lunar." },
+      { "id": "nasa_pell", "name": "Jonah Pell", "gender": "m", "role": "astronaut", "skill": 60, "experience": 5, "age": 35, "traits": ["piloto_testes", "impulsivo"], "loyalty": 58, "ambition": 70, "morale": 64, "bio": "Piloto de testes da Marinha, ainda sem voo espacial. Rápido no manche e na língua." },
+      { "id": "nasa_brooks", "name": "Imani Brooks", "gender": "f", "role": "astronaut", "skill": 66, "experience": 12, "missions": 1, "successes": 1, "age": 39, "traits": ["carismatico", "cabeca_fria"], "loyalty": 72, "ambition": 55, "morale": 70, "bio": "Engenheira de voo e voz conhecida das transmissões ao vivo para escolas." }
+    ],
+    "spacex": [
+      { "id": "spacex_navarro", "name": "Valerie Navarro", "gender": "f", "role": "flight_director", "skill": 76, "experience": 45, "missions": 10, "successes": 9, "age": 43, "traits": ["intuicao", "cabeca_fria"], "loyalty": 65, "ambition": 50, "morale": 68, "bio": "Dirigiu dezenas de pousos de propulsor. Para ela, cada explosão é um dado." },
+      { "id": "spacex_asante", "name": "Ben Asante", "gender": "m", "role": "flight_director", "skill": 62, "experience": 14, "age": 34, "traits": ["impulsivo", "ambicioso"], "loyalty": 45, "ambition": 80, "morale": 66, "bio": "Subiu de controlador de recuperação a diretor em quatro anos. Recebe ofertas toda semana." },
+      { "id": "spacex_okafor", "name": "Tyler Okafor", "gender": "m", "role": "engineer", "skill": 72, "experience": 28, "age": 38, "traits": ["inventivo", "workaholic"], "loyalty": 55, "ambition": 65, "morale": 55, "bio": "Projetou a nova turbobomba de metano. Itera rápido, quebra rápido, aprende rápido." },
+      { "id": "spacex_voss", "name": "Hannah Voss", "gender": "f", "role": "engineer", "skill": 68, "experience": 20, "age": 41, "traits": ["perfeccionista", "leal"], "loyalty": 78, "ambition": 30, "morale": 60, "bio": "Chefe de qualidade de estruturas. A única que consegue frear um teste quando precisa." },
+      { "id": "spacex_salcedo", "name": "Diego Salcedo", "gender": "m", "role": "engineer", "skill": 60, "experience": 10, "age": 31, "traits": ["inventivo"], "loyalty": 60, "ambition": 60, "morale": 65, "bio": "Especialista em reabastecimento em órbita. Fala de transferência de propelente até no almoço." },
+      { "id": "spacex_quintana", "name": "Rafael Quintana", "gender": "m", "role": "astronaut", "skill": 74, "experience": 30, "missions": 2, "successes": 2, "age": 45, "traits": ["piloto_testes", "lider_nato"], "loyalty": 62, "ambition": 60, "morale": 70, "bio": "Ex-piloto de caça e comandante de duas missões privadas em órbita." },
+      { "id": "spacex_kowalczyk", "name": "Sasha Kowalczyk", "gender": "f", "role": "astronaut", "skill": 64, "experience": 10, "missions": 1, "successes": 1, "age": 33, "traits": ["resistente", "carismatico"], "loyalty": 58, "ambition": 65, "morale": 72, "bio": "Engenheira de trajes que testou o próprio projeto numa caminhada espacial." },
+      { "id": "spacex_marsh", "name": "Elliot Marsh", "gender": "m", "role": "astronaut", "skill": 56, "experience": 0, "age": 36, "traits": ["supersticioso", "pe_quente"], "loyalty": 60, "ambition": 50, "morale": 66, "bio": "Médico de emergência que ganhou a vaga numa seleção aberta. Nunca voa sem o relógio do avô." }
+    ],
+    "cnsa": [
+      { "id": "cnsa_zheng", "name": "Zheng Hongyu", "gender": "m", "role": "flight_director", "skill": 80, "experience": 55, "missions": 8, "successes": 8, "age": 54, "traits": ["metodico", "veterano"], "loyalty": 88, "ambition": 25, "morale": 68, "bio": "Conduziu as acoplagens da estação desde o primeiro módulo. Prazos firmes, voz mansa." },
+      { "id": "cnsa_qiao", "name": "Qiao Lan", "gender": "f", "role": "flight_director", "skill": 66, "experience": 18, "missions": 2, "successes": 2, "age": 40, "traits": ["calculista", "ambicioso"], "loyalty": 70, "ambition": 65, "morale": 64, "bio": "Planejadora de trajetórias das sondas lunares. Agora quer conduzir o pouso tripulado." },
+      { "id": "cnsa_lin", "name": "Lin Shuhua", "gender": "f", "role": "engineer", "skill": 76, "experience": 32, "age": 47, "traits": ["perfeccionista", "mentor"], "loyalty": 82, "ambition": 35, "morale": 62, "bio": "Engenheira-chefe do lander. Revisou cada solda da perna de pouso pessoalmente." },
+      { "id": "cnsa_gao", "name": "Gao Wenbo", "gender": "m", "role": "engineer", "skill": 68, "experience": 20, "age": 39, "traits": ["inventivo"], "loyalty": 72, "ambition": 50, "morale": 60, "bio": "Projetista de motores do novo lançador pesado. Gosta de desenhar à mão antes do CAD." },
+      { "id": "cnsa_tang", "name": "Tang Meilin", "gender": "f", "role": "engineer", "skill": 62, "experience": 12, "age": 33, "traits": ["workaholic", "metodico"], "loyalty": 75, "ambition": 55, "morale": 58, "bio": "Especialista em suporte de vida, criada numa vila onde a água era racionada." },
+      { "id": "cnsa_han", "name": "Han Zhiyuan", "gender": "m", "role": "astronaut", "skill": 80, "experience": 42, "missions": 2, "successes": 2, "age": 47, "traits": ["ex_militar", "cabeca_fria"], "loyalty": 90, "ambition": 40, "morale": 72, "bio": "Piloto da força aérea, duas expedições à estação. Cotado para ser o primeiro a pisar na Lua pela China." },
+      { "id": "cnsa_du", "name": "Du Xiaoqing", "gender": "f", "role": "astronaut", "skill": 70, "experience": 20, "missions": 1, "successes": 1, "age": 38, "traits": ["cientista_campo", "resistente"], "loyalty": 80, "ambition": 55, "morale": 70, "bio": "Engenheira de carga útil que conduziu experimentos de cultivo em órbita." },
+      { "id": "cnsa_ma", "name": "Ma Junjie", "gender": "m", "role": "astronaut", "skill": 62, "experience": 6, "age": 34, "traits": ["piloto_testes", "leal"], "loyalty": 85, "ambition": 45, "morale": 66, "bio": "Do terceiro grupo de seleção. Treina o pouso manual no simulador todas as noites." },
+      { "id": "cnsa_pan", "name": "Pan Ruoxi", "gender": "f", "role": "astronaut", "skill": 58, "experience": 0, "age": 31, "traits": ["supersticioso", "carismatico"], "loyalty": 72, "ambition": 60, "morale": 68, "bio": "Especialista de missão, ex-cirurgiã. Leva um bordado da avó em cada treino." }
+    ],
+    "isro": [
+      { "id": "isro_bhatia", "name": "Rohan Bhatia", "gender": "m", "role": "flight_director", "skill": 72, "experience": 35, "missions": 5, "successes": 5, "age": 50, "traits": ["calculista", "leal"], "loyalty": 86, "ambition": 30, "morale": 66, "bio": "Dirigiu o pouso lunar robótico de 2023 a partir de Bengaluru. Faz contas no guardanapo." },
+      { "id": "isro_joshi", "name": "Meera Joshi", "gender": "f", "role": "flight_director", "skill": 60, "experience": 10, "missions": 1, "successes": 1, "age": 38, "traits": ["metodico", "ambicioso"], "loyalty": 64, "ambition": 68, "morale": 62, "bio": "Preparou os voos de teste da cápsula. Quer ser a voz do primeiro voo tripulado." },
+      { "id": "isro_iyer", "name": "Kavya Iyer", "gender": "f", "role": "engineer", "skill": 70, "experience": 25, "age": 45, "traits": ["inventivo", "perfeccionista"], "loyalty": 80, "ambition": 40, "morale": 60, "bio": "Engenheira de sistemas da cápsula. Encontrou e corrigiu a falha do paraquedas em 2025." },
+      { "id": "isro_menon", "name": "Arjun Menon", "gender": "m", "role": "engineer", "skill": 64, "experience": 16, "age": 36, "traits": ["workaholic"], "loyalty": 70, "ambition": 55, "morale": 56, "bio": "Responsável pelo estágio criogênico. Fã de críquete e de margens apertadas." },
+      { "id": "isro_kulkarni", "name": "Deepa Kulkarni", "gender": "f", "role": "engineer", "skill": 58, "experience": 8, "age": 30, "traits": ["metodico", "leal"], "loyalty": 82, "ambition": 40, "morale": 64, "bio": "Especialista em suporte de vida, formada no programa frugal de testes em câmara." },
+      { "id": "isro_rathore", "name": "Vikram Rathore", "gender": "m", "role": "astronaut", "skill": 70, "experience": 15, "age": 43, "traits": ["ex_militar", "lider_nato"], "loyalty": 88, "ambition": 50, "morale": 70, "bio": "Piloto de testes da força aérea, treinado por anos para o primeiro voo indiano." },
+      { "id": "isro_desai", "name": "Ananya Desai", "gender": "f", "role": "astronaut", "skill": 62, "experience": 8, "age": 36, "traits": ["cabeca_fria", "cientista_campo"], "loyalty": 78, "ambition": 55, "morale": 68, "bio": "Bióloga e piloto civil. A primeira mulher selecionada para o corpo de astronautas." },
+      { "id": "isro_rao", "name": "Siddharth Rao", "gender": "m", "role": "astronaut", "skill": 60, "experience": 8, "age": 39, "traits": ["piloto_testes", "supersticioso"], "loyalty": 74, "ambition": 50, "morale": 64, "bio": "Piloto de caça com milhares de horas de voo. Reza antes de cada simulação." },
+      { "id": "isro_qureshi", "name": "Farhan Qureshi", "gender": "m", "role": "astronaut", "skill": 56, "experience": 4, "age": 34, "traits": ["carismatico", "ambicioso"], "loyalty": 60, "ambition": 72, "morale": 70, "bio": "Engenheiro de voo e criador de vídeos de divulgação com milhões de seguidores." }
+    ],
+    "esa": [
+      { "id": "esa_brenner", "name": "Klaus Brenner", "gender": "m", "role": "flight_director", "skill": 76, "experience": 40, "missions": 6, "successes": 6, "age": 55, "traits": ["metodico", "teimoso"], "loyalty": 80, "ambition": 25, "morale": 62, "bio": "Diretor de operações em Darmstadt desde a sonda cometária. Exige consenso, depois não cede." },
+      { "id": "esa_almeida", "name": "Sofia Almeida", "gender": "f", "role": "flight_director", "skill": 64, "experience": 16, "missions": 2, "successes": 2, "age": 41, "traits": ["cabeca_fria", "mentor"], "loyalty": 70, "ambition": 50, "morale": 66, "bio": "Portuguesa, conduziu a inserção de uma sonda em Júpiter. Fala cinco línguas no console." },
+      { "id": "esa_halvorsen", "name": "Ingrid Halvorsen", "gender": "f", "role": "engineer", "skill": 72, "experience": 26, "age": 46, "traits": ["perfeccionista", "leal"], "loyalty": 82, "ambition": 30, "morale": 60, "bio": "Norueguesa, especialista em módulos de serviço. Seu motor empurra cápsulas de outros países." },
+      { "id": "esa_ferraro", "name": "Matteo Ferraro", "gender": "m", "role": "engineer", "skill": 66, "experience": 18, "age": 39, "traits": ["inventivo", "carismatico"], "loyalty": 60, "ambition": 60, "morale": 64, "bio": "Italiano de Turim, projeta módulos pressurizados. Desenha habitats nas toalhas de restaurante." },
+      { "id": "esa_marchand", "name": "Élodie Marchand", "gender": "f", "role": "engineer", "skill": 62, "experience": 12, "age": 35, "traits": ["calculista"], "loyalty": 68, "ambition": 55, "morale": 60, "bio": "Francesa, engenheira de propulsão do lançador europeu. Conta cada grama de margem." },
+      { "id": "esa_vermeer", "name": "Lukas Vermeer", "gender": "m", "role": "astronaut", "skill": 72, "experience": 25, "missions": 1, "successes": 1, "age": 46, "traits": ["cabeca_fria", "lider_nato"], "loyalty": 76, "ambition": 55, "morale": 68, "bio": "Holandês, piloto de testes e veterano da estação. Primeiro europeu escalado para orbitar a Lua." },
+      { "id": "esa_moreau", "name": "Clara Moreau", "gender": "f", "role": "astronaut", "skill": 66, "experience": 15, "missions": 1, "successes": 1, "age": 40, "traits": ["cientista_campo", "metodico"], "loyalty": 72, "ambition": 50, "morale": 66, "bio": "Francesa, astrofísica e mergulhadora de cavernas. Coordena os experimentos europeus." },
+      { "id": "esa_ortega", "name": "Javier Ortega", "gender": "m", "role": "astronaut", "skill": 60, "experience": 4, "age": 37, "traits": ["resistente", "ambicioso"], "loyalty": 58, "ambition": 70, "morale": 66, "bio": "Espanhol, médico de expedições antárticas. Ainda espera seu primeiro voo." },
+      { "id": "esa_lindqvist", "name": "Annika Lindqvist", "gender": "f", "role": "astronaut", "skill": 58, "experience": 0, "age": 34, "traits": ["avesso_midia", "pe_quente"], "loyalty": 70, "ambition": 40, "morale": 64, "bio": "Sueca, engenheira de robótica da reserva de astronautas. Prefere o laboratório às câmeras." }
+    ]
+  }
+}
