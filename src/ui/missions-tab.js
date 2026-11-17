@@ -121,7 +121,8 @@ function missionCard(store, m) {
     m.launchTurn != null && !res ? chip(`🗓 ${fmtMonth(m.launchTurn, st.startYear)} · ${fmtIn(m.launchTurn, st.turn)}`, 'muted') : null,
     m.estimate && !res ? chip(`Chance ${fmtBand(m.estimate.low, m.estimate.high)}`, 'info') : null,
     m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : null,
-    m.paid === false && m.status === 'planning' ? chip('não paga', 'warn') : null),
+    m.paid === false && m.status === 'planning' ? chip('não paga', 'warn') : null,
+    Number.isFinite(m.readyTurn) && m.readyTurn > st.turn && !res ? chip(`hardware pronto em ${fmtMonth(m.readyTurn, st.startYear)}`, 'warn') : null),
   m.transit && m.status === 'transit' ? bar(((st.turn - m.transit.departTurn) / Math.max(1, m.transit.arriveTurn - m.transit.departTurn)) * 100, { key: `mt.${m.id}`, label: `Chegada ${fmtIn(m.transit.arriveTurn, st.turn)}`, kind: 'accent' }) : null);
 }
 
@@ -141,13 +142,15 @@ export function openMission(store, missionId) {
     const actions = h('div', { class: 'btn-col' });
     if (m.status === 'planning') {
       const opts = launchTurnOptions(store, m, null);
-      actions.append(h('div', { class: 'muted small' }, 'Agendar lançamento:'),
-        h('div', { class: 'chips wrap' }, opts.map((o) => chip(o.label, 'accent', {
+      const hint = windowHint(store, m, null);
+      actions.append(...[h('div', { class: 'muted small' }, 'Agendar lançamento:'),
+        hint ? h('div', { class: 'tiny muted' }, hint) : null,
+        opts.length ? h('div', { class: 'chips wrap' }, opts.map((o) => chip(o.label, 'accent', {
           onclick: () => {
             const r = store.dispatch({ type: 'mission/schedule', missionId: m.id, launchTurn: o.turn });
-            if (r?.ok) { toast(`Agendada para ${fmtDate(o.turn, st.startYear)}.`, 'good'); close(); } else toast(r?.error || 'Não foi possível agendar.', 'bad');
+            if (r?.ok) { toast(`Agendada para ${fmtDate(o.turn, st.startYear)}.`, 'good'); close(); } else toast(scheduleErrorText(r), 'bad', 5000);
           },
-        }))));
+        }))) : h('p', { class: 'small warn-text' }, noSlotText(store, m, null))].filter(Boolean));
     }
     if (['planning', 'scheduled'].includes(m.status)) {
       actions.append(button('Cancelar missão', async () => {
@@ -157,13 +160,18 @@ export function openMission(store, missionId) {
       }, { kind: 'danger', icon: '✕' }));
     }
     const r = m.result;
+    const calDef = m.calendarId ? (store.data?.calendar?.missions || []).find((x) => x.id === m.calendarId) : null;
+    const calText = calDef?.partnersText || null;
     return h('div', { class: 'mission-sheet' },
       h('div', { class: 'chips' },
         chip(STATUS_LABELS[m.status] || m.status, 'accent'), chip(TYPE_LABELS[m.type] || m.type || '—', 'muted'),
         m.launchTurn != null ? chip(`🗓 ${fmtDate(m.launchTurn, st.startYear)}`, 'muted') : null,
         m.cost != null ? chip(fmtMoney(m.cost), 'muted') : null),
+      m.source === 'calendar' ? h('p', { class: 'tiny muted' }, 'Programa do calendário real: destino, tipo e tripulação já estão definidos.') : null,
+      calText ? h('p', { class: 'tiny muted' }, calText) : null,
       h('div', { class: 'kv' },
         kv('Destino', dest?.name || m.destination || '—'),
+        Number.isFinite(m.readyTurn) && m.readyTurn > st.turn ? kv('Hardware pronto', `${fmtDate(m.readyTurn, st.startYear)} (${fmtIn(m.readyTurn, st.turn)})`) : null,
         kv('Veículo', veh ? `${veh.name}` : m.vehicleId || '—'),
         kv('Espaçonave', sc?.name || m.spacecraftId || '—'),
         m.secondarySpacecraftId ? kv('Módulo de apoio', idx.spacecraft?.[m.secondarySpacecraftId]?.name || m.secondarySpacecraftId) : null,
@@ -204,8 +212,14 @@ function crewMini(store, id) {
     h('div', { class: 'small' }, c.name?.split(' ')[0] || c.id), h('div', { class: 'muted tiny' }, ROLE_LABELS[c.role] || c.role));
 }
 
-function chanceGauge(est) {
+function chanceGauge(est, { invalid = false } = {}) {
   if (!est) return null;
+  if (invalid) {
+    return h('div', { class: 'gauge g-muted' },
+      h('div', { class: 'gauge-label' }, 'Chance estimada'),
+      h('div', { class: 'gauge-value muted' }, '—'),
+      h('div', { class: 'muted tiny' }, 'Corrija os itens marcados com ✕ para ver a chance.'));
+  }
   const low = est.low ?? est.p, high = est.high ?? est.p;
   const lp = Math.max(0, Math.min(1, low <= 1 ? low : low / 100)), hp = Math.max(0, Math.min(1, high <= 1 ? high : high / 100));
   const kind = (lp + hp) / 2 >= 0.75 ? 'good' : (lp + hp) / 2 >= 0.5 ? 'warn' : 'bad';
@@ -287,7 +301,7 @@ function draftOptions(store, draft) {
   const errors = [...(q.errors || []), ...(estimate?.errors || [])];
   const warnings = [...(q.warnings || []), ...(estimate?.warnings || [])];
   return {
-    raw: q, destinations, vehicles, spacecraft, cost, estimate, window, errors: [...new Set(errors)], warnings: [...new Set(warnings)],
+    raw: q, destinations, vehicles, spacecraft, cost, estimate, window, errors: dedupeMessages(errors), warnings: dedupeMessages(warnings),
     valid: q.valid ?? estimate?.valid ?? errors.length === 0,
     earliest: q.earliestLaunchTurn ?? q.earliestTurn ?? q.launchTurnMin ?? null,
     crewSeats: (Number.isFinite(q.seats) && q.seats > 0 ? q.seats : null) ?? q.crewSeats ?? sc?.crew ?? (draft.type === 'crewed' ? 3 : 0),
@@ -310,35 +324,71 @@ function builder(store, rerender) {
   let opts = draftOptions(store, d);
   // past step 1 with no spacecraft chosen: preselect the cheapest compatible one (the player can still change it)
   if (ui.step >= 2 && d.type && d.destination && !d.spacecraftId && !ui.noCraft) {
-    const pick = opts.spacecraft.filter((s) => s.ok).sort((a, b) => (a.costM || 0) - (b.costM || 0))[0];
+    const pick = opts.spacecraft.filter((s) => s.ok && !flightBlock(store, s.id, d.vehicleId)).sort((a, b) => (a.costM || 0) - (b.costM || 0))[0];
     if (pick) { ui.draft = d = { ...d, spacecraftId: pick.id }; opts = draftOptions(store, d); }
   }
+  // and the best free flight director (an empty control room is rarely what the player wants)
+  if (ui.step >= 2 && !d.crew?.flightDirector && !ui.noFd) {
+    const raw = opts.raw?.crew?.flightDirector;
+    const fd = (Array.isArray(raw) ? raw : []).filter((p) => !p.busy).sort((a, b) => (b.skill || 0) - (a.skill || 0))[0];
+    if (fd) { ui.draft = d = { ...d, crew: { ...(d.crew || {}), flightDirector: fd.id } }; opts = draftOptions(store, d); }
+  }
   const set = (patch) => { ui.draft = { ...ui.draft, ...patch }; rerender(); };
+  // a new step is a new screen: start it at the top (same route, so the shell keeps the scroll otherwise)
+  const blockers = step2Blockers(store, d, opts);
+  const goStep = (n) => { ui.step = n; rerender(); store.ui?.scrollTop?.(); };
   const steps = ['Alvo e tipo', 'Veículo e equipe', 'Resumo'];
 
   const stepper = h('ol', { class: 'stepper' }, steps.map((s, i) => h('li', {
     class: [ui.step === i + 1 && 'active', ui.step > i + 1 && 'done'],
-    onclick: () => { if (i + 1 < ui.step || canGo(i + 1, d)) { ui.step = i + 1; rerender(); } },
+    onclick: () => { if (i + 1 < ui.step || canGo(i + 1, d, blockers)) goStep(i + 1); },
   }, h('span', { class: 'step-n' }, String(i + 1)), h('span', { class: 'step-t' }, s))));
 
   const body = h('div', { class: 'builder-body' });
   if (ui.step === 1) body.append(step1(store, d, opts, set));
   else if (ui.step === 2) body.append(step2(store, d, opts, set));
   else body.append(step3(store, d, opts, rerender));
+  // what still blocks "Próximo" on step 2, said right above the button (not only on step 3)
+  if (ui.step === 2 && blockers.length) body.append(h('div', { class: 'notes bad', role: 'status' }, blockers.map((b) => h('div', null, `✕ ${b}`))));
 
   const nav = h('div', { class: 'builder-nav' },
-    ui.step > 1 ? button('Voltar', () => { ui.step -= 1; rerender(); }, { kind: 'ghost', icon: '‹' }) : button('Limpar', () => { ui.draft = newDraft(); ui.step = 1; rerender(); }, { kind: 'ghost' }),
-    ui.step < 3 ? button('Próximo', () => { ui.step += 1; rerender(); }, { kind: 'primary', disabled: !canGo(ui.step + 1, d) }) : null);
+    ui.step > 1 ? button('Voltar', () => goStep(ui.step - 1), { kind: 'ghost', icon: '‹' }) : button('Limpar', () => { ui.draft = newDraft(); ui.noFd = false; ui.noCraft = false; goStep(1); }, { kind: 'ghost' }),
+    ui.step < 3 ? button('Próximo', () => goStep(ui.step + 1), { kind: 'primary', disabled: !canGo(ui.step + 1, d, blockers) }) : null);
 
   return h('div', { class: 'builder' },
     d.contractId ? h('div', { class: 'contract-banner' }, `📜 Missão para contrato`, button('remover', () => set({ contractId: null, source: 'custom' }), { kind: 'ghost', small: true })) : null,
     stepper, body, nav);
 }
 
-function canGo(step, d) {
+function canGo(step, d, blockers = []) {
   if (step >= 2 && !(d.type && d.destination)) return false;
-  if (step >= 3 && !d.vehicleId) return false;
+  if (step >= 3 && (!d.vehicleId || blockers.length)) return false;
   return true;
+}
+
+/** Reason a spacecraft cannot ride a vehicle (spacecraft.compatibleVehicles), or null. */
+function flightBlock(store, scId, vehId) {
+  const idx = store.data?.index || {};
+  const sc = idx.spacecraft?.[scId];
+  if (!sc || !vehId) return null;
+  const list = sc.compatibleVehicles;
+  if (!Array.isArray(list) || !list.length || list.includes(vehId)) return null;
+  const names = list.map((id) => idx.vehicles?.[id]?.name || id);
+  return `só voa no ${names.join(' / ')}`;
+}
+
+/** Step-2 problems that make step 3 pointless: no usable vehicle, craft that can't ride it, crewed flight without commander. */
+function step2Blockers(store, d, opts) {
+  const idx = store.data?.index || {};
+  const out = [];
+  if (!d.type || !d.destination) return out;
+  const v = opts.vehicles.find((x) => x.id === d.vehicleId);
+  if (d.vehicleId && v && !v.ok) out.push(`${v.name || v.id}: ${v.reason || 'indisponível para esta missão'}`);
+  const sc = idx.spacecraft?.[d.spacecraftId];
+  if (sc && d.vehicleId && flightBlock(store, sc.id, d.vehicleId)) out.push(`${sc.name} não voa no ${idx.vehicles?.[d.vehicleId]?.name || d.vehicleId}.`);
+  const crewed = d.type === 'crewed' || (sc?.crew > 0);
+  if (d.vehicleId && crewed && !d.crew?.commander) out.push('Escolha o comandante.');
+  return out;
 }
 
 function step1(store, d, opts, set) {
@@ -398,7 +448,9 @@ function step2(store, d, opts, set) {
       const flights = rel?.flights ?? v.history?.flights ?? v.flights;
       return h('button', {
         class: ['veh-card', d.vehicleId === v.id && 'selected', !v.ok && 'disabled'], type: 'button', disabled: !v.ok,
-        onclick: () => set({ vehicleId: v.id }),
+        onclick: () => (d.spacecraftId && flightBlock(store, d.spacecraftId, v.id)
+          ? (ui.noCraft = false, set({ vehicleId: v.id, spacecraftId: null, secondarySpacecraftId: null }))
+          : set({ vehicleId: v.id })),
       },
       raw(emblemSVG(op, { size: 30 }), 'veh-emblem'),
       h('div', { class: 'veh-text' },
@@ -406,7 +458,7 @@ function step2(store, d, opts, set) {
         h('div', { class: 'tiny muted' }, [
           v.costM != null ? fmtMoney(v.costM) : null,
           cap != null && d.destination ? `${String(cap).replace('.', ',')} t até o alvo` : null,
-          flights != null ? `${flights} voos` : null,
+          flights != null ? `${flights} voo${flights === 1 ? "" : "s"}` : null,
           v.reusable ? 'reutilizável' : null,
         ].filter(Boolean).join(' · ')),
         !v.ok && v.reason ? h('div', { class: 'tiny warn-text' }, v.reason) : null),
@@ -417,13 +469,18 @@ function step2(store, d, opts, set) {
     sectionTitle('Espaçonave'),
     opts.spacecraft.length ? h('div', { class: 'chips wrap' },
       chip('nenhuma', !d.spacecraftId ? 'accent' : 'muted', { onclick: () => { ui.noCraft = true; set({ spacecraftId: null, secondarySpacecraftId: null }); } }),
-      opts.spacecraft.map((s) => chip(`${s.name || s.id}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}`,
-        d.spacecraftId === s.id ? 'accent' : s.ok ? '' : 'muted', { onclick: s.ok ? () => { ui.noCraft = false; set({ spacecraftId: s.id, secondarySpacecraftId: null }); } : null, title: s.reason || s.notes || '' })))
+      opts.spacecraft.filter((s) => s.ok || s.id === d.spacecraftId).map((s) => {
+        const block = s.ok ? flightBlock(store, s.id, d.vehicleId) : null;
+        const usable = s.ok && !block;
+        return chip(`${s.name || s.id}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}${block ? ` · ${block}` : ''}`,
+          d.spacecraftId === s.id ? (usable ? 'accent' : 'bad') : usable ? '' : 'muted',
+          { onclick: usable ? () => { ui.noCraft = false; set({ spacecraftId: s.id, secondarySpacecraftId: null }); } : () => toast(`${s.name}: ${block || s.reason || 'incompatível'}.`, 'warn'), title: block || s.reason || s.notes || '', 'aria-disabled': usable ? null : 'true' });
+      }))
       : h('p', { class: 'muted small' }, 'Sem espaçonaves compatíveis no catálogo (a carga vai como satélite genérico).'),
     landerPicker(opts, d, set),
 
     sectionTitle('Sala de controle'),
-    pickPerson(store, 'Diretor(a) de voo', fds, d.crew.flightDirector, (id) => setCrew({ flightDirector: id })),
+    pickPerson(store, 'Diretor(a) de voo', fds, d.crew.flightDirector, (id) => { ui.noFd = !id; setCrew({ flightDirector: id }); }),
     crewed ? pickPerson(store, 'Comandante', astros, d.crew.commander, (id) => setCrew({ commander: id, astronauts: (d.crew.astronauts || []).filter((x) => x !== id) })) : null,
     crewed ? pickMany(store, `Tripulação (${opts.crewSeats || '?'} lugares)`, astros.filter((a) => a.id !== d.crew.commander), d.crew.astronauts || [], Math.max(0, (opts.crewSeats || 3) - 1), (ids) => setCrew({ astronauts: ids })) : null,
 
@@ -475,31 +532,126 @@ function pickMany(store, label, people, selected, max, onChange) {
     })) : h('p', { class: 'muted small' }, 'Sem astronautas ativos.'));
 }
 
-/** Launch date options: earliest feasible turn plus a few later slots, inside the window when there is one. */
-function launchTurnOptions(store, draftOrMission, opts) {
+/**
+ * Legal launch range for a draft or a planned mission, as the sim sees it: preparation lead + destination window.
+ * Builder passes its draftOptions result (earliest + window); the mission sheet asks the sim for the mission itself.
+ * Returns { earliest, openTurn, closeTurn } (closeTurn exclusive, Infinity when the destination has no window).
+ */
+function launchRange(store, m, opts) {
   const st = store.state;
-  const lead = 4;
-  let earliest = opts?.earliest ?? st.turn + lead;
-  const w = opts?.window || (draftOrMission.windowTurn != null ? { openTurn: draftOrMission.windowTurn } : null);
-  if (w?.openTurn != null) earliest = Math.max(earliest, w.openTurn);
-  earliest = Math.max(earliest, st.turn + 1);
-  const close = w?.closeTurn != null && Number.isFinite(w.closeTurn) ? w.closeTurn : Infinity;
-  const turns = [earliest, earliest + 4, earliest + 8, earliest + 16].filter((t) => t <= Math.max(close, earliest) && t <= st.endTurn);
-  return [...new Set(turns)].map((t, i) => ({ turn: t, label: `${i === 0 ? 'O quanto antes · ' : ''}${fmtMonth(t, st.startYear)} (${fmtIn(t, st.turn)})` }));
+  let earliest = opts?.earliest;
+  let w = opts?.window || null;
+  if (earliest == null && m?.id) earliest = store.tryQuery('missions/get', null, m.id)?.check?.earliestLaunchTurn ?? null;
+  if (earliest == null) {
+    const q = store.tryQuery('missions/draftOptions', null, { ...m, missionId: m?.id });
+    earliest = q?.earliestLaunchTurn ?? null;
+    w = w || q?.window || null;
+  }
+  if (earliest == null) earliest = st.turn + 8; // sim default lead when nothing answers
+  if (!opts && m?.destination) w = store.tryQuery('missions/nextWindow', null, m.destination, earliest) || w;
+  const close = w?.closeTurn != null && Number.isFinite(Number(w.closeTurn)) ? Number(w.closeTurn) : Infinity;
+  return { earliest: Math.max(earliest, st.turn + 1), openTurn: w?.openTurn ?? null, closeTurn: close };
 }
 
-function step3(store, d, opts, rerender) {
+/**
+ * Date chips inside [earliest, closeTurn) and the scenario end, at most one per month (two chips that read
+ * "abr/2026" are noise). Pure: exported for tests.
+ */
+export function launchSlots(range, now, endTurn, startYear, max = 4) {
+  const last = Math.min(range.closeTurn - 1, endTurn ?? Infinity);
+  if (!(range.earliest <= last)) return [];
+  const cands = [0, 4, 8, 13, 17, 26, 39].map((k) => range.earliest + k).filter((t) => t <= last);
+  if (Number.isFinite(range.closeTurn) && !cands.includes(last)) cands.push(last); // the window's last week
+  const seen = new Set();
+  const out = [];
+  for (const t of cands) {
+    const month = fmtMonth(t, startYear);
+    if (seen.has(month)) continue;
+    seen.add(month);
+    out.push({ turn: t, label: `${out.length === 0 ? 'O quanto antes · ' : ''}${month} (${fmtIn(t, now)})` });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** Launch date options for a draft/mission (see launchRange + launchSlots). */
+export function launchTurnOptions(store, draftOrMission, opts) {
+  const st = store.state;
+  return launchSlots(launchRange(store, draftOrMission, opts), st.turn, st.endTurn, st.startYear);
+}
+
+/** Why there is no date to pick (window not reachable before the scenario ends, or none at all). */
+function noSlotText(store, m, opts) {
+  const st = store.state;
+  const r = launchRange(store, m, opts);
+  if (r.earliest > (st.endTurn ?? Infinity)) return 'Não há data possível antes do fim do cenário.';
+  return `Sem data possível agora. Primeira data: ${fmtMonth(r.earliest, st.startYear)}.`;
+}
+
+/** Window hint for the sheet: "Janela para Órbita de Marte: out/2026 a dez/2026". */
+function windowHint(store, m, opts) {
+  const st = store.state;
+  const r = launchRange(store, m, opts);
+  if (!Number.isFinite(r.closeTurn) || r.openTurn == null) return null;
+  const name = store.data?.index?.destinations?.[m.destination]?.name || m.destination;
+  const opensLater = r.openTurn > st.turn;
+  return `${opensLater ? 'Janela abre' : 'Janela aberta'} para ${name}: ${fmtMonth(Math.max(r.openTurn, r.earliest), st.startYear)} a ${fmtMonth(r.closeTurn - 1, st.startYear)}.`;
+}
+
+/** Scheduling failure: all distinct reasons, not just the first (the window error used to be hidden). */
+export function scheduleErrorText(r) {
+  const list = Array.isArray(r?.errors) && r.errors.length ? r.errors : [r?.error || 'Não foi possível agendar.'];
+  return dedupeMessages(list).join(' ');
+}
+
+/**
+ * Drop near-duplicate validation messages: the same rule worded by two modules ("Carga de 26,5 t excede a
+ * capacidade de 15,8 t do Falcon 9…" vs "…com essa margem.") shares the opening words. Pure: exported for tests.
+ */
+export function dedupeMessages(list) {
+  const key = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const out = [];
+  const keys = [];
+  for (const msg of list || []) {
+    if (!msg) continue;
+    const k = key(msg);
+    const head = k.slice(0, 24);
+    // same opening, or one of the pair is a known generic restatement ("caixa insuficiente ...")
+    const dup = keys.some((o) => o === k || (head.length >= 18 && o.slice(0, 24) === head) || (o.startsWith('caixa insuficiente') && k.startsWith('caixa insuficiente')));
+    if (dup) continue;
+    keys.push(k);
+    out.push(msg);
+  }
+  return out;
+}
+
+/** The name the sim will give this draft (draftOptions.autoName when offered; same pattern otherwise). */
+function autoNameOf(store, d, opts) {
+  if (opts.raw?.autoName) return opts.raw.autoName;
+  const st = store.state;
+  const me = st.actors?.[st.playerId];
+  const dest = store.data?.index?.destinations?.[d.destination];
+  const n = (st.missions || []).filter((m) => m.type === d.type).length + 1;
+  return `${me?.short || me?.name || ''} ${TYPE_LABELS[d.type] || 'Missão'}${dest ? ` · ${dest.name}` : ''} ${n}`.trim();
+}
+
+function step3(store, d, optsBase, rerender) {
   const st = store.state;
   const idx = store.data?.index || {};
   const dest = idx.destinations?.[d.destination];
   const veh = idx.vehicles?.[d.vehicleId];
   const sc = idx.spacecraft?.[d.spacecraftId];
   const me = st.actors?.[st.playerId];
-  const dates = launchTurnOptions(store, d, opts);
-  if (ui.launchTurn == null || !dates.some((x) => x.turn === ui.launchTurn)) ui.launchTurn = dates[0]?.turn ?? st.turn + 4;
-  const autoName = `${TYPE_LABELS[d.type] || 'Missão'} ${dest?.name || ''}`.trim();
+  // dates come from the sim's own earliest turn + window (same helper as the planned-mission sheet)
+  const dates = launchTurnOptions(store, d, optsBase);
+  if (ui.launchTurn == null || !dates.some((x) => x.turn === ui.launchTurn)) ui.launchTurn = dates[0]?.turn ?? null;
+  // estimate, factors and errors for the date actually picked (a tight date costs points: show it here)
+  const opts = ui.launchTurn != null ? draftOptions(store, { ...d, launchTurn: ui.launchTurn }) : optsBase;
+  const autoName = autoNameOf(store, d, opts);
   const nameInput = h('input', { class: 'input', value: ui.name || '', placeholder: `${autoName} (nome automático)`, maxlength: '40', 'aria-label': 'Nome da missão', oninput: (e) => { ui.name = e.target.value; } });
   const cantPay = opts.cost != null && me && !(me.cash >= opts.cost);
+  const errors = dedupeMessages([...opts.errors, ...(cantPay ? ['Caixa insuficiente para pagar a missão agora.'] : [])]);
+  if (!dates.length) errors.push(noSlotText(store, d, optsBase));
   const est = opts.estimate;
   const factors = (est?.factors || []).slice().sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0)).slice(0, 6);
 
@@ -511,10 +663,10 @@ function step3(store, d, opts, rerender) {
     const id = r.missionId || r.id || r.mission?.id;
     if (schedule && id) {
       const r2 = store.dispatch({ type: 'mission/schedule', missionId: id, launchTurn: ui.launchTurn });
-      if (!r2?.ok) { toast(`Criada, mas não agendada: ${r2?.error || 'erro'}`, 'warn'); }
+      if (!r2?.ok) { toast(`Criada, mas não agendada: ${scheduleErrorText(r2)}`, 'warn', 5000); }
       else { toast(`🚀 ${store.state.missions?.find((m) => m.id === id)?.name || draft.name || 'Missão'} agendada para ${fmtMonth(ui.launchTurn, st.startYear)}.`, 'good'); store.vibrate(30); }
     } else toast('Missão salva em planejamento.', 'good');
-    ui.draft = newDraft(); ui.step = 1; ui.name = ''; ui.launchTurn = null;
+    ui.draft = newDraft(); ui.step = 1; ui.noFd = false; ui.noCraft = false; ui.name = ''; ui.launchTurn = null;
     store.ui?.navigate ? store.ui.navigate('missoes', 'lista') : rerender();
   };
 
@@ -532,17 +684,17 @@ function step3(store, d, opts, rerender) {
         opts.payloadT != null ? kv('Carga', `${String(opts.payloadT).replace('.', ',')} t${opts.capacityT != null ? ` de ${String(opts.capacityT).replace('.', ',')} t possíveis` : ''}`) : null,
         kv('Custo', opts.cost != null ? fmtMoney(opts.cost) : '—'),
         me ? kv('Caixa depois', fmtMoney((me.cash || 0) - (opts.cost || 0))) : null,
-        opts.window?.openTurn != null ? kv('Janela', `${fmtMonth(opts.window.openTurn, st.startYear)}${Number.isFinite(opts.window.closeTurn) ? ' a ' + fmtMonth(opts.window.closeTurn, st.startYear) : ''}`) : null)),
-    est ? chanceGauge(est) : h('p', { class: 'muted small' }, 'A estimativa de chance aparece quando o módulo de risco estiver pronto.'),
+        opts.window?.openTurn != null && Number.isFinite(opts.window.closeTurn) ? kv('Janela', `${fmtMonth(opts.window.openTurn, st.startYear)} a ${fmtMonth(opts.window.closeTurn - 1, st.startYear)}`) : null)),
+    // a chance for a mission that cannot fly is misleading: grey it out until the errors are fixed
+    est ? chanceGauge(est, { invalid: errors.length > 0 }) : h('p', { class: 'muted small' }, 'A estimativa de chance aparece quando o módulo de risco estiver pronto.'),
     factors.length ? h('ul', { class: 'factors' }, factors.map((f) => h('li', { class: (f.delta || 0) >= 0 ? 'pos' : 'neg' },
       h('span', null, (f.delta || 0) >= 0 ? '▲' : '▼'), ' ', f.label, h('span', { class: 'muted' }, ` ${f.delta > 0 ? '+' : ''}${fmtPct(f.delta)}`)))) : null,
     opts.warnings.length ? h('div', { class: 'notes warn' }, opts.warnings.map((w) => h('div', null, `⚠ ${w}`))) : null,
-    opts.errors.length ? h('div', { class: 'notes bad' }, opts.errors.map((w) => h('div', null, `✕ ${w}`))) : null,
-    cantPay ? h('div', { class: 'notes bad' }, '✕ Caixa insuficiente para pagar a missão agora.') : null,
+    errors.length ? h('div', { class: 'notes bad' }, errors.map((w) => h('div', null, `✕ ${w}`))) : null,
     sectionTitle('Data de lançamento'),
-    h('div', { class: 'chips wrap' }, dates.map((o) => chip(o.label, ui.launchTurn === o.turn ? 'accent' : '', { onclick: () => { ui.launchTurn = o.turn; rerender(); } }))),
+    dates.length ? h('div', { class: 'chips wrap' }, dates.map((o) => chip(o.label, ui.launchTurn === o.turn ? 'accent' : '', { onclick: () => { ui.launchTurn = o.turn; rerender(); } }))) : null,
     h('div', { class: 'btn-col' },
-      button('Criar e agendar lançamento', () => create(true), { kind: 'primary', icon: '🚀', disabled: !opts.valid || opts.errors.length > 0 || cantPay }),
+      button('Criar e agendar lançamento', () => create(true), { kind: 'primary', icon: '🚀', disabled: !opts.valid || errors.length > 0 || ui.launchTurn == null }),
       button('Salvar em planejamento', () => create(false), { kind: 'ghost', disabled: !d.type })));
 }
 

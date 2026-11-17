@@ -175,17 +175,49 @@ export function portraitSVG(portrait, { size = 64, mood = 'neutral', title } = {
     + '</g></svg>';
 }
 
+const LIGHT_INK = '#f7f1e3';
+const DARK_INK = '#14202e';
+
+/** WCAG relative luminance of a #rgb / #rrggbb colour. */
+function luminance(hex) {
+  let x = String(hex).replace('#', '');
+  if (x.length === 3 || x.length === 4) x = x.slice(0, 3).split('').map((c) => c + c).join('');
+  const ch = [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
+
+/** Ink for text/lines on a fill: whichever of light or dark reads better (SpaceX's #E8E8E8 needs dark ink). */
+export function inkFor(fill) {
+  try { return contrast(fill, DARK_INK) > contrast(fill, LIGHT_INK) ? DARK_INK : LIGHT_INK; } catch { return LIGHT_INK; }
+}
+
+/**
+ * Up to 6 letters for the emblem: an explicit actor.emblem, the short name when it fits, otherwise a word-aware
+ * abbreviation ("Blue Origin" -> "BLUE", "Roscosmos" -> "ROSC") instead of a hard cut ("BLUE O", "ROSCOS").
+ */
+export function emblemLabel(actor) {
+  if (actor?.emblem) return String(actor.emblem).toUpperCase().slice(0, 6);
+  const base = String(actor?.short || actor?.name || actor?.id || '?').replace(/\(.*?\)/g, '').trim() || '?';
+  const up = base.toUpperCase();
+  if (up.length <= 6) return up;
+  const words = up.split(/[\s\-]+/).filter(Boolean);
+  if (words.length > 1) return words[0].length <= 6 ? words[0] : words.map((w) => w[0]).join('').slice(0, 6);
+  return up.slice(0, 4);
+}
+
 /** Round emblem for an actor (agency/company) used as "portrait" on actor cards. */
 export function emblemSVG(actor, { size = 48 } = {}) {
   const color = /^#[0-9a-f]{3,8}$/i.test(actor?.color || '') ? actor.color : '#28628f';
-  const label = String(actor?.short || actor?.name || actor?.id || '?').toUpperCase().slice(0, 6).replace(/[<&>]/g, '');
+  const ink = inkFor(color);
+  const label = emblemLabel(actor).replace(/[<&>"]/g, '');
   const fs = label.length <= 3 ? 26 : label.length <= 4 ? 21 : label.length <= 5 ? 17 : 14;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}" role="img" class="emblem">`
-    + `<circle cx="50" cy="50" r="48" fill="${color}"/>`
-    + `<circle cx="50" cy="50" r="41" fill="none" stroke="#f7f1e3" stroke-width="2.5" opacity=".85"/>`
-    + `<ellipse cx="50" cy="50" rx="46" ry="15" fill="none" stroke="#f7f1e3" stroke-width="2" opacity=".45" transform="rotate(-24 50 50)"/>`
-    + `<circle cx="84" cy="34" r="4" fill="#f7f1e3"/>`
-    + `<text x="50" y="${50 + fs * 0.36}" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-weight="800" font-size="${fs}" fill="#f7f1e3" letter-spacing="1">${label}</text>`
+    + `<circle cx="50" cy="50" r="48" fill="${color}"${ink === DARK_INK ? ` stroke="${DARK_INK}" stroke-opacity=".35" stroke-width="2"` : ''}/>`
+    + `<circle cx="50" cy="50" r="41" fill="none" stroke="${ink}" stroke-width="2.5" opacity=".85"/>`
+    + `<ellipse cx="50" cy="50" rx="46" ry="15" fill="none" stroke="${ink}" stroke-width="2" opacity=".45" transform="rotate(-24 50 50)"/>`
+    + `<circle cx="84" cy="34" r="4" fill="${ink}"/>`
+    + `<text x="50" y="${50 + fs * 0.36}" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-weight="800" font-size="${fs}" fill="${ink}" letter-spacing="1">${label}</text>`
     + '</svg>';
 }
 

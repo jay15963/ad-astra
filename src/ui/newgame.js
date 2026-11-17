@@ -16,11 +16,22 @@ const POSTER = `<svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg" ar
 <g fill="#f7f1e3"><circle cx="30" cy="30" r="1.6"/><circle cx="70" cy="18" r="1.2"/><circle cx="110" cy="44" r="1"/><circle cx="290" cy="130" r="1.4"/><circle cx="300" cy="24" r="1.1"/><circle cx="46" cy="96" r="1"/></g>
 </svg>`;
 
-function difficultyOf(actor) {
-  const b = Number(actor?.budget) || 0;
-  if (b >= 8000) return ['Potência', 'good'];
-  if (b >= 3000) return ['Média', 'accent'];
-  return ['Desafio', 'warn'];
+// GDD "Quem você dirige": uma potência, uma média ou uma empresa. The tier is who you are, not your budget
+// (China is a potência with less money than NASA; India a média with little).
+const TIERS = {
+  potencia: ['Potência', 'good'], 'potência': ['Potência', 'good'],
+  media: ['Média', 'accent'], 'média': ['Média', 'accent'],
+  empresa: ['Empresa', 'info'], company: ['Empresa', 'info'],
+};
+
+/** [label, chip kind] of the actor's tier: actors.json `tier` when present, else from what the actor is. */
+export function tierOf(actor) {
+  const t = TIERS[String(actor?.tier || '').toLowerCase()];
+  if (t) return t;
+  if (actor?.kind === 'company') return TIERS.empresa;
+  // a power launches its own crews and cargo by policy (NASA, CNSA, Roscosmos); the rest are médias
+  if (actor?.launchPolicy === 'domestic') return TIERS.potencia;
+  return TIERS.media;
 }
 
 function actorInfo(store, id) {
@@ -55,7 +66,7 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
     h('p', { class: 'muted small' }, 'Cada ator tem verba, aliados e rivais próprios. O mundo reage diferente a cada campanha.'),
     ...playable.map((id) => {
       const a = actorInfo(store, id);
-      const [diff, kind] = difficultyOf(a);
+      const [diff, kind] = tierOf(a);
       return card({
         cls: 'actor-option', onClick: () => start(id),
         icon: raw(emblemSVG(a, { size: 48 })),
@@ -65,6 +76,7 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
       },
       h('div', { class: 'chips' },
         a.budget ? chip(`${fmtMoney(a.budget)}/ano`, 'muted') : null,
+        a.difficulty ? chip(`dificuldade: ${a.difficulty}`, 'muted') : null,
         a.capabilities?.crewed ? chip('voo tripulado', 'info') : chip('sem voo tripulado próprio', 'muted'),
         a.bloc ? chip(blocName(store, a.bloc), 'muted') : null));
     }),
@@ -99,7 +111,7 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
       onSettings ? button('Ajustes', onSettings, { kind: 'ghost', icon: '⚙' }) : null),
     picker,
     sc.victory?.description ? h('p', { class: 'muted small center' }, sc.victory.description) : null,
-    h('footer', { class: 'title-foot muted small' }, `v${APP_VERSION} · dados reais até nov/2026, futuro é simulação`)));
+    h('footer', { class: 'title-foot muted small' }, `v${APP_VERSION} · baseado no calendário real de 2026; o futuro é simulação`)));
 }
 
 function blocName(store, blocId) {

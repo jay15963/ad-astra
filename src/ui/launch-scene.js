@@ -7,6 +7,7 @@
 // Resilient: reopening mid-launch resumes the same act from state; missing fields never throw.
 
 import { getAudio, unlockAudio } from './audio.js';
+import { formatTurn, weeksToText } from '../core/time.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -28,6 +29,9 @@ const FAILURE_LABELS = { propulsion: 'Propulsão', structure: 'Estrutura', softw
 
 // default animation times (s) and telemetry keyframes for standard ascent milestones
 const ASCENT_T = { ignition: 2, liftoff: 5, maxq: 16, staging: 29, fairing_or_les: 39, orbit: 54, tli: 68 };
+// real mission elapsed time (s) at each standard milestone: the HUD clock runs on this scale, the same one the
+// sim's TLM radio lines use ("TLM T+3:30 · alt 110 km"), while the animation itself stays compressed
+const ASCENT_MET = { ignition: 0, liftoff: 3, maxq: 72, staging: 160, fairing_or_les: 210, orbit: 530, tli: 3900 };
 const ASCENT_KEYS = {
   ignition: [0, 0], liftoff: [0.06, 0.02], maxq: [12, 0.45], staging: [68, 2.4],
   fairing_or_les: [115, 3.4], orbit: [200, 7.8], tli: [240, 10.9],
@@ -120,15 +124,20 @@ export function buildProfile(milestones, phase = 'ascent', body = 'moon', kind =
       const f = n > 1 ? i / (n - 1) : 1;
       const lastOne = i === n - 1;
       if (orbit) keys.push({ t: times[i], alt: A0 * (1 - 0.93 * f), vel: V0 * (1 - 0.35 * f) });
-      else keys.push({ t: times[i], alt: lastOne ? 0 : A0 * Math.pow(1 - f, 2.2), vel: lastOne ? 0.001 : V0 * Math.pow(1 - f, 1.4) + 0.002 });
+      // the touchdown milestone is rolled (and its intervention card shown) a few metres up: the lander
+      // touches the ground after it, not while "Poeira cegando as câmeras" is still on screen
+      else keys.push({ t: times[i], alt: lastOne ? 0.03 : A0 * Math.pow(1 - f, 2.2), vel: lastOne ? 0.002 : V0 * Math.pow(1 - f, 1.4) + 0.002 });
     });
+    if (!orbit && n) keys.push({ t: times[n - 1] + 3, alt: 0, vel: 0.001 });
+    keys.forEach((k) => { k.met = k.t; }); // no published timeline for arrivals: the clock is the scene's
   } else {
-    keys.push({ t: 0, alt: 0, vel: 0 });
+    keys.push({ t: 0, alt: 0, vel: 0, met: 0 });
     ms.forEach((m, i) => {
       const f = n > 1 ? (i + 1) / n : 1;
       const k = ASCENT_KEYS[m?.id] || [200 * Math.pow(f, 1.5), 7.8 * Math.pow(f, 1.2)];
       const prevK = keys[keys.length - 1];
-      keys.push({ t: times[i], alt: Math.max(prevK.alt, k[0]), vel: Math.max(prevK.vel, k[1]) });
+      const met = Math.max(prevK.met, ASCENT_MET[m?.id] ?? prevK.met + (times[i] - prevK.t) * 8);
+      keys.push({ t: times[i], alt: Math.max(prevK.alt, k[0]), vel: Math.max(prevK.vel, k[1]), met });
     });
   }
   return { keys, times };
@@ -150,6 +159,22 @@ export function telemetryAt(profile, t) {
   }
   const l = keys[keys.length - 1];
   return { alt: l.alt, vel: l.vel };
+}
+
+/** Mission elapsed time (s) shown by the HUD at animation time t (see ASCENT_MET). */
+export function metAt(profile, t) {
+  const keys = profile?.keys || [];
+  if (!keys.length || !Number.isFinite(keys[0].met)) return Math.max(0, t);
+  if (t <= keys[0].t) return keys[0].met;
+  for (let i = 1; i < keys.length; i++) {
+    const a = keys[i - 1];
+    const b = keys[i];
+    if (t <= b.t) return a.met + (b.met - a.met) * (b.t > a.t ? (t - a.t) / (b.t - a.t) : 1);
+  }
+  const l = keys[keys.length - 1];
+  const p = keys[keys.length - 2];
+  const rate = p && l.t > p.t ? (l.met - p.met) / (l.t - p.t) : 1;
+  return l.met + (t - l.t) * Math.max(1, rate);
 }
 
 /** True when no more milestones will be rolled in this scene. */
@@ -175,7 +200,8 @@ export function fallbackOutcome(al) {
 /** "02:14" style mission clock (T+). */
 export function fmtClock(s) {
   const v = Math.max(0, Math.floor(s));
-  return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+  const mm = `${String(Math.floor(v / 60) % 60).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+  return v >= 3600 ? `${Math.floor(v / 3600)}:${mm}` : `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
 }
 
 /** Numbers with a pt-BR comma. */
@@ -297,7 +323,7 @@ export function openLaunchScene(store) {
   if (!store || !al || typeof document === 'undefined') return () => {};
   const key = `${al.missionId}|${al.phase || 'ascent'}`;
   if (activeScene && activeScene.alive() && activeScene.key === key) return activeScene.close;
-  if (activeScene) activeScene.close();
+  if (activeScene) (activeScene.forceClose || activeScene.close)();
   try {
     activeScene = createScene(store, key);
   } catch (e) {
@@ -333,7 +359,9 @@ function createScene(store, key) {
   const world = /splash/.test(lastMsId) ? 'earth' : mission.destination === 'titan' ? 'titan' : body;
   const crewed = typeof al0.crewed === 'boolean' ? al0.crewed : mission.type === 'crewed' || (craft?.crew || 0) > 0 || (mission.crew?.astronauts?.length || 0) > 0 || !!al0.lineup?.commander;
   const T = phase === 'arrival'
-    ? { pre: 'Preparação da descida', start: 'Iniciar descida', cd: 'Ignição de descida em', scene: 'Chegada' }
+    ? (arrivalKind === 'landing'
+      ? { pre: 'Preparação da descida', start: 'Iniciar descida', cd: 'Ignição de descida em', scene: 'Chegada' }
+      : { pre: 'Preparação da chegada', start: 'Iniciar aproximação', cd: 'Queima de inserção em', scene: 'Chegada' })
     : { pre: 'Pré-lançamento · a escalação', start: 'Iniciar contagem', cd: 'Lançamento em', scene: 'Dia de Lançamento' };
 
   // theme colours (CSS vars of styles.css when present)
@@ -408,7 +436,7 @@ function createScene(store, key) {
     ov.classList.remove('ls-in');
     ov.classList.add('ls-out');
     setTimeout(() => ov.remove(), 350);
-    if (activeScene && activeScene.close === close) activeScene = null;
+    if (activeScene && activeScene.forceClose === close) activeScene = null;
   }
 
   function onStore() {
@@ -421,11 +449,47 @@ function createScene(store, key) {
 
   /** activeLaunch disappeared (scrub, finish, or another module): close gracefully. */
   function gone() {
-    if (S.finishing) { close(); return; }
+    if (S.finishing && !S.holdPending) { close(); return; }
     S.finishing = true;
-    showStamp('ADIADO', 'Nova data em breve', 'warn');
-    caption('Lançamento adiado. A equipe volta amanhã.', 'event');
+    // our own hold/scrub choice: chooseHold shows a card with the reason and the new date, closed by the player
+    if (S.holdPending) { S.awaitingAck = true; return; }
+    const info = scrubInfo();
+    showStamp('ADIADO', info.when ? `Nova data: ${info.when}` : 'Nova data em breve', 'warn');
+    caption(info.when ? `Adiado ${info.wait}. Nova data: ${info.when}.` : 'Adiado. A nova data sai no painel.', 'event');
     setTimeout(close, 1600);
+  }
+
+  /** New date of this phase after a postpone: { when: 'mai/2026', wait: 'em 2 semanas' } (or nulls). */
+  function scrubInfo() {
+    const st = store.state || {};
+    const m = (st.missions || []).find((x) => x?.id === mission.id) || null;
+    const t = phase === 'arrival' ? m?.transit?.arriveTurn : m?.launchTurn;
+    if (!Number.isFinite(t)) return { when: null, wait: null };
+    const d = Math.max(0, Math.round(t - (st.turn ?? 0)));
+    return { when: formatTurn(t, st.startYear ?? 2026), wait: d > 0 ? `em ${weeksToText(d)}` : 'para esta semana', weeks: d };
+  }
+
+  /** Card after a hold that ended the day: why, the new date, what it cost, and an OK the player taps. */
+  function showScrubCard(r, choice, hold) {
+    const info = scrubInfo();
+    const weeks = Number(r?.weeks) || info.weeks || null;
+    const reason = r?.windowClosed ? 'A janela do dia fechou enquanto a equipe esperava.'
+      : choice === 'scrub' ? (hold?.reason === 'weather' ? 'Você adiou por causa do clima.' : 'Você adiou para verificar o sensor.')
+        : 'A contagem não pôde continuar hoje.';
+    const cost = choice === 'scrub' ? 'Apoio interno −1 (a imprensa nota cada adiamento).' : 'Sem custo de apoio: quem fechou a janela foi o tempo.';
+    showStamp('ADIADO', info.when ? `Nova data: ${info.when}` : 'Nova data em breve', 'warn');
+    caption(r?.windowClosed ? 'Janela fechada. Desmobilizando a plataforma.' : 'Contagem encerrada por hoje.', 'event');
+    sheet.innerHTML = '';
+    put(sheet,
+      el('div', { class: 'ls-card-k' }, phase === 'arrival' ? 'Descida adiada' : 'Lançamento adiado'),
+      el('div', { class: 'ls-card-t' }, reason),
+      el('ul', { class: 'ls-scrub' },
+        el('li', {}, info.when ? `Nova data: ${info.when}${weeks ? ` (${weeks} semana${weeks > 1 ? 's' : ''} depois)` : ''}.` : 'Nova data: no painel de missões.'),
+        el('li', {}, cost),
+        el('li', {}, 'A sorte dos marcos fica a mesma: só o dia muda.')),
+      el('div', { class: 'ls-cta' }, el('button', { class: 'ls-btn ls-primary', type: 'button', onclick: () => { S.awaitingAck = false; close(); } }, 'Entendido')));
+    sheet.classList.add('open');
+    sheet.querySelector('.ls-btn')?.focus?.({ preventScroll: true });
   }
 
   function dispatch(action) {
@@ -492,11 +556,19 @@ function createScene(store, key) {
     if (!box) return;
     box.innerHTML = '';
     box.append(el('strong', {}, `${m.label || m.id} — ${statusText(m.status)}`));
-    if (iv) box.append(el('div', { class: 'ls-tl-iv' }, `Intervenção: ${ivLabel(iv.optionId)}`));
+    if (iv) box.append(el('div', { class: 'ls-tl-iv' }, `Intervenção: ${ivLabel(iv)}`));
     for (const l of lines) box.append(el('div', { class: 'ls-tl-line' }, `“${l}”`));
     if (!lines.length && !iv) box.append(el('div', { class: 'ls-tl-line' }, 'Sem registro de rádio.'));
   }
-  const ivLabel = (id) => ({ reduce: 'reduzir empuxo', maintain: 'manter', abort: 'abortar', timeout: 'sem resposta' }[id] || id);
+  /** pt-BR name of an intervention choice (record or id); never the raw id. */
+  const ivLabel = (x) => {
+    const id = typeof x === 'string' ? x : x?.optionId;
+    const name = {
+      reduce: phase === 'arrival' ? (arrivalKind === 'landing' ? 'descida mais lenta' : 'queima mais suave') : 'reduzir empuxo', maintain: 'manter', contingency: 'contingência',
+      abort: phase === 'arrival' ? (crewed && arrivalKind === 'landing' ? 'abortar pouso' : 'abortar e preservar') : 'abortar', timeout: 'sem resposta',
+    }[id] || 'outra';
+    return x && typeof x === 'object' && x.timeout ? `${name} (sem resposta)` : name;
+  };
 
   // ---------- team strip (control room faces)
   function teamMembers() {
@@ -504,7 +576,7 @@ function createScene(store, key) {
     const lu = al?.lineup || {};
     const out = [];
     const fd = person(store, lu.flightDirector || mission.crew?.flightDirector);
-    if (fd) out.push({ p: fd, role: 'Diretor de voo' });
+    if (fd) out.push({ p: fd, role: fd.gender === 'f' ? 'Diretora de voo' : 'Diretor de voo' });
     const cmd = person(store, lu.commander || mission.crew?.commander);
     if (cmd) out.push({ p: cmd, role: 'Comandante' });
     for (const id of mission.crew?.astronauts || []) {
@@ -627,7 +699,9 @@ function createScene(store, key) {
     const lo = toPct(est.low) ?? (toPct(est.p) ?? 50) - 8;
     const hi = toPct(est.high) ?? (toPct(est.p) ?? 50) + 8;
     const p = toPct(est.p) ?? (lo + hi) / 2;
-    const factors = (est.factors || []).filter((f) => f && f.label).slice().sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0)).slice(0, 7);
+    // an arrival is decided after the rocket already flew: factors the sim tags as ascent-only do not apply
+    const ascentOnly = (f) => phase === 'arrival' && Array.isArray(f.stages) && f.stages.length > 0 && f.stages.every((x) => x === 'asc');
+    const factors = (est.factors || []).filter((f) => f && f.label && !ascentOnly(f)).slice().sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0)).slice(0, 7);
     const w = al.weather || {};
     const wRisk = toPct(w.risk);
     box.innerHTML = '';
@@ -636,7 +710,10 @@ function createScene(store, key) {
         el('div', {}, el('div', { class: 'ls-label' }, 'Chance estimada'), el('div', { class: 'ls-band' }, formatBand(est))),
         el('div', { class: 'ls-chips' },
           w.label ? el('span', { class: `ls-chip${wRisk > 30 ? ' warn' : ''}` }, `Clima: ${w.label}`) : null,
-          el('span', { class: 'ls-chip' }, `Comando: ${al.commandPoints ?? store.state?.commandPoints ?? 0}`))),
+          el('span', { class: 'ls-chip', title: 'Pontos de Comando: a reserva da agência recarrega 1 ponto a cada 4 semanas' },
+            Number.isFinite(al.pool) && al.pool > (al.commandPoints ?? 0)
+              ? `Comando: ${al.commandPoints ?? 0} (agência: ${al.pool})`
+              : `Comando: ${al.commandPoints ?? store.state?.commandPoints ?? 0}`))),
       el('div', { class: 'ls-bandbar', role: 'img', 'aria-label': `Faixa de ${formatBand(est)}` },
         el('div', { class: 'ls-bandbar-fill', style: { left: `${Math.max(0, lo)}%`, width: `${Math.max(1, hi - lo)}%` } }),
         el('div', { class: 'ls-bandbar-p', style: { left: `${p}%` } })),
@@ -667,7 +744,7 @@ function createScene(store, key) {
     box.innerHTML = '';
     const fds = crewFor(store, 'flight_director');
     box.append(el('div', { class: 'ls-label' }, 'Diretor de voo'));
-    box.append(fds.length ? el('div', { class: 'ls-picks' }, fds.slice(0, 6).map((p) => pickCard('flightDirector', p, 'Diretor', lu.flightDirector)))
+    box.append(fds.length ? el('div', { class: 'ls-picks' }, fds.slice(0, 6).map((p) => pickCard('flightDirector', p, p.gender === 'f' ? 'Diretora' : 'Diretor', lu.flightDirector)))
       : el('p', { class: 'ls-note' }, 'Nenhum diretor de voo contratado. A sala segue com o plantão.'));
     if (crewed) {
       const assigned = (mission.crew?.astronauts || []).map((id) => person(store, id)).filter(Boolean);
@@ -710,7 +787,9 @@ function createScene(store, key) {
       onchange: (e) => { clearTimeout(timer); configure({ fuelMargin: Number(e.target.value) / 100 }); },
     });
     box.append(el('div', { class: 'ls-label ls-row' }, el('span', {}, 'Margem de combustível'), val), input,
-      el('p', { class: 'ls-note' }, 'Mais margem perdoa erros na subida, mas tira carga útil.'));
+      el('p', { class: 'ls-note' }, phase === 'arrival'
+        ? (arrivalKind === 'landing' ? 'Mais reserva dá tempo para corrigir a descida e escolher onde pousar.' : 'Mais reserva dá folga para corrigir a inserção na órbita.')
+        : 'Mais margem perdoa erros na subida, mas tira carga útil.'));
   }
 
   function configure(patch) {
@@ -814,9 +893,16 @@ function createScene(store, key) {
   }
 
   function chooseHold(choice) {
+    const hold = S.holdShown;
     closeSheet();
+    S.holdPending = choice; // if this ends the day, gone() waits for the card below instead of vanishing
     const r = dispatch({ type: 'launch/hold', choice });
-    if (!AL()) return; // scrub -> gone()
+    S.holdPending = null;
+    if (!AL()) {
+      if (r?.ok && (r.scrubbed || S.awaitingAck)) showScrubCard(r, choice, hold);
+      else close();
+      return;
+    }
     if (!r.ok && r.error) caption(r.error, 'event');
     if (choice === 'hold') { caption('Segurando. Reciclando para T−20.', 'radio'); S.cd = HOLD_AT - 0.01; }
     else if (choice === 'go') caption('Diretor de voo: “Seguimos. Retomar contagem.”', 'radio');
@@ -1015,11 +1101,12 @@ function createScene(store, key) {
   // ---------- intervention cards (5 s)
   function showIntervention(iv) {
     S.ivShown = iv.id + '|' + iv.milestoneId;
-    S.ivTotal = Number(iv.seconds) > 0 ? Number(iv.seconds) : 5;
+    S.ivTotal = interventionTimer(iv);
     S.ivLeft = S.ivTotal; // a reopened app always gets the full timer back (pausing never punishes)
+    const untimed = !Number.isFinite(S.ivTotal);
     const cp = AL()?.commandPoints ?? 0;
     sheet.innerHTML = '';
-    const ring = el('div', { class: 'ls-ring', html: `<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" class="bg"/><circle cx="22" cy="22" r="19" class="fg" pathLength="100"/></svg><span>${Math.ceil(S.ivTotal)}</span>` });
+    const ring = untimed ? null : el('div', { class: 'ls-ring', html: `<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" class="bg"/><circle cx="22" cy="22" r="19" class="fg" pathLength="100"/></svg><span>${Math.ceil(S.ivTotal)}</span>` });
     const opts = (iv.options || []).map((o) => {
       const cost = Number(o.cost) || 0;
       const disabled = !!o.disabled || cost > cp;
@@ -1037,7 +1124,7 @@ function createScene(store, key) {
         el('div', { class: 'ls-card-k' }, `Intervenção · Comando ${'●'.repeat(Math.min(cp, 6))} (${cp})`),
         el('div', { class: 'ls-card-t' }, iv.prompt || 'Leitura fora da faixa. Sua decisão?')), ring),
       el('div', { class: 'ls-opts' }, opts),
-      el('div', { class: 'ls-note' }, `Sem resposta em ${Math.ceil(S.ivTotal)} s: ${ivLabel(iv.defaultOption || 'maintain')}.`));
+      el('div', { class: 'ls-note' }, untimed ? 'Sem limite de tempo (Ajustes). Escolha com calma.' : `Sem resposta em ${Math.ceil(S.ivTotal)} s: ${ivLabel(iv.defaultOption || 'maintain')}.`));
     sheet.classList.add('open');
     audio.alarm();
     vibrate([90, 50, 90]);
@@ -1046,7 +1133,15 @@ function createScene(store, key) {
     caption(iv.prompt || 'Anomalia detectada.', 'event');
     sheet.querySelector('.ls-opt:not([disabled])')?.focus?.({ preventScroll: true });
   }
+  /** Seconds for an intervention card: the player's setting (5 / 10 / no limit) over the sim's default. */
+  function interventionTimer(iv) {
+    const base = Number(iv?.seconds) > 0 ? Number(iv.seconds) : 5;
+    const pref = Number(store.settings?.interventionSeconds);
+    if (pref === 0) return Infinity;
+    return pref > 0 ? Math.max(base, pref) : base;
+  }
   function updateRing() {
+    if (!Number.isFinite(S.ivTotal)) return; // no-limit setting: no ring, no ticking
     const fg = sheet.querySelector('.ls-ring .fg');
     const num = sheet.querySelector('.ls-ring span');
     const f = Math.max(0, S.ivLeft / S.ivTotal);
@@ -1117,7 +1212,7 @@ function createScene(store, key) {
     S.presented = (al.milestones || []).length;
     deriveVehicleState(al);
     const out = al.outcome || fallbackOutcome(al);
-    const info = OUTCOME_INFO[out.level] || OUTCOME_INFO.partial;
+    const info = outcomeInfoFor(out);
     const good = out.level === 'total' || out.level === 'partial';
     setMood(good ? 'happy' : 'sad');
     S.resultFx = good ? (out.level === 'total' ? 'confetti' : 'sparks') : 'smoke';
@@ -1128,6 +1223,20 @@ function createScene(store, key) {
     showStamp(info.label.toUpperCase(), '', info.tone === 'ok' ? 'ok' : info.tone === 'warn' ? 'warn' : 'bad');
     renderTrack(true);
     renderResult(al, out, info);
+  }
+
+  /**
+   * A good ascent of a mission that still has to arrive somewhere is one leg, not the mission: "Subida
+   * concluída / A caminho", never "Missão cumprida" while the lander is still in transit.
+   */
+  function outcomeInfoFor(out) {
+    const base = OUTCOME_INFO[out.level] || OUTCOME_INFO.partial;
+    const more = out.final === false || (out.final !== true && phase === 'ascent' && (dest?.arrivalMilestones || []).length > 0);
+    if (!more || (out.level !== 'total' && out.level !== 'partial')) return base;
+    const where = dest?.name ? ` de ${dest.name}` : '';
+    return out.level === 'total'
+      ? { ...base, label: 'Subida concluída', glyph: '➚', line: `A caminho${where}. A chegada decide a missão.` }
+      : { ...base, label: 'Subida com ressalvas', line: `A nave segue a caminho${where}, com menos folga para a chegada.` };
   }
 
   function renderResult(al, out, info) {
@@ -1165,7 +1274,7 @@ function createScene(store, key) {
         el('ul', { class: 'ls-heads' }, headlines.slice(0, 3).map((hl) => el('li', {}, hl)))),
       el('section', { class: 'ls-sec' },
         el('div', { class: 'ls-label' }, 'Linha do tempo · toque num marco'),
-        el('div', { class: 'ls-tl-detail' }, ivs.length ? `${ivs.length} intervenç${ivs.length > 1 ? 'ões' : 'ão'}: ${ivs.map((x) => ivLabel(x.optionId)).join(', ')}.` : 'Nenhuma intervenção: a equipe só torceu.')),
+        el('div', { class: 'ls-tl-detail' }, ivs.length ? `${ivs.length} intervenç${ivs.length > 1 ? 'ões' : 'ão'}: ${ivs.map((x) => ivLabel(x)).join(', ')}.` : 'Nenhuma intervenção: a equipe só torceu.')),
       el('div', { class: 'ls-cta' },
         el('button', { class: 'ls-btn', type: 'button', onclick: startReplay }, 'Rever'),
         el('button', { class: 'ls-btn ls-primary', type: 'button', onclick: finish }, 'Continuar')),
@@ -1897,12 +2006,12 @@ function createScene(store, key) {
     const nervBase = Number(al.nerves) || 30;
     const nerv = Math.max(0, Math.min(100, nervBase + (S.view === 'countdown' ? (1 - S.cd / COUNT_FROM) * 12 : 0) + (al.pendingIntervention ? 15 : 0) + (reduce() ? 0 : Math.sin(S.t * 3.1) * 2)));
     const cp = al.commandPoints ?? 0;
-    const tlabel = S.view === 'countdown' ? `T−${fmtClock(Math.ceil(S.cd))}` : `T+${fmtClock(S.clock)}`;
+    const tlabel = S.view === 'countdown' ? `T−${fmtClock(Math.ceil(S.cd))}` : `T+${fmtClock(metAt(S.profile, S.clock))}`;
     const altTxt = tele.alt < 1 ? `${Math.round(tele.alt * 1000)} m` : `${fmtNum(tele.alt, tele.alt < 100 ? 1 : 0)} km`;
     const velTxt = tele.vel < 1 ? `${Math.round(tele.vel * 1000)} m/s` : `${fmtNum(tele.vel, 2)} km/s`;
     hud.innerHTML =
       `<div class="ls-tele"><div><small>${phase === 'arrival' ? 'TEMPO' : 'MET'}</small>${tlabel}</div>` +
-      (S.view !== 'countdown' ? `<div><small>ALT</small>${altTxt}</div><div><small>VEL</small>${velTxt}</div>` : `<div><small>${phase === 'arrival' ? 'ALVO' : 'CLIMA'}</small>${esc(al.weather?.label || '—')}</div>`) +
+      (S.view !== 'countdown' ? `<div><small>ALT</small>${altTxt}</div><div><small>VEL</small>${velTxt}</div>` : `<div><small>CLIMA</small>${esc(al.weather?.label || '—')}</div>`) +
       `</div><div class="ls-bars">` +
       `<div class="ls-meter m-conf"><small>Confiança</small><i style="width:${conf.toFixed(0)}%"></i></div>` +
       `<div class="ls-meter m-nerv"><small>Nervosismo</small><i style="width:${nerv.toFixed(0)}%"></i></div>` +
@@ -1951,5 +2060,7 @@ function createScene(store, key) {
   renderTrack(S.view === 'result');
   raf = requestAnimationFrame(frame);
 
-  return { key, close, alive: () => S.alive };
+  // app.js closes the scene a moment after activeLaunch clears; a scrub card waits for its "Entendido"
+  const requestClose = () => { if (S.awaitingAck && S.alive) return; close(); };
+  return { key, close: requestClose, forceClose: close, alive: () => S.alive };
 }

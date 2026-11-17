@@ -272,8 +272,9 @@ test('applyEffects: every effect type changes state', () => {
   assert.equal(s.actors.cnsa.reputation, before.actors.cnsa.reputation - 5);
   // money effects scale with the agency's size (data is written for a ~US$ 4 bi agency)
   assert.equal(s.actors.esa.budget, before.actors.esa.budget + Math.round((100 * N.moneyScale(before, 'esa')) / 5) * 5);
-  assert.equal(s.relations[relKey('esa', 'cnsa')].trust, 12);
-  assert.equal(s.relations[relKey('esa', 'nasa')].rivalry, 7);
+  // relations go through diplomacy.bumpRelation (default relation: trust 0, rivalry 10)
+  assert.equal(s.relations[relKey('esa', 'cnsa')].trust, (before.relations?.[relKey('esa', 'cnsa')]?.trust ?? 0) + 12);
+  assert.equal(s.relations[relKey('esa', 'nasa')].rivalry, (before.relations?.[relKey('esa', 'nasa')]?.rivalry ?? 10) + 7);
   assert.equal(s.events.flags.f1, true);
   assert.equal(s.events.flags.f2, 3);
   assert.deepEqual(s.events.scheduled.at(-1), { eventId: 'leak_2', turn: s.turn + 4, context: { person: 'p2', rival: 'cnsa', mission: 'm1' } });

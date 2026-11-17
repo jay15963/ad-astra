@@ -15,6 +15,8 @@
 import { clamp, relKey, addNews, pushDecision, emitSignal, log, changeActor, nextId } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
 import * as budget from './budget.js';
+import * as politics from './politics.js';
+import * as diplomacy from './diplomacy.js';
 import * as research from './research.js';
 
 // ---------------------------------------------------------------- constants
@@ -513,11 +515,8 @@ function applyOne(state, data, e, context, rng) {
   } else if ('relation' in e) {
     const other = resolveTarget(state, e.relation, context);
     if (!other || other === pid) return;
-    state.relations ||= {};
-    const k = relKey(pid, other);
-    const rel = state.relations[k] || (state.relations[k] = { trust: 0, dependence: 0, rivalry: 0 });
-    const lo = e.field === 'trust' ? -100 : 0;
-    rel[e.field] = clamp((rel[e.field] ?? 0) + e.delta, lo, 100);
+    // relations belong to diplomacy: go through its export
+    if (['trust', 'dependence', 'rivalry'].includes(e.field) && typeof diplomacy.bumpRelation === 'function') diplomacy.bumpRelation(state, pid, other, { [e.field]: e.delta });
   } else if ('flag' in e) {
     ev.flags[e.flag] = e.value ?? true;
   } else if ('schedule' in e) {
@@ -571,14 +570,8 @@ function applyOne(state, data, e, context, rng) {
   } else if ('tension' in e) {
     const other = resolveTarget(state, e.tension, context);
     if (!other || other === pid) return;
-    state.tension ||= {};
-    const k = relKey(pid, other);
-    const from = state.tension[k] ?? 0;
-    const to = clamp(Math.round(from + e.delta), 0, 4);
-    if (to !== from) {
-      state.tension[k] = to;
-      emitSignal(state, 'tension/changed', { a: pid, b: other, from, to });
-    }
+    // tension belongs to politics: a provocation becomes pressure there (no phantom level change, no fake signal)
+    if (typeof politics.nudgeTension === 'function') politics.nudgeTension(state, pid, other, Number(e.delta) || 0, `evento: ${note}`, data);
   } else if ('unlockTech' in e) {
     const id = e.unlockTech;
     ev.flags[`tech:${id}`] = true;

@@ -8,7 +8,7 @@ export const MONTHS_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago'
 /** turn -> {year, week (1..52), month (0..11), monthName} */
 export function turnToDate(turn, startYear) {
   const year = startYear + Math.floor(turn / WEEKS_PER_YEAR);
-  const week = (turn % WEEKS_PER_YEAR) + 1;
+  const week = (((turn % WEEKS_PER_YEAR) + WEEKS_PER_YEAR) % WEEKS_PER_YEAR) + 1; // negative turns = before the campaign
   const month = Math.min(11, Math.floor((week - 1) / (WEEKS_PER_YEAR / 12)));
   return { year, week, month, monthName: MONTHS_PT[month] };
 }

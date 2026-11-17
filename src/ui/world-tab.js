@@ -1,8 +1,18 @@
 // Mundo: news feed, actors/rivals with relation bars and tension, treaties/blocs, diplomacy proposals, Tabela da Era.
 import {
   h, raw, card, chip, bar, button, segmented, sectionTitle, emptyState, safePanel, openModal, toast, confirmDialog, attempt,
-  fmtMoney, fmtDate, fmtMonth, fmtIn, TENSION_LABELS, PROPOSAL_LABELS, FIRST_LABELS,
+  fmtMoney, fmtDate, fmtMonth, fmtIn, TENSION_LABELS, PROPOSAL_LABELS, FIRST_LABELS, newsIcon,
 } from './components.js';
+
+// news tags are module-internal (mixed languages); only these are shown to the player, in pt-BR
+const TAG_LABELS = {
+  diplomacia: 'diplomacia', diplomacy: 'diplomacia', tratado: 'tratado', ruptura: 'ruptura', bloco: 'bloco', atrito: 'atrito', aproximação: 'aproximação',
+  budget: 'orçamento', economy: 'economia', market: 'mercado', mission: 'missão', launch: 'lançamento', launches: 'lançamentos',
+  crew: 'equipe', research: 'pesquisa', pesquisa: 'pesquisa', secret: 'segredo', election: 'eleição', politics: 'política',
+  conflict: 'conflito', tension: 'tensão', contract: 'contrato', rival: 'rival', race: 'corrida', corrida: 'corrida',
+  first: 'primeiro', failure: 'falha', success: 'sucesso', delay: 'atraso', cancel: 'cancelado', cancelled: 'cancelado',
+  memorial: 'memorial', death: 'memorial', legend: 'lenda', evento: 'evento', event: 'evento', tabela: 'tabela', era: 'era',
+};
 import { emblemSVG } from './portrait.js';
 import { relKey } from '../core/helpers.js';
 import { decisionRow, sortDecisions } from './decisions.js';
@@ -67,12 +77,12 @@ function newsView(store, rerender) {
     const actors = (n.actors || []).map((id) => st.actors?.[id]).filter(Boolean);
     feed.append(h('article', { class: ['news-item', `imp-${n.importance || 1}`] },
       h('div', { class: 'news-head' },
-        h('span', { class: 'news-icon', 'aria-hidden': 'true' }, n.icon || (n.importance >= 3 ? '⚡' : n.importance >= 2 ? '◆' : '•')),
+        h('span', { class: 'news-icon', 'aria-hidden': 'true' }, newsIcon(n)),
         h('h3', { class: 'news-headline' }, n.headline)),
       n.body ? h('p', { class: 'news-body small' }, n.body) : null,
       actors.length || n.tags?.length ? h('div', { class: 'chips' },
         actors.map((a) => chip(`${a.flag || ''} ${a.short || a.name}`.trim(), 'muted')),
-        (n.tags || []).slice(0, 3).map((t) => chip(`#${t}`, 'muted'))) : null));
+        [...new Set((n.tags || []).map((t) => TAG_LABELS[t]).filter(Boolean))].slice(0, 3).map((t) => chip(`#${t}`, 'muted'))) : null));
   }
   out.append(feed);
   if (list.length > ui.newsLimit) out.append(button('Ver mais', () => { ui.newsLimit += 30; rerender(); }, { kind: 'ghost' }));
@@ -136,6 +146,7 @@ function openActor(store, actorId) {
   const pol = st.politics?.[actorId] || {};
   const pending = (st.proposals || []).filter((p) => (p.from === me && p.to === actorId) || (p.to === me && p.from === actorId));
   const treaties = (st.treaties || []).filter((x) => x.status === 'active' && x.parties?.includes(actorId) && x.parties?.includes(me));
+  const types = proposalTypes(store, actorId);
   openModal((close) => h('div', { class: 'actor-sheet' },
     h('div', { class: 'actor-hero' }, raw(emblemSVG(a, { size: 72 })),
       h('div', null, h('div', { class: 'small muted' }, `${a.country || ''} · ${a.kind === 'company' ? 'empresa' : 'agência'}`), h('p', null, a.style || ''))),
@@ -152,24 +163,63 @@ function openActor(store, actorId) {
       `${p.from === me ? 'Você propôs' : 'Eles propõem'}: ${PROPOSAL_LABELS[p.type] || p.type}${p.expiresTurn != null ? ` · vence ${fmtIn(p.expiresTurn, st.turn)}` : ''}`))) : null,
     sectionTitle('Propor'),
     t >= 3 ? h('p', { class: 'warn-text small' }, 'Com o conflito neste nível, a outra parte dificilmente aceita algo.') : null,
-    h('div', { class: 'proposal-list' }, proposalTypes(store, actorId).map((pt) => h('button', {
-      class: ['proposal-btn', !pt.ok && 'disabled'], type: 'button', disabled: !pt.ok,
-      onclick: () => {
-        // `type` is the action route, so the proposal kind travels as proposalType (see diplomacy.proposalTypeOf)
-        const r = store.dispatch({ type: 'diplomacy/propose', to: actorId, proposalType: pt.id, terms: pt.terms || {} });
-        const who = a.short || a.name;
-        if (r?.ok) {
-          const st2 = r.status || (r.accepted === true ? 'accepted' : r.accepted === false ? 'rejected' : 'pending');
-          toast(r.message || (st2 === 'accepted' ? `🤝 ${who} aceitou: ${pt.label}!` : st2 === 'rejected' ? `${who} recusou a proposta.` : `Proposta enviada. ${who} responde na próxima semana.`), st2 === 'rejected' ? 'warn' : 'good');
-          close();
-        } else toast(r?.error || 'Proposta não pôde ser enviada.', 'bad');
-      },
+    longShotHint(types),
+    h('div', { class: 'proposal-list' }, types.map((pt) => h('button', {
+      class: ['proposal-btn', !pt.ok && 'disabled', pt.ok && pt.chance != null && pt.chance < 0.05 && 'long-shot'], type: 'button', disabled: !pt.ok,
+      // select, then confirm: a refusal costs trust, so one stray tap must not send anything
+      onclick: () => confirmProposal(store, actorId, pt, close),
     },
     h('span', { class: 'proposal-top' }, h('span', { class: 'proposal-label' }, `${pt.icon ? pt.icon + ' ' : ''}${pt.label}`),
-      pt.chanceLabel || pt.chance != null ? chip(pt.chanceLabel || `${Math.round(pt.chance * 100)}%`, pt.chance >= 0.6 ? 'good' : pt.chance >= 0.3 ? 'warn' : 'bad') : null),
+      // a row you cannot send has no odds: its reason says why ("Vocês já são signatários")
+      pt.ok && (pt.chanceLabel || pt.chance != null) ? chip(pt.chanceLabel || `${Math.round(pt.chance * 100)}%`, pt.chance >= 0.6 ? 'good' : pt.chance >= 0.3 ? 'warn' : 'bad') : null,
+      !pt.ok ? chip(unavailableLabel(pt.reason), 'muted') : null),
     pt.termsText ? h('span', { class: 'tiny' }, pt.termsText) : pt.description ? h('span', { class: 'tiny muted' }, pt.description) : null,
     !pt.ok && pt.reason ? h('span', { class: 'tiny warn-text' }, pt.reason) : null)))),
   { title: `${a.flag ? a.flag + ' ' : ''}${a.name}` });
+}
+
+/** Short tag for a proposal you cannot send, from the sim's reason. */
+function unavailableLabel(reason) {
+  const r = String(reason || '').toLowerCase();
+  if (/signat|assinad/.test(r)) return 'já assinado';
+  if (/em vigor|já existe/.test(r)) return 'acordo em vigor';
+  if (/pendente|em aberto|aguard/.test(r)) return 'já proposta';
+  return 'indisponível';
+}
+
+/** When nothing on the list has a real chance, say how trust is earned instead of letting the player spam refusals. */
+function longShotHint(types) {
+  const open = types.filter((t) => t.ok && t.chance != null);
+  if (!open.length || open.some((t) => t.chance >= 0.05)) return null;
+  return h('p', { class: 'small muted' }, 'Tudo aqui é quase impossível por enquanto. A confiança cresce aceitando propostas deles, voando juntos e baixando a tensão; cada recusa custa um pouco dela.');
+}
+
+/** Confirm sheet for a proposal: odds, what weighs for and against, and what a refusal costs. */
+async function confirmProposal(store, actorId, pt, closeSheet) {
+  const st = store.state;
+  const a = st.actors?.[actorId] || { id: actorId };
+  const who = a.short || a.name || actorId;
+  const pre = store.tryQuery('diplomacy/preview', null, actorId, pt.id, pt.terms || {}) || {};
+  const chance = pt.chance ?? pre.chance;
+  const chanceText = pt.chanceLabel || pre.label || (chance != null ? `${Math.round(chance * 100)}%` : null);
+  const pros = (pre.reasons || []).filter(Boolean);
+  const cons = (pre.against || []).filter(Boolean);
+  const trustCost = Math.abs(pt.refusalTrust ?? pre.refusalTrust ?? 1);
+  const body = h('div', { class: 'proposal-confirm' },
+    h('p', null, h('strong', null, `${pt.icon ? pt.icon + ' ' : ''}${pt.label}`), ` para ${who}.`),
+    pt.termsText ? h('p', { class: 'small' }, pt.termsText) : null,
+    chanceText ? h('p', { class: 'small' }, 'Chance de aceite: ', chip(chanceText, chance >= 0.6 ? 'good' : chance >= 0.3 ? 'warn' : 'bad')) : null,
+    pros.length ? h('p', { class: 'tiny muted' }, `A favor: ${pros.join(' · ')}`) : null,
+    cons.length ? h('p', { class: 'tiny muted' }, `Contra: ${cons.join(' · ')}`) : null,
+    h('p', { class: 'tiny warn-text' }, `Se ${who} recusar, a confiança cai ${trustCost} ponto${trustCost === 1 ? '' : 's'} (e o recado vira notícia).`));
+  if (!(await confirmDialog(body, { title: 'Enviar proposta?', okLabel: 'Enviar proposta', cancelLabel: 'Voltar' }))) return;
+  // `type` is the action route, so the proposal kind travels as proposalType (see diplomacy.proposalTypeOf)
+  const r = store.dispatch({ type: 'diplomacy/propose', to: actorId, proposalType: pt.id, terms: pt.terms || {} });
+  if (r?.ok) {
+    const st2 = r.status || (r.accepted === true ? 'accepted' : r.accepted === false ? 'rejected' : 'pending');
+    toast(r.message || (st2 === 'accepted' ? `🤝 ${who} aceitou: ${pt.label}!` : st2 === 'rejected' ? `${who} recusou a proposta. Confiança −${trustCost}.` : `Proposta enviada. ${who} responde na próxima semana.`), st2 === 'rejected' ? 'warn' : 'good');
+    closeSheet?.();
+  } else toast(r?.error || 'Proposta não pôde ser enviada.', 'bad');
 }
 
 function stat(label, value) {
@@ -268,9 +318,12 @@ function leagueView(store) {
   out.append(h('div', { class: 'firsts' }, Object.entries(FIRST_LABELS).filter(([id]) => id !== 'crewed_orbit_national').map(([id, label]) => {
     const f = st.firsts?.[id];
     const a = f ? st.actors?.[f.actorId] : null;
+    // feats history already saw (Apollo, Luna...) are "do século" in this race
+    const hist = st.firstsHistory?.[id] || (f?.era ? {} : null);
     return h('div', { class: ['first-row', f && 'claimed', f?.actorId === st.playerId && 'mine'] },
       h('span', { class: 'goal-mark', 'aria-hidden': 'true' }, f ? (f.actorId === st.playerId ? '★' : '✓') : '○'),
-      h('span', { class: 'first-label' }, label),
+      h('span', { class: 'first-label' }, label,
+        hist ? h('span', { class: 'tiny muted first-hist' }, ` · ${f ? 'primeiro do século; ' : ''}história: ${hist.mission || hist.holder} (${hist.year})`) : null),
       f ? chip(`${a?.short || f.actorId} · ${fmtMonth(f.turn, st.startYear)}`, f.actorId === st.playerId ? 'good' : 'muted') : chip('em aberto', 'muted'));
   })));
   return out;

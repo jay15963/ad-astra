@@ -291,6 +291,8 @@ test('onLaunchResolved: lunar lander goes to transit, then arrival scene; first 
   const { data, state } = setup();
   const { missionId } = act(state, data, { type: 'mission/create', draft: { type: 'lander', destination: 'lunar_surface', vehicleId: 't_small', spacecraftId: 't_lander', milestone: 'lunar_resource_demo' } });
   const m = state.missions[0];
+  assert.equal(m.milestone, null, 'public mission/create must not accept a milestone');
+  m.milestone = 'lunar_resource_demo'; // as an internal briefing would set it
   m.status = 'launch';
   const r = missions.onLaunchResolved(state, data, missionId, 'ascent', { level: 'total' });
   assert.equal(r.final, false);

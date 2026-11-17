@@ -100,7 +100,7 @@
       "availableFrom": { "year": 2024, "month": 7 }, "truthLayer": "fato",
       "costM": 115, "cadencePerYear": 9, "backgroundPerYear": 7,
       "history": { "flights": 6, "failures": 0, "firstFlight": 2024 },
-      "estimatedReliability": 0.94, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos"], "standDownWeeks": 18,
+      "estimatedReliability": 0.94, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 18,
       "capacity": { "leo": 21.6, "gto": 11.5, "tli": 8.6, "mars": 6, "outer": 2 },
       "notes": "Acesso autônomo da Europa ao espaço. Cadência subindo devagar; a versão de quatro boosters leva cargas pesadas."
     },
@@ -109,7 +109,7 @@
       "availableFrom": { "year": 2022, "month": 7 }, "truthLayer": "fato",
       "costM": 45, "cadencePerYear": 4, "backgroundPerYear": 3,
       "history": { "flights": 6, "failures": 1, "firstFlight": 2022 },
-      "estimatedReliability": 0.9, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos"], "standDownWeeks": 30,
+      "estimatedReliability": 0.9, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 30,
       "capacity": { "leo": 3.3, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
       "notes": "Lançador leve europeu. Voltou a voar em dez/2024 depois da falha de 2022. Levará o Space Rider."
     },

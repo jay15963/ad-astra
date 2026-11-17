@@ -325,6 +325,30 @@ export function setTension(state, a, b, level, reason = '', data = null) {
   return to;
 }
 
+/**
+ * A provocation from another module (narrative card "+1 tension with the rival"). Same rule as reconcileExternal:
+ * a nudge of ±1 becomes pressure on the nation pair (the monthly dynamics decide if the level really moves);
+ * a jump of 2+ is deliberate and adopted at once. Only real level changes emit 'tension/changed'.
+ * Returns the current level.
+ */
+export function nudgeTension(state, a, b, delta, reason = 'externo', data = null) {
+  if (data) DATA = data;
+  if (!state || !a || !b || a === b || !Number.isFinite(delta) || !delta) return tensionBetween(state, a, b);
+  const na = nationOf(state, a);
+  const nb = nationOf(state, b);
+  if (na && nb && na === nb) return 0;
+  const pk = na && nb ? relKey(na, nb) : null;
+  const p = pk ? state.world?.pairs?.[pk] : null;
+  if (p) {
+    if (Math.abs(delta) >= 2) return applyLevel(state, data || DATA, pk, p.level + Math.round(delta), 'externo');
+    const M = PD(data || DATA).tensionModel || {};
+    p.pressure = r3((p.pressure || 0) + delta * (M.externalImpulse ?? 0.45));
+    log(state, `politics: ${reason} em ${pk} vira pressão (${p.pressure})`);
+    return p.level;
+  }
+  return setTension(state, a, b, tensionBetween(state, a, b) + Math.round(delta), reason, data);
+}
+
 function syncPair(state, pk) {
   const p = state.world.pairs[pk];
   if (!p) return;
@@ -953,6 +977,12 @@ function agencyBudgetPct(state, data, id, rng) {
   }
   pct += add('Humor político', ((p?.stance ?? 0.3) - (p?.stanceRef ?? 0.3)) * (bm.stanceEffect ?? 0.1));
   pct += add('Apoio público', (((a?.support ?? 50) - 50) / 50) * (bm.supportEffect ?? 0.03));
+  // the player's agency left a quarter of the year's money unspent: the legislature trims next year's raise
+  if (id === state.playerId) {
+    const y = state.finance?.year;
+    const spent = Object.values(y?.spent || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+    if (y && a?.budget > 0 && (y.income - spent) / a.budget > (bm.unspentShare ?? 0.25)) pct += add('Verba parada no caixa', bm.unspentPct ?? -0.05);
+  }
   const pri = pd.priorities?.[p?.priority];
   if (pri?.budgetBias) pct += add('Prioridade do governo', pri.budgetBias);
   // geopolitics: rivalry funds the race; conflict and war drain it; sanctions hit partnerships
@@ -974,6 +1004,8 @@ function agencyBudgetPct(state, data, id, rng) {
   if (dm) { pct += add('Promessa não cumprida', dm); delete state.world.pendingPenalty[id]; }
   const vol = (nd?.economy?.budgetVolatility ?? 0.03) * (ns?.divided ? bm.dividedVolatility ?? 1.5 : 1);
   pct += add(ns?.divided ? 'Negociação no Legislativo' : 'Negociação política', rng.normal(0, vol));
+  // legislatures rarely hand out big raises: good years are damped (cuts are not)
+  if (pct > 0) pct *= bm.raiseDamping ?? 1;
   return { pct: clamp(pct, bm.min ?? -0.25, bm.max ?? 0.2), reasons };
 }
 
@@ -992,7 +1024,7 @@ function companyBudgetPct(state, data, id, rng) {
   if (dm) { pct += add('Promessa não cumprida', dm); delete state.world.pendingPenalty[id]; }
   pct += add('Imprevistos', rng.normal(0, 0.035));
   const bm = pd.budgetModel || {};
-  return { pct: clamp(pct, bm.min ?? -0.25, bm.max ?? 0.2), reasons };
+  return { pct: clamp(pct, bm.min ?? -0.25, bm.companyMax ?? bm.max ?? 0.2), reasons };
 }
 
 function annualRollover(state, data, ctx) {

@@ -59,7 +59,9 @@ function manageMissions(state, m, stats) {
     if (!opts.valid) {
       // try a valid vehicle / spacecraft combination
       const patch = {};
-      if (opts.vehicles?.length && !opts.vehicles.find((v) => v.selected)?.valid) {
+      // program hardware (calendar): wait for the planned rocket for a year before swapping it
+      const patient = mis.calendarId && state.turn - mis.createdTurn < 52;
+      if (!patient && opts.vehicles?.length && !opts.vehicles.find((v) => v.selected)?.valid) {
         const v = opts.vehicles.find((x) => x.valid);
         if (v) patch.vehicleId = v.id;
       }
@@ -167,11 +169,11 @@ function playLaunch(state, stats) {
   if (state.activeLaunch) throw new Error('launch never finished');
 }
 
-function runCampaign(playerId, seed) {
+export function runCampaign(playerId, seed, { untilTurn = Infinity } = {}) {
   let state = newGame(data, { seed, playerId });
   const stats = { decisions: 0, kinds: {}, custom: 0, scheduleErrors: {}, interventions: {}, results: {}, news: 0, cashByYear: [], lastNews: null };
   let guard = 0;
-  while (!state.gameOver && guard++ < 4000) {
+  while (!state.gameOver && state.turn < untilTurn && guard++ < 4000) {
     for (let pass = 0; pass < 5 && state.decisions.length; pass++) {
       for (const d of state.decisions.slice()) {
         const c = choose(state, d);
@@ -199,12 +201,13 @@ function runCampaign(playerId, seed) {
     if (state.turn !== before && state.turn % 52 === 0) stats.cashByYear.push(Math.round(playerCash(state)));
     if (guard % 60 === 0) state = deserialize(serialize(state));
   }
-  if (!state.gameOver) throw new Error(`no game over (turn ${state.turn})`);
+  if (!state.gameOver && untilTurn === Infinity) throw new Error(`no game over (turn ${state.turn})`);
   return { state, stats };
 }
 
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const agg = {};
-for (const playerId of actors) {
+for (const playerId of isMain ? actors : []) {
   for (let s = 1; s <= nSeeds; s++) {
     const seed = s * 104729;
     let res;
@@ -243,7 +246,7 @@ for (const playerId of actors) {
     if (errs.length) process.exitCode = 1;
   }
 }
-console.log('\n== média por ator');
+if (isMain) console.log('\n== média por ator');
 for (const [k, a] of Object.entries(agg)) {
   console.log(`${k.padEnd(10)} voos/ano=${(a.flown / a.n / 5).toFixed(1)} sucessos=${(a.succ / a.n).toFixed(1)} primeiros=${(a.firsts / a.n).toFixed(1)} rank=${(a.rank / a.n).toFixed(1)} mortes=${(a.deaths / a.n).toFixed(1)}`);
 }

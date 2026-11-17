@@ -6,12 +6,25 @@
   "endYear": 2030,
   "era": 4,
   "playableActors": ["nasa", "cnsa", "isro", "esa", "spacex"],
+  "historicalFirstsNote": "Feitos já realizados antes de 2026 (O passado é fiel): quem chega primeiro nesta era leva o 'primeiro do século', que vale menos que um feito inédito.",
+  "historicalFirsts": {
+    "crewed_lunar_flyby": { "holder": "EUA", "year": 1968, "mission": "Apollo 8" },
+    "crewed_lunar_orbit": { "holder": "EUA", "year": 1968, "mission": "Apollo 8" },
+    "crewed_lunar_landing": { "holder": "EUA", "year": 1969, "mission": "Apollo 11" },
+    "lunar_surface_robotic": { "holder": "URSS", "year": 1966, "mission": "Luna 9" },
+    "lunar_sample_return": { "holder": "EUA", "year": 1969, "mission": "Apollo 11" },
+    "lunar_south_pole_landing": { "holder": "Índia", "year": 2023, "mission": "Chandrayaan-3" },
+    "mars_landing_robotic": { "holder": "URSS", "year": 1971, "mission": "Mars 3" },
+    "jupiter_arrival": { "holder": "EUA", "year": 1995, "mission": "Galileo" },
+    "titan_arrival": { "holder": "Europa e EUA", "year": 2005, "mission": "Huygens" },
+    "national_station": { "holder": "URSS", "year": 1971, "mission": "Salyut 1" }
+  },
   "victory": {
     "description": "Ao fim de 2030, a agência com mais prestígio vence a Tabela da Era.",
     "goals": [
       { "id": "crewed_lunar_landing", "label": "Pouso tripulado na Lua" },
       { "id": "lunar_surface_robotic", "label": "Pouso robótico na Lua" },
-      { "id": "crewed_orbit", "label": "Voo orbital tripulado" }
+      { "id": "crewed_orbit_national", "label": "Voo orbital tripulado próprio" }
     ]
   }
 }

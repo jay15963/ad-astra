@@ -14,8 +14,9 @@ import * as crewMod from './crew.js';
 import * as research from './research.js';
 import * as narrative from './narrative.js';
 import * as diplomacy from './diplomacy.js';
-import { clamp, nextId, addNews, pushDecision, emitSignal, claimFirst, changeActor, log, relKey } from '../core/helpers.js';
+import { clamp, nextId, addNews, pushDecision, emitSignal, claimFirst, firstValue, changeActor, log, relKey } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
+import { destPrestige as outcomeDestPrestige, missionPrestige } from '../core/outcome.js';
 import { turnToDate, formatTurn, weeksToText } from '../core/time.js';
 
 // ---------------------------------------------------------------------------------------------
@@ -53,12 +54,8 @@ const SC_KINDS = {
   station: ['station_module'],
   lander: ['lander', 'rover', 'probe'],
 };
-// Difficulty → base prestige (destination.prestige in data wins).
-const DEST_PRESTIGE = {
-  leo: 3, sso: 3, gto: 3, iss: 4, cislunar: 8, lunar_orbit: 10, lunar_surface: 18, lunar_south_pole: 24,
-  mars_orbit: 22, mars_surface: 32, jupiter: 30, titan: 38,
-};
-const PRESTIGE_BY_KEY = { leo: 3, gto: 3, tli: 12, mars: 24, outer: 32 };
+// Difficulty → base prestige: core/outcome.js destPrestige (shared with the AI's calendar results).
+const GENERIC_COST_SCALE = { leo: 1, gto: 1.2, tli: 1.6, mars: 2.4, outer: 4 };
 const OPS_COST_BY_KEY = { leo: 6, gto: 5, tli: 35, mars: 60, outer: 90 }; // US$ mi, operations + ground segment
 const SCIENCE_BASE = { satellite: 6, probe: 40, crewed: 20, cargo: 3, station: 25, lander: 45 };
 const SCIENCE_BODY = { earth: 1, moon: 1.5, mars: 2.2, jupiter: 2.8, saturn: 3 };
@@ -66,6 +63,13 @@ const OPS_WEEKS = { satellite: 0, probe: 10, crewed: 2, cargo: 1, station: 8, la
 const LEAD_WEEKS = { satellite: 6, probe: 10, crewed: 12, cargo: 6, station: 14, lander: 10 };
 const LEAD_BY_SOURCE = { calendar: 2, contract: 4 };
 const CREW_COST_PER_PERSON = 15; // US$ mi: training, suits, recovery
+const CONSERVATIVE_EXTRA_WEEKS = 6; // conservative strategy: extra tests before launch
+// fuel margin price: the default 10% is cheap (part of any plan); every point above it costs 1% of the launch
+const MARGIN_BASE = 0.1;
+// a calendar program's hardware can be ready a little before the official date, never much earlier
+const PROGRAM_EARLY_WEEKS = 4;
+// prestige multiplier per strategy (same values as risk.STRATEGIES): less risk, less glory
+const STRATEGY_PRESTIGE = { conservative: 0.8, balanced: 1, aggressive: 1.25 };
 const ACTIVE_STATUSES = ['scheduled', 'launch', 'transit', 'arrival', 'operations'];
 
 // pt-BR labels for the fixed "Os Primeiros" vocabulary.
@@ -73,15 +77,15 @@ const MILESTONE_LABELS = {
   crewed_lunar_flyby: 'primeiro sobrevoo lunar tripulado do século',
   crewed_lunar_orbit: 'primeira órbita lunar tripulada do século',
   crewed_lunar_landing: 'primeiro pouso tripulado na Lua do século',
-  lunar_south_pole_landing: 'primeiro pouso no polo sul da Lua',
+  lunar_south_pole_landing: 'primeiro pouso no polo sul lunar da corrida',
   lunar_surface_robotic: 'primeiro pouso robótico na Lua da corrida',
-  lunar_south_pole_crewed: 'primeiros humanos no polo sul da Lua',
+  lunar_south_pole_crewed: 'primeira tripulação no polo sul lunar',
   lunar_sample_return: 'primeiro retorno de amostras lunares da corrida',
   lunar_resource_demo: 'primeira demonstração de recursos lunares',
   lunar_base: 'primeira base lunar',
   mars_landing_robotic: 'primeiro pouso robótico em Marte da corrida',
   mars_sample_return: 'primeiro retorno de amostras de Marte',
-  titan_arrival: 'primeira chegada a Titã',
+  titan_arrival: 'primeira chegada a Titã do século',
   jupiter_arrival: 'primeira chegada a Júpiter da corrida',
   commercial_station: 'primeira estação comercial',
   national_station: 'primeira estação nacional da corrida',
@@ -368,9 +372,12 @@ export function normalizeDraft(d = {}) {
     contractId: d.contractId || null,
     clientPayload: !!d.clientPayload,
     grantM: Math.max(0, Number(d.grantM) || 0),
+    // share of the bill paid by someone else (program appropriation, sponsor): scales with the configuration
+    grantShare: clamp(Number(d.grantShare) || 0, 0, 0.9),
     deadlineTurn: Number.isFinite(d.deadlineTurn) ? d.deadlineTurn : null,
     milestone: d.milestone || null,
     targetTurn: Number.isFinite(d.targetTurn) ? d.targetTurn : null,
+    readyTurn: Number.isFinite(d.readyTurn) ? d.readyTurn : null,
   };
 }
 
@@ -437,7 +444,9 @@ export function computeCost(state, data, draft) {
   const lines = [];
   const launchCost = v ? (v.costM || 0) * Math.max(0.3, 1 + techBonus(state, 'launchCost')) : 0;
   if (v) lines.push({ label: `Lançador (${v.name})`, amount: round1(launchCost) });
-  if (sc && !d.clientPayload) lines.push({ label: `Espaçonave (${sc.name})`, amount: round1(sc.costM || 0) });
+  // generic hardware is priced per class of destination (a Jupiter probe is not a lunar cubesat)
+  const scCost = sc ? (sc.costM || 0) * (sc.access === 'generic' ? GENERIC_COST_SCALE[dest?.capacityKey] ?? 1 : 1) : 0;
+  if (sc && !d.clientPayload) lines.push({ label: `Espaçonave (${sc.name})`, amount: round1(scCost) });
   const sc2 = spacecraftDef(data, companionOf(state, data, d));
   if (sc2) {
     lines.push({ label: `Módulo de apoio (${sc2.name})`, amount: round1(sc2.costM || 0) });
@@ -450,13 +459,17 @@ export function computeCost(state, data, draft) {
   }
   const nCrew = d.crewed ? crewIdsOf(d).length : 0;
   if (nCrew) lines.push({ label: `Tripulação (${nCrew})`, amount: nCrew * CREW_COST_PER_PERSON });
-  if (v && d.config.fuelMargin > 0) lines.push({ label: 'Margem de combustível', amount: round1(launchCost * d.config.fuelMargin * 0.25) });
-  const hw = launchCost + (sc && !d.clientPayload ? sc.costM || 0 : 0);
+  if (v && d.config.fuelMargin > 0) {
+    const fm = d.config.fuelMargin;
+    lines.push({ label: 'Margem de combustível', amount: round1(launchCost * (Math.min(fm, MARGIN_BASE) * 0.25 + Math.max(0, fm - MARGIN_BASE))) });
+  }
+  const hw = launchCost + (sc && !d.clientPayload ? scCost : 0);
   if (d.config.strategy === 'conservative') lines.push({ label: 'Testes extras (conservadora)', amount: round1(hw * 0.06) });
   if (d.config.strategy === 'aggressive') lines.push({ label: 'Cronograma enxuto (agressiva)', amount: round1(-hw * 0.04) });
   let total = lines.reduce((s, l) => s + l.amount, 0);
-  if (d.grantM > 0) {
-    const g = Math.min(d.grantM, total);
+  if (d.grantShare > 0 || d.grantM > 0) {
+    // a share, not a fixed amount: swapping to cheap hardware must not turn the grant into a free mission
+    const g = d.grantShare > 0 ? total * d.grantShare : Math.min(d.grantM, total);
     lines.push({ label: d.source === 'calendar' ? 'Verba dedicada do programa' : 'Financiamento externo', amount: -round1(g) });
     total -= g;
   }
@@ -464,12 +477,15 @@ export function computeCost(state, data, draft) {
 }
 
 function leadWeeks(d) {
-  return LEAD_BY_SOURCE[d.source] ?? LEAD_WEEKS[d.type] ?? 8;
+  const base = LEAD_BY_SOURCE[d.source] ?? LEAD_WEEKS[d.type] ?? 8;
+  // extra tests take time, not only money
+  return base + (d.config?.strategy === 'conservative' ? CONSERVATIVE_EXTRA_WEEKS : 0);
 }
 
 /** Earliest turn this draft can launch (preparation lead + launch window). */
 function earliestLaunch(state, data, d) {
-  const from = state.turn + leadWeeks(d);
+  // a calendar program's hardware is ready on its own schedule (readyTurn), not the day the plan is approved
+  const from = Math.max(state.turn + leadWeeks(d), Number.isFinite(d.readyTurn) ? d.readyTurn : -Infinity);
   if (!d.destination) return from;
   const w = windowFor(state, data, d.destination, from);
   return Math.max(from, w.openTurn);
@@ -498,7 +514,7 @@ function validate(state, data, d, opts = {}) {
   } else if (!sc) errors.push('Espaçonave desconhecida.');
   else {
     if (!spacecraftFor(state, data).some((s) => s.id === sc.id)) errors.push(`${sc.name} não está disponível para a agência agora.`);
-    if (d.type && !scOkForType(sc, d.type, d.crewed)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
+    if (d.type && d.source !== 'calendar' && !scOkForType(sc, d.type, d.crewed)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
     if (dest && !scOkForDest(sc, dest.id)) errors.push(`${sc.name} não foi projetada para ${dest.name}.`);
   }
   // companion craft (lander for Orion, capsule for Lanyue)
@@ -545,7 +561,7 @@ function validate(state, data, d, opts = {}) {
   if (d.crew.flightDirector) {
     const fd = state.crew?.[d.crew.flightDirector];
     if (!fd || fd.role !== 'flight_director' || (fd.status && fd.status !== 'active')) errors.push('Diretor de voo indisponível.');
-  } else warnings.push('Sem diretor de voo: faixa de chance mais larga e menos pontos de Comando.');
+  } // (no flight director: risk.missionRisk already warns)
   if (d.crewed) {
     if (!d.crew.commander) errors.push('Escolha o comandante.');
     else checkPerson(d.crew.commander, 'astronaut', 'Astronauta');
@@ -564,9 +580,18 @@ function validate(state, data, d, opts = {}) {
   const lt = Number.isFinite(opts.launchTurn) ? opts.launchTurn : earliest;
   const window = d.destination ? windowFor(state, data, d.destination, lt) : null;
   if (opts.schedule) {
+    // hardware must still be in service on launch day (a rocket retiring before the date cannot be booked)
+    const svc = fn(calendar, 'inServiceAt');
+    if (svc) {
+      for (const item of [v, sc, sc2]) {
+        if (item && !svc(state, data, item, lt)) errors.push(`${item.name} sai de serviço antes de ${fmtT(state, lt)}.`);
+      }
+    }
     const minTurn = state.turn + leadWeeks(d);
     if (!opts.skipLead && lt < minTurn) errors.push(`Preparação mínima de ${weeksToText(leadWeeks(d))}: lançamento a partir de ${fmtT(state, minTurn)}.`);
-    if (lt > state.endTurn) errors.push('Data além do fim do cenário.');
+    if (Number.isFinite(d.readyTurn) && lt < d.readyTurn) errors.push(`O hardware do programa só fica pronto em ${fmtT(state, d.readyTurn)}.`);
+    // the last week is the end of the campaign: a launch then would fly after the Era Trophy
+    if (lt >= state.endTurn) errors.push('Data além do fim do cenário.');
     if (window && !inWindow(window, lt)) {
       errors.push(`Fora da janela para ${dest?.name || d.destination}. Próxima janela: ${fmtT(state, window.openTurn)} a ${fmtT(state, window.closeTurn)}.`);
     }
@@ -590,6 +615,9 @@ function planOf(state, d, launchTurn) {
     actorId: state.playerId, type: d.type, destination: d.destination, vehicleId: d.vehicleId, spacecraftId: d.spacecraftId,
     secondarySpacecraftId: d.secondarySpacecraftId || undefined,
     crew: d.crew, config: d.config, launchTurn: launchTurn ?? state.turn, crewed: d.crewed, riskMod: d.riskMod || 0,
+    // a draft is "created" now: lets risk show "Prazo apertado" in the builder, same rule as launch day
+    createdTurn: Number.isFinite(d.createdTurn) ? d.createdTurn : state.turn,
+    calendarId: d.source === 'calendar' ? d.calendarId || undefined : undefined,
   };
 }
 
@@ -677,11 +705,17 @@ function pickConfig(state, data, { type, destination, crewed = type === 'crewed'
   return best;
 }
 
+const NAME_TYPE = { satellite: 'Satélite', probe: 'Sonda', crewed: 'Voo tripulado', cargo: 'Carga', station: 'Módulo', lander: 'Pousador' };
+const NAME_DEST = {
+  leo: 'LEO', sso: 'Polar', gto: 'GEO', iss: 'ISS', cislunar: 'Cislunar', lunar_orbit: 'Lunar', lunar_surface: 'Lunar',
+  lunar_south_pole: 'Polo Sul', mars_orbit: 'Marte', mars_surface: 'Marte', jupiter: 'Júpiter', titan: 'Titã',
+};
 function nameFor(state, data, d) {
-  const short = actorName(state, state.playerId);
-  const n = (state.missions || []).filter((m) => m.type === d.type).length + 1;
   const dest = destDef(data, d.destination);
-  return `${short} ${TYPE_LABELS[d.type] || 'Missão'}${dest ? ` · ${dest.name}` : ''} ${n}`;
+  const tag = NAME_DEST[d.destination] || dest?.name || '';
+  const prefix = `${NAME_TYPE[d.type] || TYPE_LABELS[d.type] || 'Missão'}${tag ? ` ${tag}` : ''}`;
+  const n = (state.missions || []).filter((m) => typeof m.name === 'string' && m.name.startsWith(`${prefix}-`)).length + 1;
+  return `${prefix}-${n}`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -711,12 +745,15 @@ function createMission(state, data, draft) {
     launchTurn: null,
     windowTurn: null,
     targetTurn: d.targetTurn,
+    readyTurn: d.readyTurn,
     deadlineTurn: d.deadlineTurn,
     milestone: d.milestone,
     clientPayload: d.clientPayload,
     grantM: d.grantM,
+    grantShare: d.grantShare,
     cost: 0,
     paid: false,
+    paidM: 0,
     estimate: null,
     riskMod: 0,
     attempts: 0,
@@ -742,6 +779,7 @@ function scheduleMission(state, data, m, launchTurn) {
     if (!pay(state, v.cost.total, `Missão ${m.name}`)) return { ok: false, error: 'Caixa insuficiente para pagar a missão.' };
     m.paid = true;
     m.cost = v.cost.total;
+    m.paidM = v.cost.total;
   }
   const wasScheduled = m.status === 'scheduled';
   m.status = 'scheduled';
@@ -751,7 +789,9 @@ function scheduleMission(state, data, m, launchTurn) {
   // a player calendar item follows the player's date
   const inst = m.calendarId ? (state.calendar || []).find((c) => c.id === m.calendarId) : null;
   if (inst && inst.status === 'player') inst.currentTurn = lt;
-  if (!wasScheduled) {
+  const routine = !m.crewed && (destDef(data, m.destination)?.body ?? 'earth') === 'earth' && m.source !== 'calendar';
+  if (!wasScheduled && routine) stat(state, 'scheduled');
+  else if (!wasScheduled) {
     addNews(state, {
       headline: `${actorName(state, state.playerId)} marca ${m.name} para ${fmtT(state, lt)}`,
       body: `Chance estimada entre ${pct(m.estimate.low)} e ${pct(m.estimate.high)}. Custo: ${fmtMoney(m.cost)}.`,
@@ -769,7 +809,8 @@ function cancelMission(state, data, m, { reason = 'player' } = {}) {
   state.decisions = state.decisions.filter((x) => !(x.kind === 'launch/ready' && x.payload?.missionId === m.id));
   let refund = 0;
   if (m.paid) {
-    refund = round1(m.cost * (m.status === 'planning' ? 0.6 : 0.4));
+    // refund a share of what was actually paid (a paid mission sent back to planning is still a paid mission)
+    refund = round1(paidOf(m) * 0.4);
     receive(state, state.playerId, refund, 'missions', `Reembolso parcial: ${m.name}`);
   }
   m.status = 'cancelled';
@@ -795,8 +836,42 @@ function cancelMission(state, data, m, { reason = 'player' } = {}) {
 
 const PATCH_KEYS = ['name', 'type', 'destination', 'vehicleId', 'spacecraftId', 'secondarySpacecraftId', 'crew', 'config', 'crewed'];
 
+/** Amount the player actually paid for a mission (older saves: the cost at scheduling). */
+function paidOf(m) {
+  if (!m?.paid) return 0;
+  return Number.isFinite(m.paidM) && m.paidM > 0 ? m.paidM : m.cost || 0;
+}
+
+/** Mission type a calendar definition flies as (same rule as calendarDraft). */
+function calendarTypeOf(def) {
+  return TYPES.includes(def?.type) ? def.type : def?.crewed ? 'crewed' : 'probe';
+}
+
+/**
+ * Does the mission still fly its calendar program? Same type and crew flag, and the same destination
+ * (or one whose own firsts include the program's milestone). Missions without a program: true.
+ */
+export function matchesCalendar(data, m) {
+  if (!m?.calendarId) return true;
+  const def = calDef(data, m.calendarId);
+  if (!def) return true;
+  if (m.type !== calendarTypeOf(def) || !!m.crewed !== !!def.crewed) return false;
+  if (m.destination === def.destination) return true;
+  const dest = destDef(data, m.destination);
+  const own = [].concat((m.crewed ? dest?.firsts?.crewed : dest?.firsts?.robotic) ?? []);
+  return !!def.milestone && own.includes(def.milestone);
+}
+
 function updateMission(state, data, m, patch = {}) {
   if (!['planning', 'scheduled'].includes(m.status)) return { ok: false, error: 'Só missões em planejamento ou agendadas podem mudar.' };
+  // a calendar program is a fixed goal (Artemis IV lands on the Moon): the hardware may change, the target may not
+  if (m.source === 'calendar' && m.calendarId) {
+    const def = calDef(data, m.calendarId);
+    const changed = (k) => k in patch && patch[k] != null && (k === 'crewed' ? !!patch[k] !== !!m[k] : patch[k] !== m[k]);
+    if (def && ['type', 'destination', 'crewed'].some(changed)) {
+      return { ok: false, error: `${def.name} é um programa com destino e tipo definidos. Para outro alvo, monte uma missão nova.` };
+    }
+  }
   const merged = {
     ...m,
     ...Object.fromEntries(PATCH_KEYS.filter((k) => k in patch && k !== 'crew' && k !== 'config').map((k) => [k, patch[k]])),
@@ -812,9 +887,18 @@ function updateMission(state, data, m, patch = {}) {
   if (m.status === 'scheduled') {
     const v = validate(state, data, d, { schedule: true, launchTurn: m.launchTurn, missionId: m.id, paid: true, skipLead: true });
     if (v.errors.length) return { ok: false, error: v.errors[0], errors: v.errors };
-    const diff = round1(newCost - m.cost);
-    if (m.paid && diff > 0 && !pay(state, diff, `Ajuste: ${m.name}`)) return { ok: false, error: `Caixa insuficiente para a diferença de ${fmtMoney(diff)}.` };
-    if (m.paid && diff < 0) receive(state, state.playerId, round1(-diff * 0.8), 'missions', `Ajuste: ${m.name}`);
+  }
+  // already paid (scheduled, or sent back to planning on launch day): settle the difference whatever the status
+  if (m.paid) {
+    const paidM = paidOf(m);
+    const diff = round1(newCost - paidM);
+    if (diff > 0) {
+      if (!canPay(state, diff) || !pay(state, diff, `Ajuste: ${m.name}`)) return { ok: false, error: `Caixa insuficiente para a diferença de ${fmtMoney(diff)}.` };
+      m.paidM = round1(paidM + diff);
+    } else if (diff < 0) {
+      receive(state, state.playerId, round1(-diff * 0.8), 'missions', `Ajuste: ${m.name}`);
+      m.paidM = newCost;
+    }
   }
   if (d.name) m.name = d.name;
   Object.assign(m, {
@@ -861,7 +945,7 @@ function calendarDraft(state, data, inst, def) {
   const cs = fn(diplomacy, 'costShare');
   if (cs) share += Math.max(0, ...(def.partners || []).map((p) => Number(cs(state, state.playerId, p)) || 0));
   share = clamp(share, 0, 0.7);
-  if (share > 0) d.grantM = round1(computeCost(state, data, normalizeDraft(d)).total * share);
+  if (share > 0) d.grantShare = Math.round(share * 1000) / 1000;
   return d;
 }
 
@@ -947,9 +1031,36 @@ function resolveCalendarBriefing(state, data, dec, choiceId) {
     });
     return { ok: true };
   }
-  const res = createMission(state, data, draft || calendarDraft(state, data, inst, def || {}));
+  const d0 = draft || calendarDraft(state, data, inst, def || {});
+  const res = createMission(state, data, { ...d0, readyTurn: programReadyTurn(state, data, inst, def) });
   if (res.ok) inst.missionId = res.missionId;
   return res;
+}
+
+/**
+ * When the program's hardware is ready: the official date (a few weeks of slack), plus a readiness slip rolled
+ * from the item's own delay model (rival programs slip by the same numbers in calendar.js). Announces the slip.
+ */
+function programReadyTurn(state, data, inst, def) {
+  const target = inst.currentTurn ?? inst.plannedTurn ?? state.turn;
+  const d = def?.delay || {};
+  const rng = rngFor(state.seed, 'missions', 'readiness', inst.id);
+  let weeks = 0;
+  // two review gates before launch, like the rivals' periodic revisions
+  for (let gate = 0; gate < 2; gate++) {
+    if (!(d.slipChance > 0) || !rng.chance(d.slipChance)) continue;
+    const months = clamp(rng.normal(d.meanMonths ?? 3, d.sdMonths ?? 2), 0.5, (d.meanMonths ?? 3) + 3 * (d.sdMonths ?? 2));
+    weeks += Math.max(1, Math.round(months * 52 / 12));
+  }
+  weeks = Math.min(weeks, Math.round((d.maxMonths ?? 24) * 52 / 12));
+  if (weeks > 0) {
+    addNews(state, {
+      headline: `Hardware de ${def?.name || 'programa'} atrasa: pronto só em ${fmtT(state, target + weeks)}`,
+      body: 'Testes de qualificação acharam problemas. A equipe pede mais tempo antes do voo.',
+      tags: ['mission', 'delay'], actors: [state.playerId], importance: 2,
+    });
+  }
+  return Math.max(state.turn, target - PROGRAM_EARLY_WEEKS + weeks);
 }
 
 // --- opportunities: windows, rival moves, custom targets, follow-ups ---
@@ -967,16 +1078,16 @@ function pushOpportunity(state, data, { sub, title, body, type, destination, gra
     type, destination, vehicleId: cfg.vehicleId, spacecraftId: cfg.spacecraftId, crewed: isCrewed, source: 'custom',
     crew: autoCrew(state, data, isCrewed ? sc?.crew || 0 : 0), config: { strategy: 'balanced', fuelMargin: 0.1 }, ...extra,
   };
-  const base = computeCost(state, data, normalizeDraft(draft)).total;
-  draft.grantM = round1(base * grantShare);
-  const net = round1(base - draft.grantM);
+  draft.grantShare = grantShare;
+  const net = computeCost(state, data, normalizeDraft(draft)).total;
+  const grantM = round1(computeCost(state, data, normalizeDraft({ ...draft, grantShare: 0 })).total - net);
   const dest = destDef(data, destination);
   stat(state, 'opportunities');
   state.stats['missions.lastOpportunityTurn'] = state.turn;
   return pushDecision(state, {
     kind: 'briefing',
     title,
-    body: `${body}\nDestino: ${dest?.name || destination}. Custo para a agência: ${fmtMoney(net)}${draft.grantM ? ` (${fmtMoney(draft.grantM)} vêm de fora)` : ''}.`,
+    body: `${body}\nDestino: ${dest?.name || destination}. Custo para a agência: ${fmtMoney(net)}${grantM > 0 ? ` (${fmtMoney(grantM)} vêm de fora)` : ''}.`,
     portrait: { actorId: state.playerId },
     urgency,
     expiresTurn: state.turn + 8,
@@ -1251,7 +1362,7 @@ function closeAuctions(state, data) {
       receive(state, win.actorId, Math.round(win.price * 0.25), 'contracts', c.title);
       changeActor(state, win.actorId, 'reputation', 1);
       addNews(state, {
-        headline: `${actorName(state, win.actorId)} vence contrato: ${c.title.toLowerCase()}`,
+        headline: `${actorName(state, win.actorId)} vence contrato: ${c.title.charAt(0).toLowerCase() + c.title.slice(1)}`,
         body: c.playerBid ? `A proposta da ${actorName(state, pid)} (${fmtMoney(c.playerBid.price)}) perdeu para ${fmtMoney(win.price)}.` : `Valor: ${fmtMoney(win.price)}.`,
         tags: ['contract'], actors: [win.actorId], importance: c.playerBid ? 2 : 1,
       });
@@ -1278,7 +1389,7 @@ function awardToPlayer(state, data, c) {
   receive(state, pid, c.advancePaidM, 'contracts', `Adiantamento: ${c.title}`);
   changeActor(state, pid, 'reputation', 1);
   addNews(state, {
-    headline: `${actorName(state, pid)} vence o contrato: ${c.title.toLowerCase()}`,
+    headline: `${actorName(state, pid)} vence o contrato: ${c.title.charAt(0).toLowerCase() + c.title.slice(1)}`,
     body: `${fmtMoney(c.winningPrice)}, com ${fmtMoney(c.advancePaidM)} adiantados. Lançamento até ${fmtT(state, c.deadlineTurn)}.`,
     tags: ['contract', 'win'], actors: [pid], importance: 2,
   });
@@ -1354,7 +1465,8 @@ function settleContract(state, data, m, level) {
 // ---------------------------------------------------------------------------------------------
 
 const hasArrivalScene = (data, m) => (destDef(data, m.destination)?.arrivalMilestones || []).length > 0;
-const needsTransit = (data, m) => {
+/** True when a successful ascent still leaves a transit/arrival phase ahead (the ascent is not the final word). */
+export const needsTransit = (data, m) => {
   const dest = destDef(data, m.destination);
   return (dest?.transitWeeks || 0) > 0 || (dest?.arrivalMilestones || []).length > 0;
 };
@@ -1373,7 +1485,7 @@ function pushLaunchReady(state, data, m, phase) {
   const v = vehicleDef(data, m.vehicleId);
   const fd = state.crew?.[m.crew?.flightDirector];
   const cmd = state.crew?.[m.crew?.commander];
-  const team = [fd && `Diretor de voo: ${fd.name}`, cmd && `Comandante: ${cmd.name}`].filter(Boolean).join(' · ');
+  const team = [fd && `${fd.gender === "f" ? "Diretora" : "Diretor"} de voo: ${fd.name}`, cmd && `Comandante: ${cmd.name}`].filter(Boolean).join(' · ');
   const band = `Chance estimada: ${pct(m.estimate.low)} a ${pct(m.estimate.high)}.`;
   const card = phase === 'arrival'
     ? {
@@ -1533,10 +1645,7 @@ function addScience(state, n, m) {
 // Result impact
 // ---------------------------------------------------------------------------------------------
 
-function destPrestige(dest) {
-  if (!dest) return 3;
-  return dest.prestige ?? DEST_PRESTIGE[dest.id] ?? PRESTIGE_BY_KEY[dest.capacityKey] ?? 5;
-}
+const destPrestige = (dest) => outcomeDestPrestige(dest);
 
 function mainRival(state) {
   const pid = state.playerId;
@@ -1562,13 +1671,13 @@ const fill = (t, vars) => t.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
 
 // Era 4 tone: bloc rivalry, lunar dust, urgency. Data templates (politics.json missionHeadlines) win when present.
 const HEADLINES = {
-  first: ['{actor} faz história: {milestone}', 'Primeira vez: {actor} conquista o {milestone}', '{mission} coloca a {actor} na frente da corrida lunar'],
+  first: ['{actor} faz história: {milestone}', 'Primeira vez: {actor} conquista: {milestone}', '{mission} coloca a {actor} na frente da corrida lunar'],
   total: ['{mission}: sucesso total para a {actor}', '{actor} acerta em cheio com {mission}', '{mission} cumpre o plano e reforça a {actor} na corrida'],
   partial: ['{mission} cumpre parte dos objetivos', 'Sucesso parcial para {mission}; engenheiros analisam desvio', '{mission} chega, mas não como planejado'],
   recoverable: ['{mission} falha, mas a {actor} salva o essencial', 'Falha de {failure} interrompe {mission}', 'Revés para a {actor}: {mission} não cumpre a missão'],
-  catastrophic: ['{mission} é perdida em falha de {failure}', 'Desastre: {mission} põe o programa da {actor} em xeque', 'Fim abrupto para {mission}; investigação começa hoje'],
-  death: ['Luto na {actor}: tripulação da {mission} morre em acidente', 'Tragédia: {mission} termina com {deaths} morte(s)', 'O mundo para: a {actor} perde astronautas em {mission}'],
-  transit: ['{mission} deixa a Terra rumo a {dest}', '{actor} lança {mission}; chegada prevista em {arrive}'],
+  catastrophic: ['Perdemos {mission}: falha de {failure}', 'Desastre: {mission} põe o programa da {actor} em xeque', 'Fim abrupto para {mission}; investigação começa hoje'],
+  death: ['Luto na {actor}: tripulação de {mission} morre em acidente', 'Tragédia: {mission} termina com {deaths} morte(s)', 'O mundo para: a {actor} perde astronautas em {mission}'],
+  transit: ['{mission} deixa a Terra rumo {to}', '{mission} a caminho; chegada prevista em {arrive}'],
   rival: ['{rival} reage: "a corrida não acabou"', '{rival} promete acelerar o próprio programa', 'Pressão sobe na {rival} depois do feito da {actor}'],
 };
 function headline(state, data, key, vars, rng) {
@@ -1591,7 +1700,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
   const success = level === 'total' || level === 'partial';
   const dest = destDef(data, m.destination);
   const vars = {
-    actor: actorName(state, pid), mission: m.name, dest: dest?.name || m.destination,
+    actor: actorName(state, pid), mission: m.name, dest: dest?.name || m.destination, to: dest?.toLabel || `a ${dest?.name || m.destination}`,
     failure: FAILURE_LABELS[failureType] || 'origem desconhecida',
   };
   const headlines = [];
@@ -1633,32 +1742,38 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
   let prestige = 0;
   let science = 0;
   const firsts = [];
+  let rivalLine = null;
   if (!final) {
-    headlines.push(headline(state, data, 'transit', { ...vars, arrive: fmtT(state, m.transit.arriveTurn) }, rng));
+    // the launch scene already wrote the departure headline: the transit line only replaces a missing one
+    if (!outcome?.headline) headlines.push(headline(state, data, 'transit', { ...vars, arrive: fmtT(state, m.transit.arriveTurn) }, rng));
     changeActor(state, pid, 'support', 1);
     if (level === 'partial') headlines.push(`${m.name} entra em órbita abaixo do previsto; margem reduzida para a chegada`);
   } else {
     const p0 = m.estimate?.p ?? 0.8;
-    const bold = (m.config?.strategy === 'aggressive' ? 0.15 : 0) + (p0 < 0.6 ? 0.2 : 0) + (m.crewed ? 0.1 : 0);
-    const base = destPrestige(dest) * (m.crewed ? 1.8 : 1);
+    const strategy = outcome?.lineup?.strategy || m.config?.strategy || 'balanced';
+    const stratMult = STRATEGY_PRESTIGE[strategy] ?? 1;
     // repetition is less newsworthy: diminishing returns per earlier success at the same destination
     const repeats = (state.missions || []).filter((x) => x.id !== m.id && x.destination === m.destination && !!x.crewed === !!m.crewed
       && ['operations', 'done'].includes(x.status) && ['total', 'partial'].includes(x.result?.outcome)).length;
     // contract deliveries are a service: they pay in cash and reputation more than in prestige
-    const novelty = Math.max(0.15, 1 / (1 + 0.55 * repeats)) * (m.source === 'contract' ? 0.5 : 1);
+    // (same scale as the AI's calendar results: core/outcome.js missionPrestige)
+    const mp = missionPrestige(dest, { crewed: !!m.crewed, level, p: p0, repeats, strategyMult: stratMult, contract: m.source === 'contract' });
+    const { base, novelty, bold } = mp;
     const routine = (dest?.body ?? 'earth') === 'earth' && !m.crewed;
     if (success) {
-      prestige = Math.round(base * (level === 'total' ? 1 : 0.45) * (1 + bold) * novelty);
+      prestige = mp.prestige;
       changeActor(state, pid, 'prestige', prestige);
       // "Os Primeiros": destination firsts, calendar milestone, national crewed orbit
       // (crewed_orbit_national is per actor: handled below with its ":<actorId>" key)
-      const ms = [m.crewed ? dest?.firsts?.crewed : dest?.firsts?.robotic, m.milestone].filter((id) => id && !String(id).startsWith('crewed_orbit_national'));
+      // the program milestone only counts if the flight really is that program (not a LEO hop renamed Artemis IV)
+      const programOk = matchesCalendar(data, m);
+      const ms = [...[].concat((m.crewed ? dest?.firsts?.crewed : dest?.firsts?.robotic) ?? []), programOk ? m.milestone : null].filter((id) => id && !String(id).startsWith('crewed_orbit_national'));
       for (const id of [...new Set(ms)]) {
         if (state.firsts?.[id]?.actorId === pid || (state.stats?.[`missions.reached.${id}`] || 0) > 0) continue;
         stat(state, `reached.${id}`);
         const firstPts = 30 + Math.round(base);
         const wasFirst = claimFirst(state, id, pid, firstPts, 5);
-        prestige += wasFirst ? firstPts : 5;
+        prestige += wasFirst ? firstValue(state, id, firstPts) : 5;
         if (wasFirst) { firsts.push(id); emitSignal(state, 'first', { milestoneId: id, actorId: pid }); }
       }
       const natKey = `crewed_orbit_national:${pid}`;
@@ -1676,7 +1791,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
       // support / reputation / culture: bold missions pay off more
       changeActor(state, pid, 'support', level === 'total' ? Math.round((1 + base / 8 + bold * 4) * novelty) : routine ? 0 : 1);
       changeActor(state, pid, 'reputation', level === 'total' && novelty >= 0.4 ? 1 : 0);
-      if (level === 'total' && m.config?.strategy === 'aggressive') changeActor(state, pid, 'culture', 3);
+      if (level === 'total' && strategy === 'aggressive') changeActor(state, pid, 'culture', 3);
       stat(state, level === 'total' ? 'success' : 'partial');
     } else {
       const heavy = level === 'catastrophic';
@@ -1700,11 +1815,14 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
     }
     if (!outcome?.headline || headlines.length < 2) headlines.push(headline(state, data, level, vars, rng));
     const rival = mainRival(state);
-    if (rival && success && (firsts.length || prestige >= 10)) headlines.push(headline(state, data, 'rival', { ...vars, rival: actorName(state, rival) }, rng));
+    if (rival && success && (firsts.length || prestige >= 10)) headlines.push((rivalLine = headline(state, data, 'rival', { ...vars, rival: actorName(state, rival) }, rng)));
 
     // linked calendar item + contract
     const inst = m.calendarId ? (state.calendar || []).find((c) => c.id === m.calendarId) : null;
-    if (inst) {
+    if (inst && !matchesCalendar(data, m)) {
+      // flew something else under the program's name: the program itself never happened
+      if (inst.status === 'player') { inst.status = 'cancelled'; inst.resolvedTurn = state.turn; }
+    } else if (inst) {
       inst.status = level === 'total' ? 'success' : level === 'partial' ? 'partial' : 'failed';
       inst.outcome = { level, failureType };
       inst.resolvedTurn = state.turn;
@@ -1725,23 +1843,31 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
 
   // news feed
   const top = m.result.headlines[0];
-  if (top) {
+  // routine repeats (3rd+ uneventful success to the same Earth orbit) are log-only: the feed is for news
+  const routineRepeat = final && level === 'total' && !firsts.length && !deadIds.length && (dest?.body ?? 'earth') === 'earth' && !m.crewed
+    && (state.missions || []).filter((x) => x.id !== m.id && x.destination === m.destination && !x.crewed && x.result?.outcome === 'total').length >= 2;
+  if (top && routineRepeat) log(state, `missions: ${top}`);
+  else if (top) {
     addNews(state, {
       headline: top,
       body: [
-        final ? `Resultado: ${LEVEL_LABELS[level]}.` : `Subida: ${LEVEL_LABELS[level]}.`,
-        prestige ? `+${prestige} prestígio.` : '',
-        science ? `+${science} ciência.` : '',
-        ...(outcome?.causes || []).slice(0, 2).map((c) => c.label).filter(Boolean),
-      ].filter(Boolean).join(' '),
+        [
+          final ? `Resultado: ${LEVEL_LABELS[level]}.` : `Subida: ${LEVEL_LABELS[level]}.`,
+          prestige ? `+${prestige} prestígio.` : '',
+          science ? `+${science} ciência.` : '',
+        ].filter(Boolean).join(' '),
+        (outcome?.causes || []).slice(0, 2).map((c) => c.label).filter(Boolean).join(' · '),
+      ].filter(Boolean).join('\n'),
       tags: ['mission', level, phase], actors: [pid], importance: deadIds.length || firsts.length || level === 'catastrophic' ? 3 : 2,
     });
-    for (const h of m.result.headlines.slice(1, 3)) addNews(state, { headline: h, tags: ['mission', 'reaction'], actors: [pid], importance: 1 });
+    // one headline per event; a rival's reaction is news only when a first changed the race
+    const reaction = firsts.length && rivalLine && rivalLine !== top ? rivalLine : null;
+    if (reaction) addNews(state, { headline: reaction, tags: ['mission', 'reaction'], actors: [pid], importance: 1 });
   }
 
   emitSignal(state, 'mission/resolved', {
     missionId: m.id, calendarId: m.calendarId || null, actorId: pid, destination: m.destination, missionType: m.type, // NOT "type": emitSignal spreads payload over the signal type
-    crewed: !!m.crewed, outcome: level, failureType, phase,
+    crewed: !!m.crewed, outcome: level, failureType, phase, final,
   });
   return { status: m.status, final, prestige, science, firsts, headlines: m.result.headlines };
 }
@@ -1753,6 +1879,8 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
 /** Everything the 3-step builder needs for a partial draft. Pure; never throws on partial input. */
 export function draftOptions(state, data, draftIn = {}) {
   const d = { ...normalizeDraft(draftIn), riskMod: 0 };
+  const existing = draftIn.missionId ? missionById(state, draftIn.missionId) : null;
+  if (Number.isFinite(existing?.createdTurn)) d.createdTurn = existing.createdTurn;
   const pid = state.playerId;
   const cash = state.actors?.[pid]?.cash ?? 0;
   const types = TYPES.map((t) => ({ id: t, label: TYPE_LABELS[t], selected: t === d.type }));
@@ -1786,8 +1914,12 @@ export function draftOptions(state, data, draftIn = {}) {
 
   const spacecraft = spacecraftFor(state, data).map((s) => {
     const reasons = [];
-    if (d.type && !scOkForType(s, d.type, d.crewed)) reasons.push(d.crewed ? 'Não leva tripulação.' : 'Tipo incompatível.');
+    if (d.type && !(d.source === 'calendar' && s.id === d.spacecraftId) && !scOkForType(s, d.type, d.crewed)) reasons.push(d.crewed ? 'Não leva tripulação.' : 'Tipo incompatível.');
     if (d.destination && !scOkForDest(s, d.destination)) reasons.push('Não serve para este destino.');
+    if (d.vehicleId && Array.isArray(s.compatibleVehicles) && s.compatibleVehicles.length && !s.compatibleVehicles.includes(d.vehicleId)) {
+      const names = s.compatibleVehicles.map((id) => vehicleDef(data, id)?.name || id);
+      reasons.push(`Só voa no ${names.join(' ou ')}.`);
+    }
     const rel = spacecraftReliability(state, data, s.id);
     return {
       id: s.id, name: s.name, operator: s.operator, kind: s.kind, crew: s.crew || 0, massT: s.massT ?? null, costM: s.costM || 0,
@@ -1827,6 +1959,7 @@ export function draftOptions(state, data, draftIn = {}) {
   const w = v.window;
   return {
     draft: d,
+    autoName: d.name ? null : nameFor(state, data, d),
     types,
     destinations,
     vehicles,
@@ -1877,13 +2010,23 @@ export function tick(state, data, ctx) {
   }
 }
 
+const PRIVILEGED_DRAFT_KEYS = ['grantM', 'grantShare', 'milestone', 'calendarId', 'contractId', 'deadlineTurn', 'targetTurn', 'readyTurn', 'clientPayload'];
+/** A draft as the player may send it: no grants, no program/contract links, always a custom mission. */
+export function publicDraft(draft) {
+  const d = { ...(draft && typeof draft === 'object' ? draft : {}) };
+  for (const k of PRIVILEGED_DRAFT_KEYS) delete d[k];
+  d.source = 'custom';
+  return d;
+}
+
 const getM = (state, action) => {
   const m = missionById(state, action.missionId);
   return m ? { m } : { err: { ok: false, error: 'Missão não encontrada.' } };
 };
 
 export const actions = {
-  'mission/create': (state, data, action) => createMission(state, data, action.draft || {}),
+  // public entry point: privileged fields (grants, program/contract links, milestones) only come from briefings and contracts
+  'mission/create': (state, data, action) => createMission(state, data, publicDraft(action.draft)),
   'mission/update': (state, data, action) => {
     const { m, err } = getM(state, action);
     return err || updateMission(state, data, m, action.patch || {});

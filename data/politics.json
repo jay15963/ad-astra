@@ -907,9 +907,11 @@
   "budgetModel": {
     "growthEffect": 0.008,
     "stanceEffect": 0.1,
-    "supportEffect": 0.03,
-    "min": -0.25,
-    "max": 0.2,
+    "supportEffect": 0.02,
+    "min": -0.2,
+    "max": 0.06,
+    "raiseDamping": 0.6,
+    "companyMax": 0.15,
     "floorShare": 0.4,
     "playerCutThreshold": -0.035,
     "dividedVolatility": 1.5

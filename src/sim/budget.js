@@ -196,7 +196,9 @@ function debtWeek(state) {
   if (!me) return;
   if ((me.cash || 0) < 0) {
     f.debtWeeks += 1;
-    if (f.debtWeeks === 1) {
+    // 8 weeks of hysteresis: a cash line hovering around zero does not flip the headline every week
+    if (f.debtWeeks === 1 && state.turn - (f.redNewsTurn ?? -99) >= 8) {
+      f.redNewsTurn = state.turn;
       addNews(state, { headline: 'Caixa da agência no vermelho', body: 'O tesouro cobre por enquanto, mas o governo está de olho.', tags: ['budget'], actors: [state.playerId], importance: 2, icon: 'budget' });
     }
     if (f.debtWeeks >= DEBT_GRACE) {
@@ -212,7 +214,7 @@ function debtWeek(state) {
       log(state, 'budget: game over (fired)');
     }
   } else if (f.debtWeeks > 0) {
-    if (f.debtWeeks >= DEBT_GRACE) addNews(state, { headline: 'Agência sai do vermelho', body: 'O caixa voltou a ficar positivo.', tags: ['budget'], actors: [state.playerId], importance: 1, icon: 'budget' });
+    if (f.debtWeeks >= DEBT_GRACE && state.turn - (f.redNewsTurn ?? -99) >= 8) addNews(state, { headline: 'Agência sai do vermelho', body: 'O caixa voltou a ficar positivo.', tags: ['budget'], actors: [state.playerId], importance: 1, icon: 'budget' });
     f.debtWeeks = 0;
   }
 }
@@ -228,7 +230,28 @@ export function tick(state, data, ctx) {
     charge(state, a.id, (budget * clamp(a.fixedCostShare ?? DEFAULT_FIXED_SHARE, 0, 1)) / WEEKS, 'facilities', 'Custos fixos (folha e instalações)');
     if (a.id !== state.playerId) aiWeek(state, a);
   }
+  if (state.turn % 13 === 12) companyPayout(state);
   debtWeek(state);
+}
+
+// Companies do not sit on cash: investors take dividends every quarter, and a hoard well above a year of revenue
+// makes them ask why the money is not flying (support = investor confidence). Keeps the player company cash-limited.
+const PAYOUT_KEEP = 0.3;  // share of the yearly revenue a company keeps as working cash
+const PAYOUT_SHARE = 0.5; // share of the excess paid out each quarter
+function companyPayout(state) {
+  const me = state.actors?.[state.playerId];
+  if (!me || me.kind !== 'company') return;
+  const excess = (me.cash || 0) - (me.budget || 0) * PAYOUT_KEEP;
+  if (excess <= 0) return;
+  charge(state, me.id, Math.round(excess * PAYOUT_SHARE), 'grants', 'Dividendos aos investidores');
+  if ((me.cash || 0) > (me.budget || 0) * 0.75) {
+    changeActor(state, me.id, 'support', -2);
+    const f = fin(state);
+    if (state.turn - (f.hoardNewsTurn ?? -99) >= 52) {
+      f.hoardNewsTurn = state.turn;
+      addNews(state, { headline: 'Investidores cobram: caixa parado não leva ninguém à Lua', body: 'O conselho quer o dinheiro em missões, não no banco.', tags: ['budget'], actors: [me.id], importance: 2, icon: 'budget' });
+    }
+  }
 }
 
 // ---------- actions ----------

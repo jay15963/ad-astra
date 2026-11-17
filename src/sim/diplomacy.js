@@ -14,11 +14,15 @@ const ACCEPT_T = 8;      // acceptance threshold (utility)
 const PROPOSE_T = 24;    // AI only proposes when the best option clears this
 const BREAK_T = 22;      // AI breaks a treaty above this
 const LEAVE_T = 16;      // AI leaves its bloc above this
+const SEEDED_GRACE_WEEKS = 26; // default protection of the starting treaties
+const STRAIN_K = 0.04;   // monthly chance factor of an AI-AI rupture under strain (rivalry above trust)
+const STRAIN_OFFSET = 25; // even a lukewarm partnership (trust barely above rivalry) can sour
 const JOIN_T = 14;       // blocless AI asks to join a bloc above this
 const NOISE = 6;         // sd of the decision noise
 const PLAYER_PROPOSAL_GAP = 8;   // weeks between AI proposals to the player
 const PROPOSAL_TTL = 6;          // weeks the player has to answer
 const REJECT_MEMORY = 26;        // weeks an actor remembers a refusal
+const REFUSAL_TRUST = 1;         // trust lost when a player proposal is refused (2x for a counter-proposal)
 const BREAK_MEMORY = 156;        // weeks an actor remembers a betrayal
 
 const DEFAULT_REL = { trust: 0, dependence: 0, rivalry: 10 };
@@ -416,6 +420,12 @@ export function init(state, data) {
     signedTurn: t.signedTurn ?? 0,
     terms: { health: 60, ...(t.terms || {}) },
   }));
+  // real arrangements of 2026 do not collapse in the first months: seeded bilateral deals are protected until
+  // their own milestone (data: terms.protectedUntil) or for the first half year
+  for (const t of state.treaties) {
+    if (t.status !== 'active' || t.parties.length !== 2 || t.terms.multilateral) continue;
+    if (t.terms.protectedUntil == null) t.terms.protectedUntil = SEEDED_GRACE_WEEKS;
+  }
   for (const t of state.treaties) if (t.status === 'broken' && t.brokenBy) {
     for (const p of t.parties) if (p !== t.brokenBy && state.actors[p]) memoryOf(state, p).brokenBy[t.brokenBy] = t.brokenTurn ?? -999;
   }
@@ -635,12 +645,39 @@ function treatyUpkeep(state, data, rng) {
     const h = t.terms.health ?? 60;
     const dh = (55 - h) * 0.05 + (r.trust - 20) / 25 - (r.rivalry - 30) / 30 - bp * 4 - tensionOf(state, a, b) * 3 + rng.normal(0, 5);
     t.terms.health = Math.round(clamp(h + dh, 0, 100));
+    if (isProtected(state, t)) t.terms.health = Math.max(t.terms.health, 40);
     bumpRelation(state, a, b, { trust: (t.terms.health - 50) / 100, dependence: 0.3 });
   }
+  strainRuptures(state, data, rng);
   // keeping your word slowly builds reputation
   for (const id of sortedIds(state)) {
     const n = bilateralLoad(state, id);
     if (n > 0) changeActor(state, id, 'reputation', Math.min(0.3, 0.08 * n));
+  }
+}
+
+function isProtected(state, t) {
+  return t?.terms?.protectedUntil != null && state.turn < t.terms.protectedUntil;
+}
+
+/**
+ * Alliances cool and break (GDD "uma aliança nasce, esfria e se rompe"): a bilateral AI-AI deal under strain
+ * (rivalry above trust, worse in a crisis) may break any month, on top of the utility-driven decisions.
+ */
+function strainRuptures(state, data, rng) {
+  for (const t of activeTreaties(state).slice()) {
+    if (t.terms?.multilateral || t.type === 'peaceful_use' || t.parties.length !== 2 || isProtected(state, t)) continue;
+    if (t.parties.includes(state.playerId) || state.turn - (t.signedTurn ?? 0) < 26) continue;
+    const [a, b] = t.parties;
+    const r = relation(state, a, b);
+    const ten = tensionOf(state, a, b);
+    const p = STRAIN_K * Math.max(0, r.rivalry - r.trust + STRAIN_OFFSET) / 100 * (ten >= 2 ? 2 : 1) * (1 + Math.max(0, 50 - (t.terms.health ?? 60)) / 50);
+    if (!(p > 0) || !rng.chance(p)) continue;
+    // the more aggressive (or more squeezed) side walks out
+    const score = (x) => (state.actors[x]?.ai?.aggression ?? 0.5) + budgetPressure(state, x);
+    const by = score(a) >= score(b) ? a : b;
+    const f = new Factors().add('rivalidade acima da confiança', r.rivalry - r.trust).add('acordo desgastado', 55 - (t.terms.health ?? 60));
+    breakTreaty(state, data, by, t.id, rng, f);
   }
 }
 
@@ -792,6 +829,7 @@ function aiEvaluate(state, data, id, rng) {
     if (t.terms?.blocId && blocOf(state, id)?.id === t.terms.blocId) continue; // leaving the bloc handles this
     if (state.turn - (t.signedTurn ?? 0) < 12) continue; // the ink is still wet
     if (state.turn < 12 && (t.signedTurn ?? 0) < 0) continue; // the world does not flip in the first weeks
+    if (isProtected(state, t)) continue;
     const f = breakUtility(state, data, id, t);
     cands.push({ kind: 'break', treaty: t.id, u: f.u + rng.normal(0, NOISE), t: BREAK_T, f });
   }
@@ -818,14 +856,15 @@ function leaveUtility(state, data, id, bloc) {
   const S = state.actors[id];
   const v = view(state, id, bloc.leader);
   const f = new Factors();
-  f.add('inércia', -30);
+  f.add('inércia', -24);
   f.add('confiança no líder', -v.trust * 0.4);
   f.add('rivalidade com o líder', v.rivalry * 0.3);
   f.add('tensão com o líder', v.tension * 15);
   f.add('agressividade', (S.ai.aggression ?? 0.5) * 10);
   f.add('dependência', -v.dependence * 0.2);
+  if (v.trust < -20) f.add('relação rompida com o líder', 8 + (-20 - v.trust) * 0.4);
   const outside = Object.values(state.blocs).filter((b) => b.id !== bloc.id && b.leader);
-  for (const b of outside) f.add(`atração do ${b.short || b.name}`, Math.max(0, relation(state, id, b.leader).trust - v.trust) * 0.15);
+  for (const b of outside) f.add(`atração do ${b.short || b.name}`, Math.max(0, relation(state, id, b.leader).trust - v.trust) * 0.25);
   return f;
 }
 
@@ -1050,7 +1089,7 @@ function respond(state, data, p, responder, rng) {
   }
   memoryOf(state, other).rejected[`${responder}:${p.type}`] = state.turn;
   memoryOf(state, responder).rejected[`${other}:${p.type}`] = state.turn;
-  bumpRelation(state, responder, other, { trust: p.countered ? -2 : -1 });
+  bumpRelation(state, responder, other, { trust: p.countered ? -2 * REFUSAL_TRUST : -REFUSAL_TRUST });
   const vars = { a: short(state, p.from), b: short(state, responder), type: typeName(data, p.type).toLowerCase() };
   if (playerSide) {
     addNews(state, {
@@ -1310,14 +1349,14 @@ export function previewProposal(state, data, to, type, terms = {}) {
     if (!bloc) return { u: -999, chance: 0, label: chanceLabel(0), reasons: ['bloco inexistente'], error: 'Bloco inexistente.' };
     const f = joinBlocUtility(state, data, bloc.leader, me, { blocId, member: me }, 'accept');
     const c = chanceFrom(f.u);
-    return { u: round(f.u), chance: round(c, 2), label: chanceLabel(c), reasons: f.top(2), against: f.top(2, -1), terms: { blocId, member: me } };
+    return { u: round(f.u), chance: round(c, 2), label: chanceLabel(c), reasons: f.top(2), against: f.top(2, -1), terms: { blocId, member: me }, refusalTrust: REFUSAL_TRUST };
   }
   const err = validatePlayerProposal(state, data, me, to, type, terms);
   const t = normalizeTerms(state, data, type, me, to, terms);
   const f = dealUtility(state, data, to, me, type, t, 'accept');
   f.add('sua reputação', ((state.actors[me]?.reputation ?? 50) - 50) * 0.1);
   const c = err ? 0 : chanceFrom(f.u);
-  return { u: round(f.u), chance: round(c, 2), label: chanceLabel(c), reasons: f.top(2), against: f.top(2, -1), terms: t, error: err || undefined };
+  return { u: round(f.u), chance: round(c, 2), label: chanceLabel(c), reasons: f.top(2), against: f.top(2, -1), terms: t, error: err || undefined, refusalTrust: REFUSAL_TRUST, counterRefusalTrust: 2 * REFUSAL_TRUST };
 }
 
 /** The proposal kind travels in `proposalType` (action.type is the engine route 'diplomacy/propose'). */
@@ -1364,6 +1403,10 @@ function actJoinBloc(state, data, action, ctx) {
   const cur = blocOf(state, me);
   if (cur) return { ok: false, error: `Saia antes do bloco ${cur.name}.` };
   if (!bloc.leader || bloc.leader === me) { joinBloc(state, data, me, bloc.id, ctx.rng('join')); return { ok: true, status: 'accepted' }; }
+  // same gates as any other proposal: no channel in open conflict, one request at a time, a cooldown after a refusal
+  if (tensionOf(state, me, bloc.leader) >= 3) return { ok: false, error: 'Conflito aberto: não há canal diplomático.' };
+  if (state.proposals.some((p) => p.from === me && p.type === 'join_bloc')) return { ok: false, error: 'Já existe um pedido de adesão em aberto.' };
+  if (remembers(state, bloc.leader, 'rejected', `${me}:join_bloc`, 12)) return { ok: false, error: `${short(state, bloc.leader)} recusou isso há pouco. Espere algumas semanas.` };
   const rng = ctx.rng(`joinBloc:${bloc.id}`);
   const p = {
     id: nextId(state, 'prop'), from: me, to: bloc.leader, type: 'join_bloc', terms: { blocId: bloc.id, member: me },
@@ -1507,7 +1550,7 @@ function qProposalTypes(state, data, to) {
       const pre = previewProposal(state, data, to, type, {});
       row.available = !pre.error && pre.u > -500;
       row.reason = pre.error || (pre.u <= -500 ? pre.against?.[0] : undefined);
-      row.chance = pre.chance; row.chanceLabel = pre.label; row.terms = pre.terms;
+      row.chance = pre.chance; row.chanceLabel = pre.label; row.terms = pre.terms; row.refusalTrust = pre.refusalTrust;
       row.termsText = pre.terms ? describeTerms(state, data, type, pre.terms) : '';
     }
     return row;

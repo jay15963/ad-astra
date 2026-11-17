@@ -3,7 +3,7 @@
 
 import { loadData, browserReader } from '../core/data.js';
 import { createStore } from './store.js';
-import { h, raw, button, toast, fallbackPanel, closeAllModals, fmtDate, chip, openModal, fmtBand, esc } from './components.js';
+import { h, raw, button, toast, fallbackPanel, closeAllModals, fmtDate, chip, openModal, fmtBand, esc, newsIcon } from './components.js';
 import { emblemSVG } from './portrait.js';
 import { applySettings, render as renderSettings, APP_VERSION, BUILD_DATE } from './settings.js';
 import { renderTitle, renderGameOver } from './newgame.js';
@@ -58,10 +58,16 @@ async function boot() {
   document.body.dataset.era = String(data.scenario?.era || 4);
   store = createStore(data);
   applySettings(store.settings);
-  store.ui = { navigate, openDecision: (id) => openDecision(store, id), advance, route: () => ui.route, version: APP_VERSION };
+  store.ui = {
+    navigate, openDecision: (id) => openDecision(store, id), advance, route: () => ui.route, version: APP_VERSION,
+    // a view that swaps screens inside one route (builder steps) asks for the top explicitly
+    scrollTop: () => { if (ui.shell?.view) ui.shell.view.scrollTop = 0; },
+  };
   globalThis.adastra = store; // debugging aid in the console
   store.subscribe(onStoreChange);
-  window.addEventListener('hashchange', () => { closeAllModals(); parseHash(); renderView(); renderTabbar(); }); // back button closes sheets
+  // sheets push their own history entry (components.openModal), so back closes a sheet first; a real route
+  // change leaves those entries behind it
+  window.addEventListener('hashchange', () => { closeAllModals({ keepHistory: true }); parseHash(); renderView(); renderTabbar(); });
   parseHash();
   // resume straight into the game if a save exists and we were mid-launch (Pilar: fechar o app não prejudica)
   const info = store.saveInfo();
@@ -80,6 +86,8 @@ function showTitle() {
   ui.lookingAfterEnd = false;
   closeAllModals();
   closeLaunch();
+  // the title screen has no route: drop a stale '#ajustes' (a later start navigates to #painel)
+  if (location.hash) { try { history.replaceState(history.state, '', location.pathname + location.search); } catch { /* */ } }
   renderTitle(appRoot, store, {
     onStart: () => { navigate('painel'); renderAll(); },
     onSettings: () => {
@@ -179,7 +187,7 @@ function renderTicker() {
   ui.tickerTop = top;
   const el = ui.shell.ticker;
   el.innerHTML = '';
-  const items = news.length ? news.map((n) => `${n.icon || (n.importance >= 3 ? '⚡' : '•')} ${n.headline}`) : ['Sem manchetes por enquanto. O mundo está observando.'];
+  const items = news.length ? news.map((n) => `${newsIcon(n)} ${n.headline}`) : ['Sem manchetes por enquanto. O mundo está observando.'];
   const line = items.map((t) => `<span class="tick-item">${esc(t)}</span>`).join('');
   const secs = Math.max(20, Math.round(items.join('').length * 0.16)); // constant reading speed
   el.append(h('span', { class: 'ticker-label' }, 'AO VIVO'),
@@ -228,14 +236,18 @@ function renderTimebar() {
     return;
   }
   el.append(
-    button('+1 semana', () => advance(1, false), { kind: 'ghost', icon: '⏵', cls: 'time-btn' }),
-    button('Próximo evento', () => advance(26, true), { kind: 'primary', icon: '⏩', cls: 'time-btn grow' }));
+    button(h('span', { class: 'btn-label' }, '+1 semana'), () => advance(1, false), { kind: 'ghost', icon: '⏵', cls: 'time-btn' }),
+    // "evento" hides on narrow screens with big text (styles.css @container timebar); aria-label keeps the full name
+    button(h('span', { class: 'btn-label' }, 'Próximo', h('span', { class: 'lbl-more' }, ' evento')), () => advance(26, true), { kind: 'primary', icon: '⏩', cls: 'time-btn grow', title: 'Próximo evento' }));
 }
 
 function renderView() {
   if (!ui.shell || !store.state) return;
   const view = ui.shell.view;
-  const sameRoute = view.dataset.route === `${ui.route.tab}/${ui.route.sub}`;
+  const key = `${ui.route.tab}/${ui.route.sub}`;
+  const sameRoute = view.dataset.route === key;
+  // a re-render of the same screen keeps its place; a new screen starts at the top (the old offset used to
+  // carry over and open views mid-page with their headers hidden)
   const scroll = sameRoute ? view.scrollTop : 0;
   try { ui.cleanup?.(); } catch (e) { console.warn(e); }
   ui.cleanup = null;
@@ -260,7 +272,7 @@ function renderView() {
     container.innerHTML = '';
     container.appendChild(fallbackPanel('Esta aba ainda está em construção. O resto do jogo continua funcionando.', e));
   }
-  if (sameRoute && scroll) view.scrollTop = scroll;
+  view.scrollTop = scroll;
   renderTimebar();
 }
 

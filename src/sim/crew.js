@@ -157,9 +157,17 @@ function genPerson(state, data, rng, { id, actorId, culture, role, star = false,
   const gender = legacy?.gender || (rng.chance(0.5) ? 'f' : 'm');
   const female = new Set(C.femaleNames?.[culture] || []);
   const pool = (C.firstNames?.[culture] || ['Alex']).filter((nm) => (gender === 'f') === female.has(nm));
-  const first = rng.pick(pool.length ? pool : C.firstNames?.[culture] || ['Alex']);
-  const last = legacy?.surname || rng.pick(C.lastNames?.[culture] || ['Silva']);
-  const name = (C.surnameFirst || []).includes(culture) ? `${last} ${first}` : `${first} ${last}`;
+  // fictional crew only: never generate the name of a real astronaut or cosmonaut (data: forbiddenNames)
+  const forbidden = new Set((C.forbiddenNames || []).map((x) => String(x).toLowerCase()));
+  let first;
+  let last;
+  let name;
+  for (let tries = 0; tries < 8; tries++) {
+    first = rng.pick(pool.length ? pool : C.firstNames?.[culture] || ['Alex']);
+    last = legacy?.surname || rng.pick(C.lastNames?.[culture] || ['Silva']);
+    name = (C.surnameFirst || []).includes(culture) ? `${last} ${first}` : `${first} ${last}`;
+    if (!forbidden.has(name.toLowerCase())) break;
+  }
   const skill = star ? rng.int(80, 93) : clamp(Math.round(rng.normal(52, 11)), 25, 85);
   const age = role === 'astronaut' ? rng.int(29, 46) : role === 'flight_director' ? rng.int(33, 56) : rng.int(25, 55);
   const traits = pickTraits(data, rng, rng.chance(0.55) ? 2 : 1, star && rng.chance(0.6) ? ['ambicioso'] : []);

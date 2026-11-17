@@ -5,7 +5,7 @@
 // - Background commercial launches (aggregate) keep vehicle stats alive.
 // Pure JS, deterministic: randomness only via ctx.rng(label). No dates or mission names hard-coded here.
 
-import { addNews, emitSignal, claimFirst, changeActor, log, relKey, clamp } from '../core/helpers.js';
+import { addNews, emitSignal, claimFirst, isHistoricFirst, changeActor, log, relKey, clamp } from '../core/helpers.js';
 import { hash32, makeRng } from '../core/rng.js';
 import { formatTurn, weeksToText, WEEKS_PER_YEAR } from '../core/time.js';
 
@@ -39,26 +39,27 @@ export const STATUS_LABELS = {
 };
 
 const DEFAULT_NEWS = {
-  delayed: '{name} adiada para {date}',
+  delayed: 'Adiamento: {name} fica para {date}',
   delayedBody: 'Mais {weeks} de atraso. Plano original: {planned}.',
   windowMissed: '{name} perde a janela e fica para {date}',
   windowMissedBody: '',
   prereqWait: '{name} aguarda {prereq}',
   prereqWaitBody: 'Nova meta: {date}.',
-  prereqFailed: '{name} revista depois do fracasso de {prereq}',
-  grounded: '{name} adiada: frota do {vehicle} em solo',
-  suspended: '{name} suspensa',
+  prereqFailed: 'Revisão em {name} depois do fracasso de {prereq}',
+  grounded: 'Adiamento: {name} espera a frota do {vehicle} voltar a voar',
+  suspended: 'Guerra suspende {name}',
   suspendedBody: 'Retomada prevista para {date}.',
-  cancelled: '{name} cancelada',
+  cancelled: 'Cancelamento: {name}',
   cancelledBody: '',
   launched: '{owner} lança {name}',
   launchedBody: 'Chegada prevista para {date}.',
   success: '{name}: sucesso!',
   partial: '{name}: sucesso parcial',
   failed: '{name} fracassa',
-  lostCrew: 'Tragédia: tripulação da {name} perdida',
+  lostCrew: 'Tragédia: tripulação perdida em {name}',
   lostCrewBody: '',
-  first: '{owner} é o primeiro: {milestone}',
+  first: 'Feito inédito! {owner} conquista: {milestone}',
+  firstEra: 'Primeira vez neste século: {owner} conquista {milestone}',
   reflight: '{owner} vai repetir {name}: nova data {date}',
   bgFailure: 'Falha do {vehicle} perde carga comercial',
   bgFailureBody: 'Frota em solo por cerca de {weeks}.',
@@ -282,7 +283,9 @@ export function availableTurnOf(state, data, item) {
     const inst = calendarInstance(state, item.debutCalendarId);
     if (inst && inst.status !== 'player' && inst.status !== 'cancelled') {
       const firstOk = (inst.history || []).find((h) => h.vehicleOk);
-      if (firstOk) t = Math.max(t, firstOk.turn);
+      // player-flown debuts (missions writes the final status, without rival history)
+      const okTurn = firstOk ? firstOk.turn : ['success', 'partial'].includes(inst.status) ? inst.resolvedTurn ?? inst.currentTurn : null;
+      if (okTurn != null) t = Math.max(t, okTurn);
       else return null; // debut has not flown successfully yet
     }
   }
@@ -310,8 +313,14 @@ function inSameBloc(state, data, a, b) {
   return false;
 }
 
+// Only working agreements open hardware access; global norms (Outer Space Treaty, traffic rules) do not.
+const ACCESS_TREATIES = ['mission_partnership', 'cost_sharing', 'crew_exchange', 'tech_transfer'];
 function hasTreaty(state, a, b) {
-  return (state?.treaties || []).some((t) => t?.status === 'active' && t.parties?.includes(a) && t.parties?.includes(b));
+  return (state?.treaties || []).some((t) => t?.status === 'active' && ACCESS_TREATIES.includes(t.type) && t.parties?.includes(a) && t.parties?.includes(b));
+}
+
+function actorDef(state, data, id) {
+  return state?.actors?.[id] || (data?.actors?.actors || []).find((x) => x.id === id) || null;
 }
 
 /** Can `actorId` buy/use this catalog entry? → {ok, reason} (reason pt-BR when blocked). */
@@ -324,10 +333,20 @@ export function accessFor(state, data, actorId, item) {
   const t = tensionBetween(state, actorId, ctrl);
   if (t >= 3) return { ok: false, reason: `Bloqueado pela tensão com ${actorName(state, data, ctrl)}` };
   if (item.access === 'own') return { ok: false, reason: 'Uso exclusivo do operador' };
+  // national launch policy (NASA by law, CNSA and Roscosmos in practice): launchers must be domestic
+  const me = actorDef(state, data, actorId);
+  if (me?.launchPolicy === 'domestic' && item.capacity && item.country && me.country && !String(item.country).includes(me.country)) {
+    return { ok: false, reason: 'Política nacional: só lançadores do próprio país' };
+  }
   if (item.access === 'bloc' && !inSameBloc(state, data, actorId, ctrl) && !hasTreaty(state, actorId, ctrl)) {
     return { ok: false, reason: 'Só para o bloco e parceiros do operador' };
   }
   return { ok: true, reason: null };
+}
+
+/** True if a catalog item (vehicle or spacecraft) is still in service at `turn` (not before debut, not retired). */
+export function inServiceAt(state, data, item, turn) {
+  return !!item && inCatalogAt(state, data, item, turn);
 }
 
 export function availableVehicles(state, data, actorId) {
@@ -447,8 +466,186 @@ export function tick(state, data, ctx) {
     }
   }
   backgroundLaunches(state, data, ctx);
+  rivalOps(state, data, ctx);
   rivalProgramPrestige(state, data);
   periodicSummaries(state, data);
+}
+
+// ---------------------------------------------------------------- rival discretionary missions
+// Rivals fly more than their scripted calendar (GDD pillar "O universo reage"): every month an AI with spare cash
+// may fly a goal-driven mission of its own, weighted toward the player's latest first. Resolved with quickOutcome
+// (launch now, arrival after the transit), scored on the player's prestige scale, paid from the AI's cash.
+// Slice: state.rivalOps = { pending: [{actorId, destination, vehicleId, spacecraftId, arriveTurn, cost}], flights: {actorId: {destId: n}}, react }.
+
+const OPS_PERIOD = 4;
+const OPS_CASH_SHARE = 0.2;   // share of cash (plus OPS_BUDGET_SHARE of the yearly budget) a rival puts into its own missions per year
+const OPS_BUDGET_SHARE = 0.05;
+const OPS_REACT_WEEKS = 26;   // how long the player's latest first steers the rivals' choices
+const GOAL_DEST = {
+  lunar_south_pole_landing: 'lunar_south_pole', lunar_surface_robotic: 'lunar_surface', lunar_resource_demo: 'lunar_south_pole',
+  lunar_sample_return: 'lunar_surface', mars_landing_robotic: 'mars_surface', jupiter_arrival: 'jupiter', titan_arrival: 'titan',
+};
+const OPS_DEFAULTS = [{ destination: 'lunar_orbit', weight: 1.2 }, { destination: 'sso', weight: 0.8 }, { destination: 'mars_orbit', weight: 0.8 }, { destination: 'lunar_surface', weight: 0.8 }];
+const OPS_SCALE = { leo: 1, gto: 1.2, tli: 1.6, mars: 2.4, outer: 4 };
+const OPS_COST = { leo: 6, gto: 5, tli: 35, mars: 60, outer: 90 };
+
+function opsSlice(state) {
+  if (!state.rivalOps || typeof state.rivalOps !== 'object') state.rivalOps = { pending: [], flights: {}, react: null };
+  state.rivalOps.pending ||= [];
+  state.rivalOps.flights ||= {};
+  return state.rivalOps;
+}
+
+/** Cheapest generic spacecraft + vehicle an actor can fly to a destination right now, with its cost. */
+function opsConfig(state, data, actorId, destId) {
+  const dest = destinationById(data, destId);
+  if (!dest) return null;
+  const kinds = dest.kind === 'surface' ? ['lander'] : dest.body === 'earth' ? ['satellite'] : ['probe'];
+  const scs = availableSpacecraft(state, data, actorId)
+    .filter((s) => s.access === 'generic' && kinds.includes(s.kind) && (!s.destinations?.length || s.destinations.includes(destId)))
+    .sort((a, b) => (a.costM || 0) - (b.costM || 0));
+  const sc = scs[0];
+  if (!sc) return null;
+  let best = null;
+  for (const v of availableVehicles(state, data, actorId)) {
+    if (capacityTo(data, v.id, destId) * 0.9 < (sc.massT || 1) || isGrounded(state, v.id)) continue;
+    if (!best || (v.costM || 0) < (best.costM || 0)) best = v;
+  }
+  if (!best) return null;
+  const cost = Math.round((best.costM || 0) + (sc.costM || 0) * (OPS_SCALE[dest.capacityKey] ?? 1) + (OPS_COST[dest.capacityKey] ?? 10));
+  return { dest, sc, v: best, cost };
+}
+
+function opsFirsts(dest) {
+  return [].concat(dest?.firsts?.robotic ?? []);
+}
+
+/** The player's firsts make rivals that chase the same goal react: their related programs speed up. */
+function opsReact(state, data, ctx) {
+  const ops = opsSlice(state);
+  for (const s of state.signals || []) {
+    if (s?.type !== 'first' || s.actorId !== state.playerId || String(s.milestoneId).includes(':')) continue;
+    ops.react = { milestoneId: s.milestoneId, untilTurn: state.turn + OPS_REACT_WEEKS };
+    const body = destinationsOf(data).find((d) => [].concat(d.firsts?.crewed ?? [], d.firsts?.robotic ?? []).includes(s.milestoneId))?.body;
+    const rng = ctx.rng(`react:${s.milestoneId}`);
+    let told = false;
+    for (const inst of state.calendar || []) {
+      if (inst.status !== 'planned') continue;
+      const item = calendarItem(data, inst.id);
+      const owner = item?.owner;
+      const a = state.actors?.[owner];
+      if (!item || !a || owner === state.playerId) continue;
+      const chases = (a.ai?.goals || []).includes(s.milestoneId) || item.milestone === s.milestoneId;
+      if (!chases || destinationById(data, item.destination)?.body !== body) continue;
+      const floor = Math.max(state.turn + 3, (inst.plannedTurn ?? inst.currentTurn) - 8);
+      const to = Math.max(floor, inst.currentTurn - rng.int(4, 8));
+      if (to >= inst.currentTurn) continue;
+      inst.currentTurn = to;
+      inst.accelerated = (inst.accelerated || 0) + 1;
+      if (!told) {
+        told = true;
+        addNews(state, {
+          headline: `Resposta da ${actorName(state, data, owner)}: ${item.name} é antecipada para ${fmt(state, data, to)}`,
+          body: 'Depois do feito do rival, o governo libera horas extras e verba de emergência.',
+          tags: ['calendar', 'race'], actors: [owner, state.playerId], importance: 2, icon: '⏩',
+        });
+      }
+    }
+  }
+}
+
+function rivalOps(state, data, ctx) {
+  const ops = opsSlice(state);
+  opsReact(state, data, ctx);
+  // arrivals of missions launched earlier
+  for (const p of ops.pending.slice()) {
+    if (!p.launched || state.turn < p.arriveTurn) continue;
+    ops.pending.splice(ops.pending.indexOf(p), 1);
+    if (!p.lost) opsArrive(state, data, p, ctx.rng(`opsArrive:${p.actorId}:${p.launchTurn}`));
+  }
+  // launches of missions committed earlier (a new mission takes months to build)
+  for (const p of ops.pending) {
+    if (p.launched || state.turn < p.launchTurn) continue;
+    p.launched = true;
+    const rngL = ctx.rng(`opsLaunch:${p.actorId}:${p.launchTurn}`);
+    const v = vehicleById(data, p.vehicleId);
+    if (!v || !inCatalogAt(state, data, v, state.turn) || isGrounded(state, v.id)) { p.arriveTurn = state.turn; p.lost = true; continue; }
+    const asc = quick(rngL, clamp(vehicleSuccessP(state, data, v.id, p.actorId), 0.3, 0.995), { failureWeights: ASCENT_WEIGHTS });
+    recordFlight(state, v.id, OK_LEVELS.includes(asc.level));
+    if (!OK_LEVELS.includes(asc.level)) { p.arriveTurn = state.turn; p.lost = true; continue; } // the background feed covers launch failures
+    p.arriveTurn = state.turn + Math.max(0, destinationById(data, p.destination)?.transitWeeks || 0);
+  }
+  const tun = data?.calendar?.rivalOps || {};
+  if (tun.enabled === false || state.turn % OPS_PERIOD !== 2 || state.turn < (tun.startTurn ?? 8)) return;
+  const react = ops.react && ops.react.untilTurn > state.turn ? ops.react : null;
+  for (const id of Object.keys(state.actors || {}).sort()) {
+    const a = state.actors[id];
+    if (id === state.playerId || !a || !(a.budget > 0) || ops.pending.some((p) => p.actorId === id)) continue;
+    const reserve = a.budget * 0.1;
+    const spare = (a.cash || 0) - reserve;
+    if (spare <= 0) continue;
+    const rng = ctx.rng(`ops:${id}`);
+    const options = [...OPS_DEFAULTS];
+    for (const g of a.ai?.goals || []) if (GOAL_DEST[g]) options.push({ destination: GOAL_DEST[g], weight: state.firsts?.[g] ? 1.2 : 3 });
+    if (react && (a.ai?.goals || []).includes(react.milestoneId) && GOAL_DEST[react.milestoneId]) options.push({ destination: GOAL_DEST[react.milestoneId], weight: 4 });
+    // the scripted program already covers a destination it flies to within two years
+    const scripted = new Set((state.calendar || []).filter((c) => c.status === 'planned' && c.currentTurn - state.turn <= 104 && calendarItem(data, c.id)?.owner === id).map((c) => calendarItem(data, c.id)?.destination));
+    const build = (o) => (destinationById(data, o.destination)?.kind === 'surface' ? 39 : 26);
+    const open = options.filter((o) => {
+      if (scripted.has(o.destination)) return false;
+      const w = destinationById(data, o.destination)?.window;
+      // planetary targets: commit now only if a window opens when the hardware is ready
+      return !w || nextWindow(state, data, o.destination, state.turn + build(o)).openTurn <= state.turn + build(o) + 8;
+    });
+    const pick = rng.weighted(open);
+    const cfg = pick ? opsConfig(state, data, id, pick.destination) : null;
+    if (!cfg || cfg.cost > spare) continue;
+    const yearly = (tun.cashShare ?? OPS_CASH_SHARE) * spare + (tun.budgetShare ?? OPS_BUDGET_SHARE) * a.budget;
+    // monthly decision: expected yearly spend / (12 decisions a year) / cost
+    if (!rng.chance(clamp(yearly / (52 / OPS_PERIOD) / cfg.cost, 0, 0.45))) continue;
+    changeActor(state, id, 'cash', -cfg.cost);
+    state.stats['calendar.rivalOps'] = (state.stats['calendar.rivalOps'] || 0) + 1;
+    let launchTurn = state.turn + build(pick);
+    if (cfg.dest.window) launchTurn = Math.max(launchTurn, nextWindow(state, data, cfg.dest.id, launchTurn).openTurn);
+    ops.pending.push({ actorId: id, destination: cfg.dest.id, vehicleId: cfg.v.id, spacecraftId: cfg.sc.id, launchTurn, arriveTurn: null, cost: cfg.cost });
+  }
+}
+
+function opsArrive(state, data, p, rng) {
+  const dest = destinationById(data, p.destination);
+  const ops = opsSlice(state);
+  const owner = p.actorId;
+  let pc = spacecraftReliability(state, data, p.spacecraftId).mean + 0.5 * techBonusFor(state, data, owner, 'reliability');
+  if (dest?.kind === 'surface') pc += techBonusFor(state, data, owner, 'landingReliability') - (dest.body === 'mars' ? 0.1 : 0.05);
+  const o = quick(rng, clamp(pc, 0.3, 0.99), { failureWeights: arrivalWeights(dest) });
+  const flown = (ops.flights[owner] ||= {});
+  const repeats = flown[p.destination] || 0;
+  if (!OK_LEVELS.includes(o.level)) {
+    if (dest?.body !== 'earth') {
+      addNews(state, { headline: `Missão da ${actorName(state, data, owner)} se perde em ${dest?.name || p.destination}`, tags: ['calendar', 'failure'], actors: [owner], importance: 1, icon: '💥' });
+    }
+    return;
+  }
+  flown[p.destination] = repeats + 1;
+  const mp = scorePrestige(dest, { crewed: false, level: o.level, p: 0.8, repeats });
+  changeActor(state, owner, 'prestige', mp.prestige);
+  for (const mid of opsFirsts(dest)) {
+    if (claimFirst(state, mid, owner, mp.firstPoints, 5)) {
+      emitSignal(state, 'first', { milestoneId: mid, actorId: owner });
+      addNews(state, {
+        headline: fill(newsText(data, isHistoricFirst(state, mid) ? 'firstEra' : 'first') || newsText(data, 'first'), { owner: actorName(state, data, owner), milestone: milestoneLabel(data, mid) }),
+        tags: ['first'], actors: [owner], importance: 3, icon: '🏁',
+      });
+    }
+  }
+}
+
+/** Prestige on the player's scale (core/outcome.js), with a local fallback. */
+function scorePrestige(dest, opts) {
+  const f = outcomeMod?.missionPrestige;
+  if (typeof f === 'function') return f(dest, opts);
+  const base = (dest?.prestige ?? 5) * (opts.crewed ? 1.8 : 1);
+  return { base, prestige: OK_LEVELS.includes(opts.level) ? Math.round(base * (opts.level === 'total' ? 1 : 0.45)) : 0, firstPoints: 30 + Math.round(base) };
 }
 
 /**
@@ -457,7 +654,7 @@ export function tick(state, data, ctx) {
  * Tunable in data/calendar.json "rivalProgramPrestige" (points per US$ 1 bi of budget per year).
  */
 function rivalProgramPrestige(state, data) {
-  const rate = data?.calendar?.rivalProgramPrestige ?? 2.5;
+  const rate = data?.calendar?.rivalProgramPrestige ?? 1.0;
   if (!(rate > 0)) return;
   for (const [id, a] of Object.entries(state.actors || {})) {
     if (id === state.playerId || !(a?.budget > 0)) continue;
@@ -583,7 +780,7 @@ function applySlip(state, data, inst, item, weeks, kind, rng, opts = {}) {
     tags: ['calendar', 'delay', kind],
     actors: [item.owner, ...(item.partners || [])],
     importance: (loud && imp >= 2) || (imp >= 3 && delta >= 8) ? 2 : 1,
-    icon: 'delay',
+    icon: '⏳',
   });
 }
 
@@ -596,7 +793,7 @@ function cancel(state, data, inst, item, reason) {
     headline: fill(newsText(data, 'cancelled'), vars),
     body: fill(reason === 'war' ? newsText(data, 'suspendedBody') : newsText(data, 'cancelledBody'), { ...vars, date: '-' }),
     tags: ['calendar', 'cancelled'], actors: [item.owner, ...(item.partners || [])],
-    importance: clamp(item.importance || 1, 1, 2), icon: 'cancel',
+    importance: clamp(item.importance || 1, 1, 2), icon: '✖️',
   });
   changeActor(state, item.owner, 'support', -(item.importance || 1));
 }
@@ -697,7 +894,7 @@ function launch(state, data, inst, item, rng) {
     const vars = { name: item.name, owner: actorName(state, data, item.owner), vehicle: vehicleById(data, item.vehicleId)?.name || item.vehicleId, date: fmt(state, data, inst.arrivalTurn) };
     addNews(state, {
       headline: fill(newsText(data, 'launched'), vars), body: fill(newsText(data, 'launchedBody'), vars),
-      tags: ['calendar', 'launch'], actors: [item.owner, ...(item.partners || [])], importance: clamp(imp - 1, 1, 2), icon: 'launch',
+      tags: ['calendar', 'launch'], actors: [item.owner, ...(item.partners || [])], importance: clamp(imp - 1, 1, 2), icon: '🚀',
     });
   }
 }
@@ -724,7 +921,8 @@ function milestonesFor(state, data, item) {
     if (!list.includes(m)) list.push(m);
   };
   add(item.milestone);
-  add(dest?.firsts?.[item.crewed ? 'crewed' : 'robotic']);
+  // a destination may award several firsts (a south pole landing is also a lunar landing)
+  for (const f of [].concat(dest?.firsts?.[item.crewed ? 'crewed' : 'robotic'] ?? [])) add(f);
   return list;
 }
 
@@ -748,25 +946,30 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
   if (ok) {
     addNews(state, {
       headline: fill(newsText(data, level === 'total' ? 'success' : 'partial'), vars),
-      body: item.description || '', tags: ['calendar', 'result', 'success'], actors, importance: clamp(imp, 1, 3), icon: 'success',
+      body: item.description || '', tags: ['calendar', 'result', 'success'], actors, importance: clamp(imp, 1, 3), icon: '✅',
     });
-    changeActor(state, owner, 'prestige', level === 'total' ? imp * 3 : imp * 1.5);
+    // same feat, same points: the player's prestige scale (destination difficulty, crew, novelty), with a floor for
+    // flagship items whose value is not in the destination (a space telescope in LEO)
+    const repeats = (state.calendar || []).filter((c) => c !== inst && DONE.includes(c.status) && calendarItem(data, c.id)?.owner === owner
+      && calendarItem(data, c.id)?.destination === item.destination && !!calendarItem(data, c.id)?.crewed === !!item.crewed).length;
+    const mp = scorePrestige(destinationById(data, item.destination), { crewed: !!item.crewed, level, p: 0.8, repeats });
+    changeActor(state, owner, 'prestige', Math.max(mp.prestige, level === 'total' ? imp * 3 : imp * 1.5));
     changeActor(state, owner, 'support', level === 'total' ? imp : 0);
     changeActor(state, owner, 'reputation', level === 'total' ? 1 : 0);
     for (const mid of milestonesFor(state, data, item)) {
-      const first = claimFirst(state, mid, owner);
+      const first = claimFirst(state, mid, owner, mp.firstPoints, 5);
       if (first) {
         emitSignal(state, 'first', { milestoneId: mid, actorId: owner, calendarId: inst.id });
         addNews(state, {
-          headline: fill(newsText(data, 'first'), { ...vars, milestone: milestoneLabel(data, mid) }),
-          body: item.name, tags: ['first'], actors, importance: 3, icon: 'first',
+          headline: fill(newsText(data, isHistoricFirst(state, mid) ? 'firstEra' : 'first') || newsText(data, 'first'), { ...vars, milestone: milestoneLabel(data, mid) }),
+          body: item.name, tags: ['first'], actors, importance: 3, icon: '🏁',
         });
       }
     }
     // a successful debut puts a new vehicle in the catalog
     for (const v of vehiclesOf(data)) {
       if (v.debutCalendarId === inst.id && flags.vehicleOk) {
-        addNews(state, { headline: fill(newsText(data, 'debut'), { vehicle: v.name }), body: v.notes || '', tags: ['catalog'], actors: [v.operator], importance: 1, icon: 'rocket' });
+        addNews(state, { headline: fill(newsText(data, 'debut'), { vehicle: v.name }), body: v.notes || '', tags: ['catalog'], actors: [v.operator], importance: 1, icon: '🚀' });
       }
     }
     return;
@@ -779,7 +982,7 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
   addNews(state, {
     headline: fill(newsText(data, lostCrew ? 'lostCrew' : 'failed'), vars),
     body: lostCrew ? fill(newsText(data, 'lostCrewBody'), vars) : item.description || '',
-    tags: ['calendar', 'result', 'failure'], actors, importance: lostCrew ? 3 : clamp(Math.max(2, imp), 1, 3), icon: lostCrew ? 'memorial' : 'failure',
+    tags: ['calendar', 'result', 'failure'], actors, importance: lostCrew ? 3 : clamp(Math.max(2, imp), 1, 3), icon: lostCrew ? '🕯️' : '💥',
   });
   if (lostCrew) {
     for (const other of state.calendar) {
@@ -799,7 +1002,7 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
     inst.delayWeeks = inst.currentTurn - inst.plannedTurn;
     addNews(state, {
       headline: fill(newsText(data, 'reflight'), { ...vars, date: fmt(state, data, inst.currentTurn) }),
-      tags: ['calendar', 'reflight'], actors, importance: 1, icon: 'delay',
+      tags: ['calendar', 'reflight'], actors, importance: 1, icon: '⏳',
     });
   }
 }
@@ -827,13 +1030,19 @@ function backgroundLaunches(state, data, ctx) {
       recordFlight(state, v.id, ok);
       total++;
       if (Math.floor(before / 100) < Math.floor((before + 1) / 100)) {
-        addNews(state, { headline: fill(newsText(data, 'bgMilestone'), { vehicle: v.name, n: before + 1 }), tags: ['catalog', 'launches'], actors: [v.tensionActor || v.operator], importance: 1, icon: 'rocket' });
+        addNews(state, { headline: fill(newsText(data, 'bgMilestone'), { vehicle: v.name, n: before + 1 }), tags: ['catalog', 'launches'], actors: [v.tensionActor || v.operator], importance: 1, icon: '🚀' });
       }
       if (!ok) {
-        const weeks = state.vehicleStats[v.id].standDownWeeks ?? 12;
+        const st = state.vehicleStats[v.id];
+        const weeks = st.standDownWeeks ?? 12;
+        st.quarterFailures = (st.quarterFailures || 0) + 1;
+        // a vehicle that keeps failing stops being news: after 2 in a year it goes to the quarterly summary
+        st.failNewsTurns = (st.failNewsTurns || []).filter((t) => turn - t < WEEKS_PER_YEAR);
+        if (st.failNewsTurns.length >= 2) break;
+        st.failNewsTurns.push(turn);
         addNews(state, {
           headline: fill(newsText(data, v.backgroundKind === 'test' ? 'bgTestFailure' : 'bgFailure'), { vehicle: v.name }), body: fill(newsText(data, 'bgFailureBody'), { weeks: weeksToText(weeks) }),
-          tags: ['catalog', 'failure'], actors: [v.tensionActor || v.operator], importance: v.class === 'small' ? 1 : 2, icon: 'failure',
+          tags: ['catalog', 'failure'], actors: [v.tensionActor || v.operator], importance: v.class === 'small' ? 1 : 2, icon: '💥',
         });
         break; // fleet grounded
       }
@@ -851,10 +1060,12 @@ function periodicSummaries(state, data) {
       .sort((a, b) => b.n - a.n);
     const total = rows.reduce((s, r) => s + r.n, 0);
     if (rows.length) {
-      const summary = `${total} lançamentos; ${rows.slice(0, 3).map((r) => `${r.v.name} ${r.n}`).join(', ')}`;
+      const fails = vehiclesOf(data).map((v) => ({ v, n: state.vehicleStats[v.id]?.quarterFailures || 0 })).filter((r) => r.n > 0);
+      const failText = fails.length ? `; falhas: ${fails.map((r) => `${r.v.name} ${r.n}`).join(', ')}` : '';
+      const summary = `${total} lançamentos; ${rows.slice(0, 3).map((r) => `${r.v.name} ${r.n}`).join(', ')}${failText}`;
       addNews(state, { headline: fill(newsText(data, 'bgQuarter'), { summary }), tags: ['catalog', 'launches', 'summary'], actors: [], importance: 1, icon: 'chart' });
     }
-    for (const st of Object.values(state.vehicleStats)) st.quarterFlights = 0;
+    for (const st of Object.values(state.vehicleStats)) { st.quarterFlights = 0; st.quarterFailures = 0; }
   }
   if (turn % WEEKS_PER_YEAR === WEEKS_PER_YEAR - 1) {
     for (const st of Object.values(state.vehicleStats)) st.yearFlights = 0;

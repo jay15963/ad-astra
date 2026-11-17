@@ -45,6 +45,8 @@ export function runMany(data, h, mission, phase, n, policy = POLICIES.maintain, 
   for (let i = 0; i < n; i++) {
     state.seed = (seed0 * 1000003 + i * 7919) >>> 0;
     state.activeLaunch = null;
+    // every run is an independent scene: start from a full Command pool (the campaign pool is tested by sim-campaign)
+    state.commandPoints = null;
     const al = openScene(state, data, mission.id, phase);
     if (!al) throw new Error('scene not opened');
     pSum += al.estimate.pPhase;

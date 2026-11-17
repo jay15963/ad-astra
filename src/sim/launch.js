@@ -16,7 +16,10 @@ export const MAX_INTERVENTIONS = 3;
 const SUDDEN = 0.3; // share of the failure zone that fails with no warning
 const REDUCE_FAIL = 0.72; // reduce: critical anomaly still fails if roll < pf * this (tuned so the shown chance stays honest)
 const CONTINGENCY_FAIL = 0.6; // contingency: same, stronger fix; on a minor anomaly it burns margin (overreaction)
-const CONTINGENCY_MARGIN = 0.05; // margin burned by a contingency on a minor anomaly
+const CONTINGENCY_MARGIN = 0.08; // margin burned by a contingency on a minor anomaly (overreaction has a price)
+// Command points are a pool shared by every scene (GDD: "um recurso escasso"): spent points come back
+// one at a time, every CP_REGEN_WEEKS weeks, up to the cap set by the best flight director (crew.commandPointsFor).
+export const CP_REGEN_WEEKS = 4;
 const MINOR_MAINTAIN_FAIL = 0.5; // maintaining through a minor anomaly: fails if 2nd roll < pf * this
 const REDUCE_MARGIN = 0.07; // margin consumed by each reduction
 const REDUCE_PF_MULT = 1.12; // later milestones get riskier after a reduction
@@ -162,35 +165,49 @@ const TELEMETRY = {
   tli: 'T+1:05:00 · 39.000 km/h · rumo de escape',
 };
 
+// {em} / {a}: destination phrases from data ("na Lua", "à Lua"); emptied when the mission name already says where
 const HEADLINES = {
   total: {
     ascent: ['{m} decola e chega ao espaço sem sustos', '{v} leva {m} à órbita com perfeição', 'Lançamento impecável: {m} está a caminho'],
-    ascentFar: ['{m} decola rumo a {dest}', 'A caminho de {dest}: {m} deixa a Terra'],
+    ascentFar: ['{m} decola rumo {a}', 'Rumo {a}: {m} deixa a Terra'],
     crewed: ['Tripulação de {m} chega ao espaço', '{m}: decolagem perfeita com tripulação a bordo'],
-    arrival: ['{m} chega a {dest}!', 'Missão cumprida: {m} em {dest}'],
-    landing: ['{m} pousa em {dest}!', 'Contato! {m} está na superfície de {dest}'],
+    arrival: ['{m} chega {a}!', 'Missão cumprida: {m} {em}'],
+    landing: ['{m} pousa {em}!', 'Contato! {m} toca o solo {em}'],
   },
   partial: {
     ascent: ['{m} chega ao espaço, mas fora do plano', 'Meio sucesso: {m} em órbita errada'],
-    arrival: ['{m} chega a {dest}, mas não cumpre tudo', 'Sucesso parcial para {m} em {dest}'],
+    arrival: ['{m} chega {a}, mas não cumpre tudo', 'Sucesso parcial para {m} {em}'],
   },
   recoverable: {
-    ascent: ['{m} é perdida, mas a lição fica', 'Falha no lançamento de {m}; sem vítimas'],
+    ascent: ['Perdemos {m}, mas a lição fica', 'Falha no lançamento de {m}; sem vítimas'],
     crewed: ['Tripulação de {m} volta a salvo após abortar', 'Abort salva a tripulação de {m}'],
-    arrival: ['{m} falha em {dest}, mas a nave sobrevive', 'Chegada de {m} frustrada'],
+    arrival: ['{m} falha {em}, mas a nave sobrevive', 'Chegada de {m} frustrada'],
   },
   catastrophic: {
-    ascent: ['{v} falha em {ms}: {m} perdida', 'Explosão em {ms} encerra {m}'],
-    crewed: ['Tragédia: tripulação de {m} é perdida', 'Luto: {m} termina em tragédia'],
-    crewedSafe: ['{m} é perdida, mas a tripulação escapa', 'Sistema de escape salva a tripulação de {m}'],
-    arrival: ['{m} é perdida em {dest}', 'Silêncio em {dest}: {m} perdida'],
+    ascent: ['{v} falha em {ms} e {m} se perde', 'Explosão em {ms} encerra {m}'],
+    crewed: ['Tragédia: perdemos a tripulação de {m}', 'Luto: {m} termina em tragédia'],
+    crewedSafe: ['Perdemos {m}, mas a tripulação escapa', 'Sistema de escape salva a tripulação de {m}'],
+    arrival: ['Perdemos {m} {em}', 'Silêncio {em}: {m} se perde'],
   },
 };
+
+/** True when the mission name already names the destination (avoid "Marte 2 chega a Marte"). */
+function nameSaysDest(al) {
+  const n = String(al.name || '').toLowerCase();
+  return [al.destName, al.destShort].filter((x) => x && x.length >= 3).some((x) => n.includes(String(x).toLowerCase()));
+}
 
 // ---------- helpers ----------
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const pct = (x) => `${Math.round(x * 100)}%`;
+/** Small risks keep a decimal ("0,4%", "<0,1%") so a cause never reads "risco de 0%". */
+const pctFine = (x) => {
+  const v = (Number(x) || 0) * 100;
+  if (v < 0.1) return '<0,1%';
+  if (v < 10) return `${(Math.round(v * 10) / 10).toString().replace('.', ',')}%`;
+  return `${Math.round(v)}%`;
+};
 
 function safe(fn, args, fallback) {
   if (typeof fn !== 'function') return fallback;
@@ -228,7 +245,12 @@ function personName(state, id) {
 }
 
 function fill(state, al, text) {
-  return String(text)
+  const rep = /\{em\}|\{a\}/.test(String(text)) && nameSaysDest(al);
+  const em = rep ? '' : al.destEm || `em ${al.destName}`;
+  const to = rep ? 'ao destino' : al.destTo || `a ${al.destName}`;
+  let t = String(text).replaceAll('{em}', em).replaceAll('{a}', to);
+  if (rep) t = t.replace(/ +([!:,])/g, '$1').replace(/ {2,}/g, ' ').trim();
+  return t
     .replaceAll('{m}', al.name)
     .replaceAll('{v}', al.vehicleName)
     .replaceAll('{dest}', al.destName)
@@ -269,6 +291,7 @@ function planFor(state, mission, al) {
     config: { ...(mission.config || {}), strategy: al.lineup.strategy, fuelMargin: al.lineup.fuelMargin },
     launchTurn: Number.isFinite(mission.launchTurn) ? mission.launchTurn : state.turn,
     createdTurn: mission.createdTurn,
+    calendarId: mission.calendarId || undefined,
     crewed: mission.crewed ?? (mission.type === 'crewed' || undefined),
     weather: al.weather,
   };
@@ -321,7 +344,10 @@ function rebuild(state, data, al) {
   al.prestigeMult = est.prestigeMult ?? 1;
   al.scienceMult = est.scienceMult ?? 1;
   al.vehicleFlights = est.vehicleFlights ?? 0;
-  al.commandPoints = commandPointsFor(state, data, { ...(mission?.crew || {}), flightDirector: al.lineup.flightDirector, commander: al.lineup.commander });
+  // the lineup sets the ceiling; the agency's pool (what earlier scenes left) sets what is really there
+  const cap = commandPointsFor(state, data, { ...(mission?.crew || {}), flightDirector: al.lineup.flightDirector, commander: al.lineup.commander });
+  al.commandPoints = Math.max(0, Math.min(cap, Number.isFinite(al.pool) ? al.pool : cap));
+  al.commandPointsCap = cap;
   al.commandPointsStart = al.commandPoints;
   state.commandPoints = al.commandPoints;
   return al;
@@ -388,6 +414,9 @@ export function openScene(state, data, missionId, phase = 'ascent') {
     spacecraftId: mission.spacecraftId,
     destination: mission.destination,
     destName: dest?.name || mission.destination || 'destino',
+    destShort: dest?.short || null,
+    destEm: dest?.emLabel || null,
+    destTo: dest?.toLabel || null,
     crewed: !!(mission.crewed ?? (mission.type === 'crewed' || crewIds.length > 0)),
     crewIds,
     lineup: {
@@ -416,6 +445,8 @@ export function openScene(state, data, missionId, phase = 'ascent') {
     forcedIndex: null,
     endedAt: null,
     startTurn: state.turn,
+    pool: Number.isFinite(state.commandPoints) ? state.commandPoints : null,
+    arrivalAhead: phase === 'ascent' && typeof missions.needsTransit === 'function' && !!missions.needsTransit(data, mission),
     snapshot: { id: mission.id, type: mission.type, destination: mission.destination, vehicleId: mission.vehicleId, spacecraftId: mission.spacecraftId, crew: mission.crew || {}, config: mission.config || {}, launchTurn: mission.launchTurn, createdTurn: mission.createdTurn, name: mission.name },
   };
   state.activeLaunch = al;
@@ -432,6 +463,8 @@ function postpone(state, missionId, phase, reasonText, supportCost = 1) {
   const mission = findMission(state, missionId);
   const weeks = roll(state.seed, 'scrub', missionId, phase, state.turn) < 0.5 ? 1 : 2;
   if (mission) {
+    // a new day is a new countdown: the scrub count feeds the countdown seed (holds, sensor glitches)
+    mission.scrubs = (mission.scrubs || 0) + 1;
     if (phase === 'arrival') {
       if (mission.transit && Number.isFinite(mission.transit.arriveTurn)) mission.transit.arriveTurn = Math.max(mission.transit.arriveTurn, state.turn) + weeks;
       if (mission.status === 'arrival') mission.status = 'transit';
@@ -442,7 +475,7 @@ function postpone(state, missionId, phase, reasonText, supportCost = 1) {
   }
   if (supportCost) changeActor(state, state.playerId, 'support', -supportCost);
   addNews(state, {
-    headline: `${mission?.name || 'Missão'} adiada em ${weeks} semana${weeks > 1 ? 's' : ''}`,
+    headline: `${phase === 'arrival' ? 'Chegada' : 'Lançamento'} de ${mission?.name || 'missão'} ${phase === 'arrival' ? 'adiada' : 'adiado'} em ${weeks} semana${weeks > 1 ? 's' : ''}`,
     body: reasonText || 'A direção preferiu não arriscar hoje.',
     tags: ['launch', 'scrub'],
     actors: [state.playerId],
@@ -477,13 +510,14 @@ function makeIntervention(state, al, i, severity) {
   if (m.id === 'fairing_or_les' && al.crewed) prompt = prompt.replace('separação', 'torre de escape');
   const cp = al.commandPoints;
   const arrival = al.phase === 'arrival';
+  const landingMs = arrival && al.milestones.some((x) => /descent|landing|touch|hazard/.test(x.id));
   const opts = [
-    { id: 'reduce', label: arrival ? 'Descida mais lenta' : 'Reduzir empuxo', cost: 1, preview: arrival ? 'Menos risco agora, gasta a reserva de combustível' : 'Menos risco agora, menos margem depois' },
+    { id: 'reduce', label: arrival ? (landingMs ? 'Descida mais lenta' : 'Queima mais suave') : 'Reduzir empuxo', cost: 1, preview: arrival ? 'Menos risco agora, gasta a reserva de combustível' : 'Menos risco agora, menos margem depois' },
     { id: 'maintain', label: 'Manter', cost: 0, preview: 'Confia no veículo e segue o perfil' },
     { id: 'contingency', label: 'Contingência', cost: 2, preview: 'A sala assume o procedimento de emergência' },
     {
       id: 'abort',
-      label: arrival ? (al.crewed ? 'Abortar pouso' : 'Abortar e preservar') : 'Abortar',
+      label: arrival ? (al.crewed && landingMs ? 'Abortar pouso' : 'Abortar e preservar') : 'Abortar',
       cost: al.crewed ? 0 : 1,
       preview: arrival ? 'Salva a nave; missão vira sucesso parcial' : al.crewed ? 'Salva a tripulação; missão perdida' : 'Encerra com segurança; missão perdida',
     },
@@ -654,7 +688,7 @@ function buildCauses(state, al, level, ft, extra) {
   }
   if (success) {
     const flights = al.vehicleFlights || 0;
-    add('part', al.phase === 'arrival' ? 'A nave cumpriu a sequência de chegada' : `${al.vehicleName} cumpriu o perfil de voo`, flights ? `${flights} voos de histórico pesaram a favor.` : 'Veículo novo que se provou hoje.', flights >= 20 ? 0.5 : 0.35);
+    add('part', al.phase === 'arrival' ? 'A nave cumpriu a sequência de chegada' : `${al.vehicleName} cumpriu o perfil de voo`, flights ? `${flights} voo${flights === 1 ? "" : "s"} de histórico pesaram a favor.` : 'Veículo novo que se provou hoje.', flights >= 20 ? 0.5 : 0.35);
   }
   for (const f of est.factors || []) {
     if (f.kind === 'part' && !f.info && f.label.startsWith('Pesquisa')) add('part', f.label, `Efeito estimado: ${f.delta > 0 ? '+' : ''}${Math.round(f.delta * 1000) / 10} p.p.`, clamp(f.delta * 8, -0.6, 0.6));
@@ -689,12 +723,18 @@ function buildCauses(state, al, level, ft, extra) {
       else add('decision', `Sangue frio em ${L}`, 'Manter o perfil era o certo.', 0.3);
     }
   }
-  if (extra.tight) add('decision', 'As reduções consumiram a margem', 'Sem combustível de sobra, o resultado ficou abaixo do plano.', -0.5);
+  if (extra.tight) {
+    // name what really burned the margin
+    const used = new Set(al.interventions.filter((x) => x.optionId === 'reduce' || (x.optionId === 'contingency' && x.severity !== 'critical')).map((x) => x.optionId));
+    const label = used.has('reduce') && used.has('contingency') ? 'Contingências e reduções consumiram a margem'
+      : used.has('contingency') ? 'As contingências consumiram a margem' : 'As reduções consumiram a margem';
+    add('decision', label, 'Sem combustível de sobra, o resultado ficou abaixo do plano.', -0.5);
+  }
 
   // luck
   if (end && (extra.how === 'sudden' || extra.how === 'anomaly')) {
     const m = al.milestones[end.index];
-    add('luck', `Dado da sorte em ${end.label}`, `Sorteio caiu na faixa de falha: risco de ${pct(m.pEff ?? m.pFail)} nesse marco.`, extra.how === 'sudden' ? -0.7 : -0.4);
+    add('luck', `Dado da sorte em ${end.label}`, `Sorteio caiu na faixa de falha: risco de ${pctFine(m.pEff ?? m.pFail)} nesse marco.`, extra.how === 'sudden' ? -0.7 : -0.4);
   } else if (success) {
     if (pPhase < 0.75) add('luck', 'A sorte sorriu', `A chance era de ${pct(pPhase)} e deu certo.`, 0.5);
     const close = al.milestones.filter((m) => m.status === 'ok' && m.severity === 'critical');
@@ -708,23 +748,45 @@ function buildCauses(state, al, level, ft, extra) {
   if (wr >= 0.2) add('environment', `Clima: ${al.weather.label}`, al.hold?.choice === 'hold' ? 'O clima melhorou durante a espera.' : 'O clima pesou contra.', ft === 'environment' ? -0.7 : -clamp(wr, 0.1, 0.4));
   else if (success) add('environment', `Clima: ${al.weather?.label || 'bom'}`, 'Condições a favor.', 0.15);
   for (const f of est.factors || []) {
-    if (f.kind === 'environment' && !String(f.label).startsWith('Clima') && Math.abs(f.delta) >= 0.002) add('environment', f.label, 'Pressão de fora da agência.', clamp(f.delta * 6, -0.5, 0.5));
+    if (f.kind === 'environment' && !String(f.label).startsWith('Clima') && Math.abs(f.delta) >= 0.002) add('environment', f.label, envDetail(al, f.label), clamp(f.delta * 6, -0.5, 0.5));
   }
 
   // crew
   const fd = personName(state, al.lineup.flightDirector);
   if (fd) {
     const sk = skillOf(state, al.lineup.flightDirector);
-    add('crew', `Diretor de voo: ${fd}`, sk >= 70 ? 'Leitura fina da telemetria.' : sk < 40 ? 'Pouca experiência na cadeira.' : 'Sala bem conduzida.', clamp((sk - 50) / 80, -0.5, 0.5) + (success ? 0.1 : 0));
+    add('crew', `${state.crew?.[al.lineup.flightDirector]?.gender === "f" ? "Diretora" : "Diretor"} de voo: ${fd}`, sk >= 70 ? 'Leitura fina da telemetria.' : sk < 40 ? 'Pouca experiência na cadeira.' : 'Sala bem conduzida.', clamp((sk - 50) / 80, -0.5, 0.5) + (success ? 0.1 : 0));
   } else add('crew', 'Sala sem diretor de voo', 'Menos pontos de Comando e leitura pior das anomalias.', -0.4);
   const cmd = personName(state, al.lineup.commander);
   if (al.crewed && cmd) add('crew', `Comandante: ${cmd}`, success ? 'Voz calma no rádio.' : 'Seguiu o treino até o fim.', success ? 0.3 : 0.1);
-  for (const f of est.factors || []) if (f.kind === 'crew' && f.info && Math.abs(f.delta) >= 0.003) add('crew', f.label, '', clamp(f.delta * 6, -0.4, 0.4));
+  for (const f of est.factors || []) if (f.kind === 'crew' && f.info && Math.abs(f.delta) >= 0.003 && !/^Diretora? de voo|^Diretor\(a\) de voo/.test(f.label)) add('crew', f.label, '', clamp(f.delta * 6, -0.4, 0.4));
   if (al.nerves >= 75 && !success) add('crew', 'Nervos à flor da pele na sala', 'A tensão aumentou o risco de erro humano.', -0.25);
   if (extra.crewLost?.length) add('crew', `Perdemos ${extra.crewLost.length} tripulante${extra.crewLost.length > 1 ? 's' : ''}`, extra.crewLost.map((id) => personName(state, id)).filter(Boolean).join(', '), -1);
 
   causes.sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
-  return causes.slice(0, 9);
+  if (success) return causes.slice(0, 9);
+  // a failure report leads with what went wrong; at most two consolations
+  const neg = causes.filter((c) => c.weight < 0);
+  const pos = causes.filter((c) => c.weight >= 0).slice(0, 2);
+  return [...neg, ...pos].slice(0, 9);
+}
+
+/** Specific text for an environment factor of the estimate (destination difficulty, politics, sanctions). */
+function envDetail(al, label) {
+  const s = String(label);
+  if (s.startsWith('Dificuldade do destino')) {
+    const d = String(al.destination || '');
+    if (d === 'lunar_south_pole') return 'Pouso no polo sul: sombras longas, terreno acidentado e nenhuma atmosfera para frear.';
+    if (d === 'lunar_surface') return 'Descida sem atmosfera: só os motores seguram a nave, sem margem para erro.';
+    if (d === 'mars_surface') return 'Entrada, descida e pouso em Marte: sete minutos sem ajuda da Terra.';
+    if (d === 'mars_orbit') return 'Captura em Marte: uma queima longa, longe demais para correções em tempo real.';
+    if (d === 'titan' || d === 'jupiter') return 'Espaço profundo: anos de viagem e sinal com horas de atraso.';
+    if (d === 'lunar_orbit' || d === 'cislunar') return 'Inserção lunar: uma queima precisa, com a Terra a um segundo-luz.';
+    return 'O destino cobra seu preço em cada etapa.';
+  }
+  if (s.startsWith('Sanções')) return 'Crise com o operador do lançador atrasou peças e suporte.';
+  if (s.startsWith('Tensão política')) return 'Crise internacional: mais pressão e escrutínio sobre a sala.';
+  return 'Pressão de fora da agência.';
 }
 
 function headlineFor(state, al, level, extra) {
@@ -760,6 +822,9 @@ function setOutcome(state, al, level, ft, extra) {
     sudden: extra.how === 'sudden',
     escaped: !!extra.escaped,
   };
+  // final: false when a good ascent still has a transit/arrival ahead (UI and listeners should not celebrate yet)
+  const success = level === 'total' || level === 'partial';
+  al.outcome.final = !(success && al.arrivalAhead);
   al.act = 'climax';
 }
 
@@ -808,7 +873,10 @@ export const actions = {
     if (al.act !== 'prelaunch') return { ok: false, error: 'A contagem já começou.' };
     rebuild(state, data, al); // final numbers with today's weather
     initialMood(al);
+    // milestone rolls are locked per attempt (scrubbing does not re-roll the flight: "Justiça da sorte");
+    // the countdown itself (holds, sensor glitches) is a new day after each scrub
     al.seed = hash32(state.seed, 'launch', al.missionId, al.phase, al.attempt);
+    al.countSeed = hash32(state.seed, 'countdown', al.missionId, al.phase, al.attempt, findMission(state, al.missionId)?.scrubs || 0);
     al.act = 'countdown';
     const n = al.milestones.length;
     al.forcedIndex = n > 1 ? rngFor(al.seed, 'forced').int(1, n - 1) : 0;
@@ -827,7 +895,7 @@ export const actions = {
           { id: 'go', label: 'Lançar assim mesmo', preview: 'Mantém o risco do clima; +nervosismo' },
         ],
       };
-    } else if (roll(al.seed, 'sensor') < sensorChance) {
+    } else if (roll(al.countSeed ?? al.seed, 'sensor') < sensorChance) {
       al.pendingHold = {
         reason: 'sensor',
         text: 'Sensor com leitura duvidosa. Pode ser falso alarme.',
@@ -857,21 +925,21 @@ export const actions = {
     al.pendingHold = null;
     if (choice === 'scrub') {
       const weeks = postpone(state, al.missionId, al.phase, h.reason === 'weather' ? `Clima: ${al.weather.label}.` : 'Sensor em verificação.', 1);
-      state.activeLaunch = null;
+      closeScene(state, al);
       return { ok: true, scrubbed: true, weeks };
     }
     if (choice === 'hold') {
       pushLog(state, al, -4, 'radio', pick(al.seed, RADIO.hold, 'hold'));
       bump(al, -10, 3);
       if (h.reason === 'weather') {
-        if (roll(al.seed, 'holdclear') < 0.72) {
+        if (roll(al.countSeed ?? al.seed, 'holdclear') < 0.72) {
           al.weather = { ...al.weather, risk: r3(al.weather.risk * 0.35), label: `${al.weather.label} (melhorando)` };
           rebuildRisks(state, data, al);
           pushLog(state, al, -3, 'radio', pick(al.seed, RADIO.holdOk, 'holdok'));
         } else {
           // the window closed while waiting
           const weeks = postpone(state, al.missionId, al.phase, 'A janela do dia fechou durante a espera.', 0);
-          state.activeLaunch = null;
+          closeScene(state, al);
           return { ok: true, scrubbed: true, weeks, windowClosed: true };
         }
       } else {
@@ -880,7 +948,7 @@ export const actions = {
     } else {
       pushLog(state, al, -4, 'radio', pick(al.seed, RADIO.goAnyway, 'go'));
       bump(al, 12, -6);
-      if (h.reason === 'sensor' && roll(al.seed, 'sensorReal') < 0.5) {
+      if (h.reason === 'sensor' && roll(al.countSeed ?? al.seed, 'sensorReal') < 0.5) {
         const n = al.milestones.length;
         al.sensorIssue = { index: Math.min(n - 1, Math.max(1, Math.floor(n / 2))) };
       }
@@ -949,13 +1017,17 @@ export const actions = {
       commandPointsUsed: (al.commandPointsStart || 0) - (al.commandPoints || 0),
       launchedTurn: al.startTurn,
     };
+    // the arrival scene inherits what the director chose at launch (strategy, fuel margin)
+    const flownMission = findMission(state, al.missionId);
+    if (flownMission && al.phase === 'ascent') {
+      flownMission.config = { ...(flownMission.config || {}), strategy: al.lineup.strategy, fuelMargin: al.lineup.fuelMargin };
+    }
     const key = `launch.flown.${al.missionId}.${al.phase}`;
     state.stats[key] = (state.stats[key] || 0) + 1;
     state.stats['launch.scenes'] = (state.stats['launch.scenes'] || 0) + 1;
     state.stats[`launch.${outcome.level}`] = (state.stats[`launch.${outcome.level}`] || 0) + 1;
     state.stats['launch.interventions'] = (state.stats['launch.interventions'] || 0) + al.interventions.length;
-    state.activeLaunch = null;
-    state.commandPoints = previewPoints(state, data);
+    closeScene(state, al);
     if (typeof missions.onLaunchResolved === 'function') {
       missions.onLaunchResolved(state, data, al.missionId, al.phase, outcome);
     } else {
@@ -997,6 +1069,14 @@ export const decisionHandlers = {
 
 // ---------- weekly housekeeping ----------
 
+/** End the scene: what was not spent goes back to the agency's pool. */
+function closeScene(state, al) {
+  const used = Math.max(0, (al.commandPointsStart || 0) - (al.commandPoints || 0));
+  const pool = Number.isFinite(al.pool) ? al.pool : al.commandPointsStart || 0;
+  state.commandPoints = Math.max(0, pool - used);
+  state.activeLaunch = null;
+}
+
 function previewPoints(state, data) {
   const fds = Object.values(state.crew || {}).filter((p) => p && p.actorId === state.playerId && p.role === 'flight_director' && (!p.status || p.status === 'active'));
   fds.sort((a, b) => (b.skill || 0) - (a.skill || 0) || String(a.id).localeCompare(String(b.id)));
@@ -1006,12 +1086,30 @@ function previewPoints(state, data) {
 export function init(state, data, ctx) {
   state.activeLaunch = null;
   state.commandPoints = previewPoints(state, data);
+  state.commandPointsWeeks = 0;
+}
+
+/** Weekly refill of the Command pool: +1 every CP_REGEN_WEEKS weeks, never above the current cap. */
+function regenPool(state, data) {
+  const cap = previewPoints(state, data);
+  let pool = Number.isFinite(state.commandPoints) ? state.commandPoints : cap;
+  if (pool >= cap) {
+    state.commandPoints = cap;
+    state.commandPointsWeeks = 0;
+    return;
+  }
+  state.commandPointsWeeks = (state.commandPointsWeeks || 0) + 1;
+  if (state.commandPointsWeeks >= CP_REGEN_WEEKS) {
+    pool += 1;
+    state.commandPointsWeeks = 0;
+  }
+  state.commandPoints = Math.min(cap, pool);
 }
 
 export function tick(state, data, ctx) {
   // a stale scene (mission vanished) must not block the game
-  if (state.activeLaunch && !findMission(state, state.activeLaunch.missionId)) state.activeLaunch = null;
-  if (!state.activeLaunch) state.commandPoints = previewPoints(state, data);
+  if (state.activeLaunch && !findMission(state, state.activeLaunch.missionId)) closeScene(state, state.activeLaunch);
+  if (!state.activeLaunch) regenPool(state, data);
 }
 
 // ---------- queries ----------

@@ -1,7 +1,7 @@
 {
   "actors": [
     {
-      "id": "nasa", "name": "NASA (EUA)", "short": "NASA", "kind": "agency", "country": "EUA", "flag": "🇺🇸", "color": "#0072B2",
+      "id": "nasa", "name": "NASA (EUA)", "short": "NASA", "kind": "agency", "country": "EUA", "launchPolicy": "domestic", "flag": "🇺🇸", "color": "#0072B2",
       "bloc": "artemis_accords", "budget": 9000, "fixedCostShare": 0.55, "support": 62, "reputation": 72, "culture": 25, "prestige": 0,
       "style": "Lidera o Artemis e contrata empresas",
       "description": "Lidera o programa Artemis e o bloco dos Acordos Artemis. Contrata SpaceX e Blue Origin para os pousos lunares.",
@@ -12,7 +12,7 @@
       "id": "spacex", "name": "SpaceX", "short": "SpaceX", "kind": "company", "country": "EUA", "flag": "🇺🇸", "color": "#E8E8E8",
       "bloc": "artemis_accords", "budget": 5000, "fixedCostShare": 0.35, "support": 70, "reputation": 64, "culture": 80, "prestige": 0,
       "style": "Rápida, arriscada",
-      "description": "Cadência e preço imbatíveis. Starship é o lander tripulado da Artemis III e a aposta para Marte.",
+      "description": "Cadência e preço imbatíveis. A Starship HLS é o lander do primeiro pouso do Artemis (Artemis IV) e a aposta para Marte.",
       "capabilities": { "crewed": true, "launchSites": ["Starbase", "Cabo Canaveral", "Kennedy", "Vandenberg"] },
       "ai": { "cooperation": 0.45, "aggression": 0.75, "riskTolerance": 0.85, "goals": ["crewed_lunar_landing", "lunar_south_pole_landing", "mars_landing_robotic", "commercial_station"] }
     },
@@ -25,7 +25,7 @@
       "ai": { "cooperation": 0.55, "aggression": 0.6, "riskTolerance": 0.65, "goals": ["lunar_south_pole_landing", "crewed_lunar_landing", "commercial_station"] }
     },
     {
-      "id": "cnsa", "name": "CNSA (China)", "short": "CNSA", "kind": "agency", "country": "China", "flag": "🇨🇳", "color": "#D55E00",
+      "id": "cnsa", "name": "CNSA (China)", "short": "CNSA", "kind": "agency", "country": "China", "launchPolicy": "domestic", "flag": "🇨🇳", "color": "#D55E00",
       "bloc": "ilrs", "budget": 6000, "fixedCostShare": 0.45, "support": 80, "reputation": 60, "culture": 10, "prestige": 0,
       "style": "Metódica, prazos firmes",
       "description": "Pouso tripulado até 2030 com Mengzhou e Lanyue, Chang'e-7 e 8 no polo sul e a base lunar ILRS com a Rússia.",
@@ -49,7 +49,7 @@
       "ai": { "cooperation": 0.85, "aggression": 0.2, "riskTolerance": 0.3, "goals": ["mars_landing_robotic", "lunar_resource_demo", "jupiter_arrival", "lunar_sample_return"] }
     },
     {
-      "id": "roscosmos", "name": "Roscosmos (Rússia)", "short": "Roscosmos", "kind": "agency", "country": "Rússia", "flag": "🇷🇺", "color": "#CC79A7",
+      "id": "roscosmos", "name": "Roscosmos (Rússia)", "short": "Roscosmos", "kind": "agency", "country": "Rússia", "launchPolicy": "domestic", "flag": "🇷🇺", "color": "#CC79A7",
       "bloc": "ilrs", "budget": 2200, "fixedCostShare": 0.6, "support": 55, "reputation": 45, "culture": 5, "prestige": 0,
       "style": "Isolada, orgulhosa",
       "description": "Planeja a estação ROS e as sondas Luna. Aliada da China no ILRS e cada vez mais isolada do Ocidente.",
@@ -141,12 +141,12 @@
     {
       "id": "artemis_iii_docking", "type": "mission_partnership", "name": "Artemis III: teste de acoplagem Starship e Blue Moon",
       "parties": ["spacex", "blueorigin"], "signedTurn": -20, "status": "active",
-      "terms": { "program": "docking_test", "lead": "spacex", "untilTurn": 104, "note": "Rivais no pouso, parceiras no teste em órbita exigido pela NASA." }
+      "terms": { "program": "docking_test", "lead": "spacex", "untilTurn": 104, "protectedUntil": 80, "note": "Rivais no pouso, parceiras no teste em órbita exigido pela NASA." }
     },
     {
       "id": "iss_integrated_crew", "type": "crew_exchange", "name": "Assentos integrados da ISS",
       "parties": ["nasa", "roscosmos"], "signedTurn": -180, "status": "active",
-      "terms": { "seats": 1, "untilTurn": 103, "note": "Astronautas em Soyuz e cosmonautas em Crew Dragon." }
+      "terms": { "seats": 1, "untilTurn": 103, "protectedUntil": 103, "note": "Astronautas em Soyuz e cosmonautas em Crew Dragon." }
     },
     {
       "id": "orion_esm", "type": "cost_sharing", "name": "Módulo de Serviço Europeu da Orion",
@@ -271,7 +271,7 @@
     { "id": "export_control", "kind": "friction", "requires": "opposing", "weight": 3, "trust": -6, "rivalry": 4, "text": "{a} amplia o controle de exportação de componentes contra {b}." },
     { "id": "espionage", "kind": "friction", "requires": "rivals", "weight": 2, "trust": -10, "rivalry": 5, "text": "{a} acusa {b} de espionagem industrial no programa lunar." },
     { "id": "spectrum", "kind": "friction", "requires": "any", "weight": 2, "trust": -4, "rivalry": 3, "text": "{a} e {b} disputam frequências de rádio para a órbita lunar." },
-    { "id": "debris", "kind": "friction", "requires": "any", "weight": 2, "trust": -5, "rivalry": 2, "text": "Estágio de foguete de {b} passa perto de um satélite de {a}, que cobra explicações." },
+    { "id": "debris", "kind": "friction", "requires": "any", "weight": 2, "trust": -5, "rivalry": 2, "text": "Um estágio de foguete descartado por {b} passa perto de um satélite operado por {a}, que cobra explicações." },
     { "id": "landing_zone", "kind": "friction", "requires": "rivals", "weight": 2, "trust": -6, "rivalry": 5, "text": "{a} e {b} reivindicam a mesma região de pouso no polo sul lunar." },
     { "id": "talent_poach", "kind": "friction", "requires": "companies", "weight": 3, "trust": -5, "rivalry": 4, "text": "{a} contrata engenheiros-chave de {b}, que vai à Justiça." },
     { "id": "price_war", "kind": "friction", "requires": "companies", "weight": 3, "trust": -4, "rivalry": 5, "text": "{a} derruba o preço de lançamento e tira um cliente de {b}." },
@@ -281,7 +281,7 @@
     { "id": "summit", "kind": "goodwill", "requires": "any", "weight": 3, "trust": 4, "rivalry": -2, "text": "Chefes de {a} e {b} se encontram em congresso e prometem diálogo." },
     { "id": "joint_test", "kind": "goodwill", "requires": "partners", "weight": 3, "trust": 6, "dependence": 2, "text": "Teste conjunto de {program} sai melhor que o esperado; {a} e {b} comemoram." },
     { "id": "hotline", "kind": "goodwill", "requires": "rivals", "weight": 2, "trust": 7, "rivalry": -3, "text": "{a} e {b} criam linha direta para evitar colisões em órbita." },
-    { "id": "student_exchange", "kind": "goodwill", "requires": "any", "weight": 2, "trust": 3, "text": "Universidades ligadas a {a} e {b} lançam intercâmbio de engenheiros." },
+    { "id": "student_exchange", "kind": "goodwill", "requires": "any", "weight": 2, "trust": 3, "text": "Universidades da {a} e da {b} lançam intercâmbio de engenheiros." },
     { "id": "rescue_pledge", "kind": "goodwill", "requires": "rivals", "weight": 1, "trust": 8, "rivalry": -2, "text": "{a} promete resgatar tripulantes de {b} em emergência, se puder." }
   ],
 
@@ -298,9 +298,9 @@
     "founded": ["Nasce o {treaty}: {parties} assinam.", "{founder} reúne {parties} no {treaty}."],
     "acceded": ["{a} adere ao {treaty}.", "{a} assina o {treaty}."],
     "rejected": ["{b} recusa {type} proposta por {a}.", "Sem acordo: {b} diz não a {a} ({type})."],
-    "broken": ["{a} rompe {treaty} com {b}.", "Fim da linha: {a} abandona {treaty} com {b}.", "{a} denuncia {treaty}; {b} fala em quebra de confiança."],
+    "broken": ["{a} rompe {treaty} com {b}.", "{a} abandona o acordo com {b} ({treaty}).", "{a} denuncia {treaty}; {b} fala em quebra de confiança."],
     "withdrawn": ["{a} se retira do {treaty}.", "{a} abandona o {treaty} e choca os parceiros."],
-    "expired": ["Expira {treaty} entre {parties}.", "{treaty} chega ao fim sem renovação."],
+    "expired": ["Expira {treaty} entre {parties}.", "Fim do acordo {treaty}, sem renovação."],
     "joinedBloc": ["{a} adere ao bloco {bloc}.", "{a} entra para o bloco {bloc}, liderado por {leader}."],
     "leftBloc": ["{a} deixa o bloco {bloc}.", "Racha no bloco {bloc}: {a} sai."],
     "leaderChange": ["{a} assume a liderança do bloco {bloc}."],

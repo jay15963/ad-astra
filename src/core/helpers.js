@@ -80,10 +80,13 @@ const ACTOR_RANGES = {
   cash: [-Infinity, Infinity],
   budget: [0, Infinity],
 };
+const SOFT_CAPPED = ['support', 'reputation'];
 export function changeActor(state, actorId, field, delta) {
   const a = state.actors[actorId];
   if (!a) return;
   const [lo, hi] = ACTOR_RANGES[field] || [-Infinity, Infinity];
+  // diminishing returns near the top: support/reputation gains shrink above 60 so they do not run away to 100
+  if (SOFT_CAPPED.includes(field) && delta > 0) delta *= clamp((100 - (a[field] || 0)) / 40, 0.05, 1);
   a[field] = clamp((a[field] || 0) + delta, lo, hi);
 }
 
@@ -91,11 +94,28 @@ export function player(state) {
   return state.actors[state.playerId];
 }
 
-/** Award a "Os Primeiros" milestone if nobody reached it yet. Returns true if this actor was first. */
+/** Share of the first-place prestige for repeating a feat history already saw ("primeiro do século"). */
+export const HISTORIC_FIRST_SHARE = 0.35;
+
+/** Was this milestone already achieved before the scenario (Apollo, Luna, Viking...)? */
+export function isHistoricFirst(state, milestoneId) {
+  return !!state?.firstsHistory?.[String(milestoneId).split(':')[0]];
+}
+
+/** Prestige the first actor of the era gets for a milestone (full for true firsts, a share for historic ones). */
+export function firstValue(state, milestoneId, prestigeFirst = 30) {
+  return isHistoricFirst(state, milestoneId) ? Math.round(prestigeFirst * HISTORIC_FIRST_SHARE) : prestigeFirst;
+}
+
+/**
+ * Award a "Os Primeiros" milestone if nobody reached it yet in this era. Returns true if this actor was first.
+ * Feats history already saw (state.firstsHistory) count as "first of the century" (era: true) and pay less.
+ */
 export function claimFirst(state, milestoneId, actorId, prestigeFirst = 30, prestigeLater = 5) {
   if (!state.firsts[milestoneId]) {
-    state.firsts[milestoneId] = { actorId, turn: state.turn };
-    changeActor(state, actorId, 'prestige', prestigeFirst);
+    const era = isHistoricFirst(state, milestoneId);
+    state.firsts[milestoneId] = era ? { actorId, turn: state.turn, era: true } : { actorId, turn: state.turn };
+    changeActor(state, actorId, 'prestige', firstValue(state, milestoneId, prestigeFirst));
     return true;
   }
   changeActor(state, actorId, 'prestige', prestigeLater);

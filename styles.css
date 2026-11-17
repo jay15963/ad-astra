@@ -143,7 +143,12 @@ p { margin: .4rem 0; }
   padding: 8px calc(10px + var(--safe-r)) 8px calc(10px + var(--safe-l));
   background: var(--bg2); border-top: 1px solid var(--line);
 }
+.timebar { container-type: inline-size; container-name: timebar; }
 .timebar .grow { flex: 1; }
+.timebar > * { min-width: 0; }
+.time-btn .btn-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* em here follows the text size (A / A+ / A++): a narrow phone with big text drops "evento" before anything clips */
+@container timebar (max-width: 20em) { .time-btn .lbl-more { display: none; } }
 .timebar-msg { flex: 1; font-size: .86rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .time-btn { min-height: 48px; }
 
@@ -228,8 +233,10 @@ button.chip { min-height: 38px; padding: 6px 13px; font-size: .85rem; }
 .segmented {
   display: flex; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 3px;
 }
+.segmented { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.segmented::-webkit-scrollbar { display: none; }
 .seg {
-  flex: 1; min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted);
+  flex: 1 0 auto; white-space: nowrap; min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted);
   font-weight: 700; font-size: .86rem; display: inline-flex; align-items: center; justify-content: center; padding: 4px 6px;
 }
 .seg.active { background: var(--panel2); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
@@ -541,7 +548,7 @@ button.chip { min-height: 38px; padding: 6px 13px; font-size: .85rem; }
 .news-head { display: flex; gap: 8px; align-items: flex-start; }
 .news-headline { font-family: var(--font-body); font-size: .98rem; letter-spacing: 0; font-weight: 700; }
 .news-item.imp-3 .news-headline { font-family: Georgia, "Times New Roman", serif; font-size: 1.08rem; }
-.news-body { color: var(--ink2); margin: 0; }
+.news-body { color: var(--ink2); margin: 0; white-space: pre-line; }
 .actor-card .card-icon svg, .actor-hero svg { border-radius: 50%; }
 .actor-hero { display: flex; gap: 12px; align-items: center; }
 .proposal-list { display: flex; flex-direction: column; gap: 6px; }
@@ -549,6 +556,8 @@ button.chip { min-height: 38px; padding: 6px 13px; font-size: .85rem; }
 .proposal-label { font-weight: 700; }
 .proposal-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .proposal-btn.disabled { opacity: .5; }
+.proposal-btn.long-shot { opacity: .72; border-style: dashed; }
+.proposal-confirm p { margin: 0 0 8px; }
 .person-pick.busy { opacity: .45; }
 .btn-row.grow { flex: 1; }
 .emblem-row { display: flex; gap: 4px; flex-wrap: wrap; }

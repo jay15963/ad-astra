@@ -42,7 +42,7 @@
     "nrho": "Órbita halo (NRHO)",
     "lunar_orbit": "Órbita lunar",
     "lunar_surface": "Superfície lunar",
-    "lunar_south_pole": "Polo Sul lunar",
+    "lunar_south_pole": "Polo sul lunar",
     "tmi": "Injeção para Marte",
     "mars_transfer": "Transferência Marte",
     "mars_orbit": "Órbita de Marte",
@@ -58,8 +58,8 @@
     "crewed_lunar_flyby": "Primeiro sobrevoo lunar tripulado da era",
     "crewed_lunar_orbit": "Órbita lunar tripulada",
     "crewed_lunar_landing": "Pouso tripulado na Lua",
-    "lunar_south_pole_landing": "Pouso no Polo Sul lunar",
-    "lunar_south_pole_crewed": "Pessoas no Polo Sul lunar",
+    "lunar_south_pole_landing": "Pouso no polo sul lunar",
+    "lunar_south_pole_crewed": "Pessoas no polo sul lunar",
     "lunar_sample_return": "Amostras lunares trazidas",
     "lunar_resource_demo": "Demonstração de recursos lunares",
     "lunar_base": "Base lunar",
@@ -199,7 +199,7 @@
         "gravidade": "0,17 g (1,6 m/s²)",
         "atmosfera": "Praticamente nenhuma (exosfera)",
         "recursos": [
-          "Gelo de água nas crateras do Polo Sul",
+          "Gelo de água nas crateras do polo sul",
           "Regolito para construção",
           "Hélio-3 (especulativo)",
           "Luz solar quase contínua nas bordas polares"
@@ -210,8 +210,8 @@
           "Radiação sem magnetosfera",
           "Terreno polar com sombras profundas"
         ],
-        "historia": "Doze pessoas caminharam aqui entre 1969 e 1972. Em 2026 a Artemis II voltou a levar gente até lá, e Estados Unidos e China correm pelo Polo Sul, onde está o gelo.",
-        "descoberta": "As primeiras imagens chegam com sombras longas no Polo Sul. Há gelo onde o Sol nunca bate. O mapa da Lua deixa de ser um disco cinza e vira terreno."
+        "historia": "Doze pessoas caminharam aqui entre 1969 e 1972. Em 2026 a Artemis II voltou a levar gente até lá, e Estados Unidos e China correm pelo polo sul, onde está o gelo.",
+        "descoberta": "As primeiras imagens chegam com sombras longas no polo sul. Há gelo onde o Sol nunca bate. O mapa da Lua deixa de ser um disco cinza e vira terreno."
       },
       "milestones": [
         "crewed_lunar_flyby",
@@ -248,7 +248,7 @@
           "id": "lunar_south_pole",
           "anchor": "surface",
           "angle": 270,
-          "label": "Polo Sul lunar"
+          "label": "Polo sul lunar"
         }
       ]
     },

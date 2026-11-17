@@ -6,6 +6,7 @@
     "roscosmos": "russian", "jaxa": "japanese"
   },
   "surnameFirst": ["chinese"],
+  "forbiddenNames": ["Yuri Gagarin", "Gherman Titov", "Valentina Tereshkova", "Alexei Leonov", "Aleksei Leonov", "Pavel Belyaev", "Pavel Belyayev", "Pavel Vinogradov", "Pavel Popovich", "Vladimir Komarov", "Sergei Krikalev", "Gennady Padalka", "Valeri Polyakov", "Yelena Serova", "Elena Serova", "Anna Kikina", "Oleg Kononenko", "Fyodor Yurchikhin", "Svetlana Savitskaya", "Anton Shkaplerov", "Oleg Artemyev", "Sergey Prokopyev", "Dmitri Kondratyev", "Mikhail Kornienko", "Yang Liwei", "Wang Yaping", "Liu Yang", "Zhai Zhigang", "Jing Haipeng", "Nie Haisheng", "Tang Hongbo", "Tang Shengjie", "Song Lingdong", "Rakesh Sharma", "Shubhanshu Shukla", "Kalpana Chawla", "Sunita Williams", "Koichi Wakata", "Soichi Noguchi", "Naoko Yamazaki", "Chiaki Mukai", "Kimiya Yui", "Takuya Onishi", "Satoshi Furukawa", "Akihiko Hoshide", "Norishige Kanai", "Samantha Cristoforetti", "Thomas Pesquet", "Alexander Gerst", "Luca Parmitano", "Matthias Maurer", "Andreas Mogensen", "Christina Koch", "Peggy Whitson", "Neil Armstrong", "Buzz Aldrin", "Jeremy Hansen", "Victor Glover", "Reid Wiseman"],
   "firstNames": {
     "american": ["Abigail", "Brooke", "Camila", "Dana", "Erin", "Gabrielle", "Harper", "Jada", "Kendra", "Lauren", "Maya", "Nadia", "Paige", "Rosalind", "Tessa", "Valerie", "Whitney", "Yolanda",
                  "Aaron", "Brandon", "Calvin", "Dominic", "Emmett", "Grant", "Isaiah", "Jamal", "Kyle", "Luis", "Mason", "Noah", "Owen", "Preston", "Quentin", "Russell", "Silas", "Wesley"],
@@ -33,7 +34,7 @@
     "chinese": ["Lin", "Gao", "Tang", "Zheng", "Qiao", "Han", "Du", "Ma", "Pan", "Xu", "Luo", "Shen", "Fang", "Cao", "Yuan", "Kong", "Lu", "Xiao", "Wei", "Song", "Guo", "Jin", "Bai", "Qian", "Hou"],
     "indian": ["Iyer", "Menon", "Kulkarni", "Bhatia", "Joshi", "Rathore", "Desai", "Rao", "Qureshi", "Chatterjee", "Banerjee", "Pillai", "Reddy", "Gokhale", "Natarajan", "Malhotra", "Sengupta", "Thakur", "Venkatesh", "Dutta", "Srinivasan", "Kapoor", "Ghosh", "Patil", "Hegde"],
     "european": ["Halvorsen", "Ferraro", "Marchand", "Brenner", "Almeida", "Vermeer", "Moreau", "Ortega", "Lindqvist", "Kowalska", "De Smet", "Hoffmann", "Rinaldi", "Castaño", "Nyberg", "Dubois", "Kessler", "Van Dijk", "Novák", "Lombardi", "Ferreira", "Aalto", "Lefèvre", "Brandstätter", "Moretti"],
-    "russian": ["Belyaev", "Volkov", "Sokolov", "Morozov", "Lebedev", "Kuznetsov", "Orlov", "Zaitsev", "Golubev", "Fedorov", "Vinogradov", "Semyonov", "Karpov", "Zhukov", "Gromov", "Komarovsky", "Polyakov", "Sorokin", "Tarasov", "Yermakov", "Belov", "Krylov", "Medvedko", "Rybakov", "Ustinov"],
+    "russian": ["Zaretsky", "Volkov", "Sokolov", "Morozov", "Lebedev", "Kuznetsov", "Orlov", "Zaitsev", "Golubev", "Fedorov", "Lavrentyev", "Semyonov", "Karpov", "Zhukov", "Gromov", "Komarovsky", "Polyakov", "Sorokin", "Tarasov", "Yermakov", "Belov", "Krylov", "Medvedko", "Rybakov", "Ustinov"],
     "japanese": ["Takahashi", "Nakamura", "Kobayashi", "Watanabe", "Ito", "Kato", "Yoshida", "Sasaki", "Matsumoto", "Inoue", "Kimura", "Hayashi", "Shimizu", "Ishikawa", "Ogawa", "Fujita", "Okada", "Hasegawa", "Murakami", "Kondo", "Ishii", "Sakamoto", "Endo", "Aoki", "Fujii"]
   },
   "roles": {
@@ -54,13 +55,13 @@
     { "id": "impulsivo", "name": "Impulsividade", "description": "Decide rápido, às vezes rápido demais. Comando extra, mas risco maior.", "effects": { "missionDelta": -0.015, "band": -0.03, "commandPoints": 1 }, "weight": 2 },
     { "id": "leal", "name": "Lealdade", "description": "Veste a camisa da agência. Quase nunca aceita propostas de rivais.", "effects": { "loyaltyTarget": 20, "leaveChance": 0.2 }, "weight": 3 },
     { "id": "carismatico", "name": "Carisma", "description": "A câmera adora. Sucessos com essa pessoa rendem apoio público.", "effects": { "supportOnSuccess": 1, "ambition": 10 }, "weight": 2 },
-    { "id": "saude_fragil", "name": "Saúde frágil", "description": "Corpo cobra a conta: mais lesões e aposentadoria mais cedo.", "effects": { "injuryChance": 0.12, "retireChance": 0.8, "survival": -0.05 }, "weight": 1 },
+    { "id": "saude_fragil", "name": "Saúde frágil", "description": "O corpo cobra a conta: mais lesões e aposentadoria mais cedo.", "effects": { "injuryChance": 0.12, "retireChance": 0.8, "survival": -0.05 }, "weight": 1 },
     { "id": "resistente", "name": "Resistência", "description": "Aguenta força-g, frio e fome. Mais chance de sobreviver ao pior.", "effects": { "survival": 0.12, "injuryChance": -0.08 }, "weight": 2 },
     { "id": "mentor", "name": "Mentoria", "description": "Ensina quem voa junto. Novatos na mesma missão ganham experiência extra.", "effects": { "mentorXp": 0.4, "teamMorale": 2 }, "weight": 2 },
     { "id": "workaholic", "name": "Vício em trabalho", "description": "A última luz acesa no prédio. Acelera projetos, mas a moral desgasta.", "effects": { "researchSpeed": 0.1, "moraleDrift": -1.5 }, "weight": 2 },
     { "id": "avesso_midia", "name": "Avesso aos holofotes", "description": "Odeia entrevistas. A moral quase não oscila com a imprensa.", "effects": { "moraleSwing": 0.5, "ambition": -15 }, "weight": 2 },
     { "id": "calculista", "name": "Frieza de cálculo", "description": "Pensa em probabilidades. Estimativas melhores e Comando mais bem gasto.", "effects": { "band": 0.04, "missionDelta": 0.005 }, "weight": 2 },
-    { "id": "pe_quente", "name": "Pé-quente", "description": "As coisas costumam dar certo perto dela(e). Ninguém sabe explicar.", "effects": { "missionDelta": 0.01, "survival": 0.08 }, "weight": 1 },
+    { "id": "pe_quente", "name": "Pé-quente", "description": "As coisas costumam dar certo quando essa pessoa está por perto. Ninguém sabe explicar.", "effects": { "missionDelta": 0.01, "survival": 0.08 }, "weight": 1 },
     { "id": "teimoso", "name": "Teimosia", "description": "Não larga o osso. Raramente vai embora, mas discute com a sala de controle.", "effects": { "missionDelta": -0.005, "loyaltyTarget": 10, "commandPoints": -1 }, "weight": 2 },
     { "id": "intuicao", "name": "Intuição de voo", "description": "Sente o problema antes do sensor. Um ponto de Comando extra.", "effects": { "commandPoints": 1, "band": 0.01 }, "weight": 2 },
     { "id": "ex_militar", "name": "Ex-militar", "description": "Disciplina de esquadrão. Lealdade alta e procedimentos firmes.", "effects": { "band": 0.02, "loyaltyTarget": 10, "missionDelta": 0.005 }, "weight": 2 },

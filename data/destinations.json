@@ -19,20 +19,20 @@
   ],
   "destinations": [
     {
-      "id": "leo", "name": "Órbita baixa da Terra", "short": "LEO", "body": "earth", "kind": "orbit", "capacityKey": "leo", "capacityFactor": 1,
+      "id": "leo", "name": "Órbita baixa da Terra", "emLabel": "na órbita baixa", "toLabel": "à órbita baixa", "short": "LEO", "body": "earth", "kind": "orbit", "capacityKey": "leo", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }],
       "transitWeeks": 0, "window": null, "arrivalMilestones": [],
       "firsts": { "crewed": "crewed_orbit_national" },
       "description": "Onde tudo começa: 400 km de altitude, 90 minutos por volta."
     },
     {
-      "id": "sso", "name": "Órbita heliossíncrona", "short": "SSO", "body": "earth", "kind": "orbit", "capacityKey": "leo", "capacityFactor": 0.75,
+      "id": "sso", "name": "Órbita heliossíncrona", "emLabel": "na órbita heliossíncrona", "toLabel": "à órbita heliossíncrona", "short": "SSO", "body": "earth", "kind": "orbit", "capacityKey": "leo", "capacityFactor": 0.75,
       "route": [{ "from": "earth", "to": "sso", "dv": 9.8 }],
       "transitWeeks": 0, "window": null, "arrivalMilestones": [], "firsts": {},
       "description": "Órbita polar que passa sempre à mesma hora local: a favorita da observação da Terra."
     },
     {
-      "id": "iss", "name": "Estação Espacial Internacional", "short": "ISS", "body": "earth", "kind": "station", "capacityKey": "leo", "capacityFactor": 0.9,
+      "id": "iss", "name": "Estação Espacial Internacional", "emLabel": "na ISS", "toLabel": "à ISS", "short": "ISS", "body": "earth", "kind": "station", "capacityKey": "leo", "capacityFactor": 0.9,
       "availableUntil": { "year": 2030, "month": 12 },
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "iss", "dv": 0.2 }],
       "transitWeeks": 0, "window": null, "arrivalMilestones": [],
@@ -40,13 +40,13 @@
       "description": "Inclinação de 51,6 graus, um pouco mais cara que a órbita baixa padrão. Aposentadoria prevista para o fim de 2030."
     },
     {
-      "id": "gto", "name": "Transferência geoestacionária", "short": "GTO", "body": "earth", "kind": "orbit", "capacityKey": "gto", "capacityFactor": 1,
+      "id": "gto", "name": "Transferência geoestacionária", "emLabel": "na órbita de transferência", "toLabel": "à órbita de transferência", "short": "GTO", "body": "earth", "kind": "orbit", "capacityKey": "gto", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "gto", "dv": 2.4 }],
       "transitWeeks": 0, "window": null, "arrivalMilestones": [], "firsts": {},
       "description": "Rumo aos 36 mil km da órbita geoestacionária, o mercado dos satélites de comunicação."
     },
     {
-      "id": "cislunar", "name": "Sobrevoo lunar", "short": "Cislunar", "body": "moon", "kind": "flyby", "capacityKey": "tli", "capacityFactor": 1,
+      "id": "cislunar", "name": "Sobrevoo lunar", "emLabel": "ao redor da Lua", "toLabel": "à Lua", "short": "Cislunar", "body": "moon", "kind": "flyby", "capacityKey": "tli", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }],
       "transitWeeks": 1, "window": null,
       "arrivalMilestones": [
@@ -67,7 +67,7 @@
       "description": "Trajetória de retorno livre em volta da Lua: o caminho do Artemis II e da Apollo 8."
     },
     {
-      "id": "lunar_orbit", "name": "Órbita lunar", "short": "Órbita lunar", "body": "moon", "kind": "orbit", "capacityKey": "tli", "capacityFactor": 1,
+      "id": "lunar_orbit", "name": "Órbita lunar", "emLabel": "na órbita lunar", "toLabel": "à órbita lunar", "short": "Órbita lunar", "body": "moon", "kind": "orbit", "capacityKey": "tli", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }, { "from": "tli", "to": "lunar_orbit", "dv": 0.9 }],
       "transitWeeks": 1, "window": null,
       "arrivalMilestones": [
@@ -79,7 +79,7 @@
       "description": "Órbita baixa (LLO) ou halo quase retilínea (NRHO), porta de entrada para a superfície."
     },
     {
-      "id": "lunar_surface", "name": "Superfície lunar", "short": "Lua", "body": "moon", "kind": "surface", "capacityKey": "tli", "capacityFactor": 1,
+      "id": "lunar_surface", "name": "Superfície lunar", "emLabel": "na Lua", "toLabel": "à Lua", "short": "Lua", "body": "moon", "kind": "surface", "capacityKey": "tli", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }, { "from": "tli", "to": "lunar_orbit", "dv": 0.9 }, { "from": "lunar_orbit", "to": "lunar_surface", "dv": 1.9 }],
       "transitWeeks": 1, "window": null,
       "arrivalMilestones": [
@@ -88,7 +88,7 @@
           "radio": ["Queima de inserção nominal.", "Órbita lunar confirmada."] },
         { "id": "descent", "label": "Descida motorizada", "pFail": 0.04, "anomalyBand": 0.08,
           "failureWeights": { "propulsion": 0.45, "structure": 0.05, "software": 0.35, "human": 0.1, "environment": 0.05 },
-          "radio": ["Início da descida motorizada.", "Radar de altitude travado.", "Quatro mil pés, descendo bem."] },
+          "radio": ["Início da descida motorizada.", "Radar de altitude travado.", "Mil e duzentos metros, descendo bem."] },
         { "id": "hazard_avoidance", "label": "Desvio de obstáculos", "pFail": 0.04, "anomalyBand": 0.1,
           "failureWeights": { "propulsion": 0.1, "structure": 0.05, "software": 0.45, "human": 0.2, "environment": 0.2 },
           "radio": ["Pedras no ponto previsto, desviando.", "Novo ponto escolhido, combustível ok."] },
@@ -100,7 +100,7 @@
       "description": "Planícies equatoriais e de média latitude, iluminadas e conhecidas desde a Apollo."
     },
     {
-      "id": "lunar_south_pole", "name": "Polo sul lunar", "short": "Polo sul", "body": "moon", "kind": "surface", "capacityKey": "tli", "capacityFactor": 1,
+      "id": "lunar_south_pole", "name": "Polo sul lunar", "emLabel": "no polo sul lunar", "toLabel": "ao polo sul lunar", "short": "Polo sul", "body": "moon", "kind": "surface", "capacityKey": "tli", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tli", "dv": 3.15 }, { "from": "tli", "to": "lunar_orbit", "dv": 0.9 }, { "from": "lunar_orbit", "to": "lunar_south_pole", "dv": 2.1 }],
       "transitWeeks": 1, "window": null,
       "arrivalMilestones": [
@@ -117,11 +117,11 @@
           "failureWeights": { "propulsion": 0.15, "structure": 0.4, "software": 0.15, "human": 0.1, "environment": 0.2 },
           "radio": ["Contato! Verificando a inclinação...", "De pé no polo sul."] }
       ],
-      "firsts": { "crewed": "lunar_south_pole_crewed", "robotic": "lunar_south_pole_landing" },
+      "firsts": { "crewed": ["lunar_south_pole_crewed", "crewed_lunar_landing"], "robotic": ["lunar_south_pole_landing", "lunar_surface_robotic"] },
       "description": "Gelo nas crateras de sombra eterna e picos quase sempre iluminados: o terreno mais disputado da década."
     },
     {
-      "id": "mars_orbit", "name": "Órbita de Marte", "short": "Órbita marciana", "body": "mars", "kind": "orbit", "capacityKey": "mars", "capacityFactor": 1,
+      "id": "mars_orbit", "name": "Órbita de Marte", "emLabel": "na órbita de Marte", "toLabel": "à órbita de Marte", "short": "Órbita marciana", "body": "mars", "kind": "orbit", "capacityKey": "mars", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tmi", "dv": 3.6 }, { "from": "tmi", "to": "mars_orbit", "dv": 2.1 }],
       "transitWeeks": 30, "window": { "periodWeeks": 112, "phaseTurn": 39, "openWeeks": 12 },
       "arrivalMilestones": [
@@ -133,7 +133,7 @@
       "description": "Uma janela a cada cerca de 26 meses. Perder a janela custa mais de dois anos."
     },
     {
-      "id": "mars_surface", "name": "Superfície de Marte", "short": "Marte", "body": "mars", "kind": "surface", "capacityKey": "mars", "capacityFactor": 1,
+      "id": "mars_surface", "name": "Superfície de Marte", "emLabel": "em Marte", "toLabel": "a Marte", "short": "Marte", "body": "mars", "kind": "surface", "capacityKey": "mars", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "tmi", "dv": 3.6 }, { "from": "tmi", "to": "mars_orbit", "dv": 0.8 }, { "from": "mars_orbit", "to": "mars_surface", "dv": 1.0 }],
       "transitWeeks": 32, "window": { "periodWeeks": 112, "phaseTurn": 39, "openWeeks": 12 },
       "arrivalMilestones": [
@@ -154,7 +154,7 @@
       "description": "Atmosfera fina demais para frear e grossa demais para ignorar."
     },
     {
-      "id": "jupiter", "name": "Sistema de Júpiter", "short": "Júpiter", "body": "jupiter", "kind": "orbit", "capacityKey": "outer", "capacityFactor": 1,
+      "id": "jupiter", "name": "Sistema de Júpiter", "emLabel": "em Júpiter", "toLabel": "a Júpiter", "short": "Júpiter", "body": "jupiter", "kind": "orbit", "capacityKey": "outer", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "jupiter", "dv": 6.3 }],
       "transitWeeks": 300, "window": { "periodWeeks": 57, "phaseTurn": 20, "openWeeks": 8 },
       "arrivalMilestones": [
@@ -166,7 +166,7 @@
       "description": "Cerca de seis anos de viagem com ajudas gravitacionais. Radiação brutal perto do planeta."
     },
     {
-      "id": "titan", "name": "Titã", "short": "Titã", "body": "saturn", "kind": "surface", "capacityKey": "outer", "capacityFactor": 1,
+      "id": "titan", "name": "Titã", "emLabel": "em Titã", "toLabel": "a Titã", "short": "Titã", "body": "saturn", "kind": "surface", "capacityKey": "outer", "capacityFactor": 1,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "titan", "dv": 7.3 }],
       "transitWeeks": 312, "window": { "periodWeeks": 54, "phaseTurn": 22, "openWeeks": 4 },
       "arrivalMilestones": [

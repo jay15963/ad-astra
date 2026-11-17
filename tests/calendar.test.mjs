@@ -84,7 +84,7 @@ test('data: destinations use the fixed vocabulary, routes and milestones', () =>
       const w = Object.values(m.failureWeights).reduce((a, b) => a + b, 0);
       assert.ok(Math.abs(w - 1) < 0.01, `${d.id}/${m.id} weights sum to 1`);
     }
-    for (const f of Object.values(d.firsts)) assert.ok(FIRSTS.includes(f), `${d.id} first ${f}`);
+    for (const f of Object.values(d.firsts).flat()) assert.ok(FIRSTS.includes(f), `${d.id} first ${f}`);
   }
   const ms = data.index.destinations.mars_surface;
   assert.deepEqual(ms.arrivalMilestones.map((m) => m.id), ['entry', 'parachute', 'powered_descent', 'touchdown']);

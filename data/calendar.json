@@ -2,40 +2,41 @@
   "_comment": "Calendário vivo 2026-2030. As datas oficiais vivem SÓ aqui (meses em base 1). planned = plano publicado até 17/nov/2026. delay = distribuição de atraso a partir do histórico real do programa: slipChance por revisão trimestral (só nos ~2 anos antes do voo), meanMonths/sdMonths por escorregão, maxMonths = teto do atraso acumulado, cancelChance opcional por revisão. launches = lançamentos do mesmo veículo por missão. refly = em caso de falha o dono repete o voo. historicalOutcome: resultado real, respeitado quando truthLayer = 'fato'. importance 1-3 controla o destaque das notícias. client = empresa contratada quando o dono no jogo é outro.",
   "monthBase": 1,
   "news": {
-    "delayed": "{name} adiada para {date}",
+    "delayed": "Adiamento: {name} fica para {date}",
     "delayedBody": "Nova revisão de cronograma: mais {weeks} de atraso. Plano original: {planned}.",
     "windowMissed": "{name} perde a janela e fica para {date}",
     "windowMissedBody": "O destino só fica alcançável de novo na próxima janela.",
     "prereqWait": "{name} aguarda {prereq}",
     "prereqWaitBody": "Sem o voo anterior não há como seguir. Nova meta: {date}.",
-    "prereqFailed": "{name} revista depois do fracasso de {prereq}",
-    "grounded": "{name} adiada: frota do {vehicle} em solo",
-    "suspended": "{name} suspensa por causa do conflito",
+    "prereqFailed": "Revisão em {name} depois do fracasso de {prereq}",
+    "grounded": "Adiamento: {name} espera a frota do {vehicle} voltar a voar",
+    "suspended": "Guerra suspende {name}",
     "suspendedBody": "Com a guerra, o governo desviou verba e pessoal. Retomada prevista para {date}.",
-    "cancelled": "{name} cancelada",
+    "cancelled": "Cancelamento: {name}",
     "cancelledBody": "O programa não sobreviveu à revisão de prioridades.",
     "launched": "{owner} lança {name}",
     "launchedBody": "Lançamento nominal no {vehicle}. Chegada prevista para {date}.",
     "success": "{name}: sucesso!",
     "partial": "{name}: sucesso parcial",
     "failed": "{name} fracassa",
-    "lostCrew": "Tragédia: tripulação da {name} perdida",
+    "lostCrew": "Tragédia: tripulação perdida em {name}",
     "lostCrewBody": "{owner} suspende todos os voos tripulados enquanto investiga.",
-    "first": "{owner} é o primeiro: {milestone}",
+    "first": "Feito inédito! {owner} conquista: {milestone}",
     "reflight": "{owner} vai repetir {name}: nova data {date}",
     "bgFailure": "Falha do {vehicle} perde carga comercial",
     "bgFailureBody": "Frota em solo por cerca de {weeks} para investigação.",
     "bgTestFailure": "{vehicle} explode em voo de teste",
     "bgMilestone": "{vehicle} chega ao {n}º voo",
     "bgQuarter": "Balanço do trimestre: {summary}",
-    "debut": "Estreia do {vehicle}: o novo foguete entra no catálogo"
+    "debut": "Estreia do {vehicle}: o novo foguete entra no catálogo",
+    "firstEra": "Primeira vez neste século: {owner} conquista {milestone}"
   },
   "milestoneLabels": {
     "crewed_lunar_flyby": "sobrevoo lunar tripulado",
     "crewed_lunar_orbit": "órbita lunar tripulada",
     "crewed_lunar_landing": "pouso tripulado na Lua",
     "lunar_south_pole_landing": "pouso no polo sul lunar",
-    "lunar_south_pole_crewed": "humanos no polo sul lunar",
+    "lunar_south_pole_crewed": "tripulação no polo sul lunar",
     "lunar_surface_robotic": "pouso robótico na Lua",
     "lunar_sample_return": "amostras lunares trazidas à Terra",
     "lunar_resource_demo": "uso de recursos lunares",
@@ -79,7 +80,8 @@
       "importance": 3,
       "statusNov2026": "Realizada: lançada em 1º de abril, amerissagem em 10 de abril.",
       "source": "https://spacepolicyonline.com/?p=88152",
-      "description": "Quatro astronautas (três da NASA e um canadense) dão a volta na Lua na Orion, o primeiro voo humano além da órbita baixa desde 1972. Estava prevista para setembro de 2025."
+      "description": "Quatro astronautas (três da NASA e um canadense) dão a volta na Lua na Orion, o primeiro voo humano além da órbita baixa desde 1972. Estava prevista para setembro de 2025.",
+      "partnersText": "NASA e CSA (Agência Espacial Canadense: Jeremy Hansen voa como especialista de missão). A ESA fornece o módulo de serviço."
     },
     {
       "id": "blue_moon_pathfinder",
@@ -333,7 +335,7 @@
       "crewed": false,
       "planned": {
         "year": 2026,
-        "month": 8
+        "month": 12
       },
       "truthLayer": "plano_oficial",
       "delay": {
@@ -347,7 +349,8 @@
       "importance": 3,
       "statusNov2026": "Lançamento adiado em 23 de agosto por tempestade tropical; nova data a confirmar.",
       "source": "https://www.natureworldnews.com/articles/73200/20260826/change-7-launch-postponed-tropical-storm-narra.htm",
-      "description": "Orbitador, lander, rover e um saltador que entra nas crateras de sombra eterna atrás de gelo. Leva instrumentos de sete países."
+      "description": "Orbitador, lander, rover e um saltador que entra nas crateras de sombra eterna atrás de gelo. Leva instrumentos de sete países.",
+      "knownSlip": "Adiado em 23/ago/2026 (tempestade tropical): não voa antes de dez/2026."
     },
     {
       "id": "gaganyaan_g2",
@@ -964,7 +967,8 @@
       "partners": [
         "spacex",
         "esa",
-        "jaxa"
+        "jaxa",
+        "blueorigin"
       ],
       "type": "crewed",
       "destination": "lunar_south_pole",
@@ -1435,7 +1439,7 @@
     },
     {
       "id": "china_crewed_landing",
-      "name": "Pouso tripulado chinês na Lua",
+      "name": "Mengzhou-Lanyue, pouso tripulado",
       "owner": "cnsa",
       "partners": [],
       "type": "crewed",

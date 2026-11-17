@@ -31,7 +31,7 @@ for (const playerId of actors) {
           const al = state.activeLaunch;
           let r;
           if (al.pendingIntervention) {
-            r = dispatch(state, data, { type: 'launch/choose', optionId: al.pendingIntervention.options[0].id });
+            r = dispatch(state, data, { type: 'launch/choose', optionId: (al.pendingIntervention.options.find((o) => !o.disabled) || al.pendingIntervention.options[0]).id });
           } else if (al.act === 'prelaunch') {
             r = dispatch(state, data, { type: 'launch/countdown' });
           } else if (al.pendingHold) {
@@ -44,6 +44,8 @@ for (const playerId of actors) {
           if (!r.ok) throw new Error(`launch: ${r.error}`);
         }
         if (state.activeLaunch) throw new Error('launch never finished');
+        // schedule whatever is ready (exercises costs, launches, transit and arrivals)
+        for (const m of state.missions.filter((x) => x.status === 'planning')) dispatch(state, data, { type: 'mission/schedule', missionId: m.id });
         const r = dispatch(state, data, { type: 'time/advance', weeks: 4, stopOnEvent: true });
         if (!r.ok) throw new Error(`advance: ${r.error}`);
         if (r.advanced === 0 && isBlocked(state) === 'decision' && state.decisions.length === 0) throw new Error('blocked with no decisions');
@@ -53,7 +55,7 @@ for (const playerId of actors) {
       const errs = state.log.filter((l) => l.includes('erro'));
       if (errs.length) throw new Error(`errors logged: ${errs.slice(0, 3).join(' | ')}`);
       const p = state.actors[playerId];
-      console.log(`ok ${playerId} seed=${seed} turn=${state.turn} news=${state.news.length} missions=${state.missions.length} cash=${p?.cash?.toFixed?.(0)} prestige=${p?.prestige}`);
+      console.log(`ok ${playerId} seed=${seed} turn=${state.turn} news=${state.news.length} missions=${state.missions.length} cash=${p?.cash?.toFixed?.(0)} prestige=${Math.round(p?.prestige ?? 0)} fim=${state.gameOver?.reason}`);
     } catch (e) {
       failures++;
       console.error(`FAIL ${playerId} seed=${seed}: ${e.stack || e.message}`);

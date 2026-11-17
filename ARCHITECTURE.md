@@ -321,7 +321,8 @@ Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), de
 
 ## Sinais (cross-módulo)
 `emitSignal(state, type, payload)`; ficam visíveis em `state.signals` durante o **próximo** tick, para todos os módulos.
-Tipos: `mission/launched {missionId, actorId}`, `mission/resolved {missionId?, calendarId?, actorId, destination, type, crewed, outcome, failureType, phase}`,
+`emitSignal` monta `{...payload, type, turn}` (o tipo do sinal sempre vence). Payload **não** usa a chave `type`.
+Tipos: `mission/launched {missionId, actorId}`, `mission/resolved {missionId?, calendarId?, actorId, destination, missionType, crewed, outcome, failureType, phase}`,
 `crew/died {crewId, missionId}`, `crew/legend {crewId}`, `first {milestoneId, actorId}`, `treaty/signed {treatyId}`, `treaty/broken {treatyId, by}`,
 `tension/changed {a, b, from, to}`, `election {actorId, result}`, `budget/changed {actorId, from, to}`, `research/completed {nodeId, actorId}`,
 `calendar/delayed {calendarId, weeks}`, `contract/awarded {contractId, winner}`.
@@ -386,8 +387,86 @@ Tema por era: `document.body.dataset.era = '4'`; CSS variables por era em styles
 `env(safe-area-inset-*)`. Acessibilidade: texto escalável (`--text-scale`), modo daltonismo (sem depender só de vermelho/verde), reduzir movimento, nada só por som.
 
 ## Testes e ferramentas
-- `npm test` → `node --test tests/` (cada módulo tem `tests/<modulo>.test.mjs`; use `loadDataNode(root)` de `src/core/data.js`).
+- `npm test` → `node --test tests/*.test.mjs` (no Windows `node --test tests/` falha; use o glob) (cada módulo tem `tests/<modulo>.test.mjs`; use `loadDataNode(root)` de `src/core/data.js`).
 - `node tools/smoke.mjs [seeds] [actor]` — bot joga campanhas completas com todos os atores jogáveis, faz save/load no meio, falha em exceção ou `log` com "erro".
 - `tools/sim-launches.mjs` (10 mil lançamentos por veículo), `tools/sim-calendar.mjs` (20 sementes × 5 anos), `tools/sim-diplomacy.mjs` (log de alianças),
   `tools/sim-world.mjs` (20 sementes, mundos divergentes).
 - Rodar localmente: `npx http-server -c-1 .` (ou qualquer servidor estático) e abrir `http://localhost:8080`.
+
+## Integração — desvios aceitos (nov/2026)
+
+Decisões tomadas ao juntar os módulos. Onde este bloco contradiz o texto acima, vale este bloco.
+
+- **Sinais**: `mission/resolved` traz o tipo da missão em `missionType` (calendar e missions emitem assim; diplomacy, politics,
+  narrative e missions leem assim). Sinais extras: `crew/left`, `crew/injured`, `diplomacy/techTransfer`, `diplomacy/crewExchange`,
+  `diplomacy/blocChanged`, `politics/suspension`, `politics/program_review`.
+- **Tempo**: `dateToTurn(year, month0..11)` usa `ceil` (casa com `turnToDate`). `vehicles/spacecraft/destinations/calendar.json`
+  têm `monthBase: 1` (meses 1–12); `politics.json` (eleições) usa meses 0–11.
+- **Artemis / arquitetura de pouso**: uma nave com `landerRequired: [destId]` (Orion) só pousa com um **módulo de apoio**
+  `secondarySpacecraftId` (lander tripulado pré-posicionado: Starship HLS, Blue Moon Mk2; para o Lanyue a Mengzhou). missions escolhe o
+  melhor (`companionOf`), cobra nave + lançamento dele, e risk soma a confiabilidade do módulo. Itens do calendário podem declarar
+  `secondarySpacecraftId`. Programas apertados (Orion no SLS, Lanyue no LM-10) recebem margem de combustível fina automaticamente.
+- **Capacidade**: a única fonte é `calendar.capacityTo` = `capacity[capacityKey] × destination.capacityFactor`; missions e risk usam ela.
+- **Acesso a hardware** (`calendar.accessFor`): `embargo`, tensão ≥ 3, `access: own|bloc|open|generic`. `bloc` libera para o mesmo bloco
+  ou para quem tem tratado de trabalho ativo (`mission_partnership, cost_sharing, crew_exchange, tech_transfer`; o Tratado do Espaço
+  Exterior não conta). Ator com `launchPolicy: 'domestic'` (NASA, CNSA, Roscosmos) só usa lançadores do próprio país.
+- **Estreia de veículo**: veículo com `debutCalendarId` fica disponível quando a estreia teve sucesso, também se foi o jogador que voou.
+- **Primeiros**: `destination.firsts.crewed|robotic` pode ser string ou lista (polo sul lunar também conta como pouso na Lua).
+  Meta da era `crewed_orbit_national` (por ator).
+- **Economia**: `changeActor` aplica retorno decrescente a ganhos de `support`/`reputation` acima de 60. Reajuste anual de agências
+  amortecido (`budgetModel.raiseDamping`, `max`), empresas com `companyMax`. Na virada do ano budget.js devolve metade do caixa acima
+  de 60% da verba (tesouro/investidores). Hardware genérico custa mais para destinos distantes (`GENERIC_COST_SCALE`).
+- **UI**: `createStore(data, {storage})`; `store.ui`, `tryQuery`, `trend`, `series`; rota por hash. `'diplomacy/propose'` usa
+  `proposalType` (porque `type` é a rota). `news.icon` pode ser emoji ou nome curto (`'failure'`, `'budget'`…): a UI traduz com
+  `components.newsIcon`; tags de notícia são internas e só as traduzidas em `world-tab.TAG_LABELS` aparecem.
+- **Imports extras** (sem ciclo): research/crew → budget; crew → research; narrative → politics, diplomacy; missions → core/outcome.
+  calendar lê a tensão direto de `state.tension` (sem importar politics).
+- **Ferramentas**: `tools/sim-campaign.mjs [seeds] [ator] [--verbose|--quiet]` (bot "esperto", exporta `runCampaign`);
+  `tools/smoke.mjs` agenda missões e voa as cenas. `tools/sim-calendar.mjs` conta notícias ao nascer (o feed guarda só 200).
+
+## Integridade e equilíbrio (revisão nov/2026)
+
+- **Fim de jogo**: `engine.dispatch` recusa toda ação (exceto `time/advance` e `mission/estimate`) quando `state.gameOver` existe
+  ("Campanha encerrada."). Se um módulo encerra a campanha no meio da semana (budget demite a direção), os módulos seguintes não rodam;
+  `engine.endGame` limpa a fila de decisões e chama os `onGameEnd` **uma vez** para qualquer motivo (`gameOver.hooksRun`).
+  Lançamento não pode ser marcado para a última semana (`launchTurn < endTurn`).
+- **Missões** (campos novos em Mission): `paidM` (quanto foi pago de fato; ajustes cobram/devolvem a diferença sempre que `paid`,
+  inclusive de volta ao planejamento; cancelar devolve 40% de `paidM`), `grantShare` (verba externa como **fração** do custo, não valor
+  fixo; `grantM` só em saves antigos), `readyTurn` (programa do calendário: hardware pronto na data oficial −4 semanas + atraso sorteado
+  com o `delay` do item), `scrubs` (contagens de adiamento, escritas por launch). Missões de programa travam `type/destination/crewed`;
+  o marco do programa só vale se `missions.matchesCalendar`. `'mission/create'` (público) apaga campos privilegiados
+  (`publicDraft`): grant, milestone, calendarId, contractId, prazos, readyTurn, clientPayload. Agendar checa se veículo e naves ainda
+  estão em serviço na data (`calendar.inServiceAt`).
+- **Risco** (`risk.missionRisk`): `plan.calendarId` aplica pré-requisitos do calendário que não voaram (−12 p.p. cada, com aviso);
+  nave tripulada com pouco histórico: hazard × (1 + 0,6/(1+voos)). Estratégia tem multiplicador de prestígio aplicado de verdade
+  (conservadora 0,8, agressiva 1,25); conservadora soma 6 semanas de preparo; margem acima de 10% custa 1% do lançamento por ponto.
+- **Prestígio numa escala só**: `core/outcome.js` `destPrestige`/`missionPrestige` servem ao jogador (missions) e à IA (calendar).
+  `calendar.rivalProgramPrestige` padrão 1,0.
+- **Os Primeiros e a história**: `state.firstsHistory` [core] vem de `scenario.historicalFirsts` (Apollo 8/11, Luna 9, Mars 3, Galileo,
+  Huygens, Salyut 1, Chandrayaan-3). `claimFirst` marca `era: true` e paga 35% (`HISTORIC_FIRST_SHARE`) por esses; feitos inéditos
+  (tripulação no polo sul, estação comercial, amostras de Marte, base lunar...) pagam inteiro. `helpers.isHistoricFirst`, `firstValue`.
+  Notícia: `calendar.news.firstEra` ("Primeira vez neste século").
+- **Rivais reagem** (calendar, slice `state.rivalOps = {pending, flights, react}`): todo mês cada IA com caixa pode encomendar uma
+  missão própria (sonda/lander genéricos, alvo pelos `ai.goals`), paga do caixa, voa após 6–9 meses de construção e pontua na mesma
+  escala. Um "primeiro" do jogador antecipa 4–8 semanas os programas rivais que buscam o mesmo marco e puxa as missões próprias deles.
+  Ajuste em `data/calendar.json` `rivalOps: {enabled, cashShare, budgetShare, startTurn}`.
+- **Comando** (launch): `state.commandPoints` é um **estoque** da agência; a cena usa min(estoque, teto da escalação) e devolve o que
+  sobrou; +1 a cada `CP_REGEN_WEEKS` (4) semanas até o teto do melhor diretor de voo (`state.commandPointsWeeks`). Contingência numa
+  anomalia menor queima 8% de margem. Contagem regressiva usa `al.countSeed` (muda a cada adiamento); marcos continuam presos a `al.seed`.
+- **Fatias**: narrative não escreve mais `state.tension` nem `state.relations`: usa `politics.nudgeTension` (±1 vira pressão no par de
+  nações; 2+ adota o nível) e `diplomacy.bumpRelation`. Imports novos (sem ciclo): narrative → politics, diplomacy; missions → core/outcome.
+- **Diplomacia**: tratados iniciais bilaterais têm `terms.protectedUntil` (padrão 26 semanas; ISS e Artemis III em data); tratados
+  IA–IA sob tensão (rivalidade acima da confiança) podem romper todo mês (`STRAIN_K`). `diplomacy/joinBloc` tem as mesmas travas das
+  propostas (recusa recente, tensão ≥ 3, pedido em aberto).
+- **Dinheiro**: empresa do jogador paga dividendos trimestrais (50% do caixa acima de 30% da receita anual) e perde apoio se acumular;
+  agência do jogador que deixa > 25% da verba do ano parada leva −5% no reajuste (`budgetModel.unspentShare/unspentPct`).
+- **Notícias**: uma manchete por evento de missão (+ reação do rival só quando há "primeiro"); repetições de rotina na Terra e
+  agendamentos de rotina só no log; falhas de lançadores no fundo: no máximo 2 por veículo em 52 semanas (o resto vai ao balanço
+  trimestral); "caixa no vermelho" com 8 semanas de histerese. Templates do calendário sem concordância de gênero fixa.
+
+### Ajustes cruzados sim ↔ UI
+- `missions.needsTransit(data, m)` exportado; `mission/resolved` traz `final`; `activeLaunch.outcome.final` (false quando ainda há chegada).
+- Fatores de `risk.missionRisk` podem ter `stages: ['asc']` (só valem no dia do lançamento; a cena de chegada os esconde).
+- `diplomacy/preview` e `diplomacy/proposalTypes` trazem `refusalTrust` (e `counterRefusalTrust` na prévia).
+- `missions/draftOptions` traz `autoName`; naves fora de `compatibleVehicles` do foguete escolhido vêm `valid: false`.
+- destinations.json: `emLabel` ("na órbita lunar") e `toLabel` ("à órbita lunar") para manchetes.

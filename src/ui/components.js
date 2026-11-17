@@ -102,7 +102,7 @@ export const PROPOSAL_LABELS = {
 // "Os Primeiros" — fixed milestone vocabulary from ARCHITECTURE.md
 export const FIRST_LABELS = {
   crewed_lunar_flyby: 'Sobrevoo lunar tripulado', crewed_lunar_orbit: 'Órbita lunar tripulada', crewed_lunar_landing: 'Pouso tripulado na Lua',
-  lunar_south_pole_landing: 'Pouso no polo sul lunar', lunar_south_pole_crewed: 'Tripulação no polo sul', lunar_sample_return: 'Amostras lunares trazidas',
+  lunar_south_pole_landing: 'Pouso no polo sul lunar', lunar_south_pole_crewed: 'Pessoas no polo sul lunar', lunar_sample_return: 'Amostras lunares trazidas',
   lunar_resource_demo: 'Uso de recursos lunares', lunar_base: 'Base lunar', mars_landing_robotic: 'Pouso robótico em Marte',
   mars_sample_return: 'Amostras de Marte', titan_arrival: 'Chegada a Titã', jupiter_arrival: 'Chegada a Júpiter',
   commercial_station: 'Estação comercial', national_station: 'Estação nacional', crewed_orbit_national: 'Voo orbital tripulado próprio',
@@ -302,6 +302,29 @@ function overlayRoot() {
 }
 
 const modalStack = [];
+
+// Android back / browser back closes the top sheet instead of leaving the screen: every dismissable sheet
+// pushes a same-URL history entry ({ adastraModal: n }); popstate closes the sheets above the entry we
+// landed on, and closing a sheet by hand pops its own entry.
+// markers grow across page loads too (entries left by an earlier visit always sort below this visit's sheets)
+let modalSeq = (() => { try { return Date.now(); } catch { return 0; } })();
+let pendingBacks = 0; // history.back() calls we made ourselves (their popstate is not the player's)
+let historyTop = 0; // marker of the entry we are on once our own pending backs land (history.state lags behind them)
+const markerOf = (st) => (st && typeof st === 'object' && Number.isFinite(st.adastraModal) ? st.adastraModal : 0);
+function hasHistory() {
+  try { return typeof history !== 'undefined' && typeof history.pushState === 'function' && typeof window !== 'undefined'; } catch { return false; }
+}
+function onPopState(e) {
+  if (pendingBacks > 0) { pendingBacks -= 1; return; }
+  const at = markerOf(e.state);
+  historyTop = at;
+  const above = modalStack.filter((c) => c.marker && c.marker > at);
+  if (above.length) { for (const c of above.reverse()) c({ fromHistory: true }); return; }
+  // landed on the entry of a sheet that was closed by navigation: skip it (that sheet is gone)
+  if (at && !modalStack.some((c) => c.marker === at)) { try { history.back(); } catch { /* */ } }
+}
+let popBound = false;
+
 /**
  * Bottom-sheet modal. content: Node | (close) => Node.
  * opts: { title, cls, dismissable = true, onClose }
@@ -309,11 +332,17 @@ const modalStack = [];
  */
 export function openModal(content, { title, cls, dismissable = true, onClose } = {}) {
   let closed = false;
-  const close = () => {
+  const close = ({ fromHistory = false } = {}) => {
     if (closed) return;
     closed = true;
     const i = modalStack.indexOf(close);
     if (i >= 0) modalStack.splice(i, 1);
+    // closed by hand: drop our history entry so the next back press goes where the player expects
+    if (close.marker && !fromHistory && hasHistory() && historyTop === close.marker) {
+      pendingBacks += 1;
+      historyTop = close.prevTop || 0;
+      try { history.back(); } catch { pendingBacks -= 1; }
+    }
     backdrop.classList.add('closing');
     document.removeEventListener('keydown', onKey);
     setTimeout(() => backdrop.remove(), reduceMotion() ? 0 : 180);
@@ -334,13 +363,33 @@ export function openModal(content, { title, cls, dismissable = true, onClose } =
   const backdrop = h('div', { class: 'modal-backdrop', onclick: (e) => { if (e.target === backdrop && dismissable) close(); } }, sheet);
   overlayRoot().appendChild(backdrop);
   document.addEventListener('keydown', onKey);
+  if (dismissable && hasHistory()) {
+    if (!popBound) { window.addEventListener('popstate', onPopState); popBound = true; }
+    try {
+      close.marker = ++modalSeq;
+      close.prevTop = historyTop;
+      history.pushState({ adastraModal: close.marker }, '');
+      historyTop = close.marker;
+    } catch { close.marker = 0; }
+  }
   modalStack.push(close);
   setTimeout(() => sheet.querySelector('button:not(.icon-btn), [tabindex="0"]')?.focus?.({ preventScroll: true }), 30);
   return close;
 }
 
-export function closeAllModals() {
-  for (const c of modalStack.slice().reverse()) c();
+/**
+ * Close every sheet. keepHistory: the route already changed (hashchange), so the sheets' history entries are
+ * behind us and must stay; otherwise pop them in one step so back is not "eaten" later.
+ */
+export function closeAllModals({ keepHistory = false } = {}) {
+  const open = modalStack.slice();
+  const marked = open.filter((c) => c.marker);
+  if (!keepHistory && marked.length && hasHistory() && historyTop === marked[marked.length - 1].marker) {
+    pendingBacks += 1;
+    historyTop = marked[0].prevTop || 0;
+    try { history.go(-marked.length); } catch { pendingBacks -= 1; }
+  } else if (keepHistory && hasHistory()) historyTop = markerOf(history.state);
+  for (const c of open.reverse()) c({ fromHistory: true });
 }
 
 /** Yes/no confirmation sheet. Resolves true/false. */
@@ -348,7 +397,7 @@ export function confirmDialog(text, { okLabel = 'Confirmar', cancelLabel = 'Canc
   return new Promise((resolve) => {
     let answered = false;
     const close = openModal((close) => h('div', { class: 'confirm' },
-      h('p', null, text),
+      typeof text === 'string' ? h('p', null, text) : text, // a Node brings its own layout
       h('div', { class: 'btn-row' },
         button(cancelLabel, () => { answered = true; resolve(false); close(); }, { kind: 'ghost' }),
         button(okLabel, () => { answered = true; resolve(true); close(); }, { kind: danger ? 'danger' : 'primary' }))),
@@ -400,4 +449,15 @@ export function attempt(fn, fallback) {
   } catch {
     return fallback;
   }
+}
+
+/** News icon: modules may store an emoji or a short name ('failure', 'budget', ...). Names map to emoji here. */
+const NEWS_ICONS = {
+  budget: '💰', launch: '🚀', rocket: '🚀', event: '📜', chart: '📊', delay: '⏳', cancel: '✖️', success: '✅',
+  first: '🏁', failure: '💥', memorial: '🕯️', crew: '👩‍🚀', research: '🔬', politics: '🏛', diplomacy: '🤝',
+};
+export function newsIcon(n) {
+  const i = n?.icon;
+  if (i && /^[a-z_]+$/.test(i)) return NEWS_ICONS[i] || (n.importance >= 3 ? '⚡' : '•');
+  return i || (n?.importance >= 3 ? '⚡' : n?.importance >= 2 ? '◆' : '•');
 }

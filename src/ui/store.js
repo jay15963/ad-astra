@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   reduceMotion: false,
   textScale: 1,      // 1 | 1.15 | 1.3
   colorblind: false,
+  interventionSeconds: 5, // 5 | 10 | 0 (= no limit): GDD act 4 default is 5 s; pillar 5, no punishing timers
 };
 
 function defaultStorage() {

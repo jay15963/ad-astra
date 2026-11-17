@@ -25,6 +25,7 @@ const DEFAULT_LEVELS = [
 /* ------------------------------------------------------------------ */
 
 const arr = (x) => (Array.isArray(x) ? x : []);
+const asList = (x) => (Array.isArray(x) ? x : typeof x === 'string' && x ? [x] : []); // firsts: "id" or ["id", ...]
 const DEG = Math.PI / 180;
 
 export function getBodies(data) {
@@ -86,7 +87,7 @@ function milestoneBody(data, milestoneId) {
   for (const b of getBodies(data)) if (arr(b.milestones).includes(base)) return b.id;
   for (const d of getDestinations(data)) {
     const f = d.firsts || {};
-    if (f.crewed === base || f.robotic === base) return destBodyId(data, d.id);
+    if ([].concat(f.crewed ?? [], f.robotic ?? []).includes(base)) return destBodyId(data, d.id);
   }
   return null;
 }
@@ -270,15 +271,39 @@ export function visits(state, data) {
   return out;
 }
 
+/**
+ * Milestones that belong to a destination. A milestone listed by several destinations (lunar_surface_robotic is
+ * also in lunar_south_pole.firsts) belongs to the one(s) that list it earliest in their own list.
+ */
+export function ownFirsts(data, destId) {
+  const all = getDestinations(data);
+  const rank = (d, mid) => {
+    let best = Infinity;
+    for (const list of Object.values(d?.firsts || {})) { const i = asList(list).indexOf(mid); if (i >= 0) best = Math.min(best, i); }
+    return best;
+  };
+  const me = destById(data, destId);
+  const mine = [...new Set(Object.values(me?.firsts || {}).flatMap(asList))];
+  // ties (LEO and ISS both list the national crewed orbit first) belong to every tied destination
+  return mine.filter((mid) => rank(me, mid) <= Math.min(...all.map((d) => rank(d, mid))));
+}
+
 /** Fog per body ('known' | 'partial' | 'unknown') and per destination ('player' | 'rival' | null). */
 export function computeFog(state, data, vis = visits(state, data)) {
   const pid = state?.playerId;
   const bodies = {};
   const dests = {};
   for (const b of getBodies(data)) bodies[b.id] = b.fog === 'known' ? 'known' : 'unknown';
+  const mark = (id, mine) => { dests[id] = mine || dests[id] === 'player' ? 'player' : 'rival'; };
   for (const v of vis) {
     const mine = v.actorId === pid;
-    if (v.destId) dests[v.destId] = mine || dests[v.destId] === 'player' ? 'player' : 'rival';
+    if (v.destId) {
+      mark(v.destId, mine);
+      // a lunar landing went through lunar orbit: the stops on its route that are destinations count as visited
+      for (const leg of arr(destById(data, v.destId)?.route)) {
+        if (leg?.to && leg.to !== v.destId && destById(data, leg.to)) mark(leg.to, mine);
+      }
+    }
     if (v.bodyId && bodies[v.bodyId] !== undefined && bodies[v.bodyId] !== 'known') {
       bodies[v.bodyId] = mine ? 'known' : 'partial';
     }
@@ -554,6 +579,7 @@ export function render(container, store) {
   let dpr = 1;
   let starfield = null;
   let hits = [];
+  let lastScr = {}; // screen geometry of the last frame (sheet panning)
   let rafId = 0;
   let lastPulseDraw = 0;
   let tween = null;
@@ -572,7 +598,8 @@ export function render(container, store) {
     return { ox: fr.reduce((t, p) => t + p.x, 0) / fr.length - f.x, oy: fr.reduce((t, p) => t + p.y, 0) / fr.length - f.y };
   }
   if (!MEM.cam) MEM.cam = { follow: levels[0].focus, ...levelOffset(levels[0]), span: levels[0].span };
-  const spanMin = levels[0].span * 0.55;
+  // Terra-Lua needs real zoom on a 375px phone (LEO, ISS, GTO and SSO sit within a few pixels of Earth): 5x
+  const spanMin = levels[0].span * 0.2;
   const spanMax = levels[levels.length - 1].span * 1.45;
 
   function camNow(now = performance.now()) {
@@ -631,6 +658,8 @@ export function render(container, store) {
   }
 
   function snap() {
+    // zoomed in past the first level: that zoom is the player's choice, do not spring back to 1x
+    if ((tween ? tween.to.span : MEM.cam.span) < levels[0].span * 0.98) { invalidate(); return; }
     const lvl = currentLevel();
     const followLevel = MEM.cam.follow === lvl.focus;
     goLevel(lvl, followLevel);
@@ -774,6 +803,7 @@ export function render(container, store) {
       return scr[b.id];
     };
     for (const b of bodies) placeScreen(b);
+    lastScr = scr;
     const sun = scr.sun || toS({ x: 0, y: 0 });
 
     // orbits
@@ -857,6 +887,46 @@ export function render(container, store) {
       }
     }
 
+    // label placement: body names first, then destination names only where they fit (no overlaps, not on a disc)
+    const boxes = [];
+    const textRect = (text, x, y, size, align) => {
+      g.font = `600 ${size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+      const w = g.measureText(text).width + 4;
+      const hh = size * 1.25;
+      const left = align === 'left' ? x - 2 : align === 'right' ? x - w + 2 : x - w / 2;
+      return { x: left, y: y - hh / 2, w, h: hh };
+    };
+    const hitsBox = (r) => boxes.some((o) => r.x < o.x + o.w && r.x + r.w > o.x && r.y < o.y + o.h && r.y + r.h > o.y);
+    const onDisc = (r) => Object.values(scr).some((p) => {
+      if (!p || p.R < 3) return false;
+      const nx = Math.max(r.x, Math.min(p.x, r.x + r.w));
+      const ny = Math.max(r.y, Math.min(p.y, r.y + r.h));
+      return Math.hypot(nx - p.x, ny - p.y) < p.R;
+    });
+    const bodyLabels = [];
+    for (const b of bodies) {
+      const p = scr[b.id];
+      if (!p || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60) continue;
+      if (b.parent && b.parent !== 'sun' && !detail && p.R <= 4) continue; // satellites too small to label
+      const f = fog[b.id];
+      const item = { text: f === 'unknown' ? `${b.name} ?` : b.name, x: p.x, y: p.y + p.R + 13 * ts, size: (b.reference ? 11 : 12) * ts, color: f === 'unknown' ? 'rgba(190,200,225,0.55)' : '#e8eefc' };
+      const r = textRect(item.text, item.x, item.y, item.size, 'center');
+      if (hitsBox(r)) continue; // two bodies on top of each other at this zoom: the first one speaks
+      boxes.push(r);
+      bodyLabels.push(item);
+    }
+    /** Destination label beside its marker: try four corners, skip it when none is free (zoom in to read it). */
+    const placeDestLabel = (text, pos, size, color) => {
+      for (const [dx, dy, align] of [[7, -7, 'left'], [7, 8, 'left'], [-7, -7, 'right'], [-7, 8, 'right']]) {
+        const r = textRect(text, pos.x + dx, pos.y + dy, size, align);
+        if (r.x < 0 || r.x + r.w > W || hitsBox(r) || onDisc(r)) continue;
+        boxes.push(r);
+        label(g, text, pos.x + dx, pos.y + dy, size, color, align);
+        return true;
+      }
+      return false;
+    };
+
     // destination rings/markers (only where there is room)
     if (detail) {
       for (const b of bodies) {
@@ -877,7 +947,7 @@ export function render(container, store) {
           }
           drawDestMarker(g, pos, st, MEM.selected?.destId === a.id);
           hits.push({ x: pos.x, y: pos.y, r: 14, kind: 'dest', id: a.id, bodyId: b.id });
-          if (s >= 2.4 && p.R >= 16) label(g, destName(data, a.id), pos.x + 7, pos.y - 7, 10 * ts, st ? '#d9e6ff' : 'rgba(200,210,235,0.6)', 'left');
+          if (s >= 2.4 && p.R >= 16) placeDestLabel(destName(data, a.id), pos, 10 * ts, st ? '#d9e6ff' : 'rgba(200,210,235,0.6)');
         }
       }
     }
@@ -930,15 +1000,8 @@ export function render(container, store) {
       hits.push({ x: pt.x, y: pt.y, r: 16, kind: 'transit', id: t.key, bodyId: t.bodyId });
     }
 
-    // body labels
-    for (const b of bodies) {
-      const p = scr[b.id];
-      if (!p || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60) continue;
-      if (b.parent && b.parent !== 'sun' && !detail && p.R <= 4) continue; // satellites too small to label
-      const f = fog[b.id];
-      const name = f === 'unknown' ? `${b.name} ?` : b.name;
-      label(g, name, p.x, p.y + p.R + 13 * ts, (b.reference ? 11 : 12) * ts, f === 'unknown' ? 'rgba(190,200,225,0.55)' : '#e8eefc');
-    }
+    // body labels (placed above, drawn on top of markers)
+    for (const it of bodyLabels) label(g, it.text, it.x, it.y, it.size, it.color);
 
     // Sun direction indicator when the Sun is off-screen (Terra-Lua)
     if (sun.x < 0 || sun.y < 0 || sun.x > W || sun.y > H) edgeArrow(g, sun, '☀ Sol', ts);
@@ -1277,7 +1340,28 @@ export function render(container, store) {
   function openSheet(sel) {
     MEM.selected = sel;
     renderSheet();
+    keepAboveSheet(sel);
     invalidate();
+  }
+
+  /** Pan so the selected body (or destination) sits in the middle of the map area the card leaves free. */
+  function keepAboveSheet(sel) {
+    const p = sel && lastScr[sel.bodyId];
+    if (!p || !H) return;
+    requestAnimationFrame(() => {
+      if (destroyed || MEM.selected !== sel) return;
+      const sh = sheet.getBoundingClientRect?.().height || 0;
+      const freeH = Math.max(80, H - sh);
+      const target = freeH / 2;
+      if (p.y + p.R <= freeH - 12 && p.y - p.R >= 8) return; // already in view
+      const cam = camNow();
+      const dy = (p.y - target) / cam.s;
+      const dx = (p.x - W / 2) / cam.s;
+      const to = { ...MEM.cam, ox: MEM.cam.ox + dx, oy: MEM.cam.oy + dy, span: cam.span };
+      if (reduceMotion()) { tween = null; MEM.cam = to; }
+      else tween = { from: { cx: cam.cx, cy: cam.cy, span: cam.span }, to, t0: performance.now(), dur: 320 };
+      invalidate();
+    });
   }
   function closeSheet() {
     MEM.selected = null;
@@ -1304,7 +1388,9 @@ export function render(container, store) {
       const st = model.fog.dests[a.id];
       const w = windowFor(state, data, a.id, q);
       const dv = arr(dest?.route).reduce((t, s) => t + (Number(s?.dv) || 0), 0);
-      const firsts = Object.values(dest?.firsts || {}).map((mid) => state.firsts?.[mid] && { mid, ...state.firsts[mid] }).filter(Boolean);
+      // only this destination's own milestones: the pole lists the general Moon landing too (an alias for
+      // scoring), and crediting it here showed "Nunca visitado" next to "Primeiro CNSA"
+      const firsts = ownFirsts(data, a.id).map((mid) => state.firsts?.[mid] && { mid, ...state.firsts[mid] }).filter(Boolean);
       const chip = st === 'player' ? '<span class="map-chip is-player">Visitado por você</span>' : st === 'rival' ? '<span class="map-chip is-rival">Visitado por rivais</span>' : homeChip(a.id) || '<span class="map-chip">Nunca visitado</span>';
       return `<li class="map-dest ${sel.destId === a.id ? 'is-sel' : ''}">
         <div class="map-dest__head"><b>${esc(destName(data, a.id))}</b>${chip}</div>

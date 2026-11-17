@@ -66,10 +66,16 @@ function destBaseFail(dest) {
 const PREP_WEEKS = { satellite: 6, cargo: 8, probe: 12, crewed: 16, lander: 14, station: 16 };
 
 export const STRATEGIES = {
-  conservative: { hazard: 0.8, prestige: 0.85, science: 0.95, label: 'Estratégia conservadora' },
+  // prestige multipliers are applied by missions when the mission resolves (less risk, less glory)
+  conservative: { hazard: 0.8, prestige: 0.8, science: 0.95, label: 'Estratégia conservadora' },
   balanced: { hazard: 1, prestige: 1, science: 1, label: 'Estratégia equilibrada' },
-  aggressive: { hazard: 1.25, prestige: 1.2, science: 1.1, label: 'Estratégia agressiva' },
+  aggressive: { hazard: 1.25, prestige: 1.25, science: 1.1, label: 'Estratégia agressiva' },
 };
+
+/** Crewed hardware with little flight history: hazard x (1 + CREW_NOVELTY / (1 + flights)) on craft and destination. */
+const CREW_NOVELTY = 0.6;
+/** Probability (p.p.) lost per calendar prerequisite that has not flown yet (untested hardware, no rehearsal). */
+const PREREQ_PENALTY = 0.12;
 
 /** Expected weather risk before the launch day (the real roll replaces it). */
 export const EXPECTED_WEATHER_RISK = 0.1;
@@ -212,7 +218,7 @@ function fallbackCrew(state, sel) {
     const d = ((fd.skill ?? 50) - 50) / 1500;
     delta += d;
     band += (fd.skill ?? 50) / 300;
-    factors.push({ label: `Diretor de voo: ${fd.name || 'sem nome'}`, delta: r3(d) });
+    factors.push({ label: `${fd.gender === "f" ? "Diretora" : "Diretor"} de voo: ${fd.name || "sem nome"}`, delta: r3(d) });
   }
   if (cmd) {
     const d = ((cmd.skill ?? 50) - 50) / 2000;
@@ -317,20 +323,22 @@ export function missionRisk(state, data, plan = {}) {
   const relS2 = sc2 ? relOf(safe(calendar.spacecraftReliability, [state, data, sc2.id], null), fallbackCraftReliability(sc2)) : null;
   const seg = { asc: H(relV.mean), craft: H(relS.mean), dest: H(1 - destFail) + (relS2 ? COMPANION_WEIGHT * H(relS2.mean) : 0), arr: explicitArrival ? arrPre.reduce((h, m) => h + H(1 - m.extraFail), 0) : 0 };
   const baseP = P(seg.asc + seg.craft + seg.dest);
-  factors.push({ label: `Confiabilidade do ${vehicle?.name || 'veículo'} (${relV.flights ?? 0} voos)`, delta: r3(relV.mean - 1), kind: 'part' });
-  if (sc) factors.push({ label: `Confiabilidade da ${sc.name || sc.id}`, delta: r3(relS.mean - 1), kind: 'part' });
+  factors.push({ label: `Confiabilidade do ${vehicle?.name || 'veículo'} (${relV.flights ?? 0} voo${(relV.flights ?? 0) === 1 ? "" : "s"})`, delta: r3(relV.mean - 1), kind: 'part', stages: ['asc'] });
+  if (sc) factors.push({ label: `Confiabilidade da nave (${sc.name || sc.id})`, delta: r3(relS.mean - 1), kind: 'part' });
   if (relS2) factors.push({ label: `Confiabilidade do módulo ${sc2.name || sc2.id}`, delta: r3(P(COMPANION_WEIGHT * H(relS2.mean)) - 1), kind: 'part' });
   if (seg.dest + seg.arr > 0) factors.push({ label: `Dificuldade do destino: ${dest?.name || dest?.id}`, delta: r3(P(seg.dest + seg.arr) - 1), kind: 'environment' });
 
   const total = () => seg.asc + seg.craft + seg.dest + seg.arr;
   const ALL = ['asc', 'craft', 'dest', 'arr'];
   // Multiply some segments, record the change in p as a factor.
-  const apply = (label, mult, keys = ALL, kind = 'decision') => {
+  // `stages` tags factors that only matter on launch day (the arrival scene hides them)
+  const apply = (label, mult, keys = ALL, kind = 'decision', stages = null) => {
     if (!Number.isFinite(mult) || Math.abs(mult - 1) < 1e-9) return;
     const before = P(total());
     for (const k of keys) seg[k] *= mult;
     const d = P(total()) - before;
-    if (Math.abs(d) >= 0.0005) factors.push({ label, delta: r3(d), kind });
+    const st = stages || (keys.every((k) => k === 'asc') ? ['asc'] : null);
+    if (Math.abs(d) >= 0.0005) factors.push(st ? { label, delta: r3(d), kind, stages: st } : { label, delta: r3(d), kind });
   };
   const applyDelta = (label, delta, keys, kind) => {
     if (!delta) return;
@@ -352,6 +360,24 @@ export function missionRisk(state, data, plan = {}) {
   }
   if (crewed && !crewSel.commander) apply('Sem comandante', 1.1, ['craft', 'dest', 'arr'], 'crew');
 
+  // crewed flight on hardware that has barely flown: first flights are where crews are lost
+  if (crewed) {
+    const flights = Math.min(relS.flights ?? 0, relS2 ? relS2.flights ?? 0 : Infinity);
+    const mult = 1 + CREW_NOVELTY / (1 + Math.max(0, flights));
+    if (mult > 1.02) apply(flights > 0 ? `Nave tripulada com pouco histórico (${flights} voo${flights > 1 ? 's' : ''})` : 'Primeiro voo tripulado desta nave', mult, ['craft', 'dest', 'arr'], 'part');
+  }
+
+  // calendar programs: prerequisites that have not flown (lander demo, rehearsal) make the real thing riskier
+  if (plan.calendarId) {
+    const ps = safe(calendar.prerequisiteStatus, [state, data, plan.calendarId], null);
+    const missing = ps ? [...(ps.pending || []), ...(ps.failed || []), ...(ps.cancelled || [])] : [];
+    if (missing.length) {
+      const names = missing.map((id) => data?.index?.calendar?.[id]?.name || (data?.calendar?.missions || []).find((x) => x.id === id)?.name || id);
+      applyDelta(`Sem ensaio: ${names.join(', ')} ainda não voou`, -PREREQ_PENALTY * missing.length, ['craft', 'dest', 'arr'], 'decision');
+      warnings.push(`Depende de ${names.join(', ')}, que ainda não ${missing.length > 1 ? 'voaram' : 'voou'} com sucesso.`);
+    }
+  }
+
   // culture: bold agencies run hotter, cautious ones double-check
   const culture = clamp(actor?.culture ?? 0, -100, 100);
   if (Math.abs(culture) >= 10) apply(culture > 0 ? 'Cultura ousada da agência' : 'Cultura cautelosa da agência', 1 + (culture / 100) * 0.1, undefined, 'decision');
@@ -372,7 +398,7 @@ export function missionRisk(state, data, plan = {}) {
     const prep = plan.launchTurn - plan.createdTurn;
     const need = PREP_WEEKS[type] ?? 10;
     if (prep < need) {
-      apply(`Prazo apertado (${Math.max(0, prep)} de ${need} semanas)`, 1 + 0.5 * (1 - Math.max(0, prep) / need), undefined, 'decision');
+      apply(`Prazo apertado (${Math.max(0, prep)} de ${need} semanas)`, 1 + 0.5 * (1 - Math.max(0, prep) / need), undefined, 'decision', ['asc']);
       warnings.push('Preparação curta: a equipe vai trabalhar sob pressão.');
     }
   }

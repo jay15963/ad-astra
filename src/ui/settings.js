@@ -14,6 +14,12 @@ export function applySettings(settings) {
   } catch { /* not in a browser */ }
 }
 
+/** Intervention timer from settings: 5 (default), 10, or 0 for no limit. */
+export function interventionSecondsOf(settings) {
+  const v = Number(settings?.interventionSeconds);
+  return v === 0 || v === 10 ? v : 5;
+}
+
 function toggleRow(label, hint, value, onChange) {
   const id = `opt-${label.replace(/\W+/g, '-').toLowerCase()}`;
   return h('label', { class: 'toggle-row', for: id },
@@ -51,7 +57,14 @@ export function render(container, store, { onExit, onQuit } = {}) {
         segmented([{ id: 1, label: 'A' }, { id: 1.15, label: 'A+' }, { id: 1.3, label: 'A++' }], s.textScale || 1, (v) => {
           set({ textScale: v });
           rerender();
-        }, { cls: 'text-scale' }))),
+        }, { cls: 'text-scale' })),
+      h('div', { class: 'toggle-row col' },
+        h('div', { class: 'toggle-label' }, 'Tempo das intervenções'),
+        h('div', { class: 'muted small' }, 'Quanto tempo você tem para responder a um cartão no lançamento. Sem resposta, a sala mantém o plano.'),
+        segmented([{ id: 5, label: '5 s' }, { id: 10, label: '10 s' }, { id: 0, label: 'Sem limite' }], interventionSecondsOf(s), (v) => {
+          set({ interventionSeconds: v });
+          rerender();
+        }, { cls: 'iv-time' }))),
 
     sectionTitle('Jogo salvo'),
     card({},

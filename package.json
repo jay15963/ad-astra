@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Ad Astra — manager de agência espacial para navegador (mobile-first).",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.mjs",
     "serve": "npx --yes http-server -c-1 -p 8080 .",
     "sim:launches": "node tools/sim-launches.mjs",
     "sim:calendar": "node tools/sim-calendar.mjs",

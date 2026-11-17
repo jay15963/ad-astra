@@ -67,7 +67,7 @@
   scrollbar-width: none;
 }
 .map-levels button {
-  min-height: 36px;
+  min-height: 44px; /* thumb-size targets (GDD: 44px minimum) */
   padding: 0 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--map-line);
@@ -81,7 +81,7 @@
 }
 .map-levels .map-legend-btn {
   margin-left: auto;
-  min-width: 36px;
+  min-width: 44px;
   padding: 0;
 }
 .map-root[data-mode='metro'] .map-levels,
@@ -275,7 +275,7 @@
   right: 0;
   bottom: 0;
   z-index: 4;
-  max-height: 72%;
+  max-height: 58%; /* leave the selected body visible above the card (the camera pans it there) */
   display: flex;
   flex-direction: column;
   background: var(--map-panel);

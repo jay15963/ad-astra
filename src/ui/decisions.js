@@ -7,8 +7,10 @@ const KIND_LABELS = {
   event: 'Evento', crew: 'Equipe', research: 'Pesquisa', mission: 'Missão', budget: 'Orçamento',
 };
 
-export function kindLabel(kind) {
+/** Kind header of a card. The arrival of a mission reuses 'launch/ready' (payload.phase 'arrival'): it is a "Chegada". */
+export function kindLabel(kind, d = null) {
   const k = String(kind || '').split('/')[0];
+  if (k === 'launch' && d?.payload?.phase === 'arrival') return 'Chegada';
   return KIND_LABELS[k] || 'Decisão';
 }
 
@@ -46,7 +48,7 @@ export function decisionRow(store, d, { onOpen } = {}) {
   },
   raw(decisionPortraitSVG(st, d, 44), 'decision-face'),
   h('div', { class: 'decision-text' },
-    h('div', { class: 'decision-kind' }, kindLabel(d.kind),
+    h('div', { class: 'decision-kind' }, kindLabel(d.kind, d),
       d.blocking ? chip('bloqueia o tempo', 'bad') : d.urgency >= 3 ? chip('urgente', 'warn') : null),
     h('div', { class: 'decision-title' }, d.title || 'Decisão pendente'),
     d.expiresTurn != null ? h('div', { class: 'muted small' }, `Vence ${fmtIn(d.expiresTurn, st.turn)}`) : null),
@@ -122,7 +124,7 @@ export function openDecision(store, id, { onResolved } = {}) {
       h('div', { class: 'event-banner' },
         raw(decisionPortraitSVG(store.state, d, 96), 'event-face'),
         h('div', { class: 'event-meta' },
-          h('div', { class: 'event-kind' }, kindLabel(d.kind)),
+          h('div', { class: 'event-kind' }, kindLabel(d.kind, d)),
           h('h2', { class: 'event-title' }, d.title || 'Decisão'),
           h('div', { class: 'chips' },
             d.blocking ? chip('bloqueia o tempo', 'bad') : null,
@@ -141,5 +143,5 @@ export function openDecision(store, id, { onResolved } = {}) {
 
 /** Plain text for screen readers / tests. */
 export function decisionSummary(d) {
-  return esc(`${kindLabel(d.kind)}: ${d.title || ''}`);
+  return esc(`${kindLabel(d.kind, d)}: ${d.title || ''}`);
 }

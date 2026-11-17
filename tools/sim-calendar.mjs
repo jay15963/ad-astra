@@ -18,6 +18,17 @@ const nSeeds = Number(args.find((a) => /^\d+$/.test(a)) || 20);
 const playerId = (args.find((a) => a.startsWith('--player=')) || '').split('=')[1] || 'spectator';
 const useEngine = args.includes('--engine');
 
+// news are counted as they are produced (state.news is a ring buffer capped at 200 items)
+let newsSeen = new Set();
+let newsLog = [];
+function collectNews(state) {
+  for (const n of state.news) {
+    if (newsSeen.has(n.id)) break; // newest first: stop at the first item already seen
+    newsSeen.add(n.id);
+    newsLog.push(n);
+  }
+}
+
 function runStandalone(seed) {
   const state = createState(data, { seed, playerId });
   const ctxFor = () => ({ data, rng: (label = '') => rngFor(state.seed, state.turn, 'calendar', label), date: turnToDate(state.turn, state.startYear) });
@@ -26,6 +37,7 @@ function runStandalone(seed) {
     state.signals = state.signalsPending;
     state.signalsPending = [];
     calendar.tick(state, data, ctxFor());
+    collectNews(state);
     state.turn++;
   }
   return state;
@@ -37,6 +49,7 @@ function runEngine(seed) {
     state.decisions.length = 0; // spectator: ignore player decisions
     state.activeLaunch = null;
     engineTick(state, data);
+    collectNews(state);
   }
   return state;
 }
@@ -49,10 +62,22 @@ const per = {}; // id -> {launch: [], delays: [], status: {}}
 const firsts = {};
 const bg = {};
 let news = 0;
+let weeks = 0;
+let worstWeek = 0;
+const templates = {};
 for (let s = 1; s <= nSeeds; s++) {
   const seed = s * 104729;
+  newsSeen = new Set();
+  newsLog = [];
   const state = useEngine ? runEngine(seed) : runStandalone(seed);
-  news += state.news.length;
+  news += newsLog.length;
+  weeks += state.endTurn + 1;
+  const perWeek = {};
+  for (const n of newsLog) {
+    perWeek[n.turn] = (perWeek[n.turn] || 0) + 1;
+    templates[n.headline] = (templates[n.headline] || 0) + 1;
+  }
+  worstWeek = Math.max(worstWeek, ...Object.values(perWeek), 0);
   for (const inst of state.calendar) {
     const p = (per[inst.id] = per[inst.id] || { launch: [], delays: [], status: {}, planned: inst.plannedTurn });
     const launched = inst.history.find((h) => h.phase === 'ascent' || h.vehicleOk === false)?.turn ?? inst.history[0]?.turn ?? null;
@@ -89,4 +114,9 @@ for (const [v, b] of Object.entries(bg).sort((a, b) => b[1].flights - a[1].fligh
   if (!b.flights) continue;
   console.log('  ', v.padEnd(16), `${(b.flights / nSeeds).toFixed(1).padStart(6)} voos  ${(b.failures / nSeeds).toFixed(2).padStart(5)} falhas`);
 }
-console.log(`\nNotícias por semente (todas as fontes): ${(news / nSeeds).toFixed(0)}`);
+console.log(`\nNotícias por semente (todas as fontes, contadas ao nascer): ${(news / nSeeds).toFixed(0)} · ${(news / Math.max(1, weeks)).toFixed(2)} por semana · pior semana: ${worstWeek}`);
+const rep = Object.entries(templates).filter(([, c]) => c / nSeeds >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8);
+if (rep.length) {
+  console.log('Manchetes mais repetidas (média por semente):');
+  for (const [h, c] of rep) console.log('  ', (c / nSeeds).toFixed(1).padStart(5), h);
+}

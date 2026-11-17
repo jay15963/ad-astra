@@ -69,7 +69,8 @@ export function createState(data, { seed, playerId }) {
     events: { history: {}, flags: {}, chains: {} }, // [narrative]
     memorial: [],    // [crew]/[narrative]
     album: [],       // [narrative]
-    firsts: {},      // helpers.claimFirst
+    firsts: {},      // helpers.claimFirst — "first of this era" (2026+)
+    firstsHistory: JSON.parse(JSON.stringify(sc.historicalFirsts || {})), // [core] feats done before 2026: {milestoneId: {holder, year, mission}}
     decisions: [],   // helpers.pushDecision
     news: [],        // helpers.addNews
     log: [],         // helpers.log
@@ -110,16 +111,28 @@ export function tick(state, data) {
   state.signalsPending = [];
   for (const [name, mod] of MODULES) {
     if (mod.tick) mod.tick(state, data, makeCtx(state, data, name));
+    // a module ended the campaign mid-week (budget fires the director): nothing else happens this week
+    if (state.gameOver) break;
   }
   state.turn += 1;
-  if (state.turn > state.endTurn && !state.gameOver) {
-    state.gameOver = { reason: 'end', turn: state.turn, summary: null };
-    for (const [name, mod] of MODULES) {
-      if (mod.onGameEnd) mod.onGameEnd(state, data, makeCtx(state, data, name));
-    }
-  }
+  if (state.turn > state.endTurn && !state.gameOver) state.gameOver = { reason: 'end', turn: state.turn, summary: null };
+  if (state.gameOver) endGame(state, data);
   return state;
 }
+
+/** Run every module's onGameEnd exactly once, whatever ended the campaign, and clear the decision queue. */
+export function endGame(state, data) {
+  if (!state.gameOver || state.gameOver.hooksRun) return;
+  state.gameOver.hooksRun = true;
+  // nothing can be decided or flown any more (a launch card pushed in the last week would otherwise fly after the trophy)
+  state.decisions = [];
+  for (const [name, mod] of MODULES) {
+    if (mod.onGameEnd) mod.onGameEnd(state, data, makeCtx(state, data, name));
+  }
+}
+
+/** Actions that only read state; still allowed after the campaign is over. */
+const READ_ONLY_ACTIONS = new Set(['time/advance', 'mission/estimate']);
 
 /** True when time must not advance (blocking decision, active launch, or game over). */
 export function isBlocked(state) {
@@ -203,6 +216,7 @@ export function resolveDecision(state, data, decisionId, choiceId, opts = {}) {
  */
 export function dispatch(state, data, action) {
   try {
+    if (state.gameOver && !READ_ONLY_ACTIONS.has(action?.type)) return { ok: false, error: 'Campanha encerrada.' };
     if (action.type === 'time/advance') {
       return { ok: true, ...advance(state, data, action.weeks ?? 1, { stopOnEvent: action.stopOnEvent ?? true }) };
     }

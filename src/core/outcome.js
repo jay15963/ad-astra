@@ -2,6 +2,36 @@
 // Levels: total > partial > recoverable > catastrophic. Five failure types (GDD "Confiabilidade e risco").
 
 export const OUTCOMES = ['total', 'partial', 'recoverable', 'catastrophic'];
+
+// ---------- prestige (one scale for the player and the AI: same feat, same points) ----------
+
+/** Difficulty → base prestige (destination.prestige in data wins). */
+export const DEST_PRESTIGE = {
+  leo: 3, sso: 3, gto: 3, iss: 4, cislunar: 8, lunar_orbit: 10, lunar_surface: 18, lunar_south_pole: 24,
+  mars_orbit: 22, mars_surface: 32, jupiter: 30, titan: 38,
+};
+const PRESTIGE_BY_KEY = { leo: 3, gto: 3, tli: 12, mars: 24, outer: 32 };
+
+export function destPrestige(dest) {
+  if (!dest) return 3;
+  return dest.prestige ?? DEST_PRESTIGE[dest.id] ?? PRESTIGE_BY_KEY[dest.capacityKey] ?? 5;
+}
+
+/**
+ * Prestige of a resolved mission. opts: { crewed, level, p (estimated chance), repeats (earlier successes of this actor
+ * at the same destination), strategyMult, contract }. Returns { base, prestige, firstPoints }.
+ * firstPoints = what a first at this destination is worth (helpers.claimFirst scales historic feats down).
+ */
+export function missionPrestige(dest, { crewed = false, level = 'total', p = 0.8, repeats = 0, strategyMult = 1, contract = false } = {}) {
+  const base = destPrestige(dest) * (crewed ? 1.8 : 1);
+  // long odds pay more (smooth, no cliff)
+  const bold = Math.min(0.3, Math.max(0, (0.75 - p) * 0.8)) + (crewed ? 0.1 : 0);
+  // repetition is less newsworthy; contract deliveries are a service
+  const novelty = Math.max(0.15, 1 / (1 + 0.55 * Math.max(0, repeats))) * (contract ? 0.5 : 1);
+  const ok = level === 'total' || level === 'partial';
+  const prestige = ok ? Math.round(base * (level === 'total' ? 1 : 0.45) * (1 + bold) * novelty * strategyMult) : 0;
+  return { base, prestige, firstPoints: 30 + Math.round(base), novelty, bold };
+}
 export const FAILURE_TYPES = ['propulsion', 'structure', 'software', 'human', 'environment'];
 
 export const OUTCOME_LABELS = {
