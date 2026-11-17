@@ -28,6 +28,14 @@ const MAX_REFLIGHTS = 2;
 const CREWED_STANDDOWN_WEEKS = 52; // after a fatal accident the owner stops crewed flights ~1 year
 const DONE = ['success', 'partial'];
 const OK_LEVELS = ['total', 'partial'];
+/**
+ * Probes already flying when the scenario starts were paid for before 2026: their arrival pays only this share of
+ * the prestige (mission and firsts). scenario.inheritedPrestigeShare overrides. missions.js uses the same rule.
+ */
+export const INHERITED_PRESTIGE_SHARE = 0.35;
+export const inheritedShare = (data) => data?.scenario?.inheritedPrestigeShare ?? INHERITED_PRESTIGE_SHARE;
+/** Windows this rare (Apophis: one per decade) are single chances: missing one cancels the program. */
+const ONE_OFF_WINDOW_WEEKS = 260;
 const LEVEL_RANK = { total: 0, partial: 1, recoverable: 2, catastrophic: 3 };
 const FAILURE_TYPES = ['propulsion', 'structure', 'software', 'human', 'environment'];
 const ASCENT_WEIGHTS = { propulsion: 0.45, structure: 0.2, software: 0.15, human: 0.08, environment: 0.12 };
@@ -51,6 +59,8 @@ const DEFAULT_NEWS = {
   suspendedBody: 'Retomada prevista para {date}.',
   cancelled: 'Cancelamento: {name}',
   cancelledBody: '',
+  windowLost: '{name} perde a janela única e é cancelada',
+  windowLostBody: 'O alinhamento não se repete tão cedo: a próxima chance seria em {date}.',
   launched: '{owner} lança {name}',
   launchedBody: 'Chegada prevista para {date}.',
   success: '{name}: sucesso!',
@@ -232,10 +242,19 @@ export function capacityTo(data, vehicleId, destinationId) {
   return Math.round(cap * 100) / 100;
 }
 
-/** Next launch window. Destinations without window: {openTurn: fromTurn, closeTurn: Infinity}. */
-export function nextWindow(state, data, destinationId, fromTurn) {
+/** Window used by a calendar item: its own `window` (gravity-assist trajectories; `false` = none) or the destination's. */
+export function itemWindow(data, item) {
+  if (item && item.window !== undefined) return item.window || null;
+  return destinationById(data, item?.destination)?.window || null;
+}
+
+/**
+ * Next launch window. Destinations without window: {openTurn: fromTurn, closeTurn: Infinity}.
+ * `item` (optional calendar item) lets a program fly its own trajectory window (`item.window`).
+ */
+export function nextWindow(state, data, destinationId, fromTurn, item) {
   const from = fromTurn ?? state?.turn ?? 0;
-  const w = destinationById(data, destinationId)?.window;
+  const w = item ? itemWindow(data, item) : destinationById(data, destinationId)?.window;
   if (!w || !(w.periodWeeks > 0)) return { openTurn: from, closeTurn: Infinity, isOpen: true };
   const open = Math.max(1, w.openWeeks || 1);
   // smallest k with phase + k*period + open > from
@@ -245,8 +264,8 @@ export function nextWindow(state, data, destinationId, fromTurn) {
   return { openTurn, closeTurn, isOpen: from >= openTurn && from < closeTurn };
 }
 
-function snapToWindow(state, data, destinationId, turn) {
-  const w = nextWindow(state, data, destinationId, turn);
+function snapToWindow(state, data, destinationId, turn, item) {
+  const w = nextWindow(state, data, destinationId, turn, item);
   return Math.max(turn, w.openTurn);
 }
 
@@ -326,6 +345,8 @@ function actorDef(state, data, id) {
 /** Can `actorId` buy/use this catalog entry? → {ok, reason} (reason pt-BR when blocked). */
 export function accessFor(state, data, actorId, item) {
   if (!item) return { ok: false, reason: 'desconhecido' };
+  // one-off real probes already flying (BepiColombo, Psyche…): only their calendar program uses them, nobody builds another
+  if (item.calendarOnly) return { ok: false, reason: 'Sonda única, já em voo: não dá para construir outra' };
   if (item.access === 'generic' || !item.operator) return { ok: true, reason: null };
   const ctrl = item.tensionActor || item.operator;
   if (ctrl === actorId || item.operator === actorId) return { ok: true, reason: null };
@@ -402,10 +423,22 @@ function itemProgress(state, data, id) {
 function newInstance(state, data, item) {
   const sy = startYearOf(state, data);
   const plannedTurn = turnOfDate(item.planned, sy, data) ?? 0;
+  // a probe launched before the scenario: `planned` is the arrival, `launched` the real launch date
+  if (item.inTransit) {
+    const launchTurn = Math.min(plannedTurn - 1, turnOfDate(item.launched, sy, data) ?? plannedTurn - Math.max(1, destinationById(data, item.destination)?.transitWeeks || 1));
+    return {
+      id: item.id, plannedTurn, currentTurn: launchTurn,
+      status: item.owner === state.playerId ? 'player' : 'launched',
+      delayWeeks: 0, programDelayWeeks: 0, revisions: 0, outcome: null, resolvedTurn: null,
+      launchTurn, arrivalTurn: plannedTurn, ascentLevel: 'total', inTransit: true, attempts: 0,
+      history: [{ turn: launchTurn, level: 'total', phase: 'ascent', attempt: 0, vehicleOk: true, craftJudged: false }],
+      waived: [], lastWaitNewsTurn: null,
+    };
+  }
   return {
     id: item.id,
     plannedTurn,
-    currentTurn: snapToWindow(state, data, item.destination, plannedTurn),
+    currentTurn: snapToWindow(state, data, item.destination, plannedTurn, item),
     status: item.owner === state.playerId ? 'player' : 'planned',
     delayWeeks: 0,
     programDelayWeeks: 0,
@@ -430,7 +463,29 @@ function ensureSlices(state, data) {
   }
   if (!Array.isArray(state.calendar)) state.calendar = [];
   const have = new Set(state.calendar.map((c) => c.id));
-  for (const item of itemsOf(data)) if (!have.has(item.id)) state.calendar.push(newInstance(state, data, item));
+  for (const item of itemsOf(data)) {
+    if (have.has(item.id)) continue;
+    const inst = newInstance(state, data, item);
+    // an old save meets a probe that was added later and already arrived: it is history, not news
+    if (inst.inTransit && inst.arrivalTurn < (state.turn ?? 0)) settleAsHistory(state, data, inst, item);
+    state.calendar.push(inst);
+  }
+}
+
+/** Resolve an in-transit item whose arrival is already in the past (old save): success at arrivalTurn, no news, no prestige. */
+function settleAsHistory(state, data, inst, item) {
+  const turn = inst.arrivalTurn;
+  inst.status = 'success';
+  inst.outcome = { level: 'total', failureType: null, phase: 'arrival' };
+  inst.resolvedTurn = turn;
+  inst.currentTurn = inst.launchTurn;
+  inst.history.push({ turn, level: 'total', phase: 'arrival', attempt: 0, vehicleOk: true, craftJudged: true, retro: true });
+  // the feat is recorded with its real date if nobody claimed it since (points were never part of this save)
+  state.firsts = state.firsts || {};
+  for (const mid of milestonesFor(state, data, item)) {
+    if (state.firsts[mid]) continue;
+    state.firsts[mid] = isHistoricFirst(state, mid) ? { actorId: item.owner, turn, era: true } : { actorId: item.owner, turn };
+  }
 }
 
 export function init(state, data, _ctx) {
@@ -485,6 +540,11 @@ const GOAL_DEST = {
   lunar_south_pole_landing: 'lunar_south_pole', lunar_surface_robotic: 'lunar_surface', lunar_resource_demo: 'lunar_south_pole',
   lunar_sample_return: 'lunar_surface', mars_landing_robotic: 'mars_surface', jupiter_arrival: 'jupiter', titan_arrival: 'titan',
 };
+/** Destination that awards a robotic goal: the fixed table first, then any destination whose robotic firsts include it. */
+function goalDest(data, goal) {
+  if (GOAL_DEST[goal]) return GOAL_DEST[goal];
+  return destinationsOf(data).find((d) => [].concat(d.firsts?.robotic ?? []).includes(goal))?.id || null;
+}
 const OPS_DEFAULTS = [{ destination: 'lunar_orbit', weight: 1.2 }, { destination: 'sso', weight: 0.8 }, { destination: 'mars_orbit', weight: 0.8 }, { destination: 'lunar_surface', weight: 0.8 }];
 const OPS_SCALE = { leo: 1, gto: 1.2, tli: 1.6, mars: 2.4, outer: 4 };
 const OPS_COST = { leo: 6, gto: 5, tli: 35, mars: 60, outer: 90 };
@@ -586,8 +646,8 @@ function rivalOps(state, data, ctx) {
     if (spare <= 0) continue;
     const rng = ctx.rng(`ops:${id}`);
     const options = [...OPS_DEFAULTS];
-    for (const g of a.ai?.goals || []) if (GOAL_DEST[g]) options.push({ destination: GOAL_DEST[g], weight: state.firsts?.[g] ? 1.2 : 3 });
-    if (react && (a.ai?.goals || []).includes(react.milestoneId) && GOAL_DEST[react.milestoneId]) options.push({ destination: GOAL_DEST[react.milestoneId], weight: 4 });
+    for (const g of a.ai?.goals || []) { const gd = goalDest(data, g); if (gd) options.push({ destination: gd, weight: state.firsts?.[g] ? 1.2 : 3 }); }
+    if (react && (a.ai?.goals || []).includes(react.milestoneId) && goalDest(data, react.milestoneId)) options.push({ destination: goalDest(data, react.milestoneId), weight: 4 });
     // the scripted program already covers a destination it flies to within two years
     const scripted = new Set((state.calendar || []).filter((c) => c.status === 'planned' && c.currentTurn - state.turn <= 104 && calendarItem(data, c.id)?.owner === id).map((c) => calendarItem(data, c.id)?.destination));
     const build = (o) => (destinationById(data, o.destination)?.kind === 'surface' ? 39 : 26);
@@ -735,8 +795,8 @@ function applySlip(state, data, inst, item, weeks, kind, rng, opts = {}) {
   let target = opts.toTurn != null ? Math.max(opts.toTurn, old + 1) : old + Math.max(1, Math.round(weeks));
   let missedWindow = false;
   const dest = destinationById(data, item.destination);
-  if (dest?.window) {
-    const cur = nextWindow(state, data, item.destination, old);
+  if (itemWindow(data, item)) {
+    const cur = nextWindow(state, data, item.destination, old, item);
     if (target >= cur.closeTurn && old < cur.closeTurn) {
       const discipline = item.delay?.windowDiscipline ?? 0.85;
       // planetary windows are hard deadlines: teams crunch to make them when the slip is modest
@@ -745,7 +805,11 @@ function applySlip(state, data, inst, item, weeks, kind, rng, opts = {}) {
         if (target <= old) return; // the team absorbs the whole slip to keep the window
       }
     }
-    const snapped = snapToWindow(state, data, item.destination, target);
+    const snapped = snapToWindow(state, data, item.destination, target, item);
+    // a once-in-a-decade window (Apophis 2029) is not "postponed ten years": the rival program is cancelled
+    if (snapped > target && (itemWindow(data, item)?.periodWeeks || 0) >= ONE_OFF_WINDOW_WEEKS && inst.status !== 'player') {
+      return cancel(state, data, inst, item, 'windowLost', { date: fmt(state, data, snapped) });
+    }
     if (snapped > target) {
       missedWindow = true;
       // a missed window gives the team years of margin: it eats the program's remaining slip budget
@@ -784,14 +848,15 @@ function applySlip(state, data, inst, item, weeks, kind, rng, opts = {}) {
   });
 }
 
-function cancel(state, data, inst, item, reason) {
+function cancel(state, data, inst, item, reason, extra = {}) {
   inst.status = 'cancelled';
   inst.resolvedTurn = state.turn;
   emitSignal(state, 'calendar/delayed', { calendarId: inst.id, weeks: 0, reason: 'cancelled' });
   const vars = { name: item.name, owner: actorName(state, data, item.owner) };
+  const lost = reason === 'windowLost';
   addNews(state, {
-    headline: fill(newsText(data, 'cancelled'), vars),
-    body: fill(reason === 'war' ? newsText(data, 'suspendedBody') : newsText(data, 'cancelledBody'), { ...vars, date: '-' }),
+    headline: fill(newsText(data, lost ? 'windowLost' : 'cancelled'), vars),
+    body: fill(reason === 'war' ? newsText(data, 'suspendedBody') : newsText(data, lost ? 'windowLostBody' : 'cancelledBody'), { ...vars, date: '-', ...extra }),
     tags: ['calendar', 'cancelled'], actors: [item.owner, ...(item.partners || [])],
     importance: clamp(item.importance || 1, 1, 2), icon: '✖️',
   });
@@ -826,7 +891,7 @@ function tryLaunch(state, data, inst, item, rng) {
     return applySlip(state, data, inst, item, w, s === 'failed' ? 'prereqFailed' : 'delayed', rng, { prereqName });
   }
   // 3. planetary window (may have closed after a grounding)
-  const win = nextWindow(state, data, item.destination, turn);
+  const win = nextWindow(state, data, item.destination, turn, item);
   if (!win.isOpen) return applySlip(state, data, inst, item, 0, 'windowMissed', rng, { toTurn: win.openTurn });
   // 4. last-week scrub (never for historical facts)
   const historical = item.truthLayer === 'fato' && item.historicalOutcome;
@@ -953,11 +1018,12 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
     const repeats = (state.calendar || []).filter((c) => c !== inst && DONE.includes(c.status) && calendarItem(data, c.id)?.owner === owner
       && calendarItem(data, c.id)?.destination === item.destination && !!calendarItem(data, c.id)?.crewed === !!item.crewed).length;
     const mp = scorePrestige(destinationById(data, item.destination), { crewed: !!item.crewed, level, p: 0.8, repeats });
-    changeActor(state, owner, 'prestige', Math.max(mp.prestige, level === 'total' ? imp * 3 : imp * 1.5));
+    const share = item.inTransit ? inheritedShare(data) : 1;
+    changeActor(state, owner, 'prestige', Math.round(share * Math.max(mp.prestige, level === 'total' ? imp * 3 : imp * 1.5)));
     changeActor(state, owner, 'support', level === 'total' ? imp : 0);
     changeActor(state, owner, 'reputation', level === 'total' ? 1 : 0);
     for (const mid of milestonesFor(state, data, item)) {
-      const first = claimFirst(state, mid, owner, mp.firstPoints, 5);
+      const first = claimFirst(state, mid, owner, Math.round(mp.firstPoints * share), Math.round(5 * share));
       if (first) {
         emitSignal(state, 'first', { milestoneId: mid, actorId: owner, calendarId: inst.id });
         addNews(state, {
@@ -998,7 +1064,7 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
     inst.status = 'planned';
     inst.arrivalTurn = null;
     inst.ascentLevel = null;
-    inst.currentTurn = snapToWindow(state, data, item.destination, turn + rng.int(16, 40));
+    inst.currentTurn = snapToWindow(state, data, item.destination, turn + rng.int(16, 40), item);
     inst.delayWeeks = inst.currentTurn - inst.plannedTurn;
     addNews(state, {
       headline: fill(newsText(data, 'reflight'), { ...vars, date: fmt(state, data, inst.currentTurn) }),
@@ -1137,7 +1203,8 @@ export function calendarView(state, data, inst) {
     ...inst,
     name: item.name, owner: item.owner, ownerName: actorName(state, data, item.owner), partners: item.partners || [], client: item.client || null,
     type: item.type, destination: item.destination, destinationName: dest?.name || item.destination,
-    vehicleId: item.vehicleId, vehicleName: vehicleById(data, item.vehicleId)?.name || item.vehicleId,
+    vehicleId: item.vehicleId, vehicleName: item.vehicleName || vehicleById(data, item.vehicleId)?.name || item.vehicleId,
+    inTransit: !!item.inTransit, launchedText: inst.launchTurn != null ? fmt(state, data, inst.launchTurn) : null,
     spacecraftId: item.spacecraftId, spacecraftName: spacecraftById(data, item.spacecraftId)?.name || item.spacecraftId,
     crewed: !!item.crewed, truthLayer: item.truthLayer, truthLabel: TRUTH_LABELS[item.truthLayer] || item.truthLayer,
     importance: item.importance || 1, milestone: item.milestone || null, prerequisites: item.prerequisites || [],

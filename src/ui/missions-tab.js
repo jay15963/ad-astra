@@ -36,12 +36,48 @@ function newDraft(patch = {}) {
   };
 }
 
+/** Mission type to preselect for a destination: its own list (missionTypes) first, then a guess from the id. */
+export function defaultTypeFor(dest, currentType = null) {
+  const list = Array.isArray(dest?.missionTypes) && dest.missionTypes.length ? dest.missionTypes : null;
+  if (list) return list.includes(currentType) ? currentType : list[0];
+  const id = String(dest?.id || '');
+  if (/surface|south_pole/.test(id)) return 'lander';
+  if (id === 'iss') return 'cargo';
+  if (['leo', 'sso', 'gto'].includes(id)) return currentType && ['satellite', 'crewed', 'cargo', 'station'].includes(currentType) ? currentType : 'satellite';
+  return currentType && currentType !== 'satellite' ? currentType : 'probe';
+}
+
+/** Start the builder on a destination (map "Planejar missão"): destination + a compatible type, step 1. */
+/** Launcher name for a mission; calendar programs on a retired rocket carry their own name (Ariane 5). */
+export function vehicleLabel(m, idx) {
+  return m?.vehicleName || (m?.calendarId && idx?.calendar?.[m.calendarId]?.vehicleName) || idx?.vehicles?.[m?.vehicleId]?.name || m?.vehicleId || null;
+}
+
+export function planMissionFor(store, destId) {
+  const dest = store.data?.index?.destinations?.[destId];
+  if (!dest) return false;
+  const keep = ui.draft && ui.draft.source === 'custom' ? ui.draft : null;
+  ui.draft = newDraft({ ...(keep ? { config: keep.config } : {}), destination: destId, type: defaultTypeFor(dest, keep?.type) });
+  ui.step = 1; ui.noFd = false; ui.noCraft = false; ui.launchTurn = null;
+  ui.seg = 'nova';
+  return true;
+}
+
+/** The builder's current draft (read-only use: tests, debugging). */
+export function currentDraft() { return ui.draft; }
+
 export function render(container, store) {
   const st = store.state;
   const route = attempt(() => store.ui?.route?.(), { sub: '' }) || { sub: '' };
   const sub = route.sub || '';
   if (sub === 'nova' || sub === 'contratos' || sub === 'lista') ui.seg = sub;
   else if (sub.startsWith('m/')) ui.seg = 'lista';
+  // the map hands a destination over (store.ui.pendingDestination): preselect it once, then forget it
+  if (store.ui && store.ui.pendingDestination) {
+    const destId = store.ui.pendingDestination;
+    store.ui.pendingDestination = null;
+    planMissionFor(store, destId);
+  }
   if (!ui.draft) ui.draft = newDraft();
 
   const go = (seg) => { ui.seg = seg; store.ui?.navigate ? store.ui.navigate('missoes', seg) : rerender(); };
@@ -105,24 +141,43 @@ function listView(store, go) {
   return out;
 }
 
+/**
+ * True when the mission's result is only the ascent's (the probe is still on its way): the outcome chip would claim
+ * "Sucesso total" before arrival. The card then shows the flight status, and the ascent as a secondary chip.
+ */
+export function isProvisionalResult(m) {
+  const r = m?.result;
+  if (!r || r.outcome == null) return false;
+  if (['launch', 'transit', 'arrival'].includes(m.status)) return true;
+  return m.status === 'operations' && r.phase === 'ascent' && !!m.transit;
+}
+
+function outcomeKindOf(outcome) {
+  return outcome === 'total' ? 'good' : outcome === 'partial' ? 'accent' : outcome === 'recoverable' ? 'warn' : 'bad';
+}
+
 function missionCard(store, m) {
   const st = store.state;
   const idx = store.data?.index || {};
   const dest = idx.destinations?.[m.destination]?.name || m.destination || '—';
-  const veh = idx.vehicles?.[m.vehicleId]?.name || m.vehicleId || 'sem veículo';
-  const res = m.result;
-  const outcomeKind = res ? (res.outcome === 'total' ? 'good' : res.outcome === 'partial' ? 'accent' : res.outcome === 'recoverable' ? 'warn' : 'bad') : null;
+  const veh = vehicleLabel(m, idx) || 'sem veículo';
+  const provisional = isProvisionalResult(m);
+  const ascent = provisional ? m.result : null;
+  const res = provisional ? null : m.result;
+  const outcomeKind = res ? outcomeKindOf(res.outcome) : null;
   return card({
     cls: `mission-card st-${m.status}`, onClick: () => openMission(store, m.id), icon: TYPE_ICONS[m.type] || '🚀',
     title: m.name || 'Missão', subtitle: `${TYPE_LABELS[m.type] || m.type || ''} · ${dest} · ${veh}`,
-    right: res ? chip(OUTCOME_TEXT[res.outcome] || res.outcome, outcomeKind) : chip(STATUS_LABELS[m.status] || m.status, m.status === 'scheduled' ? 'accent' : 'muted'),
+    right: res ? chip(OUTCOME_TEXT[res.outcome] || res.outcome, outcomeKind)
+      : chip(STATUS_LABELS[m.status] || m.status, m.status === 'scheduled' ? 'accent' : provisional ? 'info' : 'muted'),
   },
   h('div', { class: 'chips' },
-    m.launchTurn != null && !res ? chip(`🗓 ${fmtMonth(m.launchTurn, st.startYear)} · ${fmtIn(m.launchTurn, st.turn)}`, 'muted') : null,
-    m.estimate && !res ? chip(`Chance ${fmtBand(m.estimate.low, m.estimate.high)}`, 'info') : null,
+    ascent ? chip(ascent.outcome === 'total' ? '✓ subida ok' : `subida: ${(OUTCOME_TEXT[ascent.outcome] || ascent.outcome).toLowerCase()}`, outcomeKindOf(ascent.outcome)) : null,
+    m.launchTurn != null && !m.result ? chip(`🗓 ${fmtMonth(m.launchTurn, st.startYear)} · ${fmtIn(m.launchTurn, st.turn)}`, 'muted') : null,
+    m.estimate && !m.result ? chip(`Chance ${fmtBand(m.estimate.low, m.estimate.high)}`, 'info') : null,
     m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : null,
     m.paid === false && m.status === 'planning' ? chip('não paga', 'warn') : null,
-    Number.isFinite(m.readyTurn) && m.readyTurn > st.turn && !res ? chip(`hardware pronto em ${fmtMonth(m.readyTurn, st.startYear)}`, 'warn') : null),
+    Number.isFinite(m.readyTurn) && m.readyTurn > st.turn && !m.result ? chip(`hardware pronto em ${fmtMonth(m.readyTurn, st.startYear)}`, 'warn') : null),
   m.transit && m.status === 'transit' ? bar(((st.turn - m.transit.departTurn) / Math.max(1, m.transit.arriveTurn - m.transit.departTurn)) * 100, { key: `mt.${m.id}`, label: `Chegada ${fmtIn(m.transit.arriveTurn, st.turn)}`, kind: 'accent' }) : null);
 }
 
@@ -134,7 +189,6 @@ export function openMission(store, missionId) {
   const st = store.state;
   const idx = store.data?.index || {};
   const dest = idx.destinations?.[m.destination];
-  const veh = idx.vehicles?.[m.vehicleId];
   const sc = idx.spacecraft?.[m.spacecraftId];
   openModal((close) => {
     const crewIds = [m.crew?.flightDirector, m.crew?.commander, ...(m.crew?.astronauts || [])].filter(Boolean);
@@ -172,7 +226,7 @@ export function openMission(store, missionId) {
       h('div', { class: 'kv' },
         kv('Destino', dest?.name || m.destination || '—'),
         Number.isFinite(m.readyTurn) && m.readyTurn > st.turn ? kv('Hardware pronto', `${fmtDate(m.readyTurn, st.startYear)} (${fmtIn(m.readyTurn, st.turn)})`) : null,
-        kv('Veículo', veh ? `${veh.name}` : m.vehicleId || '—'),
+        kv('Veículo', vehicleLabel(m, idx) || '—'),
         kv('Espaçonave', sc?.name || m.spacecraftId || '—'),
         m.secondarySpacecraftId ? kv('Módulo de apoio', idx.spacecraft?.[m.secondarySpacecraftId]?.name || m.secondarySpacecraftId) : null,
         kv('Estratégia', STRATEGY_LABELS[m.config?.strategy] || '—'),
@@ -187,12 +241,16 @@ export function openMission(store, missionId) {
 
 function resultReport(store, m) {
   const r = m.result;
-  const kind = r.outcome === 'total' ? 'good' : r.outcome === 'partial' ? 'accent' : r.outcome === 'recoverable' ? 'warn' : 'bad';
+  const kind = outcomeKindOf(r.outcome);
+  const provisional = isProvisionalResult(m);
   const causes = (r.causes || []).slice().sort((a, b) => (b.weight || 0) - (a.weight || 0));
   const CK = { part: '🔩 Peça', decision: '🧭 Decisão', luck: '🎲 Sorte', environment: '🌩 Ambiente', crew: '👩‍🚀 Equipe' };
   return h('div', { class: 'report' },
     sectionTitle('Relatório'),
-    h('div', { class: `outcome-banner ob-${kind}` }, OUTCOME_TEXT[r.outcome] || r.outcome),
+    h('div', { class: `outcome-banner ob-${kind}` }, provisional ? `Subida: ${OUTCOME_TEXT[r.outcome] || r.outcome}` : OUTCOME_TEXT[r.outcome] || r.outcome),
+    provisional ? h('p', { class: 'small muted' }, m.transit?.arriveTurn != null
+      ? `A nave segue viagem: o resultado da missão sai na chegada, ${fmtIn(m.transit.arriveTurn, store.state.turn)}.`
+      : 'A nave segue viagem: o resultado da missão sai na chegada.') : null,
     causes.length ? h('ol', { class: 'causes' }, causes.map((c) => h('li', null,
       h('span', { class: 'cause-kind' }, CK[c.kind] || c.kind), ' ', h('strong', null, c.label || ''), c.detail ? h('div', { class: 'muted small' }, c.detail) : null))) : null,
     h('div', { class: 'chips' },
@@ -400,8 +458,33 @@ function step1(store, d, opts, set) {
       onclick: () => set({ type: t, vehicleId: null, spacecraftId: null }),
     }, h('span', { class: 'type-icon', 'aria-hidden': 'true' }, TYPE_ICONS[t]), h('span', { class: 'type-name' }, TYPE_LABELS[t]), h('span', { class: 'type-hint' }, TYPE_HINT[t])))),
     sectionTitle('Alvo'),
-    opts.destinations.length ? h('div', { class: 'dest-list' }, opts.destinations.map((x) => destCard(store, x, d, set)))
+    opts.destinations.length ? h('div', { class: 'dest-list' }, sortByArrival(opts.destinations, (x) => cardLaunchTurn(store, x), st.endTurn).map((x) => destCard(store, x, d, set)))
       : emptyState('O catálogo de destinos ainda não carregou.', '🌑'));
+}
+
+/**
+ * Arrival estimate for a destination launched at launchTurn: { arriveTurn, late } where late means the probe gets
+ * there after the campaign's last turn (the government pitches use the same rule). Pure: exported for tests.
+ */
+export function arrivalOf(dest, launchTurn, endTurn) {
+  const tw = Number(dest?.transitWeeks) || 0;
+  if (!Number.isFinite(launchTurn)) return { arriveTurn: null, late: false };
+  const arriveTurn = launchTurn + tw;
+  return { arriveTurn, late: Number.isFinite(endTurn) && tw > 0 && arriveTurn > endTurn };
+}
+
+/** Earliest plausible launch for a destination card: now, or when its next window opens. */
+function cardLaunchTurn(store, x) {
+  const st = store.state;
+  if (!x.window) return st.turn;
+  const w = attempt(() => store.tryQuery('catalog/window', null, x.id), null);
+  return w?.openTurn != null ? Math.max(st.turn, w.openTurn) : st.turn;
+}
+
+/** Destination list for step 1: those that arrive after the campaign ends go last (order otherwise kept). */
+export function sortByArrival(list, launchOf, endTurn) {
+  return list.map((x, i) => ({ x, i, late: arrivalOf(x, launchOf(x), endTurn).late }))
+    .sort((a, b) => (a.late - b.late) || (a.i - b.i)).map((e) => e.x);
 }
 
 function destCard(store, x, d, set) {
@@ -412,6 +495,7 @@ function destCard(store, x, d, set) {
     return w?.openTurn != null ? w : null;
   }, null) : null;
   const sel = d.destination === x.id;
+  const arr = x.transitWeeks ? arrivalOf(x, cardLaunchTurn(store, x), st.endTurn) : null;
   return h('button', {
     class: ['dest-card', sel && 'selected', !x.ok && 'disabled'], type: 'button', disabled: !x.ok,
     onclick: () => set({ destination: x.id, vehicleId: null, spacecraftId: null }),
@@ -424,6 +508,8 @@ function destCard(store, x, d, set) {
     x.route.map((r) => h('span', { class: 'metro-leg', style: { flexGrow: String(Math.max(0.3, r.dv || 0.3)) }, title: `${r.from} → ${r.to}: ${r.dv} km/s` })),
     h('span', { class: 'metro-dv tiny' }, `${dv.toFixed(1).replace('.', ',')} km/s`)) : null,
   x.window ? h('div', { class: 'tiny muted' }, win ? `Janela ${win.openTurn <= st.turn ? 'aberta até ' + fmtMonth(win.closeTurn, st.startYear) : 'abre ' + fmtIn(win.openTurn, st.turn)}` : `Janela a cada ${Math.round(x.window.periodWeeks / 4.33)} meses`) : null,
+  arr?.late ? h('div', { class: 'tiny warn-text' }, `⚠ Chega só em ${fmtMonth(arr.arriveTurn, st.startYear)}: depois do fim da campanha (${st.startYear + Math.floor(st.endTurn / 52)}). Sem resultado científico no jogo.`)
+    : arr && arr.arriveTurn > st.turn + 8 ? h('div', { class: 'tiny muted' }, `Chegada ~${fmtMonth(arr.arriveTurn, st.startYear)}`) : null,
   !x.ok && x.reason ? h('div', { class: 'tiny warn-text' }, x.reason) : null);
 }
 
@@ -652,6 +738,8 @@ function step3(store, d, optsBase, rerender) {
   const cantPay = opts.cost != null && me && !(me.cash >= opts.cost);
   const errors = dedupeMessages([...opts.errors, ...(cantPay ? ['Caixa insuficiente para pagar a missão agora.'] : [])]);
   if (!dates.length) errors.push(noSlotText(store, d, optsBase));
+  const arr = ui.launchTurn != null && dest?.transitWeeks ? arrivalOf(dest, ui.launchTurn, st.endTurn) : null;
+  const lateNote = arr?.late ? `A nave chega em ${fmtMonth(arr.arriveTurn, st.startYear)}, depois do fim da campanha (${st.startYear + Math.floor(st.endTurn / 52)}): o lançamento conta, mas a chegada e a ciência dela ficam fora do jogo.` : null;
   const est = opts.estimate;
   const factors = (est?.factors || []).slice().sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0)).slice(0, 6);
 
@@ -684,12 +772,13 @@ function step3(store, d, optsBase, rerender) {
         opts.payloadT != null ? kv('Carga', `${String(opts.payloadT).replace('.', ',')} t${opts.capacityT != null ? ` de ${String(opts.capacityT).replace('.', ',')} t possíveis` : ''}`) : null,
         kv('Custo', opts.cost != null ? fmtMoney(opts.cost) : '—'),
         me ? kv('Caixa depois', fmtMoney((me.cash || 0) - (opts.cost || 0))) : null,
-        opts.window?.openTurn != null && Number.isFinite(opts.window.closeTurn) ? kv('Janela', `${fmtMonth(opts.window.openTurn, st.startYear)} a ${fmtMonth(opts.window.closeTurn - 1, st.startYear)}`) : null)),
+        opts.window?.openTurn != null && Number.isFinite(opts.window.closeTurn) ? kv('Janela', `${fmtMonth(opts.window.openTurn, st.startYear)} a ${fmtMonth(opts.window.closeTurn - 1, st.startYear)}`) : null,
+        arr ? kv('Chegada', `${fmtMonth(arr.arriveTurn, st.startYear)}${arr.late ? ' ⚠ após o fim' : ''}`) : null)),
     // a chance for a mission that cannot fly is misleading: grey it out until the errors are fixed
     est ? chanceGauge(est, { invalid: errors.length > 0 }) : h('p', { class: 'muted small' }, 'A estimativa de chance aparece quando o módulo de risco estiver pronto.'),
     factors.length ? h('ul', { class: 'factors' }, factors.map((f) => h('li', { class: (f.delta || 0) >= 0 ? 'pos' : 'neg' },
       h('span', null, (f.delta || 0) >= 0 ? '▲' : '▼'), ' ', f.label, h('span', { class: 'muted' }, ` ${f.delta > 0 ? '+' : ''}${fmtPct(f.delta)}`)))) : null,
-    opts.warnings.length ? h('div', { class: 'notes warn' }, opts.warnings.map((w) => h('div', null, `⚠ ${w}`))) : null,
+    opts.warnings.length || lateNote ? h('div', { class: 'notes warn' }, [...(lateNote ? [lateNote] : []), ...opts.warnings].map((w) => h('div', null, `⚠ ${w}`))) : null,
     errors.length ? h('div', { class: 'notes bad' }, errors.map((w) => h('div', null, `✕ ${w}`))) : null,
     sectionTitle('Data de lançamento'),
     dates.length ? h('div', { class: 'chips wrap' }, dates.map((o) => chip(o.label, ui.launchTurn === o.turn ? 'accent' : '', { onclick: () => { ui.launchTurn = o.turn; rerender(); } }))) : null,

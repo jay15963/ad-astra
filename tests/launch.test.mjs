@@ -34,7 +34,7 @@ function setup({ seed = 1, playerId = 'nasa', mission = {} } = {}) {
     ...mission,
   };
   m.crewed = crewed;
-  state.missions.push(m);
+  state.missions.unshift(m); // first: inherited probes in flight (Lucy, Psyche...) are adopted at init
   return state;
 }
 

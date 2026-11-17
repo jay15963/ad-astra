@@ -17,7 +17,21 @@
     "mars_landing_robotic": { "holder": "URSS", "year": 1971, "mission": "Mars 3" },
     "jupiter_arrival": { "holder": "EUA", "year": 1995, "mission": "Galileo" },
     "titan_arrival": { "holder": "Europa e EUA", "year": 2005, "mission": "Huygens" },
-    "national_station": { "holder": "URSS", "year": 1971, "mission": "Salyut 1" }
+    "national_station": { "holder": "URSS", "year": 1971, "mission": "Salyut 1" },
+    "venus_flyby": { "holder": "EUA", "year": 1962, "mission": "Mariner 2" },
+    "venus_entry_probe": { "holder": "URSS", "year": 1967, "mission": "Venera 4" },
+    "venus_orbit": { "holder": "URSS", "year": 1975, "mission": "Venera 9" },
+    "mercury_flyby": { "holder": "EUA", "year": 1974, "mission": "Mariner 10" },
+    "mercury_orbit": { "holder": "EUA", "year": 2011, "mission": "MESSENGER" },
+    "asteroid_rendezvous": { "holder": "EUA", "year": 2000, "mission": "NEAR Shoemaker" },
+    "asteroid_sample_return": { "holder": "Japão", "year": 2010, "mission": "Hayabusa" },
+    "ceres_orbit": { "holder": "EUA", "year": 2015, "mission": "Dawn" },
+    "europa_arrival": { "holder": "EUA", "year": 1996, "mission": "Galileo" },
+    "saturn_orbit": { "holder": "EUA", "year": 2004, "mission": "Cassini" },
+    "enceladus_plume": { "holder": "EUA", "year": 2005, "mission": "Cassini" },
+    "neptune_flyby": { "holder": "EUA", "year": 1989, "mission": "Voyager 2" },
+    "pluto_flyby": { "holder": "EUA", "year": 2015, "mission": "New Horizons" },
+    "kuiper_flyby": { "holder": "EUA", "year": 2019, "mission": "New Horizons" }
   },
   "victory": {
     "description": "Ao fim de 2030, a agência com mais prestígio vence a Tabela da Era.",

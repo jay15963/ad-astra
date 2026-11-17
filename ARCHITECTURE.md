@@ -26,6 +26,7 @@ Escopo atual: **corte vertical "Corrida Lunar" (2026 a 2030)**, Era 4, 1 turno =
 
 ```
 index.html                 bootstrap (carrega styles.css, src/ui/launch-scene.css, src/ui/map.css, src/ui/app.js)
+sw.js                      service worker network-first (revalida tudo, cópia só para offline)  [ui-shell]
 styles.css                 estilos globais + temas por era                                  [ui-shell]
 manifest.webmanifest       PWA (instalar na tela inicial)                                    [ui-shell]
 assets/icon.svg            ícone                                                             [ui-shell]
@@ -39,7 +40,9 @@ data/politics.json         economia, governos, eleições, eventos exógenos, te
 data/tech.json             tech tree (6 ramos)                                               [research]
 data/crew.json             nomes, traços, peças de retrato, elencos iniciais                 [research-crew]
 data/events.json           cartões de evento narrativos e de operação, cadeias               [narrative]
-data/bodies.json           corpos do mapa (Terra, Lua, Marte, ...), posições e fichas        [map]
+data/bodies.json           corpos do Sistema Solar (planetas, luas, cinturões, marcadores), fichas [map/solar-data]
+data/geopolitics.json      países por agência, sedes, bases de lançamento, blocos, zonas disputadas [politics]
+data/world.json            contornos dos países (só carregado quando o mapa-múndi abre)      [politics/worldmap]
 src/core/rng.js            RNG determinístico (hash32, makeRng, rngFor)                      [core]
 src/core/time.js           turno <-> data                                                    [core]
 src/core/helpers.js        helpers compartilhados                                            [core]
@@ -71,8 +74,11 @@ src/ui/settings.js         acessibilidade e opções                            
 src/ui/launch-scene.js     cena do Dia de Lançamento (6 atos) — também a cena de chegada     [launch-scene]
 src/ui/launch-scene.css                                                                      [launch-scene]
 src/ui/audio.js            som adaptativo (WebAudio sintetizado, sem arquivos)               [launch-scene]
-src/ui/map.js              aba Mapa (Terra, Lua, Marte; zoom por pinça; janelas; trânsito)   [map]
+src/ui/map.js              aba Mapa: 4 níveis (Terra-Lua, Interno, Externo, Completo) + Rotas (metrô) [map]
 src/ui/map.css                                                                               [map]
+src/ui/worldmap.js         mapa-múndi da aba Mundo (zonas, conflitos, sedes, linha do tempo)  [worldmap]
+src/ui/worldmap.css        (link injetado pelo próprio JS)                                   [worldmap]
+src/ui/techtree.css        grafo da aba Pesquisa (link injetado por research-tab.js)          [techtree]
 tests/*.test.mjs           testes node:test por módulo
 tools/smoke.mjs            bot que joga campanhas inteiras e verifica invariantes            [core]
 tools/sim-*.mjs            simulações em lote por módulo
@@ -120,6 +126,7 @@ launch.js   ← risk.js, missions.js, crew.js, research.js, helpers, rng
 | `blocs` | diplomacy | `{[blocId]: {id, name, members: [actorId], leader}}` (ex.: `artemis_accords`, `ilrs`) |
 | `treaties` | diplomacy | `[{id, type, name, parties: [ids], signedTurn, status: 'active'|'broken'|'expired', terms}]` |
 | `proposals` | diplomacy | propostas em aberto `[{id, from, to, type, terms, createdTurn, expiresTurn}]` |
+| `geo` | politics | `{zones: {[id]: {controller, status: 'stable'|'contested'|'conflict'|'ceasefire', since, conflictId, changedTurn, history}}, conflicts: [...], events, shifts}` (ver Sistema Solar e mapas) |
 | `world` | politics | `{globalTension: 0..4, economy: {[actorId]: {growth, crisis: null|{type, untilTurn}}}, conflicts: [...]}` |
 | `politics` | politics | `{[actorId]: {government, stance: -1..1 (apoio ao espaço), nextElectionTurn, priority}}` |
 | `tension` | politics | `{[relKey]: 0..4}` (0 normal, 1 tensão, 2 crise, 3 conflito regional, 4 guerra aberta) |
@@ -160,7 +167,10 @@ Atores: `nasa, spacex, blueorigin, cnsa, isro, esa, roscosmos, jaxa` (jogáveis:
 `'player'` NÃO é um id; use `state.playerId`.
 
 ### Ids de destino (data/destinations.json) — vocabulário fixo
-`leo, sso, gto, iss, cislunar, lunar_orbit, lunar_surface, lunar_south_pole, mars_orbit, mars_surface, jupiter, titan`
+`leo, sso, gto, iss, cislunar, lunar_orbit, lunar_surface, lunar_south_pole, mars_orbit, mars_surface, jupiter, titan`,
+mais (nov/2026) `venus_flyby, venus_orbit, venus_atmosphere, mercury_flyby, mercury_orbit, neo_asteroid, neo_sample_return, apophis, didymos,
+phobos, ceres, psyche, jupiter_trojans, europa_flyby, ganymede_orbit, saturn_orbit, enceladus_flyby, uranus_orbit, neptune_flyby, pluto_flyby, kuiper`.
+`kind`: `orbit|surface|atmosphere|flyby|rendezvous|station`. Campos opcionais: `short`, `missionTypes`, `risk`, `prestige`, `scienceMult`, `profile`.
 ```
 { id, name, body: 'earth'|'moon'|'mars'|'jupiter'|'saturn', kind, capacityKey: 'leo'|'gto'|'tli'|'mars'|'outer',
   route: [{from, to, dv (km/s)}],  // para o "mapa de metrô" de rotas
@@ -172,7 +182,11 @@ Atores: `nasa, spacex, blueorigin, cnsa, isro, esa, roscosmos, jaxa` (jogáveis:
 ### Ids de marcos "Os Primeiros" (firsts) — vocabulário fixo
 `crewed_lunar_flyby, crewed_lunar_orbit, crewed_lunar_landing, lunar_south_pole_landing, lunar_south_pole_crewed, lunar_sample_return,
 lunar_resource_demo, lunar_base, mars_landing_robotic, mars_sample_return, titan_arrival, jupiter_arrival, commercial_station, national_station,
-crewed_orbit_national` (este último é por ator: `crewed_orbit_national:<actorId>` — `claimFirst` sempre dá "primeiro" porque é por ator).
+crewed_orbit_national`, mais (nov/2026) `venus_flyby, venus_entry_probe, venus_orbit, mercury_flyby, mercury_orbit, asteroid_rendezvous,
+asteroid_sample_return, apophis_rendezvous, planetary_defense_survey, phobos_landing, ceres_orbit, psyche_arrival, trojan_flyby, europa_arrival,
+ganymede_orbit, saturn_orbit, enceladus_plume, uranus_orbit, neptune_flyby, pluto_flyby, kuiper_flyby`. Os já feitos no século XX/XXI
+estão em `scenario.historicalFirsts` (valem 35%); `phobos_landing, psyche_arrival, trojan_flyby, apophis_rendezvous, planetary_defense_survey,
+ganymede_orbit, uranus_orbit` são inéditos. Nenhum ator tem esses marcos em `ai.goals` ainda (crewed_orbit_national é por ator: `crewed_orbit_national:<actorId>` — `claimFirst` sempre dá "primeiro" porque é por ator).
 
 ### Tipos de missão e veículos
 - `type`: `satellite | probe | crewed | cargo | station | lander`.
@@ -196,6 +210,12 @@ crewed_orbit_national` (este último é por ator: `crewed_orbit_national:<actorI
 Instância em `state.calendar`: `{ id, plannedTurn, currentTurn, status: 'planned'|'launched'|'success'|'partial'|'failed'|'cancelled'|'player',
   delayWeeks, revisions, outcome: null|{level, failureType}, resolvedTurn }`. Itens com `owner === state.playerId` ficam `status:'player'` e são
 conduzidos pelo módulo missions (briefing → missão do jogador). Os demais o módulo calendar simula (atrasos, lançamento via `quickOutcome`).
+Campos opcionais (nov/2026): `inTransit: {launched: {year, month}}` (sonda já em voo; `planned` vira a data de chegada) — de rival vira item
+"Em trânsito"; do jogador vira missão `status:'transit'` com `inheritedTransit: true` já no turno 0 (`missions.adoptTransitPrograms`), prestígio
+multiplicado por `inheritedShare(data)` (0,35, `scenario.inheritedPrestigeShare`). `vehicleName` (nome exibido quando o foguete é aposentado,
+ex.: Ariane 5 com `vehicleId: 'ariane6'` como substituto). `window` (janela própria do programa; `false` = nenhuma; `calendar.itemWindow`).
+Naves `calendarOnly: true` em spacecraft.json são únicas (já em voo) e não aparecem no montador. Janela com `periodWeeks >= 260` perdida
+cancela o programa rival.
 
 ### Mission (state.missions, dono: missions)
 ```
@@ -209,6 +229,7 @@ conduzidos pelo módulo missions (briefing → missão do jogador). Os demais o 
   result: null|{ outcome: OutcomeLevel, failureType: FailureType|null, causes: [Cause], phase: 'ascent'|'arrival',
                  launchedTurn, resolvedTurn, prestige, science, headlines: [string] } }
 ```
+Opcionais: `inheritedTransit` (sonda real já em voo no início), `vehicleName` (nome exibido; UI usa `missions-tab.vehicleLabel`).
 OutcomeLevel: `total | partial | recoverable | catastrophic`. FailureType: `propulsion | structure | software | human | environment`.
 Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), detail, weight }`.
 
@@ -381,7 +402,17 @@ Cada aba exporta `render(container, store)` (pode retornar função de limpeza).
 `map` (Mapa — `src/ui/map.js`), `world` (Mundo). `app.js` monta a barra de 5 abas na base, re-renderiza a aba ativa a cada mudança,
 abre `decisions.js` para cartões e chama `openLaunchScene(store)` de `launch-scene.js` sempre que `state.activeLaunch` existir.
 **launch-scene.js** exporta `openLaunchScene(store) → close()` (overlay de tela cheia dentro de `#overlay-root`).
-**map.js** exporta `render(container, store)`.
+**map.js** exporta `render(container, store)`. Monta sozinho 4 níveis (Terra-Lua, Interno, Externo, Completo); de `bodies.json levels` usa só
+o `id` para ajustar o enquadramento. "Planejar missão aqui" chama `store.ui.planMission(destId)` (app.js: grava `store.ui.pendingDestination`
+e abre `#missoes/nova`; o montador lê e limpa).
+**worldmap.js** (aba Mundo, seção recolhível) usa `'geo/state' (turn?)` e `'geo/history'`; `opts.focus` foca um conflito.
+**research-tab.js** desenha o grafo estilo KSP; `research/tree` traz também `icon, short, tier, row` de tech.json (opcionais; `tier`/`row`
+forçam coluna/linha do layout).
+**settings.js** exporta `APP_VERSION` (= package.json = `SW_VERSION` de sw.js), `BUILD_DATE`, `BUILD`; Ajustes mostra versão, build e o
+estado do service worker.
+**sw.js** (raiz, registrado por app.js com `updateViaCache: 'none'`): GET da mesma origem → rede primeiro com `cache: 'no-cache'`
+(revalida), resposta marcada `Cache-Control: no-cache` (o memory cache da página não reaproveita módulo velho), cópia em
+`adastra-<versão>` só para quando não há rede. Ao publicar: subir `APP_VERSION`, `SW_VERSION`, package.json e `BUILD`.
 
 Tema por era: `document.body.dataset.era = '4'`; CSS variables por era em styles.css. Fonte do sistema. Retrato, polegar, alvos >= 44px,
 `env(safe-area-inset-*)`. Acessibilidade: texto escalável (`--text-scale`), modo daltonismo (sem depender só de vermelho/verde), reduzir movimento, nada só por som.

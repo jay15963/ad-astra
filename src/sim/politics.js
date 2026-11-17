@@ -1,5 +1,5 @@
 // Politics & simulated wars (GDD "Política e guerras simuladas", Turno 5).
-// Owns the slices `world`, `politics` and `tension`. Pure JS, deterministic (ctx.rng / rngFor only).
+// Owns the slices `world`, `politics`, `tension` and `geo` (world map). Pure JS, deterministic (ctx.rng / rngFor only).
 //
 // Model in one paragraph: every nation (data/politics.json `nations`) has an economy (growth, inflation, debt,
 // crises), a government made of factions (exec/legis) with a space stance and a program priority, and a real-ish
@@ -241,6 +241,7 @@ export function init(state, data, ctx) {
   ensureEntries(state, data);
   for (const k of Object.keys(w.pairs)) syncPair(state, k);
   updateViews(state, data);
+  initGeo(state, data);
 }
 
 /** Per-actor political entry (contract: {government, stance, nextElectionTurn, priority}). */
@@ -1376,6 +1377,387 @@ export const decisionHandlers = {
   },
 };
 
+// ---------------------------------------------------------------- geopolitics (world map: zones, conflicts)
+//
+// Slice `state.geo` (owner: politics): the map state of real disputed / conflict-affected zones
+// (data/geopolitics.json). Nothing is scripted: zones only change from turn 0 on, driven by the tension scale.
+// - A nation pair reaching level 3 (world.conflicts) opens a geo conflict on the zones mapped to its `place`
+//   (or an incident area from `placeAreas`); when the pair drops below 3 the zones go to ceasefire.
+// - Conflicts already under way in the data (e.g. Russia–Ukraine) follow their `drivers` pairs: intensity, ceasefire,
+//   treaty, resumption.
+// - While a conflict runs, a `shiftable` zone may change controller (low monthly hazard by intensity, scaled by the
+//   relative strength of the sides: economy, crisis, government). Capped by model.maxShifts per campaign.
+
+const GD = (data) => (data || DATA)?.geopolitics || {};
+const GEO_STATUS = ['stable', 'contested', 'conflict', 'ceasefire'];
+const jsonCopy = (x) => JSON.parse(JSON.stringify(x));
+
+function geoTurn(data, spec, startYear) {
+  if (!spec?.year) return null;
+  const mb = GD(data).monthBase ?? 1;
+  return dateToTurn(spec.year, clamp((spec.month ?? mb) - mb, 0, 11), startYear);
+}
+const zoneDef = (data, id) => (GD(data).zones || []).find((z) => z.id === id) || null;
+const factDef = (data, id) => (GD(data).conflicts || []).find((c) => c.id === id) || null;
+const zonePairs = (zd) => (zd?.pairs || []).filter((p) => Array.isArray(p) && p.length === 2).map(([a, b]) => relKey(a, b));
+function countryForms(data, iso) {
+  const c = GD(data).countries?.[iso];
+  return forms(c?.name || GD(data).countryNames?.[iso] || iso, c ? c.art : null);
+}
+function zoneVars(data, zd) {
+  const f = forms(zd?.name || '', zd?.art || null);
+  return { zone: zd?.name || '', Zone: capFirst(f.the), oZone: f.the, deZone: f.of, emZone: f.in };
+}
+function isoVars(data, iso, K) {
+  const f = countryForms(data, iso);
+  return { [K]: GD(data).countries?.[iso]?.name || iso, ['o' + K]: f.the, ['O' + K]: capFirst(f.the), ['de' + K]: f.of };
+}
+
+export function initGeo(state, data) {
+  const G = GD(data);
+  const geo = { zones: {}, conflicts: [], events: [], shifts: 0 };
+  for (const zd of G.zones || []) {
+    if (!zd?.id || !Array.isArray(zd.claimants) || !zd.claimants.length) continue;
+    const controller = zd.claimants.includes(zd.controller) ? zd.controller : zd.claimants[0];
+    geo.zones[zd.id] = {
+      controller, status: GEO_STATUS.includes(zd.status) ? zd.status : 'contested',
+      since: geoTurn(data, zd.since, state.startYear) ?? 0, conflictId: null, changedTurn: null, history: [],
+    };
+  }
+  for (const f of G.conflicts || []) {
+    const zoneIds = (f.zoneIds || []).filter((id) => geo.zones[id]);
+    const lv = clamp(f.intensity ?? 3, 1, 4);
+    const g = {
+      id: f.id, def: f.id, fact: true, src: null, pair: null, name: f.name || null, place: f.place || '', parties: [...(f.parties || [])],
+      nations: Object.keys(f.sides || {}), zoneIds, area: null, startTurn: geoTurn(data, f.since, state.startYear) ?? 0, endTurn: null,
+      intensity: lv, peak: lv, endCause: null, settled: false, shifted: [],
+    };
+    for (const id of zoneIds) { geo.zones[id].status = 'conflict'; geo.zones[id].conflictId = g.id; }
+    geo.conflicts.push(g);
+  }
+  state.geo = geo;
+  return geo;
+}
+
+function geoEvent(state, data, ev) {
+  pushCapped(state.geo.events, { turn: state.turn, ...ev }, GD(data).model?.eventsCap ?? 80);
+}
+
+function setZone(state, data, zoneId, field, to, cause) {
+  const z = state.geo.zones[zoneId];
+  if (!z || z[field] === to) return false;
+  const from = z[field];
+  z[field] = to;
+  z.since = state.turn;
+  pushCapped(z.history, { turn: state.turn, field, from, to, cause }, GD(data).model?.historyCap ?? 20);
+  return true;
+}
+
+function activeGeoConflictOf(state, zoneId) {
+  return (state.geo.conflicts || []).find((g) => g.endTurn == null && g.zoneIds.includes(zoneId)) || null;
+}
+
+function driverLevel(state, pairs) {
+  let lv = 0;
+  for (const k of pairs) lv = Math.max(lv, state.world.pairs?.[k]?.level ?? 0);
+  return lv;
+}
+function conflictDrivers(data, g) {
+  if (g.fact) return (factDef(data, g.def)?.drivers || []).map(([a, b]) => relKey(a, b));
+  return g.pair ? [g.pair] : [];
+}
+
+/** Relative strength of a nation for the (rare) control shift: economy weight, growth, crisis, government posture. */
+function geoStrength(state, data, nid) {
+  const nd = nationDef(data, nid);
+  const ns = state.world.nations?.[nid];
+  if (!nd || !ns) return 0.3;
+  const w = nd.economy?.weight ?? 0.5;
+  const g = clamp(ns.econ?.growth ?? 2, -6, 10);
+  const hawk = factionDef(nd, ns.government?.exec)?.hawk ?? 0.5;
+  return w * (1 + g / 20) * (ns.econ?.crisis ? 0.75 : 1) * (0.8 + hawk * 0.4);
+}
+
+function conflictPlaceVars(data, g) {
+  const names = g.fact ? g.parties.map((iso) => GD(data).countries?.[iso]?.name || iso) : (g.nations || []).map((n) => nationName(data, n));
+  return { place: g.place || '', A: names[0] || '', B: names[1] || '' };
+}
+
+function openPairConflict(state, data, c) {
+  const G = GD(data);
+  const pk = c.pair;
+  const mapped = (G.zones || []).filter((zd) => state.geo.zones[zd.id] && zonePairs(zd).includes(pk) && (zd.places || []).includes(c.place)).map((zd) => zd.id);
+  const zoneIds = mapped.filter((id) => !activeGeoConflictOf(state, id));
+  if (mapped.length && !zoneIds.length) {
+    // the place is already at war (e.g. a fact conflict): the pair joins it, no second conflict on the map
+    const host = activeGeoConflictOf(state, mapped[0]);
+    state.geo.conflicts.push({ id: `geo_${c.id}`, src: c.id, pair: pk, joined: host?.id || null, fact: false, nations: [...(c.nations || [])], parties: [], zoneIds: [], area: null, place: c.place || '', startTurn: state.turn, endTurn: null, intensity: clamp(c.level ?? 3, 1, 4), peak: clamp(c.level ?? 3, 1, 4), endCause: null, settled: false, shifted: [] });
+    return null;
+  }
+  const ar = zoneIds.length ? null : G.placeAreas?.[c.place] || null;
+  const parties = [];
+  for (const n of c.nations || []) { const iso = G.nationPrimary?.[n]; if (iso && !parties.includes(iso)) parties.push(iso); }
+  for (const id of zoneIds) for (const n of c.nations || []) {
+    const iso = zoneDef(data, id)?.sides?.[n];
+    if (iso && !parties.includes(iso)) parties.push(iso);
+  }
+  const lv = clamp(c.level ?? 3, 1, 4);
+  const g = {
+    id: `geo_${c.id}`, def: null, fact: false, src: c.id, pair: pk, name: null, place: c.place || '', parties, nations: [...(c.nations || [])],
+    zoneIds, area: ar ? { name: ar.name, lat: ar.lat, lon: ar.lon, radiusKm: ar.radiusKm } : null,
+    startTurn: state.turn, endTurn: null, intensity: lv, peak: lv, endCause: null, settled: false, shifted: [],
+  };
+  state.geo.conflicts.push(g);
+  for (const id of zoneIds) {
+    setZone(state, data, id, 'status', 'conflict', 'conflito');
+    state.geo.zones[id].conflictId = g.id;
+  }
+  const vars = conflictPlaceVars(data, g);
+  geoEvent(state, data, { kind: 'conflict_start', conflictId: g.id, zoneIds, text: capFirst(fill(G.timeline?.[g.place ? 'conflict_start' : 'conflict_start_noplace'] || 'Conflito {place}', vars)) });
+  state.stats['politics.geoConflicts'] = (state.stats['politics.geoConflicts'] || 0) + 1;
+  log(state, `politics/geo: conflito ${g.id} em ${zoneIds.join(',') || g.area?.name || 'área sem zona'}`);
+  return g;
+}
+
+function endGeoConflict(state, data, g, cause, { news = false } = {}) {
+  const G = GD(data);
+  g.endTurn = state.turn;
+  g.endCause = cause;
+  if (g.joined) { g.settled = true; return; }
+  for (const id of g.zoneIds) {
+    const z = state.geo.zones[id];
+    if (z?.conflictId === g.id && z.status === 'conflict') setZone(state, data, id, 'status', 'ceasefire', cause === 'ceasefire' ? 'cessar-fogo' : cause);
+  }
+  const vars = conflictPlaceVars(data, g);
+  geoEvent(state, data, { kind: 'ceasefire', conflictId: g.id, zoneIds: g.zoneIds, text: capFirst(fill(G.timeline?.ceasefire || 'Cessar-fogo {place}', vars)) });
+  if (news) pnews(state, data, 'geo:fact_ceasefire', vars, { headlines: G.news?.fact_ceasefire, tplKey: 'geo:fact_ceasefire', importance: 3, force: true, tags: ['conflict', 'geo'] });
+}
+
+function settleConflict(state, data, g, rng) {
+  const G = GD(data);
+  const M = G.model || {};
+  const zones = g.zoneIds.filter((id) => state.geo.zones[id]?.conflictId === g.id && state.geo.zones[id]?.status === 'ceasefire');
+  if (!zones.length && g.zoneIds.length) { g.settled = true; return; }
+  const lvl = driverLevel(state, conflictDrivers(data, g));
+  const vars = conflictPlaceVars(data, g);
+  // fact conflicts resume from the state of their drivers (pair conflicts resume through the tension scale itself)
+  if (g.fact && rng.chance((M.resumeChance || [])[lvl] ?? 0)) {
+    g.settled = true;
+    const f = factDef(data, g.def) || {};
+    const ng = {
+      ...jsonCopy(g), id: `${g.def}_${state.turn}`, startTurn: state.turn, endTurn: null, endCause: null, settled: false, shifted: [],
+      zoneIds: zones, intensity: clamp(lvl + 1, 2, 4), peak: clamp(lvl + 1, 2, 4), name: f.name || g.name,
+    };
+    state.geo.conflicts.push(ng);
+    for (const id of zones) { setZone(state, data, id, 'status', 'conflict', 'retomada'); state.geo.zones[id].conflictId = ng.id; }
+    geoEvent(state, data, { kind: 'resumed', conflictId: ng.id, zoneIds: zones, text: capFirst(fill(G.timeline?.resumed || 'Hostilidades retomadas {place}', vars)) });
+    pnews(state, data, 'geo:resumed', vars, { headlines: G.news?.resumed, tplKey: 'geo:resumed', importance: 3, force: true, tags: ['conflict', 'geo'] });
+    return;
+  }
+  if (!zones.length) { g.settled = true; return; } // incident areas without zones: nothing to sign
+  if (state.turn - g.endTurn < (M.treatyMinWeeks ?? 26)) return;
+  if (!rng.chance((M.treatyChance || [])[lvl] ?? 0)) return;
+  g.settled = true;
+  g.endCause = 'treaty';
+  for (const id of zones) setZone(state, data, id, 'status', 'stable', 'acordo');
+  geoEvent(state, data, { kind: 'treaty', conflictId: g.id, zoneIds: zones, text: capFirst(fill(G.timeline?.treaty || 'Acordo de paz {place}', vars)) });
+  pnews(state, data, 'geo:treaty', vars, { headlines: G.news?.treaty, tplKey: 'geo:treaty', importance: 3, force: true, tags: ['conflict', 'geo'] });
+}
+
+function tryShift(state, data, g, zoneId, rng) {
+  const G = GD(data);
+  const M = G.model || {};
+  const zd = zoneDef(data, zoneId);
+  const z = state.geo.zones[zoneId];
+  if (!zd || !z || !zd.shiftable || g.intensity < zd.shiftable || g.shifted.includes(zoneId)) return;
+  if (state.geo.shifts >= (M.maxShifts ?? 3)) return;
+  if (state.turn - Math.max(0, g.startTurn) < (M.minConflictWeeks ?? 12)) return;
+  const f = g.fact ? factDef(data, g.def) : null;
+  const sides = f?.sides || zd.sides || {};
+  const sw = f?.sideWeights || {};
+  const nats = (g.nations || []).filter((n) => sides[n]);
+  const holders = nats.filter((n) => sides[n] === z.controller);
+  const others = nats.filter((n) => sides[n] !== z.controller && zd.claimants.includes(sides[n]));
+  if (!others.length) return;
+  const sOf = (list) => list.reduce((s, n) => s + geoStrength(state, data, n) * (sw[n] ?? 1), 0);
+  // the strongest challenger decides who would take over
+  const lead = others.slice().sort((a, b) => sOf([b]) - sOf([a]))[0];
+  const target = sides[lead];
+  const sO = sOf(others.filter((n) => sides[n] === target));
+  const sH = sOf(holders) || 0.3;
+  const [lo, hi] = M.ratioClamp || [0.4, 1.6];
+  // shiftBias: direction weight per new controller (retaking fortified ground is rarer than a slow advance)
+  const p = (M.shiftHazard?.[g.intensity] ?? 0) * clamp(sO / sH, lo, hi) * (zd.shiftWeight ?? 1) * (zd.shiftBias?.[target] ?? 1);
+  if (!rng.chance(p)) return;
+  const from = z.controller;
+  setZone(state, data, zoneId, 'controller', target, 'conflito');
+  z.changedTurn = state.turn;
+  g.shifted.push(zoneId);
+  state.geo.shifts += 1;
+  state.stats['politics.geoShifts'] = (state.stats['politics.geoShifts'] || 0) + 1;
+  // the side that lost ground pushes the pair tension up a little (pressure, not a script)
+  for (const k of conflictDrivers(data, g)) {
+    const pr = state.world.pairs?.[k];
+    if (pr) pr.pressure = r3(pr.pressure + (M.shiftPressure ?? 0.3));
+  }
+  const vars = { ...zoneVars(data, zd), ...isoVars(data, target, 'To'), ...isoVars(data, from, 'From'), ...conflictPlaceVars(data, g) };
+  geoEvent(state, data, { kind: 'control_change', conflictId: g.id, zoneIds: [zoneId], zoneId, from, to: target, text: capFirst(fill(G.timeline?.control_change || '{Zone}: controle muda', vars)) });
+  pnews(state, data, 'geo:control_change', vars, {
+    headlines: G.news?.control_change, tplKey: 'geo:control_change', importance: 3, force: true, tags: ['conflict', 'geo'],
+    actors: (g.nations || []).map((n) => leadActor(state, data, n)).filter((id) => state.actors?.[id]),
+    body: zd.desc ? `Mapa atualizado. Contexto: ${zd.desc}` : '',
+  });
+  log(state, `politics/geo: ${zoneId} ${from}→${target}`);
+}
+
+function geoTick(state, data, ctx) {
+  const G = GD(data);
+  if (!G.zones) return;
+  if (!state.geo?.zones) initGeo(state, data);
+  const geo = state.geo;
+  const M = G.model || {};
+  if (state.turn < (M.startTurn ?? 0)) return;
+  // 1. pair conflicts born from the tension scale (world.conflicts, level 3+)
+  for (const c of state.world.conflicts || []) {
+    if (c.endTurn != null || geo.conflicts.some((g) => g.src === c.id)) continue;
+    openPairConflict(state, data, c);
+  }
+  for (const g of geo.conflicts) {
+    if (g.endTurn != null) continue;
+    if (g.src) {
+      const c = (state.world.conflicts || []).find((x) => x.id === g.src);
+      if (c && c.endTurn == null) { g.intensity = clamp(c.level ?? 3, 1, 4); g.peak = Math.max(g.peak, g.intensity); }
+      else endGeoConflict(state, data, g, 'ceasefire'); // the tension scale already published the ceasefire headline
+    } else if (g.fact) {
+      g.intensity = clamp(driverLevel(state, conflictDrivers(data, g)) + 1, 2, 4);
+      g.peak = Math.max(g.peak, g.intensity);
+    }
+  }
+  if (!isMonthStart(state)) return;
+  const rng = ctx?.rng ? ctx.rng('geo') : rngFor(state.seed, state.turn, 'politics', 'geo');
+  for (const g of geo.conflicts.slice()) {
+    if (g.endTurn == null) {
+      for (const id of g.zoneIds) tryShift(state, data, g, id, rng);
+      if (g.fact && state.turn - Math.max(0, g.startTurn) >= (M.minConflictWeeks ?? 12)) {
+        const lvl = driverLevel(state, conflictDrivers(data, g));
+        let p = (M.factCeasefire || [])[lvl] ?? 0;
+        // economic crises in the driving nations make a pause more likely
+        if (p > 0 && (g.nations || []).some((n) => state.world.nations?.[n]?.econ?.crisis)) p *= 1.5;
+        if (rng.chance(p)) endGeoConflict(state, data, g, 'ceasefire', { news: true });
+      }
+    } else if (!g.settled && g.endCause === 'ceasefire') settleConflict(state, data, g, rng);
+  }
+  // keep the list short: drop the oldest settled conflicts
+  if (geo.conflicts.length > 30) {
+    const drop = new Set(geo.conflicts.filter((g) => g.endTurn != null && g.settled).slice(0, geo.conflicts.length - 30).map((g) => g.id));
+    geo.conflicts = geo.conflicts.filter((g) => !drop.has(g.id));
+  }
+}
+
+/** Country -> bloc key for the map (static signatory lists; agencies that changed bloc recolor their countries). */
+function countryBlocs(state, data) {
+  const G = GD(data);
+  const out = {};
+  for (const iso of G.blocs?.artemis || []) out[iso] = 'artemis';
+  for (const iso of G.blocs?.ilrs || []) out[iso] = out[iso] === 'artemis' ? 'both' : 'ilrs';
+  const map = G.blocMap || { artemis_accords: 'artemis', ilrs: 'ilrs' };
+  const initial = Object.fromEntries((data?.actors?.actors || []).map((a) => [a.id, a.bloc ?? null]));
+  for (const [aid, isos] of Object.entries(G.actorCountries || {})) {
+    const a = state.actors?.[aid];
+    if (!a || a.kind === 'company' || (a.bloc ?? null) === (initial[aid] ?? null)) continue;
+    const b = a.bloc ? map[a.bloc] || 'neutral' : 'neutral';
+    for (const iso of isos) out[iso] = b;
+  }
+  return out;
+}
+
+/** Nation pair levels at turn T, rebuilt from the tension history (capped: older moves are approximate). */
+function pairLevelsAt(state, T) {
+  const w = state.world || {};
+  const lv = {};
+  for (const [k, p] of Object.entries(w.pairs || {})) lv[k] = p.level;
+  if (T >= state.turn) return lv;
+  const hist = w.history?.tension || [];
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const h = hist[i];
+    if (h.turn > T && lv[h.pair] != null) lv[h.pair] = h.from;
+  }
+  return lv;
+}
+
+function geoStateQuery(state, data, atTurn) {
+  DATA = data || DATA;
+  const G = GD(data);
+  const geo = state.geo || { zones: {}, conflicts: [], events: [] };
+  const T = atTurn == null || !Number.isFinite(Number(atTurn)) ? state.turn : clamp(Math.round(Number(atTurn)), Math.min(0, state.turn), state.turn);
+  const labels = G.statusLabels || {};
+  const conflicts = (geo.conflicts || []).filter((g) => !g.joined && g.startTurn <= T && (g.endTurn == null || g.endTurn > T)).map((g) => ({
+    id: g.id, name: g.name, fact: !!g.fact, place: g.place, parties: g.parties, nations: g.nations,
+    partyNames: g.fact ? g.parties.map((iso) => G.countries?.[iso]?.name || iso) : (g.nations || []).map((n) => nationName(data, n)),
+    zoneIds: g.zoneIds, area: g.area, startTurn: g.startTurn, endTurn: g.endTurn, intensity: g.intensity, levelLabel: levelLabel(g.intensity),
+  }));
+  const zones = (G.zones || []).filter((zd) => geo.zones?.[zd.id]).map((zd) => {
+    const z = geo.zones[zd.id];
+    let controller = z.controller;
+    let status = z.status;
+    for (let i = z.history.length - 1; i >= 0; i--) {
+      const h = z.history[i];
+      if (h.turn <= T) continue;
+      if (h.field === 'controller') controller = h.from; else if (h.field === 'status') status = h.from;
+    }
+    const past = z.history.filter((h) => h.turn <= T);
+    const lastControl = past.filter((h) => h.field === 'controller').pop() || null;
+    const since = past.length ? past[past.length - 1].turn : (geoTurn(data, zd.since, state.startYear) ?? 0);
+    const conflict = conflicts.find((c) => c.zoneIds.includes(zd.id)) || null;
+    return {
+      id: zd.id, name: zd.name, kind: zd.kind, polygon: zd.polygon || null, circle: zd.circle || null, label: zd.label || zd.circle || null,
+      claimants: zd.claimants, claimantNames: zd.claimants.map((iso) => G.countries?.[iso]?.name || iso),
+      controller, controllerName: G.countries?.[controller]?.name || controller, status, statusLabel: labels[status] || status,
+      since, sinceYear: past.length ? null : zd.since?.year ?? null, desc: zd.desc || '', shiftable: !!zd.shiftable,
+      changedTurn: lastControl?.turn ?? null, changedFrom: lastControl?.from ?? null,
+      changedFromName: lastControl ? G.countries?.[lastControl.from]?.name || lastControl.from : null,
+      conflictId: conflict?.id || null,
+    };
+  });
+  const lv = pairLevelsAt(state, T);
+  const pNation = nationOf(state, state.playerId);
+  const anchors = G.nationAnchors || {};
+  const tensionLines = Object.entries(state.world?.pairs || {}).map(([k, p]) => ({ k, p, level: lv[k] ?? p.level }))
+    .filter(({ p, level }) => anchors[p.a] && anchors[p.b] && (level >= 1 || p.a === pNation || p.b === pNation))
+    .map(({ k, p, level }) => ({
+      key: k, nations: [p.a, p.b], names: [nationName(data, p.a), nationName(data, p.b)], flags: [nationDef(data, p.a)?.flag || '', nationDef(data, p.b)?.flag || ''],
+      level, levelLabel: levelLabel(level), from: anchors[p.a], to: anchors[p.b], player: p.a === pNation || p.b === pNation,
+    }))
+    .sort((x, y) => x.level - y.level);
+  const hqs = (G.hqs || []).filter((q) => state.actors?.[q.actorId]).map((q) => {
+    const a = state.actors[q.actorId];
+    return { ...q, short: a.short || a.name, flag: a.flag || '', bloc: a.bloc || null, kind: a.kind, isPlayer: q.actorId === state.playerId, color: a.color || null };
+  });
+  return {
+    turn: T, now: state.turn, isPast: T < state.turn, startYear: state.startYear,
+    zones, conflicts, countryBloc: countryBlocs(state, data), blocLabels: G.blocLabels || {}, statusLabels: labels,
+    actorCountries: G.actorCountries || {}, esaAssociates: G.esaAssociates || [], countryNames: G.countryNames || {},
+    hqs, sites: G.launchSites || [], tensionLines, playerId: state.playerId, playerNation: pNation,
+    playerCountries: G.actorCountries?.[state.playerId] || [], shifts: geo.shifts || 0, asOf: G.asOf || null, source: G.source || null,
+  };
+}
+
+function geoHistoryQuery(state, data) {
+  DATA = data || DATA;
+  const G = GD(data);
+  const events = (state.geo?.events || []).map((e) => ({ ...e }));
+  for (const h of state.world?.history?.tension || []) {
+    if (Math.max(h.from, h.to) < 3) continue;
+    const p = state.world.pairs?.[h.pair];
+    if (!p) continue;
+    const vars = { A: nationName(data, p.a), B: nationName(data, p.b), level: levelLabel(h.to) };
+    events.push({ turn: h.turn, kind: 'tension', pair: h.pair, from: h.from, to: h.to, text: capFirst(fill(G.timeline?.[h.to > h.from ? 'tension_up' : 'tension_down'] || 'Tensão {A}–{B}: {level}', vars)) });
+  }
+  // same week: the tension move first, then what it did to the map
+  events.sort((a, b) => a.turn - b.turn || (a.kind === 'tension' ? 0 : 1) - (b.kind === 'tension' ? 0 : 1));
+  return { events, minTurn: 0, maxTurn: state.turn, startYear: state.startYear };
+}
+
 // ---------------------------------------------------------------- views & tick
 
 function updateViews(state, data) {
@@ -1418,6 +1800,7 @@ export function tick(state, data, ctx) {
   electionsWeekly(state, data, ctx);
   fundingRounds(state, data, ctx);
   demandWeekly(state, data, ctx);
+  geoTick(state, data, ctx);
   updateViews(state, data);
 }
 
@@ -1437,6 +1820,10 @@ function pairView(state, data, pk) {
 export const actions = {};
 
 export const queries = {
+  /** World map state at `turn` (default now): zones, active conflicts, country blocs, HQs, sites, tension lines. */
+  'geo/state': (state, data, turn) => geoStateQuery(state, data, turn),
+  /** Geo timeline (conflicts, ceasefires, treaties, control changes, tension moves to/from level 3+), oldest first. */
+  'geo/history': (state, data) => geoHistoryQuery(state, data),
   /** All nation pairs, most tense first. */
   'politics/tension': (state, data) => {
     DATA = data || DATA;

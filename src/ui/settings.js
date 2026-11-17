@@ -1,8 +1,9 @@
 // Settings / accessibility screen + app version (so players know the phone has the latest build).
 import { h, card, button, segmented, toast, confirmDialog, sectionTitle } from './components.js';
 
-export const APP_VERSION = '0.1.0';          // keep in sync with package.json "version"
+export const APP_VERSION = '0.2.0';          // keep in sync with package.json "version"
 export const BUILD_DATE = '2026-11-17';      // bump on every deploy
+export const BUILD = '2026.11.17-1';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
 
 /** Apply settings to the document (text scale, motion, colorblind palette). */
 export function applySettings(settings) {
@@ -85,7 +86,8 @@ export function render(container, store, { onExit, onQuit } = {}) {
     sectionTitle('Sobre'),
     card({ cls: 'about' },
       h('div', { class: 'about-line' }, h('strong', null, 'Ad Astra'), ` · versão ${APP_VERSION}`),
-      h('div', { class: 'muted small' }, `Build de ${BUILD_DATE.split('-').reverse().join('/')}. Se este número não bater com o anúncio, recarregue a página para pegar a versão nova.`),
+      h('div', { class: 'muted small' }, `Build ${BUILD} (${BUILD_DATE.split('-').reverse().join('/')}). Se este número não bater com o anúncio, recarregue a página para pegar a versão nova.`),
+      swStatusLine(),
       h('div', { class: 'muted small' }, 'Corte vertical "Corrida Lunar" (2026 a 2030). Nomes reais usados só como referência histórica; sem logotipos oficiais.'),
       button('Recarregar app', () => { try { location.reload(); } catch { /* */ } }, { kind: 'ghost', small: true, icon: '↻' }))));
 
@@ -93,6 +95,22 @@ export function render(container, store, { onExit, onQuit } = {}) {
     container.innerHTML = '';
     render(container, store, { onExit, onQuit });
   }
+}
+
+/** One line about the offline/update worker; filled in asynchronously. */
+function swStatusLine() {
+  const el = h('div', { class: 'muted small sw-status' }, 'Atualização automática: verificando…');
+  try {
+    const sw = typeof navigator !== 'undefined' ? navigator.serviceWorker : null;
+    if (!sw) { el.textContent = 'Atualização automática: indisponível neste navegador (recarregue para atualizar).'; return el; }
+    sw.getRegistration().then((reg) => {
+      el.textContent = !reg ? 'Atualização automática: desligada neste navegador (recarregue para pegar a versão nova).'
+        : reg.active
+        ? 'Atualização automática ativa: cada arquivo é conferido com o servidor; sem rede, usa a última cópia.'
+        : 'Atualização automática: ainda instalando (ativa na próxima abertura).';
+    }).catch(() => { el.textContent = 'Atualização automática: indisponível.'; });
+  } catch { el.textContent = 'Atualização automática: indisponível.'; }
+  return el;
 }
 
 function exportSave(store) {

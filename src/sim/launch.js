@@ -780,7 +780,16 @@ function envDetail(al, label) {
     if (d === 'lunar_surface') return 'Descida sem atmosfera: só os motores seguram a nave, sem margem para erro.';
     if (d === 'mars_surface') return 'Entrada, descida e pouso em Marte: sete minutos sem ajuda da Terra.';
     if (d === 'mars_orbit') return 'Captura em Marte: uma queima longa, longe demais para correções em tempo real.';
-    if (d === 'titan' || d === 'jupiter') return 'Espaço profundo: anos de viagem e sinal com horas de atraso.';
+    if (d === 'titan') return 'Entrada em Titã: ar denso e frio, a mais de uma hora-luz de qualquer ajuda.';
+    if (d === 'venus_atmosphere') return 'Mergulho em Vênus: calor de forno, pressão esmagadora e ácido nas nuvens.';
+    if (d === 'venus_orbit' || d === 'venus_flyby') return 'Vênus: muito calor perto do Sol e uma passagem que não se repete.';
+    if (d === 'mercury_orbit' || d === 'mercury_flyby') return 'Mercúrio: Sol a pino, calor extremo e uma captura difícil de acertar.';
+    if (d === 'phobos') return 'Pouso em Fobos: gravidade quase nula, a nave pode quicar para longe.';
+    if (d === 'neo_sample_return') return 'Toque e volta num asteroide: superfície incerta e uma cápsula que precisa voltar.';
+    if (d === 'neo_asteroid' || d === 'apophis' || d === 'didymos' || d === 'psyche' || d === 'ceres') return 'Encontro com corpo pequeno: navegação fina, gravidade fraca e forma pouco conhecida.';
+    if (d === 'jupiter_trojans' || d === 'kuiper' || d === 'pluto_flyby' || d === 'neptune_flyby') return 'Passagem única no espaço profundo: anos de viagem e nenhuma segunda chance.';
+    if (['jupiter', 'europa_flyby', 'ganymede_orbit'].includes(d)) return 'Sistema de Júpiter: radiação intensa e sinal com quase uma hora de atraso.';
+    if (['saturn_orbit', 'enceladus_flyby', 'uranus_orbit'].includes(d)) return 'Espaço profundo: anos de viagem e sinal com horas de atraso.';
     if (d === 'lunar_orbit' || d === 'cislunar') return 'Inserção lunar: uma queima precisa, com a Terra a um segundo-luz.';
     return 'O destino cobra seu preço em cada etapa.';
   }

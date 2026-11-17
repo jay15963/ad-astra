@@ -62,6 +62,8 @@ async function boot() {
     navigate, openDecision: (id) => openDecision(store, id), advance, route: () => ui.route, version: APP_VERSION,
     // a view that swaps screens inside one route (builder steps) asks for the top explicitly
     scrollTop: () => { if (ui.shell?.view) ui.shell.view.scrollTop = 0; },
+    // space map "Planejar missão aqui": open Missões › Montar with this destination preselected
+    planMission: (destId) => { store.ui.pendingDestination = destId || null; navigate('missoes', 'nova'); },
   };
   globalThis.adastra = store; // debugging aid in the console
   store.subscribe(onStoreChange);
@@ -422,6 +424,17 @@ function openFallbackLaunch(store) {
 window.addEventListener('error', (e) => console.error('[Ad Astra]', e.error || e.message));
 window.addEventListener('unhandledrejection', (e) => console.error('[Ad Astra]', e.reason));
 console.info(`Ad Astra v${APP_VERSION} (${BUILD_DATE})`);
+registerServiceWorker();
+
+/** Network-first service worker (sw.js at the root): no stale mix of modules after a deploy, offline fallback. */
+function registerServiceWorker() {
+  try {
+    if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then((reg) => reg.update?.().catch(() => { /* offline */ }))
+      .catch((e) => console.warn('[Ad Astra] service worker:', e?.message || e));
+  } catch { /* not supported */ }
+}
 boot().catch((e) => {
   console.error(e);
   const root = document.getElementById('app');

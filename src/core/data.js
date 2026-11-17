@@ -9,6 +9,7 @@ export const DATA_FILES = [
   'destinations', // targets + energy cost per route + windows — calendar/catalog module
   'calendar',     // real/planned missions 2026-2030 with truth layer + delay history — calendar module
   'politics',     // economy/government/tension templates + news templates — politics module
+  'geopolitics',  // world map: actor countries, HQs, launch sites, disputed zones, geo model — politics module
   'tech',         // tech tree — research module
   'events',       // narrative + operation event cards and chains — narrative module
   'crew',         // name pools, traits, portrait parts, starting rosters — narrative module

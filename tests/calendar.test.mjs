@@ -14,10 +14,17 @@ import * as cal from '../src/sim/calendar.js';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const data = await loadDataNode(root);
 
-const DEST_IDS = ['leo', 'sso', 'gto', 'iss', 'cislunar', 'lunar_orbit', 'lunar_surface', 'lunar_south_pole', 'mars_orbit', 'mars_surface', 'jupiter', 'titan'];
+const DEST_IDS = ['leo', 'sso', 'gto', 'iss', 'cislunar', 'lunar_orbit', 'lunar_surface', 'lunar_south_pole', 'mars_orbit', 'mars_surface', 'jupiter', 'titan',
+  // whole Solar System (solar-data)
+  'venus_flyby', 'venus_orbit', 'venus_atmosphere', 'mercury_flyby', 'mercury_orbit', 'neo_asteroid', 'neo_sample_return', 'apophis', 'didymos',
+  'phobos', 'ceres', 'psyche', 'jupiter_trojans', 'europa_flyby', 'ganymede_orbit', 'saturn_orbit', 'enceladus_flyby', 'uranus_orbit',
+  'neptune_flyby', 'pluto_flyby', 'kuiper'];
 const FIRSTS = ['crewed_lunar_flyby', 'crewed_lunar_orbit', 'crewed_lunar_landing', 'lunar_south_pole_landing', 'lunar_south_pole_crewed',
   'lunar_sample_return', 'lunar_resource_demo', 'lunar_base', 'mars_landing_robotic', 'mars_sample_return', 'titan_arrival', 'jupiter_arrival',
-  'commercial_station', 'national_station', 'crewed_orbit_national', 'lunar_surface_robotic' /* scenario goal */];
+  'commercial_station', 'national_station', 'crewed_orbit_national', 'lunar_surface_robotic' /* scenario goal */,
+  'venus_flyby', 'venus_orbit', 'venus_entry_probe', 'mercury_flyby', 'mercury_orbit', 'asteroid_rendezvous', 'asteroid_sample_return',
+  'apophis_rendezvous', 'planetary_defense_survey', 'phobos_landing', 'ceres_orbit', 'psyche_arrival', 'trojan_flyby', 'europa_arrival',
+  'ganymede_orbit', 'saturn_orbit', 'enceladus_plume', 'uranus_orbit', 'neptune_flyby', 'pluto_flyby', 'kuiper_flyby'];
 const TRUTH = ['fato', 'plano_oficial', 'projecao', 'especulacao'];
 const TYPES = ['satellite', 'probe', 'crewed', 'cargo', 'station', 'lander'];
 const ACTORS = ['nasa', 'spacex', 'blueorigin', 'cnsa', 'isro', 'esa', 'roscosmos', 'jaxa'];
@@ -108,7 +115,9 @@ test('data: calendar items are complete and consistent', () => {
     assert.ok(data.index.spacecraft[m.spacecraftId], `${m.id} spacecraft`);
     if (m.secondarySpacecraftId) assert.ok(data.index.spacecraft[m.secondarySpacecraftId], `${m.id} secondary`);
     assert.ok(TRUTH.includes(m.truthLayer), `${m.id} truthLayer`);
-    assert.ok(m.planned.year >= 2026 && m.planned.year <= 2030 && m.planned.month >= 1 && m.planned.month <= 12, `${m.id} planned`);
+    // in-transit probes: planned = arrival (may fall after the era), launched = real launch before the scenario
+    assert.ok(m.planned.year >= 2026 && m.planned.year <= (m.inTransit ? 2035 : 2030) && m.planned.month >= 1 && m.planned.month <= 12, `${m.id} planned`);
+    if (m.inTransit) assert.ok(m.launched?.year >= 2010 && m.launched.year <= 2026 && m.launched.month >= 1 && m.launched.month <= 12, `${m.id} launched`);
     const d = m.delay;
     assert.ok(d.slipChance >= 0 && d.slipChance < 1 && d.meanMonths >= 0 && d.sdMonths >= 0 && d.maxMonths >= 0, `${m.id} delay`);
     for (const p of m.prerequisites) assert.ok(data.index.calendar[p], `${m.id} prereq ${p}`);
@@ -202,7 +211,7 @@ test('delays are plausible across 20 seeds', () => {
   const med = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)];
   const d = (id) => runs.map((s) => delayOf(s, id)).filter((x) => x != null);
   // nothing launches before its official date; total delays bounded
-  for (const s of runs) for (const c of s.calendar) if (c.history[0]) assert.ok(c.history[0].turn >= c.plannedTurn, c.id);
+  for (const s of runs) for (const c of s.calendar) if (c.history[0] && !c.inTransit) assert.ok(c.history[0].turn >= c.plannedTurn, c.id);
   // Chinese programs are methodical; Artemis slips more
   assert.ok(med(d('china_crewed_landing')) < 26, 'China lands close to plan');
   const a3 = d('artemis3');
@@ -341,7 +350,7 @@ test('queries return UI-ready views', () => {
   assert.equal(all.length, data.calendar.missions.length);
   assert.ok(all.filter((x) => x.isPlayer).every((x) => x.owner === 'isro'));
   const dests = cal.queries['catalog/destinations'](s, data);
-  assert.equal(dests.length, 12);
+  assert.equal(dests.length, data.destinations.destinations.length);
   assert.ok(dests.find((d) => d.id === 'mars_surface').windowInfo.text.length > 5);
   assert.ok(dests.every((d) => d.totalDv > 9));
   const w = cal.queries['catalog/window'](s, data, 'leo');

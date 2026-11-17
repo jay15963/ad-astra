@@ -88,12 +88,7 @@ function nextLaunchInfo(store) {
     const w = Math.max(0, sched[0].launchTurn - st.turn);
     return { label: 'Próximo lançamento', value: w, format: (v) => (Math.round(v) === 0 ? 'hoje' : `${Math.round(v)} sem`), sub: sched[0].name || 'Missão agendada' };
   }
-  const win = attempt(() => {
-    const q = store.tryQuery('missions/nextWindow', null);
-    const w = Array.isArray(q) ? q[0] : q;
-    if (w && w.openTurn != null) return w;
-    return computeNextWindow(store);
-  }, null);
+  const win = attempt(() => reachableNextWindow(store), null);
   if (win) {
     const destName = store.data?.index?.destinations?.[win.destination || win.destinationId]?.name || win.name || 'Janela';
     const w = Math.max(0, win.openTurn - st.turn);
@@ -102,13 +97,35 @@ function nextLaunchInfo(store) {
   return { label: 'Próxima janela', value: NaN, format: () => '—', sub: 'Monte uma missão' };
 }
 
-/** Fallback: earliest destination window from data (period/phase/open weeks). */
-export function computeNextWindow(store) {
+/**
+ * Earliest window whose mission still arrives before the campaign ends (launch + transitWeeks <= endTurn, the same rule
+ * the government pitches use): a Pluto flyby that lands in 2035 is not worth promoting on the dashboard.
+ * Uses the sim's per-destination 'missions/nextWindow' and falls back to the data-based computation.
+ */
+export function reachableNextWindow(store) {
+  const st = store.state;
+  const end = Number.isFinite(st.endTurn) ? st.endTurn : Infinity;
+  let best = null;
+  for (const d of store.data?.destinations?.destinations || []) {
+    if (!d.window?.periodWeeks) continue;
+    const q = store.tryQuery?.('missions/nextWindow', null, d.id, st.turn);
+    const w = q && q.openTurn != null ? q : computeNextWindow(store, (x) => x.id === d.id);
+    if (!w || w.openTurn == null) continue;
+    const launch = Math.max(st.turn, w.openTurn);
+    if (launch >= end || launch + (Number(d.transitWeeks) || 0) > end) continue;
+    if (!best || w.openTurn < best.openTurn) best = { ...w, destination: d.id };
+  }
+  return best;
+}
+
+/** Fallback: earliest destination window from data (period/phase/open weeks), optionally only for some destinations. */
+export function computeNextWindow(store, filter = null) {
   const st = store.state;
   let best = null;
   for (const d of store.data?.destinations?.destinations || []) {
     const w = d.window;
     if (!w || !w.periodWeeks) continue;
+    if (filter && !filter(d)) continue;
     const period = w.periodWeeks, phase = w.phaseTurn || 0, open = w.openWeeks || 4;
     let k = Math.floor((st.turn - phase) / period);
     let openTurn = phase + k * period;

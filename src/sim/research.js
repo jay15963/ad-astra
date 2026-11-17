@@ -563,7 +563,8 @@ function nodeView(state, data, n) {
     : null;
   return {
     id: n.id, branch: n.branch, branchName: branch?.name || n.branch, name: n.name, description: n.description,
-    era: n.era, secret: !!n.secret, status,
+    era: n.era, secret: !!n.secret, status, icon: n.icon || null, short: n.short || null,
+    tier: n.tier ?? null, row: n.row ?? null,
     cost: nodeMoneyCost(state, data, n, 'safe'), costBold: nodeMoneyCost(state, data, n, 'bold'),
     science: n.science || 0, canAffordScience: (r.points || 0) >= (n.science || 0),
     weeks: Math.ceil((n.weeks || 10) / speedSafe), weeksBold: Math.ceil((n.weeks || 10) / speedBold),

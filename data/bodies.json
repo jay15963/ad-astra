@@ -1,6 +1,25 @@
 {
+  "_schema": {
+    "note": "Campos dos corpos (bodies[]). Os marcados (novo) foram acrescentados na expansão do sistema solar; o resto já existia.",
+    "id": "id único; usado por destinations.json \"body\"",
+    "name": "nome pt-BR",
+    "kind": "(novo) star | planet | dwarf | moon | asteroid | belt | comet",
+    "group": "(novo) inner | neo | belt | outer | trans (zona do sistema solar)",
+    "parent": "id do corpo em volta do qual orbita (null = Sol/raiz)",
+    "reference": "true = só referência (Sol)",
+    "fog": "'known' (sempre visível) | 'fog' (revela com sonda)",
+    "far": "true = longe (o mapa simplifica)",
+    "rings": "(novo) true se o corpo tem anéis (display.ring traz a cor)",
+    "belt": "(novo) só kind=belt: {inner, outer} raio esquemático em unidades de mundo, {innerAU, outerAU} reais",
+    "orbit": "esquema do mapa: {radius (unidades de mundo), periodWeeks (null = fixo), angle0 (graus no turno 0), syncWindow?, leadDeg?, note?} + (novo) aAU (semi-eixo maior real em UA; para luas, km em aKm), periodDays (período real), eccentricity",
+    "display": "{radius (unidades de mundo), minPx, maxPx, color, glow?, land?, atmosphere?, dark?, bands?, ring (cor ou null)}",
+    "physical": "(novo) {radiusKm, massEarth?, gravityG, dayHours?} dados reais aproximados",
+    "ficha": "{tipo, gravidade, atmosfera, temperatura (novo), recursos [], perigos [], historia, descoberta?}",
+    "milestones": "ids de marcos \"Os Primeiros\" ligados ao corpo (revelam a névoa)",
+    "destinations": "âncoras de destino no mapa: {id, anchor: ring|surface|lagrange, r?, angle?, tilt?, from?, f?, label}"
+  },
   "version": 1,
-  "notes": "Layout esquemático (não está em escala). Unidades de mundo arbitrárias; Sol na origem. orbit.angle0 em graus (anti-horário, 0 = direita) no turno 0. display.radius em unidades de mundo; display.minPx/maxPx limitam o tamanho na tela.",
+  "notes": "Layout esquemático (não está em escala). Unidades de mundo arbitrárias; Sol na origem. orbit.angle0 em graus (anti-horário, 0 = direita) no turno 0. display.radius em unidades de mundo; display.minPx/maxPx limitam o tamanho na tela. Distâncias reais em orbit.aAU / physical. Raios esquemáticos: Mercúrio 150, Vênus 225, Terra 300, Marte 470, cinturão 540–660, Júpiter 880, Saturno 1250, Urano 1560, Netuno 1820, Plutão 2020, Kuiper 1900–2250, heliopausa 2550 (markers).",
   "levels": [
     {
       "id": "earth_moon",
@@ -18,14 +37,14 @@
       "name": "Sistema interno",
       "short": "Interno",
       "focus": "sun",
-      "span": 1060
+      "span": 1360
     },
     {
       "id": "solar",
       "name": "Sistema solar",
       "short": "Solar",
       "focus": "sun",
-      "span": 2760
+      "span": 4800
     }
   ],
   "stations": {
@@ -52,7 +71,30 @@
     "saturn_transfer": "Rumo a Saturno",
     "titan": "Titã",
     "escape": "Escape da Terra",
-    "heliocentric": "Órbita solar"
+    "heliocentric": "Órbita solar",
+    "tvi": "Injeção para Vênus",
+    "uranus_transfer": "Rumo a Urano",
+    "venus_flyby": "Sobrevoo de Vênus",
+    "venus_orbit": "Órbita de Vênus",
+    "venus_atmosphere": "Atmosfera de Vênus",
+    "mercury_flyby": "Sobrevoo de Mercúrio",
+    "mercury_orbit": "Órbita de Mercúrio",
+    "neo_asteroid": "Asteroide próximo da Terra",
+    "neo_sample_return": "Amostras de asteroide",
+    "apophis": "Apophis",
+    "didymos": "Didymos e Dimorphos",
+    "phobos": "Fobos",
+    "ceres": "Ceres",
+    "psyche": "Psyche",
+    "jupiter_trojans": "Troianos de Júpiter",
+    "europa_flyby": "Europa (sobrevoos)",
+    "ganymede_orbit": "Órbita de Ganimedes",
+    "saturn_orbit": "Órbita de Saturno",
+    "enceladus_flyby": "Gêiseres de Encélado",
+    "uranus_orbit": "Órbita de Urano",
+    "neptune_flyby": "Sobrevoo de Netuno",
+    "pluto_flyby": "Sobrevoo de Plutão",
+    "kuiper": "Cinturão de Kuiper"
   },
   "milestoneLabels": {
     "crewed_lunar_flyby": "Primeiro sobrevoo lunar tripulado da era",
@@ -69,7 +111,28 @@
     "jupiter_arrival": "Chegada a Júpiter",
     "commercial_station": "Estação comercial",
     "national_station": "Estação nacional",
-    "crewed_orbit_national": "Voo orbital tripulado próprio"
+    "crewed_orbit_national": "Voo orbital tripulado próprio",
+    "venus_flyby": "Sobrevoo de Vênus",
+    "venus_orbit": "Órbita de Vênus",
+    "venus_entry_probe": "Sonda nas nuvens de Vênus",
+    "mercury_flyby": "Sobrevoo de Mercúrio",
+    "mercury_orbit": "Órbita de Mercúrio",
+    "asteroid_rendezvous": "Encontro com asteroide",
+    "asteroid_sample_return": "Amostras de asteroide trazidas",
+    "apophis_rendezvous": "Encontro com Apophis",
+    "planetary_defense_survey": "Inspeção do teste de defesa planetária",
+    "phobos_landing": "Pouso em Fobos",
+    "ceres_orbit": "Órbita de Ceres",
+    "psyche_arrival": "Chegada ao asteroide metálico",
+    "trojan_flyby": "Sobrevoo de troiano",
+    "europa_arrival": "Missão dedicada a Europa",
+    "ganymede_orbit": "Órbita de Ganimedes",
+    "saturn_orbit": "Órbita de Saturno",
+    "enceladus_plume": "Voo pelos gêiseres de Encélado",
+    "uranus_orbit": "Órbita de Urano",
+    "neptune_flyby": "Sobrevoo de Netuno",
+    "pluto_flyby": "Sobrevoo de Plutão",
+    "kuiper_flyby": "Sobrevoo no Cinturão de Kuiper"
   },
   "bodies": [
     {
@@ -98,10 +161,167 @@
           "Tempestades solares",
           "Ejeções de massa coronal que atingem tripulações fora da magnetosfera"
         ],
-        "historia": "Referência do mapa. Toda janela de lançamento nasce do alinhamento dos planetas em volta dele. Os meteorologistas espaciais vigiam cada erupção antes de um voo tripulado."
+        "historia": "Referência do mapa. Toda janela de lançamento nasce do alinhamento dos planetas em volta dele. Os meteorologistas espaciais vigiam cada erupção antes de um voo tripulado.",
+        "temperatura": "5.500 °C na superfície; 15 milhões de °C no núcleo"
       },
       "milestones": [],
-      "destinations": []
+      "destinations": [],
+      "kind": "star",
+      "group": "inner",
+      "physical": {
+        "radiusKm": 696000,
+        "massEarth": 333000,
+        "gravityG": 28
+      }
+    },
+    {
+      "id": "mercury",
+      "name": "Mercúrio",
+      "kind": "planet",
+      "group": "inner",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 150,
+        "periodWeeks": 12.6,
+        "angle0": 40,
+        "aAU": 0.387,
+        "periodDays": 88,
+        "eccentricity": 0.206
+      },
+      "display": {
+        "radius": 3.2,
+        "minPx": 6,
+        "maxPx": 40,
+        "color": "#a8a29e",
+        "dark": "#6b6560",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 2440,
+        "massEarth": 0.055,
+        "gravityG": 0.38,
+        "dayHours": 4223
+      },
+      "ficha": {
+        "tipo": "Planeta rochoso, o mais próximo do Sol",
+        "gravidade": "0,38 g (3,7 m/s²)",
+        "atmosfera": "Quase nenhuma (exosfera de sódio e potássio)",
+        "temperatura": "430 °C de dia, -180 °C à noite",
+        "recursos": [
+          "Gelo de água em crateras polares sombreadas",
+          "Núcleo de ferro gigante: pistas da formação dos planetas"
+        ],
+        "perigos": [
+          "Calor e radiação solar intensos",
+          "Frear exige vários sobrevoos de Vênus e Mercúrio",
+          "Painéis e eletrônica no limite térmico"
+        ],
+        "historia": "A Mariner 10 passou três vezes em 1974–75 e a MESSENGER orbitou de 2011 a 2015. A europeia-japonesa BepiColombo chega depois de oito anos: inserção em órbita marcada para 21 de novembro de 2026.",
+        "descoberta": "O Sol escaldante revela crateras e escarpas de centenas de quilômetros: Mercúrio encolheu ao esfriar."
+      },
+      "milestones": [
+        "mercury_flyby",
+        "mercury_orbit"
+      ],
+      "destinations": [
+        {
+          "id": "mercury_flyby",
+          "anchor": "ring",
+          "r": 5.6,
+          "angle": 30,
+          "label": "Sobrevoo"
+        },
+        {
+          "id": "mercury_orbit",
+          "anchor": "ring",
+          "r": 4.6,
+          "angle": 210,
+          "label": "Órbita de Mercúrio"
+        }
+      ]
+    },
+    {
+      "id": "venus",
+      "name": "Vênus",
+      "kind": "planet",
+      "group": "inner",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 225,
+        "periodWeeks": 32.1,
+        "angle0": 150,
+        "syncWindow": [
+          "venus_orbit",
+          "venus_flyby",
+          "venus_atmosphere"
+        ],
+        "leadDeg": -75,
+        "aAU": 0.723,
+        "periodDays": 224.7,
+        "eccentricity": 0.007
+      },
+      "display": {
+        "radius": 7.6,
+        "minPx": 7,
+        "maxPx": 60,
+        "color": "#e9d8a6",
+        "atmosphere": "#f4e3b2",
+        "dark": "#b39b62",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 6052,
+        "massEarth": 0.815,
+        "gravityG": 0.9,
+        "dayHours": 2802
+      },
+      "ficha": {
+        "tipo": "Planeta rochoso, gêmeo infernal da Terra",
+        "gravidade": "0,9 g (8,9 m/s²)",
+        "atmosfera": "CO₂ a 92 atmosferas, nuvens de ácido sulfúrico",
+        "temperatura": "465 °C na superfície, dia e noite",
+        "recursos": [
+          "A 50 km de altura, pressão e temperatura parecidas com as da Terra",
+          "Ciência: um efeito estufa descontrolado",
+          "Ajuda gravitacional para Mercúrio e para o sistema externo"
+        ],
+        "perigos": [
+          "Pressão que esmaga sondas em poucas horas",
+          "Ácido sulfúrico nas nuvens",
+          "Janela só a cada 19 meses"
+        ],
+        "historia": "As Venera soviéticas pousaram e mandaram fotos nos anos 1970; a japonesa Akatsuki orbitou até 2024. Agora vem a \"década de Vênus\": Shukrayaan (Índia, 2028), DAVINCI e VERITAS (NASA, com verba apertada), EnVision (ESA, 2031). A Rocket Lab ainda tenta mandar uma pequena sonda privada para procurar sinais de vida nas nuvens.",
+        "descoberta": "Abaixo das nuvens, planícies de basalto sob um céu alaranjado. Vulcões que talvez ainda estejam ativos."
+      },
+      "milestones": [
+        "venus_flyby",
+        "venus_orbit",
+        "venus_entry_probe"
+      ],
+      "destinations": [
+        {
+          "id": "venus_flyby",
+          "anchor": "ring",
+          "r": 12,
+          "angle": 40,
+          "label": "Sobrevoo"
+        },
+        {
+          "id": "venus_orbit",
+          "anchor": "ring",
+          "r": 10,
+          "angle": 210,
+          "label": "Órbita de Vênus"
+        },
+        {
+          "id": "venus_atmosphere",
+          "anchor": "surface",
+          "angle": 100,
+          "label": "Nuvens"
+        }
+      ]
     },
     {
       "id": "earth",
@@ -111,7 +331,10 @@
       "orbit": {
         "radius": 300,
         "periodWeeks": 52,
-        "angle0": 205
+        "angle0": 205,
+        "aAU": 1,
+        "periodDays": 365.25,
+        "eccentricity": 0.017
       },
       "display": {
         "radius": 8,
@@ -136,7 +359,8 @@
           "Clima nas bases",
           "Política"
         ],
-        "historia": "Ponto de partida de tudo. A órbita baixa está lotada de constelações comerciais, e a ISS vive seus últimos anos antes da troca por estações privadas."
+        "historia": "Ponto de partida de tudo. A órbita baixa está lotada de constelações comerciais, e a ISS vive seus últimos anos antes da troca por estações privadas.",
+        "temperatura": "15 °C em média"
       },
       "milestones": [
         "commercial_station",
@@ -173,7 +397,15 @@
           "angle": 200,
           "label": "Transferência geo"
         }
-      ]
+      ],
+      "kind": "planet",
+      "group": "inner",
+      "physical": {
+        "radiusKm": 6371,
+        "massEarth": 1,
+        "gravityG": 1,
+        "dayHours": 24
+      }
     },
     {
       "id": "moon",
@@ -184,7 +416,9 @@
         "radius": 37,
         "periodWeeks": null,
         "angle0": 64,
-        "note": "fixa no esquema para facilitar o toque"
+        "note": "fixa no esquema para facilitar o toque",
+        "aKm": 384400,
+        "periodDays": 27.3
       },
       "display": {
         "radius": 3.4,
@@ -211,7 +445,8 @@
           "Terreno polar com sombras profundas"
         ],
         "historia": "Doze pessoas caminharam aqui entre 1969 e 1972. Em 2026 a Artemis II voltou a levar gente até lá, e Estados Unidos e China correm pelo polo sul, onde está o gelo.",
-        "descoberta": "As primeiras imagens chegam com sombras longas no polo sul. Há gelo onde o Sol nunca bate. O mapa da Lua deixa de ser um disco cinza e vira terreno."
+        "descoberta": "As primeiras imagens chegam com sombras longas no polo sul. Há gelo onde o Sol nunca bate. O mapa da Lua deixa de ser um disco cinza e vira terreno.",
+        "temperatura": "-173 °C à noite, 127 °C de dia; -240 °C nas crateras polares"
       },
       "milestones": [
         "crewed_lunar_flyby",
@@ -250,6 +485,227 @@
           "angle": 270,
           "label": "Polo sul lunar"
         }
+      ],
+      "kind": "moon",
+      "group": "inner",
+      "physical": {
+        "radiusKm": 1737,
+        "massEarth": 0.0123,
+        "gravityG": 0.17
+      }
+    },
+    {
+      "id": "apophis",
+      "name": "Apophis",
+      "kind": "asteroid",
+      "group": "neo",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 280,
+        "periodWeeks": 46.2,
+        "angle0": 250,
+        "aAU": 0.922,
+        "periodDays": 324,
+        "eccentricity": 0.19
+      },
+      "display": {
+        "radius": 0.8,
+        "minPx": 3,
+        "maxPx": 12,
+        "color": "#b9a48a",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 0.17,
+        "gravityG": 0.000005
+      },
+      "ficha": {
+        "tipo": "Asteroide próximo da Terra (~340 m)",
+        "gravidade": "Quase nula",
+        "atmosfera": "Nenhuma",
+        "temperatura": "Cerca de 0 °C ao Sol, -150 °C na sombra",
+        "recursos": [
+          "Laboratório de defesa planetária",
+          "Teste natural: como a gravidade da Terra deforma um asteroide"
+        ],
+        "perigos": [
+          "Prazo fixo: a passagem de 13/abr/2029 não espera ninguém",
+          "Rotação lenta e caótica"
+        ],
+        "historia": "Em 2004 chegou a ter 2,7% de chance de bater na Terra em 2029. Risco descartado, virou alvo: passa a 32 mil km, abaixo dos satélites geoestacionários e visível a olho nu. A OSIRIS-APEX (NASA) chega logo depois; a Ramses (ESA e JAXA) parte em abril de 2028 para chegar antes."
+      },
+      "milestones": [
+        "apophis_rendezvous"
+      ],
+      "destinations": [
+        {
+          "id": "apophis",
+          "anchor": "ring",
+          "r": 2.2,
+          "angle": 0,
+          "label": "Apophis"
+        }
+      ]
+    },
+    {
+      "id": "kamooalewa",
+      "name": "Kamoʻoalewa",
+      "kind": "asteroid",
+      "group": "neo",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 312,
+        "periodWeeks": 52,
+        "angle0": 213,
+        "aAU": 1,
+        "periodDays": 366,
+        "eccentricity": 0.1,
+        "note": "quase-satélite: acompanha a Terra"
+      },
+      "display": {
+        "radius": 0.7,
+        "minPx": 3,
+        "maxPx": 10,
+        "color": "#b07a5a",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 0.03,
+        "gravityG": 0.000001
+      },
+      "ficha": {
+        "tipo": "Quase-satélite da Terra (40 a 100 m)",
+        "gravidade": "Quase nula",
+        "atmosfera": "Nenhuma",
+        "temperatura": "Cerca de 0 °C",
+        "recursos": [
+          "Pode ser um pedaço da Lua arrancado por um impacto"
+        ],
+        "perigos": [
+          "Gira a cada 28 minutos",
+          "Minúsculo: pousar é quase atracar"
+        ],
+        "historia": "Acompanha a Terra em volta do Sol há séculos. A chinesa Tianwen-2, lançada em maio de 2025, chegou em meados de 2026, coleta amostras até abril de 2027 e solta a cápsula na Terra em novembro de 2027. Depois segue para o cometa 311P."
+      },
+      "milestones": [
+        "asteroid_sample_return"
+      ],
+      "destinations": [
+        {
+          "id": "neo_sample_return",
+          "anchor": "surface",
+          "angle": 90,
+          "label": "Amostras"
+        }
+      ]
+    },
+    {
+      "id": "bennu",
+      "name": "Bennu",
+      "kind": "asteroid",
+      "group": "neo",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 335,
+        "periodWeeks": 62.5,
+        "angle0": 120,
+        "aAU": 1.126,
+        "periodDays": 437,
+        "eccentricity": 0.2
+      },
+      "display": {
+        "radius": 0.8,
+        "minPx": 3,
+        "maxPx": 12,
+        "color": "#6f6a64",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 0.245,
+        "gravityG": 0.000008
+      },
+      "ficha": {
+        "tipo": "Asteroide próximo da Terra, rico em carbono",
+        "gravidade": "Quase nula",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-20 °C a 116 °C",
+        "recursos": [
+          "Carbono, água presa em minerais e aminoácidos",
+          "121 g de amostras já trazidas pela OSIRIS-REx (2023)"
+        ],
+        "perigos": [
+          "Superfície solta como uma piscina de bolinhas",
+          "Pequena chance de impacto no século 22"
+        ],
+        "historia": "A OSIRIS-REx coletou amostras em 2020 e as entregou em Utah em 2023: há aminoácidos e sais formados em água. Representa no mapa os asteroides próximos da Terra."
+      },
+      "milestones": [
+        "asteroid_rendezvous"
+      ],
+      "destinations": [
+        {
+          "id": "neo_asteroid",
+          "anchor": "ring",
+          "r": 2.2,
+          "angle": 0,
+          "label": "Asteroide próximo"
+        }
+      ]
+    },
+    {
+      "id": "didymos",
+      "name": "Didymos",
+      "kind": "asteroid",
+      "group": "neo",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 420,
+        "periodWeeks": 110,
+        "angle0": 330,
+        "aAU": 1.644,
+        "periodDays": 770,
+        "eccentricity": 0.38
+      },
+      "display": {
+        "radius": 0.9,
+        "minPx": 3,
+        "maxPx": 12,
+        "color": "#a39382",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 0.39,
+        "gravityG": 0.00002
+      },
+      "ficha": {
+        "tipo": "Asteroide duplo (Didymos e a lua Dimorphos)",
+        "gravidade": "Quase nula",
+        "atmosfera": "Nenhuma",
+        "temperatura": "Cerca de -60 °C",
+        "recursos": [
+          "O primeiro teste de desvio de asteroide da história (DART, 2022)"
+        ],
+        "perigos": [
+          "Poeira e rochas soltas do impacto",
+          "Dois corpos girando: navegação delicada"
+        ],
+        "historia": "Em 2022 a DART bateu em Dimorphos e encurtou sua órbita em 33 minutos. A europeia Hera chega em novembro de 2026 para medir a cratera e a massa, fechando o primeiro teste de defesa planetária."
+      },
+      "milestones": [
+        "planetary_defense_survey"
+      ],
+      "destinations": [
+        {
+          "id": "didymos",
+          "anchor": "ring",
+          "r": 2.2,
+          "angle": 0,
+          "label": "Didymos"
+        }
       ]
     },
     {
@@ -265,7 +721,10 @@
           "mars_orbit",
           "mars_surface"
         ],
-        "leadDeg": 44
+        "leadDeg": 44,
+        "aAU": 1.524,
+        "periodDays": 687,
+        "eccentricity": 0.093
       },
       "display": {
         "radius": 5,
@@ -291,7 +750,8 @@
           "Comunicação com atraso de até 22 min"
         ],
         "historia": "Só Estados Unidos e China pousaram e operaram aqui. As janelas abrem a cada 26 meses; perder uma custa mais de dois anos de espera.",
-        "descoberta": "O sinal chega com 12 minutos de atraso. Uma planície vermelha, pedras, e o céu cor de caramelo. Marte deixa de ser um ponto no mapa."
+        "descoberta": "O sinal chega com 12 minutos de atraso. Uma planície vermelha, pedras, e o céu cor de caramelo. Marte deixa de ser um ponto no mapa.",
+        "temperatura": "-63 °C em média (-140 a 20 °C)"
       },
       "milestones": [
         "mars_landing_robotic",
@@ -311,6 +771,309 @@
           "angle": 330,
           "label": "Superfície de Marte"
         }
+      ],
+      "kind": "planet",
+      "group": "inner",
+      "physical": {
+        "radiusKm": 3390,
+        "massEarth": 0.107,
+        "gravityG": 0.38,
+        "dayHours": 24.6
+      }
+    },
+    {
+      "id": "phobos",
+      "name": "Fobos",
+      "kind": "moon",
+      "group": "inner",
+      "fog": "fog",
+      "parent": "mars",
+      "orbit": {
+        "radius": 7,
+        "periodWeeks": null,
+        "angle0": 30,
+        "aKm": 9376,
+        "periodDays": 0.32
+      },
+      "display": {
+        "radius": 1.2,
+        "minPx": 4,
+        "maxPx": 18,
+        "color": "#8d7b6a",
+        "dark": "#5c5046",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 11.1,
+        "gravityG": 0.0006
+      },
+      "ficha": {
+        "tipo": "Lua de Marte, talvez um asteroide capturado ou detrito de um impacto",
+        "gravidade": "0,0006 g (5,7 mm/s²)",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-4 °C a -112 °C",
+        "recursos": [
+          "Poeira de Marte espalhada por impactos: amostras de dois mundos",
+          "Posto natural para observar Marte"
+        ],
+        "perigos": [
+          "Gravidade quase nula: pousar é atracar",
+          "Órbita caindo: Fobos vai se partir em dezenas de milhões de anos"
+        ],
+        "historia": "A soviética Phobos 2 chegou perto em 1989 e se perdeu. A japonesa MMX partiu em 20 de outubro de 2026 no H3: chega a Marte em 2027, pousa em Fobos, coleta amostras e as traz em 2031. Leva o rover franco-alemão IDEFIX.",
+        "descoberta": "Sulcos paralelos cortam a superfície como arranhões. A cratera Stickney ocupa quase um lado inteiro."
+      },
+      "milestones": [
+        "phobos_landing"
+      ],
+      "destinations": [
+        {
+          "id": "phobos",
+          "anchor": "surface",
+          "angle": 60,
+          "label": "Fobos"
+        }
+      ]
+    },
+    {
+      "id": "deimos",
+      "name": "Deimos",
+      "kind": "moon",
+      "group": "inner",
+      "fog": "fog",
+      "parent": "mars",
+      "orbit": {
+        "radius": 10.5,
+        "periodWeeks": null,
+        "angle0": 230,
+        "aKm": 23463,
+        "periodDays": 1.26
+      },
+      "display": {
+        "radius": 0.9,
+        "minPx": 3,
+        "maxPx": 14,
+        "color": "#9c8b78",
+        "dark": "#6a5d50",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 6.2,
+        "gravityG": 0.0003
+      },
+      "ficha": {
+        "tipo": "Lua pequena e distante de Marte",
+        "gravidade": "0,0003 g",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-40 °C em média",
+        "recursos": [
+          "Regolito liso: alvo fácil de pouso"
+        ],
+        "perigos": [
+          "Pouco estudada"
+        ],
+        "historia": "A menor e mais distante das duas luas. A MMX fará sobrevoos de Deimos antes de se dedicar a Fobos."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "asteroid_belt",
+      "name": "Cinturão de asteroides",
+      "kind": "belt",
+      "group": "belt",
+      "fog": "known",
+      "parent": "sun",
+      "belt": {
+        "inner": 540,
+        "outer": 660,
+        "innerAU": 2.2,
+        "outerAU": 3.3
+      },
+      "orbit": {
+        "radius": 600,
+        "periodWeeks": null,
+        "angle0": 70,
+        "aAU": 2.7
+      },
+      "display": {
+        "radius": 2,
+        "minPx": 3,
+        "maxPx": 8,
+        "color": "#8a8478",
+        "ring": null
+      },
+      "physical": {
+        "massEarth": 0.0005
+      },
+      "ficha": {
+        "tipo": "Cinturão principal de asteroides",
+        "gravidade": "Desprezível (fora Ceres)",
+        "atmosfera": "Nenhuma",
+        "temperatura": "Cerca de -100 °C",
+        "recursos": [
+          "Metais, água e carbono",
+          "Restos do material que formou os planetas"
+        ],
+        "perigos": [
+          "Viagens de 3 a 6 anos",
+          "Pouca luz para painéis solares"
+        ],
+        "historia": "Milhões de rochas entre Marte e Júpiter, tão espalhadas que as sondas passam sem desviar. A Dawn orbitou Vesta e Ceres; a Psyche chega ao asteroide metálico em 2029."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "vesta",
+      "name": "Vesta",
+      "kind": "asteroid",
+      "group": "belt",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 560,
+        "periodWeeks": 190,
+        "angle0": 300,
+        "aAU": 2.36,
+        "periodDays": 1325,
+        "eccentricity": 0.09
+      },
+      "display": {
+        "radius": 1.4,
+        "minPx": 3,
+        "maxPx": 14,
+        "color": "#b5ab9c",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 263,
+        "gravityG": 0.025
+      },
+      "ficha": {
+        "tipo": "Protoplaneta rochoso",
+        "gravidade": "0,025 g",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-20 °C a -190 °C",
+        "recursos": [
+          "Basalto: a crosta de um mini-planeta",
+          "Origem dos meteoritos HED que caem na Terra"
+        ],
+        "perigos": [
+          "Cratera Rheasilvia: relevo de 20 km"
+        ],
+        "historia": "Visitado pela Dawn em 2011–2012. Cerca de 6% dos meteoritos achados na Terra vieram daqui."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "ceres",
+      "name": "Ceres",
+      "kind": "dwarf",
+      "group": "belt",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 610,
+        "periodWeeks": 241,
+        "angle0": 20,
+        "aAU": 2.77,
+        "periodDays": 1682,
+        "eccentricity": 0.08
+      },
+      "display": {
+        "radius": 1.8,
+        "minPx": 4,
+        "maxPx": 16,
+        "color": "#9e9a92",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 470,
+        "gravityG": 0.029
+      },
+      "ficha": {
+        "tipo": "Planeta anão, o maior corpo do cinturão",
+        "gravidade": "0,03 g (0,28 m/s²)",
+        "atmosfera": "Traços de vapor d'água",
+        "temperatura": "-105 °C em média",
+        "recursos": [
+          "Gelo e salmoura no subsolo",
+          "Sais de carbonato (as manchas brilhantes de Occator)"
+        ],
+        "perigos": [
+          "Longe do Sol: painéis enormes ou propulsão elétrica",
+          "Viagem de quatro anos"
+        ],
+        "historia": "A Dawn, da NASA, orbitou Ceres de 2015 a 2018 e achou sinais de um oceano de salmoura sob a crosta. A China estuda uma missão de retorno de amostras."
+      },
+      "milestones": [
+        "ceres_orbit"
+      ],
+      "destinations": [
+        {
+          "id": "ceres",
+          "anchor": "ring",
+          "r": 3,
+          "angle": 200,
+          "label": "Órbita de Ceres"
+        }
+      ]
+    },
+    {
+      "id": "psyche",
+      "name": "Psyche",
+      "kind": "asteroid",
+      "group": "belt",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {
+        "radius": 630,
+        "periodWeeks": 260,
+        "angle0": 160,
+        "aAU": 2.92,
+        "periodDays": 1826,
+        "eccentricity": 0.13
+      },
+      "display": {
+        "radius": 1.2,
+        "minPx": 3,
+        "maxPx": 14,
+        "color": "#b8b2a7",
+        "dark": "#7c766c",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 111,
+        "gravityG": 0.013
+      },
+      "ficha": {
+        "tipo": "Asteroide metálico (tipo M)",
+        "gravidade": "0,013 g (0,13 m/s²)",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-150 °C",
+        "recursos": [
+          "Ferro e níquel: talvez o núcleo exposto de um protoplaneta",
+          "Ouro e platina (em valores que só existem na ficção)"
+        ],
+        "perigos": [
+          "Ninguém sabe como é a superfície",
+          "Seis anos de viagem com propulsão elétrica"
+        ],
+        "historia": "A sonda Psyche, lançada em outubro de 2023 num Falcon Heavy, sobrevoou Marte em 15 de maio de 2026 e chega ao asteroide em agosto de 2029, empurrada por plasma de xenônio."
+      },
+      "milestones": [
+        "psyche_arrival"
+      ],
+      "destinations": [
+        {
+          "id": "psyche",
+          "anchor": "ring",
+          "r": 2.6,
+          "angle": 200,
+          "label": "Psyche"
+        }
       ]
     },
     {
@@ -322,7 +1085,10 @@
       "orbit": {
         "radius": 880,
         "periodWeeks": 617,
-        "angle0": 95
+        "angle0": 95,
+        "aAU": 5.2,
+        "periodDays": 4333,
+        "eccentricity": 0.049
       },
       "display": {
         "radius": 22,
@@ -346,8 +1112,9 @@
           "Viagem de 5 a 6 anos",
           "Pouca luz solar para painéis"
         ],
-        "historia": "Juno orbita desde 2016. Europa Clipper e JUICE estão a caminho e chegam por volta de 2030 e 2031. Fora do alcance da Corrida Lunar, mas no horizonte.",
-        "descoberta": "As bandas de nuvens se mexem em tempo real nas imagens. A radiação já castiga a eletrônica, mas a sonda segue viva."
+        "historia": "A Juno orbita desde 2016; a extensão oficial venceu em set/2025 e o pedido de orçamento zerou a verba, mas a sonda seguia operando em 2026 com futuro incerto. A Europa Clipper (NASA) chega em abr/2030, a JUICE (ESA) em jul/2031 e a chinesa Tianwen-4 deve partir por volta de 2029 rumo a Calisto.",
+        "descoberta": "As bandas de nuvens se mexem em tempo real nas imagens. A radiação já castiga a eletrônica, mas a sonda segue viva.",
+        "temperatura": "-110 °C no topo das nuvens"
       },
       "milestones": [
         "jupiter_arrival"
@@ -356,9 +1123,266 @@
         {
           "id": "jupiter",
           "anchor": "ring",
-          "r": 32,
+          "r": 26,
           "angle": 200,
           "label": "Júpiter"
+        }
+      ],
+      "kind": "planet",
+      "group": "outer",
+      "rings": true,
+      "physical": {
+        "radiusKm": 69911,
+        "massEarth": 317.8,
+        "gravityG": 2.53,
+        "dayHours": 9.9
+      }
+    },
+    {
+      "id": "io",
+      "name": "Io",
+      "kind": "moon",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "jupiter",
+      "orbit": {
+        "radius": 31,
+        "periodWeeks": null,
+        "angle0": 20,
+        "aKm": 421700,
+        "periodDays": 1.77
+      },
+      "display": {
+        "radius": 2.6,
+        "minPx": 4,
+        "maxPx": 18,
+        "color": "#e9c46a",
+        "dark": "#b08a3a",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 1822,
+        "gravityG": 0.18
+      },
+      "ficha": {
+        "tipo": "Lua de Júpiter, o mundo mais vulcânico do sistema solar",
+        "gravidade": "0,18 g",
+        "atmosfera": "SO₂ tênue",
+        "temperatura": "-130 °C (lava a 1.600 °C)",
+        "recursos": [
+          "Ciência: centenas de vulcões ativos"
+        ],
+        "perigos": [
+          "Radiação mortal no cinturão interno de Júpiter"
+        ],
+        "historia": "A Juno passou a 1.500 km de Io em 2023 e 2024 e viu lagos de lava. Nenhuma sonda dedicada está planejada."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "europa",
+      "name": "Europa",
+      "kind": "moon",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "jupiter",
+      "orbit": {
+        "radius": 38,
+        "periodWeeks": null,
+        "angle0": 110,
+        "aKm": 671000,
+        "periodDays": 3.55
+      },
+      "display": {
+        "radius": 2.4,
+        "minPx": 4,
+        "maxPx": 18,
+        "color": "#e8dccb",
+        "dark": "#a8927a",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 1561,
+        "gravityG": 0.13
+      },
+      "ficha": {
+        "tipo": "Lua gelada de Júpiter com oceano subterrâneo",
+        "gravidade": "0,13 g",
+        "atmosfera": "Oxigênio tênue",
+        "temperatura": "-160 °C",
+        "recursos": [
+          "Oceano salgado com mais água que todos os da Terra",
+          "O melhor lugar do sistema solar para procurar vida"
+        ],
+        "perigos": [
+          "Radiação intensa na superfície",
+          "Crosta de gelo de 15 a 25 km"
+        ],
+        "historia": "A Europa Clipper partiu em outubro de 2024, passa pela Terra em 3 de dezembro de 2026 e entra em órbita de Júpiter em 11 de abril de 2030, para 49 sobrevoos de Europa.",
+        "descoberta": "Linhas vermelhas cruzam o gelo como rachaduras num para-brisa. Por baixo, um oceano."
+      },
+      "milestones": [
+        "europa_arrival"
+      ],
+      "destinations": [
+        {
+          "id": "europa_flyby",
+          "anchor": "ring",
+          "r": 3.6,
+          "angle": 200,
+          "label": "Europa"
+        }
+      ]
+    },
+    {
+      "id": "ganymede",
+      "name": "Ganimedes",
+      "kind": "moon",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "jupiter",
+      "orbit": {
+        "radius": 47,
+        "periodWeeks": null,
+        "angle0": 230,
+        "aKm": 1070400,
+        "periodDays": 7.15
+      },
+      "display": {
+        "radius": 3.2,
+        "minPx": 4,
+        "maxPx": 20,
+        "color": "#a89f91",
+        "dark": "#6f665a",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 2634,
+        "gravityG": 0.15
+      },
+      "ficha": {
+        "tipo": "A maior lua do sistema solar, com campo magnético próprio",
+        "gravidade": "0,15 g",
+        "atmosfera": "Oxigênio tênue",
+        "temperatura": "-160 °C",
+        "recursos": [
+          "Oceano salgado entre camadas de gelo",
+          "Campo magnético: proteção parcial contra a radiação"
+        ],
+        "perigos": [
+          "Radiação de Júpiter (menor que em Europa)",
+          "Oito anos de viagem"
+        ],
+        "historia": "A JUICE, lançada em abril de 2023, chega a Júpiter em julho de 2031 e será a primeira sonda a orbitar uma lua de outro planeta (Ganimedes, dezembro de 2034)."
+      },
+      "milestones": [
+        "ganymede_orbit"
+      ],
+      "destinations": [
+        {
+          "id": "ganymede_orbit",
+          "anchor": "ring",
+          "r": 4.4,
+          "angle": 200,
+          "label": "Órbita de Ganimedes"
+        }
+      ]
+    },
+    {
+      "id": "callisto",
+      "name": "Calisto",
+      "kind": "moon",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "jupiter",
+      "orbit": {
+        "radius": 58,
+        "periodWeeks": null,
+        "angle0": 320,
+        "aKm": 1882700,
+        "periodDays": 16.7
+      },
+      "display": {
+        "radius": 3,
+        "minPx": 4,
+        "maxPx": 20,
+        "color": "#6e6559",
+        "dark": "#463f36",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 2410,
+        "gravityG": 0.13
+      },
+      "ficha": {
+        "tipo": "Lua de Júpiter, a mais craterada",
+        "gravidade": "0,13 g",
+        "atmosfera": "CO₂ tênue",
+        "temperatura": "-140 °C",
+        "recursos": [
+          "Fora do pior da radiação: candidata a base no futuro distante"
+        ],
+        "perigos": [
+          "Distância e frio"
+        ],
+        "historia": "A chinesa Tianwen-4 deve partir por volta de 2029 e entrar em órbita de Calisto nos anos 2030, soltando uma pequena sonda rumo a Urano."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "trojans",
+      "name": "Troianos de Júpiter",
+      "kind": "belt",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "sun",
+      "orbit": {
+        "radius": 880,
+        "periodWeeks": 617,
+        "angle0": 155,
+        "aAU": 5.2,
+        "periodDays": 4333,
+        "note": "ponto L4, 60° à frente de Júpiter"
+      },
+      "display": {
+        "radius": 2.4,
+        "minPx": 3,
+        "maxPx": 10,
+        "color": "#8f7f6e",
+        "ring": null
+      },
+      "physical": {},
+      "ficha": {
+        "tipo": "Asteroides troianos de Júpiter (pontos L4 e L5)",
+        "gravidade": "Desprezível",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-170 °C",
+        "recursos": [
+          "Fósseis da formação dos planetas"
+        ],
+        "perigos": [
+          "A 5 UA do Sol: pouca luz",
+          "Alvos escuros e pouco conhecidos"
+        ],
+        "historia": "Dois enxames que acompanham Júpiter, 60° à frente e atrás. A Lucy chegou à região em outubro de 2026 e sobrevoa Eurybates em agosto de 2027, depois Polymele, Leucus e Orus; o final é o par Pátroclo-Menécio em 2033."
+      },
+      "milestones": [
+        "trojan_flyby"
+      ],
+      "destinations": [
+        {
+          "id": "jupiter_trojans",
+          "anchor": "ring",
+          "r": 4,
+          "angle": 90,
+          "label": "Troianos"
         }
       ]
     },
@@ -371,7 +1395,10 @@
       "orbit": {
         "radius": 1250,
         "periodWeeks": 1532,
-        "angle0": 330
+        "angle0": 330,
+        "aAU": 9.54,
+        "periodDays": 10759,
+        "eccentricity": 0.057
       },
       "display": {
         "radius": 18,
@@ -394,11 +1421,92 @@
           "Partículas dos anéis",
           "Luz solar fraca"
         ],
-        "historia": "A Cassini mergulhou em Saturno em 2017. A Dragonfly, um drone para Titã, deve partir no fim da década e chegar nos anos 2030.",
-        "descoberta": "Os anéis aparecem de lado, finos como uma lâmina. Ao fundo, a névoa laranja de Titã."
+        "historia": "A Cassini orbitou de 2004 a 2017 e mergulhou no planeta. A Dragonfly, um drone nuclear para Titã, parte em jul/2028 num Falcon Heavy e chega em 2034. Ninguém orbita Saturno nesta década.",
+        "descoberta": "Os anéis aparecem de lado, finos como uma lâmina. Ao fundo, a névoa laranja de Titã.",
+        "temperatura": "-140 °C no topo das nuvens"
       },
-      "milestones": [],
-      "destinations": []
+      "milestones": [
+        "saturn_orbit"
+      ],
+      "destinations": [
+        {
+          "id": "saturn_orbit",
+          "anchor": "ring",
+          "r": 48,
+          "angle": 140,
+          "label": "Órbita de Saturno"
+        }
+      ],
+      "kind": "planet",
+      "group": "outer",
+      "rings": true,
+      "physical": {
+        "radiusKm": 58232,
+        "massEarth": 95.2,
+        "gravityG": 1.07,
+        "dayHours": 10.7
+      },
+      "ringData": {
+        "innerKm": 74500,
+        "outerKm": 140200,
+        "thicknessM": 10,
+        "note": "Gelo de água em pedaços de grão de areia a casas; menos de 10 m de espessura no anel principal."
+      }
+    },
+    {
+      "id": "enceladus",
+      "name": "Encélado",
+      "kind": "moon",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "saturn",
+      "orbit": {
+        "radius": 28,
+        "periodWeeks": null,
+        "angle0": 250,
+        "aKm": 238000,
+        "periodDays": 1.37
+      },
+      "display": {
+        "radius": 1.4,
+        "minPx": 3,
+        "maxPx": 14,
+        "color": "#f1f5f9",
+        "dark": "#b8c2cc",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 252,
+        "gravityG": 0.011
+      },
+      "ficha": {
+        "tipo": "Lua de Saturno com gêiseres de água",
+        "gravidade": "0,011 g",
+        "atmosfera": "Vapor d'água no polo sul",
+        "temperatura": "-198 °C",
+        "recursos": [
+          "Pluma de água salgada com orgânicos e fosfatos",
+          "Dá para provar o oceano sem pousar"
+        ],
+        "perigos": [
+          "Partículas da pluma a vários km/s",
+          "Sete anos de viagem ou mais"
+        ],
+        "historia": "A Cassini atravessou a pluma entre 2005 e 2015 e achou hidrogênio, sal e moléculas orgânicas. O Enceladus Orbilander é a segunda prioridade da década na NASA e a ESA estuda uma missão para os anos 2040."
+      },
+      "milestones": [
+        "enceladus_plume"
+      ],
+      "destinations": [
+        {
+          "id": "enceladus_flyby",
+          "anchor": "ring",
+          "r": 2.4,
+          "angle": 90,
+          "label": "Gêiseres"
+        }
+      ]
     },
     {
       "id": "titan",
@@ -407,9 +1515,11 @@
       "far": true,
       "parent": "saturn",
       "orbit": {
-        "radius": 34,
+        "radius": 40,
         "periodWeeks": null,
-        "angle0": 55
+        "angle0": 55,
+        "aKm": 1221870,
+        "periodDays": 15.9
       },
       "display": {
         "radius": 3,
@@ -417,7 +1527,8 @@
         "maxPx": 24,
         "color": "#f4a261",
         "dark": "#8f5e38",
-        "ring": null
+        "ring": null,
+        "atmosphere": "#e9b872"
       },
       "ficha": {
         "tipo": "Lua de Saturno com atmosfera densa",
@@ -434,7 +1545,8 @@
           "Superfície pouco mapeada"
         ],
         "historia": "A Huygens pousou em 2005 e mandou 72 minutos de dados. É o único mundo além da Terra com chuva, rios e mares na superfície.",
-        "descoberta": "Por trás da névoa, contornos escuros: mares de metano. Titã tem praias."
+        "descoberta": "Por trás da névoa, contornos escuros: mares de metano. Titã tem praias.",
+        "temperatura": "-179 °C"
       },
       "milestones": [
         "titan_arrival"
@@ -446,7 +1558,342 @@
           "angle": 90,
           "label": "Titã"
         }
+      ],
+      "kind": "moon",
+      "group": "outer",
+      "physical": {
+        "radiusKm": 2575,
+        "gravityG": 0.14
+      }
+    },
+    {
+      "id": "uranus",
+      "name": "Urano",
+      "kind": "planet",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "sun",
+      "rings": true,
+      "orbit": {
+        "radius": 1560,
+        "periodWeeks": 4383,
+        "angle0": 50,
+        "aAU": 19.2,
+        "periodDays": 30687,
+        "eccentricity": 0.046
+      },
+      "display": {
+        "radius": 12,
+        "minPx": 7,
+        "maxPx": 48,
+        "color": "#9ad1d4",
+        "dark": "#5f9ea0",
+        "ring": "#c7e6e8"
+      },
+      "physical": {
+        "radiusKm": 25362,
+        "massEarth": 14.5,
+        "gravityG": 0.9,
+        "dayHours": 17.2
+      },
+      "ficha": {
+        "tipo": "Gigante de gelo deitado de lado (98°)",
+        "gravidade": "0,9 g",
+        "atmosfera": "Hidrogênio, hélio e metano",
+        "temperatura": "-224 °C (a mais fria do sistema solar)",
+        "recursos": [
+          "Ciência: o tipo de planeta mais comum na galáxia",
+          "Luas que podem esconder oceanos (Ariel, Miranda)"
+        ],
+        "perigos": [
+          "Doze a quinze anos de viagem",
+          "Exige energia nuclear (plutônio escasso)",
+          "Sinal com 2 h 40 min de atraso"
+        ],
+        "historia": "Só a Voyager 2 passou, em 1986. O Uranus Orbiter and Probe é a prioridade número um da década para a NASA, mas não tem data: a janela de 2031–32 com ajuda de Júpiter parece improvável. A China estuda soltar uma sonda rumo a Urano a partir da Tianwen-4."
+      },
+      "milestones": [
+        "uranus_orbit"
+      ],
+      "destinations": [
+        {
+          "id": "uranus_orbit",
+          "anchor": "ring",
+          "r": 18,
+          "angle": 200,
+          "label": "Órbita de Urano"
+        }
       ]
+    },
+    {
+      "id": "neptune",
+      "name": "Netuno",
+      "kind": "planet",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "sun",
+      "rings": true,
+      "orbit": {
+        "radius": 1820,
+        "periodWeeks": 8597,
+        "angle0": 280,
+        "aAU": 30.1,
+        "periodDays": 60190,
+        "eccentricity": 0.009
+      },
+      "display": {
+        "radius": 12,
+        "minPx": 7,
+        "maxPx": 48,
+        "color": "#4361ee",
+        "dark": "#2a3a8f",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 24622,
+        "massEarth": 17.1,
+        "gravityG": 1.14,
+        "dayHours": 16.1
+      },
+      "ficha": {
+        "tipo": "Gigante de gelo",
+        "gravidade": "1,14 g",
+        "atmosfera": "Hidrogênio, hélio e metano",
+        "temperatura": "-214 °C",
+        "recursos": [
+          "Tritão: uma lua capturada do Cinturão de Kuiper"
+        ],
+        "perigos": [
+          "Ventos de 2.000 km/h",
+          "Doze anos de viagem ou mais",
+          "Sinal com 4 horas de atraso"
+        ],
+        "historia": "Só a Voyager 2 visitou, em 1989. Propostas como Trident e Neptune Odyssey nunca saíram do papel."
+      },
+      "milestones": [
+        "neptune_flyby"
+      ],
+      "destinations": [
+        {
+          "id": "neptune_flyby",
+          "anchor": "ring",
+          "r": 17,
+          "angle": 30,
+          "label": "Sobrevoo de Netuno"
+        }
+      ]
+    },
+    {
+      "id": "triton",
+      "name": "Tritão",
+      "kind": "moon",
+      "group": "outer",
+      "fog": "fog",
+      "far": true,
+      "parent": "neptune",
+      "orbit": {
+        "radius": 22,
+        "periodWeeks": null,
+        "angle0": 140,
+        "aKm": 354800,
+        "periodDays": 5.88
+      },
+      "display": {
+        "radius": 2,
+        "minPx": 3,
+        "maxPx": 14,
+        "color": "#d8c3b0",
+        "dark": "#9a8270",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 1353,
+        "gravityG": 0.08
+      },
+      "ficha": {
+        "tipo": "Lua de Netuno, capturada do Cinturão de Kuiper",
+        "gravidade": "0,08 g",
+        "atmosfera": "Nitrogênio tênue",
+        "temperatura": "-235 °C",
+        "recursos": [
+          "Gêiseres de nitrogênio",
+          "Talvez um oceano"
+        ],
+        "perigos": [
+          "Órbita ao contrário: um dia vai cair em Netuno"
+        ],
+        "historia": "A Voyager 2 viu gêiseres ativos em 1989. É o lugar mais frio já fotografado por uma sonda."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "pluto",
+      "name": "Plutão",
+      "kind": "dwarf",
+      "group": "trans",
+      "fog": "fog",
+      "far": true,
+      "parent": "sun",
+      "orbit": {
+        "radius": 2020,
+        "periodWeeks": 12945,
+        "angle0": 205,
+        "aAU": 39.5,
+        "periodDays": 90560,
+        "eccentricity": 0.25
+      },
+      "display": {
+        "radius": 2,
+        "minPx": 4,
+        "maxPx": 20,
+        "color": "#d6b89c",
+        "dark": "#8c6e55",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 1188,
+        "massEarth": 0.0022,
+        "gravityG": 0.06,
+        "dayHours": 153
+      },
+      "ficha": {
+        "tipo": "Planeta anão com lua dupla (Caronte)",
+        "gravidade": "0,06 g",
+        "atmosfera": "Nitrogênio tênue, névoa azul",
+        "temperatura": "-230 °C",
+        "recursos": [
+          "Gelo de nitrogênio e metano",
+          "Talvez um oceano sob a planície Sputnik"
+        ],
+        "perigos": [
+          "Nove a dez anos de viagem",
+          "Sobrevoo rápido: um dia de ciência depois de uma década"
+        ],
+        "historia": "A New Horizons passou em julho de 2015 e revelou o \"coração\" de gelo. Segue pelo Cinturão de Kuiper em missão estendida até 2028–29, com verba apertada.",
+        "descoberta": "Um coração branco de gelo de nitrogênio e montanhas de gelo de água. Plutão está vivo."
+      },
+      "milestones": [
+        "pluto_flyby"
+      ],
+      "destinations": [
+        {
+          "id": "pluto_flyby",
+          "anchor": "ring",
+          "r": 4,
+          "angle": 30,
+          "label": "Sobrevoo de Plutão"
+        }
+      ]
+    },
+    {
+      "id": "charon",
+      "name": "Caronte",
+      "kind": "moon",
+      "group": "trans",
+      "fog": "fog",
+      "far": true,
+      "parent": "pluto",
+      "orbit": {
+        "radius": 4.5,
+        "periodWeeks": null,
+        "angle0": 200,
+        "aKm": 19591,
+        "periodDays": 6.39
+      },
+      "display": {
+        "radius": 1.1,
+        "minPx": 3,
+        "maxPx": 12,
+        "color": "#a59e96",
+        "dark": "#6b645c",
+        "ring": null
+      },
+      "physical": {
+        "radiusKm": 606,
+        "gravityG": 0.03
+      },
+      "ficha": {
+        "tipo": "Lua de Plutão, com metade do tamanho dele",
+        "gravidade": "0,03 g",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-220 °C",
+        "recursos": [
+          "Mancha vermelha polar (Mordor Macula)"
+        ],
+        "perigos": [
+          "Muito longe"
+        ],
+        "historia": "Plutão e Caronte giram em torno de um ponto entre os dois: um sistema binário."
+      },
+      "milestones": [],
+      "destinations": []
+    },
+    {
+      "id": "kuiper_belt",
+      "name": "Cinturão de Kuiper",
+      "kind": "belt",
+      "group": "trans",
+      "fog": "fog",
+      "far": true,
+      "parent": "sun",
+      "belt": {
+        "inner": 1900,
+        "outer": 2250,
+        "innerAU": 30,
+        "outerAU": 50
+      },
+      "orbit": {
+        "radius": 2150,
+        "periodWeeks": null,
+        "angle0": 120,
+        "aAU": 44
+      },
+      "display": {
+        "radius": 3,
+        "minPx": 3,
+        "maxPx": 10,
+        "color": "#7d8597",
+        "ring": null
+      },
+      "physical": {},
+      "ficha": {
+        "tipo": "Cinturão de Kuiper",
+        "gravidade": "Desprezível",
+        "atmosfera": "Nenhuma",
+        "temperatura": "-230 °C",
+        "recursos": [
+          "Corpos intocados desde a formação do sistema solar"
+        ],
+        "perigos": [
+          "A 50 UA, sinal com 7 horas de atraso",
+          "Alvos minúsculos e escuros"
+        ],
+        "historia": "A New Horizons sobrevoou Arrokoth em 2019, o objeto mais distante já visitado. Mais além, só as Voyager, já no espaço interestelar."
+      },
+      "milestones": [
+        "kuiper_flyby"
+      ],
+      "destinations": [
+        {
+          "id": "kuiper",
+          "anchor": "ring",
+          "r": 4,
+          "angle": 90,
+          "label": "Kuiper"
+        }
+      ]
+    }
+  ],
+  "markers": [
+    {
+      "id": "heliopause",
+      "name": "Heliopausa",
+      "radius": 2550,
+      "aAU": 120,
+      "note": "Onde o vento solar para. As Voyager 1 (2012) e 2 (2018) já passaram dela."
     }
   ]
 }

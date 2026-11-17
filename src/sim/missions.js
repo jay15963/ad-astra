@@ -262,11 +262,15 @@ function reliabilityBand(rel) {
   return 'baixa';
 }
 
-/** Next launch window for a destination: { openTurn, closeTurn } (closeTurn may be Infinity). */
-export function windowFor(state, data, destId, fromTurn = state.turn) {
+/**
+ * Next launch window for a destination: { openTurn, closeTurn } (closeTurn may be Infinity).
+ * `calendarId`: a calendar program may fly its own trajectory window (calendar item `window`).
+ */
+export function windowFor(state, data, destId, fromTurn = state.turn, calendarId = null) {
   const f = fn(calendar, 'nextWindow');
   if (f) {
-    const w = f(state, data, destId, fromTurn);
+    const item = calendarId ? calDef(data, calendarId) : null;
+    const w = f(state, data, destId, fromTurn, item && item.window !== undefined ? item : undefined);
     if (w && Number.isFinite(w.openTurn)) return { openTurn: w.openTurn, closeTurn: w.closeTurn ?? Infinity };
   }
   const win = destDef(data, destId)?.window;
@@ -487,7 +491,7 @@ function earliestLaunch(state, data, d) {
   // a calendar program's hardware is ready on its own schedule (readyTurn), not the day the plan is approved
   const from = Math.max(state.turn + leadWeeks(d), Number.isFinite(d.readyTurn) ? d.readyTurn : -Infinity);
   if (!d.destination) return from;
-  const w = windowFor(state, data, d.destination, from);
+  const w = windowFor(state, data, d.destination, from, d.calendarId);
   return Math.max(from, w.openTurn);
 }
 
@@ -578,7 +582,7 @@ function validate(state, data, d, opts = {}) {
   const cost = computeCost(state, data, d);
   const earliest = earliestLaunch(state, data, d);
   const lt = Number.isFinite(opts.launchTurn) ? opts.launchTurn : earliest;
-  const window = d.destination ? windowFor(state, data, d.destination, lt) : null;
+  const window = d.destination ? windowFor(state, data, d.destination, lt, d.calendarId) : null;
   if (opts.schedule) {
     // hardware must still be in service on launch day (a rocket retiring before the date cannot be booked)
     const svc = fn(calendar, 'inServiceAt');
@@ -598,6 +602,11 @@ function validate(state, data, d, opts = {}) {
     if (!opts.paid && !canPay(state, cost.total)) {
       errors.push(`Caixa insuficiente: custo ${fmtMoney(cost.total)}, caixa ${fmtMoney(state.actors?.[state.playerId]?.cash ?? 0)}.`);
     }
+  }
+  // prestige and science are paid on arrival: a probe that lands after the era never reaches the Era Table
+  const arriveLt = (window && Number.isFinite(window.openTurn) ? Math.max(lt, window.openTurn) : lt) + (dest?.transitWeeks || 0);
+  if (dest?.transitWeeks > 0 && arriveLt > state.endTurn && lt < state.endTurn) {
+    warnings.push(`Chega só em ${fmtT(state, arriveLt)}, depois do fim de ${turnToDate(state.endTurn, state.startYear).year}: não pontua na Tabela da Era.`);
   }
   if (d.deadlineTurn != null) {
     if (lt > d.deadlineTurn) warnings.push(`Depois do prazo do contrato (${fmtT(state, d.deadlineTurn)}): multa e receita menor.`);
@@ -712,7 +721,7 @@ const NAME_DEST = {
 };
 function nameFor(state, data, d) {
   const dest = destDef(data, d.destination);
-  const tag = NAME_DEST[d.destination] || dest?.name || '';
+  const tag = NAME_DEST[d.destination] || dest?.short || dest?.name || '';
   const prefix = `${NAME_TYPE[d.type] || TYPE_LABELS[d.type] || 'Missão'}${tag ? ` ${tag}` : ''}`;
   const n = (state.missions || []).filter((m) => typeof m.name === 'string' && m.name.startsWith(`${prefix}-`)).length + 1;
   return `${prefix}-${n}`;
@@ -984,6 +993,36 @@ function pushCalendarBriefing(state, data, inst, def) {
   });
 }
 
+/**
+ * Probes launched before the scenario (calendar items with inTransit) that belong to the player start as
+ * player missions already in transit: no briefing, no bill, the arrival is the player's scene.
+ */
+function adoptTransitPrograms(state, data) {
+  for (const inst of state.calendar || []) {
+    if (inst.status !== 'player' || !inst.inTransit) continue;
+    const def = calDef(data, inst.id);
+    if (!def || (state.missions || []).some((m) => m.calendarId === inst.id)) continue;
+    const launchTurn = inst.launchTurn ?? state.turn;
+    const arriveTurn = Math.max(state.turn, inst.arrivalTurn ?? inst.plannedTurn ?? state.turn);
+    const m = {
+      id: nextId(state, 'mis'), name: def.name, source: 'calendar', calendarId: inst.id, contractId: null,
+      type: calendarTypeOf(def), destination: def.destination, vehicleId: def.vehicleId || null, spacecraftId: def.spacecraftId || null,
+      vehicleName: def.vehicleName || def.inTransit?.vehicleName || null, // retired launcher shown by name (Ariane 5)
+      secondarySpacecraftId: null, crewed: false, crew: autoCrew(state, data, 0),
+      config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: null },
+      status: 'transit', createdTurn: state.turn, launchTurn, windowTurn: null, targetTurn: null, readyTurn: null, deadlineTurn: null,
+      milestone: def.milestone || null, clientPayload: false, grantM: 0, grantShare: 0,
+      cost: 0, paid: true, paidM: 0, estimate: null, riskMod: 0, attempts: 1, inheritedTransit: true,
+      transit: { departTurn: launchTurn, arriveTurn, events: [] }, ops: null,
+      phases: [{ phase: 'ascent', outcome: 'total', failureType: null, turn: launchTurn }],
+      result: { outcome: 'total', failureType: null, causes: [], phase: 'ascent', launchedTurn: launchTurn, resolvedTurn: launchTurn, prestige: 0, science: 0, headlines: [], firsts: [], crewLost: [] },
+    };
+    try { m.estimate = estimateOf(riskFor(state, data, m, state.turn)); } catch { m.estimate = { p: 0.85, low: 0.75, high: 0.92 }; }
+    state.missions.push(m);
+    stat(state, 'inheritedTransit');
+  }
+}
+
 function calendarBriefings(state, data) {
   for (const inst of state.calendar || []) {
     if (inst.status !== 'player') continue;
@@ -1107,6 +1146,8 @@ function windowOpportunity(state, data) {
     const w = windowFor(state, data, dest.id, state.turn + 10);
     const weeks = w.openTurn - state.turn;
     if (weeks < 14 || weeks > 40 || w.openTurn > state.endTurn) continue;
+    // a probe that would arrive after the end of the era is not an opportunity the government pitches
+    if (w.openTurn + (dest.transitWeeks || 0) > state.endTurn) continue;
     const type = dest.id.includes('surface') ? 'lander' : 'probe';
     const d = pushOpportunity(state, data, {
       sub: 'window', type, destination: dest.id, grantShare: 0.1, urgency: 2,
@@ -1124,6 +1165,9 @@ function rivalOpportunity(state, data) {
     if (s.type !== 'mission/resolved' || !s.actorId || s.actorId === pid || s.outcome !== 'total') continue;
     const dest = destDef(data, s.destination);
     if (!dest || dest.body === 'earth') continue;
+    // same rule as windowOpportunity: no pitch for a mission that could only arrive after the end of the era
+    const w = windowFor(state, data, dest.id, state.turn + (LEAD_WEEKS.probe ?? 8));
+    if (w.openTurn >= state.endTurn || w.openTurn + (dest.transitWeeks || 0) > state.endTurn) continue;
     const tryTypes = s.crewed ? ['crewed', 'lander', 'probe'] : [s.missionType, 'lander', 'probe'];
     for (const type of [...new Set(tryTypes)]) {
       if (!TYPES.includes(type) || !destOkForType(dest, type)) continue;
@@ -1516,9 +1560,9 @@ function launchDay(state, data, m) {
     m.crew.astronauts = m.crew.astronauts.filter(okP);
   }
   // missed planetary window → slip to the next one
-  const w = windowFor(state, data, m.destination, state.turn);
+  const w = windowFor(state, data, m.destination, state.turn, m.calendarId);
   if (Number.isFinite(w.closeTurn) && !inWindow(w, state.turn)) {
-    const next = windowFor(state, data, m.destination, state.turn).openTurn;
+    const next = windowFor(state, data, m.destination, state.turn, m.calendarId).openTurn;
     m.status = 'scheduled';
     m.launchTurn = next;
     m.windowTurn = next;
@@ -1664,7 +1708,7 @@ function mainRival(state) {
 function milestoneLabel(data, id) {
   const base = String(id).split(":")[0];
   const goal = (data.scenario?.victory?.goals || []).find((g) => g.id === base);
-  return MILESTONE_LABELS[base] || goal?.label?.toLowerCase() || base.replace(/_/g, " ");
+  return MILESTONE_LABELS[base] || data.calendar?.milestoneLabels?.[base] || goal?.label?.toLowerCase() || base.replace(/_/g, " ");
 }
 
 const fill = (t, vars) => t.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
@@ -1759,9 +1803,11 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
     // (same scale as the AI's calendar results: core/outcome.js missionPrestige)
     const mp = missionPrestige(dest, { crewed: !!m.crewed, level, p: p0, repeats, strategyMult: stratMult, contract: m.source === 'contract' });
     const { base, novelty, bold } = mp;
+    // a probe inherited in flight (paid before 2026) pays only a share of the prestige: calendar.js, same rule
+    const share = m.inheritedTransit ? (fn(calendar, 'inheritedShare')?.(data) ?? 0.35) : 1;
     const routine = (dest?.body ?? 'earth') === 'earth' && !m.crewed;
     if (success) {
-      prestige = mp.prestige;
+      prestige = Math.round(mp.prestige * share);
       changeActor(state, pid, 'prestige', prestige);
       // "Os Primeiros": destination firsts, calendar milestone, national crewed orbit
       // (crewed_orbit_national is per actor: handled below with its ":<actorId>" key)
@@ -1771,9 +1817,10 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
       for (const id of [...new Set(ms)]) {
         if (state.firsts?.[id]?.actorId === pid || (state.stats?.[`missions.reached.${id}`] || 0) > 0) continue;
         stat(state, `reached.${id}`);
-        const firstPts = 30 + Math.round(base);
-        const wasFirst = claimFirst(state, id, pid, firstPts, 5);
-        prestige += wasFirst ? firstValue(state, id, firstPts) : 5;
+        const firstPts = Math.round((30 + Math.round(base)) * share);
+        const laterPts = Math.round(5 * share);
+        const wasFirst = claimFirst(state, id, pid, firstPts, laterPts);
+        prestige += wasFirst ? firstValue(state, id, firstPts) : laterPts;
         if (wasFirst) { firsts.push(id); emitSignal(state, 'first', { milestoneId: id, actorId: pid }); }
       }
       const natKey = `crewed_orbit_national:${pid}`;
@@ -1784,7 +1831,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
         emitSignal(state, 'first', { milestoneId: natKey, actorId: pid });
       }
       // science: part now, the rest at the end of operations
-      const sci = (SCIENCE_BASE[m.crewed ? 'crewed' : m.type] ?? 5) * (SCIENCE_BODY[dest?.body] ?? 1) * (1 + techBonus(state, 'sciencePerMission')) * (level === 'total' ? 1 : 0.5);
+      const sci = (SCIENCE_BASE[m.crewed ? 'crewed' : m.type] ?? 5) * (dest?.scienceMult ?? SCIENCE_BODY[dest?.body] ?? 1) * (1 + techBonus(state, 'sciencePerMission')) * (level === 'total' ? 1 : 0.5);
       science = Math.round(sci * (m.ops ? 0.6 : 1));
       if (science > 0) addScience(state, science, m);
       if (m.ops) m.ops.science = Math.round(sci - science);
@@ -1988,10 +2035,12 @@ export function draftOptions(state, data, draftIn = {}) {
 // Module interface
 // ---------------------------------------------------------------------------------------------
 
-export function init(state) {
+export function init(state, data) {
   state.missions = state.missions || [];
   state.contracts = state.contracts || [];
   state.stats = state.stats || {};
+  // probes already flying on day one show up in the Missions tab before the first advance (calendar.init ran earlier)
+  if (data && Array.isArray(state.calendar)) adoptTransitPrograms(state, data);
 }
 
 export function tick(state, data, ctx) {
@@ -1999,6 +2048,7 @@ export function tick(state, data, ctx) {
   state.contracts = state.contracts || [];
   contractDeadlines(state, data);
   closeAuctions(state, data);
+  adoptTransitPrograms(state, data);
   launchTick(state, data);
   transitTick(state, data, ctx);
   calendarBriefings(state, data);
@@ -2064,7 +2114,7 @@ function decorate(state, data, m) {
     statusLabel: STATUS_LABELS[m.status] || m.status,
     typeLabel: TYPE_LABELS[m.type] || m.type,
     destinationName: dest?.name || m.destination,
-    vehicleName: vehicleDef(data, m.vehicleId)?.name || null,
+    vehicleName: m.vehicleName || (m.calendarId && data?.index?.calendar?.[m.calendarId]?.vehicleName) || vehicleDef(data, m.vehicleId)?.name || null,
     spacecraftName: spacecraftDef(data, m.spacecraftId)?.name || null,
     launchDate: m.launchTurn != null ? fmtT(state, m.launchTurn) : null,
     arriveDate: m.transit ? fmtT(state, m.transit.arriveTurn) : null,

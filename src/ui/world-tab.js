@@ -9,13 +9,14 @@ const TAG_LABELS = {
   diplomacia: 'diplomacia', diplomacy: 'diplomacia', tratado: 'tratado', ruptura: 'ruptura', bloco: 'bloco', atrito: 'atrito', aproximação: 'aproximação',
   budget: 'orçamento', economy: 'economia', market: 'mercado', mission: 'missão', launch: 'lançamento', launches: 'lançamentos',
   crew: 'equipe', research: 'pesquisa', pesquisa: 'pesquisa', secret: 'segredo', election: 'eleição', politics: 'política',
-  conflict: 'conflito', tension: 'tensão', contract: 'contrato', rival: 'rival', race: 'corrida', corrida: 'corrida',
+  conflict: 'conflito', tension: 'tensão', geo: 'mapa', contract: 'contrato', rival: 'rival', race: 'corrida', corrida: 'corrida',
   first: 'primeiro', failure: 'falha', success: 'sucesso', delay: 'atraso', cancel: 'cancelado', cancelled: 'cancelado',
   memorial: 'memorial', death: 'memorial', legend: 'lenda', evento: 'evento', event: 'evento', tabela: 'tabela', era: 'era',
 };
 import { emblemSVG } from './portrait.js';
 import { relKey } from '../core/helpers.js';
 import { decisionRow, sortDecisions } from './decisions.js';
+import * as worldmap from './worldmap.js';
 
 const SEGS = [
   { id: 'noticias', label: 'Notícias' },
@@ -32,14 +33,72 @@ export function render(container, store) {
   const go = (seg) => { ui.seg = seg; store.ui?.navigate ? store.ui.navigate('mundo', seg) : rerender(); };
   const st = store.state;
   const dipl = (st.decisions || []).filter((d) => /^(diplomacy|politics)/.test(String(d.kind)));
+  let mapCleanup = null;
   const root = h('div', { class: 'view-pad world' },
     h('div', { class: 'view-head' }, h('h1', { class: 'view-title' }, 'Mundo'), safePanel(() => tensionChip(store))),
+    safePanel(() => worldMapSection(store, (fn) => { mapCleanup = fn; }), 'O mapa-múndi está fora do ar.'),
     segmented(SEGS.map((s) => (s.id === 'atores' && dipl.length ? { ...s, badge: dipl.length } : s)), ui.seg, go));
   container.appendChild(root);
   if (ui.seg === 'atores') root.append(safePanel(() => actorsView(store, dipl), 'Os atores ainda não chegaram ao mundo.'));
   else if (ui.seg === 'tratados') root.append(safePanel(() => treatiesView(store), 'Tratados e blocos em construção.'));
   else if (ui.seg === 'tabela') root.append(safePanel(() => leagueView(store), 'A Tabela da Era ainda está sendo apurada.'));
   else root.append(safePanel(() => newsView(store, rerender), 'O noticiário está fora do ar.'));
+  return () => { try { mapCleanup?.(); } catch { /* */ } };
+}
+
+// ------------------------------------------------------------------ world map (collapsible, top of the tab)
+
+const MAP_KEY = 'adastra.worldmap.open';
+let mapOpen = attempt(() => localStorage.getItem(MAP_KEY) !== '0', true);
+
+function worldMapSection(store, setCleanup) {
+  const geo = store.tryQuery('geo/state', null);
+  const conflicts = geo?.conflicts?.length || 0;
+  const changed = (geo?.zones || []).filter((z) => z.changedTurn != null).length;
+  const body = h('div', { class: 'wm-body' });
+  const sec = h('section', { class: ['wm-section', mapOpen && 'open'] });
+  const toggle = () => {
+    mapOpen = !mapOpen;
+    attempt(() => localStorage.setItem(MAP_KEY, mapOpen ? '1' : '0'));
+    sec.classList.toggle('open', mapOpen);
+    head.setAttribute('aria-expanded', String(mapOpen));
+    mount();
+  };
+  const head = h('button', { class: 'wm-head', type: 'button', 'aria-expanded': String(mapOpen), onclick: toggle },
+    h('span', { class: 'wm-head-title' }, '🗺️ Mapa-múndi'),
+    h('span', { class: 'wm-head-chips' },
+      changed ? chip(`${changed} mudança${changed > 1 ? 's' : ''} de controle`, 'warn') : null),
+    h('span', { class: 'wm-chev', 'aria-hidden': 'true' }, '▾'));
+  // the conflict chip is its own button (outside the collapse toggle): it opens the map on the hottest conflict
+  const hottest = (geo?.conflicts || []).slice().sort((a, b) => (b.intensity || 0) - (a.intensity || 0))[0] || null;
+  const focusConflict = () => {
+    if (!hottest) return;
+    if (!mapOpen) {
+      mapOpen = true;
+      attempt(() => localStorage.setItem(MAP_KEY, '1'));
+      sec.classList.add('open');
+      head.setAttribute('aria-expanded', 'true');
+    }
+    mount({ conflictId: hottest.id, zoneIds: hottest.zoneIds, zoneId: hottest.zoneId });
+  };
+  const conflictBtn = conflicts ? chip(`⚔ ${conflicts} conflito${conflicts > 1 ? 's' : ''}`, 'bad', {
+    onclick: (e) => { e.stopPropagation(); focusConflict(); },
+  }) : null;
+  if (conflictBtn) {
+    conflictBtn.classList.add('wm-conflict-chip');
+    conflictBtn.setAttribute('aria-label', `Ver ${conflicts > 1 ? 'o conflito mais intenso' : 'o conflito'} no mapa`);
+  }
+  let cleanup = null;
+  function mount(focus = null) {
+    try { cleanup?.(); } catch { /* */ }
+    cleanup = null;
+    body.replaceChildren();
+    if (mapOpen) cleanup = worldmap.render(body, store, { onActor: (id) => openActor(store, id), focus });
+    setCleanup(() => { try { cleanup?.(); } catch { /* */ } });
+  }
+  sec.append(h('div', { class: 'wm-headrow' }, head, conflictBtn), body);
+  mount();
+  return sec;
 }
 
 function tensionLevel(store) {

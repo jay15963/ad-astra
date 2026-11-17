@@ -1,10 +1,11 @@
 # PROGRESS — Ad Astra (web)
 
 ## Estado (nov/2026)
+- Versão 0.2.0 (build 2026.11.17-1): Sistema Solar inteiro, mapa espacial novo, árvore de pesquisa em grafo, mapa-múndi, service worker.
 - Corte vertical "Corrida Lunar 2026–2030" jogável de ponta a ponta no navegador: novo jogo, briefings, montagem de missão em 3 passos,
   agendamento, Dia de Lançamento (subida e chegada), trânsito, pesquisa, equipe, diplomacia, Tabela da Era, salvar/continuar.
 - 9 módulos de simulação + UI integrados. Contratos e desvios aceitos documentados em `ARCHITECTURE.md` ("Integração").
-- Testes: `npm test` (`node --test tests/*.test.mjs`) → 190/190 (inclui `integrity`, `ui-fixes` e `crossfix`). Smoke: `node tools/smoke.mjs 4`
+- Testes: `npm test` (`node --test tests/*.test.mjs`) → 237/237 (inclui `solar`, `datafix`, `geopolitics`, `techtree`, `ui-review-fixes`, `sw`). Smoke: `node tools/smoke.mjs 4`
   → 20/20 sem erro (o bot ingênuo aceita tudo e às vezes é demitido por dívida: esperado). `node tools/sim-campaign.mjs` → 15/15 campanhas até o fim.
 - Checagem no navegador (Chrome headless, 375×812): novo jogo pela tela de título, decisões pelas folhas, montagem em 3 passos,
   cena de subida e de chegada (órbita lunar) até o resultado, recarregar no meio da subida e no meio da chegada (retoma e conclui),
@@ -13,6 +14,8 @@
 ## Como testar
 - `npm test`; `node tools/smoke.mjs 4`; `node tools/sim-campaign.mjs` (balanço por ator).
 - Navegador: `python -m http.server 8150` na raiz e abrir `http://localhost:8150/` em 375×812.
+- Service worker: o painel de navegador embutido não registra SW; testar no Chrome (headless via CDP: mudar um módulo e recarregar
+  mostra o código novo; offline abre a última cópia).
 
 ## Balanceamento (tools/sim-campaign.mjs, 4 sementes por ator)
 - Voos/ano do bot: NASA 5,8 · CNSA 6,7 · ISRO 4,8 · ESA 6,0 · SpaceX 15,9 (empresa, vive de contratos).
@@ -59,13 +62,31 @@
 - Correções achadas no navegador: "null" solto na folha de agendamento; datas antes de 2026 viravam "undefined/2025";
   chegada em órbita falava em "descida"; "1 voos"; "Diretor" para diretoras; títulos de contrato perdiam maiúsculas ("lua", "gto").
 
+## Sistema Solar, mapas e integração final (nov/2026)
+- Dados: 24 corpos novos (Mercúrio a Plutão, cinturões, Troianos, Kuiper), 21 destinos com janelas, 11 programas reais no calendário;
+  sondas já em voo (BepiColombo, Hera, JUICE, Psyche, Lucy, Europa Clipper, OSIRIS-APEX, Tianwen-2) entram no turno 0 valendo 35% do prestígio.
+- Feitos históricos novos em `scenario.historicalFirsts` (Mariner, Venera, MESSENGER, NEAR, Hayabusa, Dawn, Cassini, Voyager 2, New Horizons).
+- Mapa espacial: 4 níveis, cinturões em faixas, anéis, névoa de guerra, missões em trânsito animadas, vista de Rotas (metrô) com
+  "Planejar missão aqui" abrindo o montador já com o destino (`store.ui.planMission`).
+- Pesquisa: grafo estilo KSP com pan/zoom, folha de detalhes e caminhos destacados.
+- Mundo: mapa-múndi recolhível com zonas disputadas, conflitos (Rússia–Ucrânia já em curso), sedes, bases e linha do tempo.
+- Montador avisa destinos que chegam depois de 2030; sondas em trânsito mostram "Em trânsito" (não "Sucesso").
+- Integração final: rota de Titã passa por "Rumo a Saturno"; textos de dificuldade por destino novo no Dia de Lançamento;
+  BepiColombo e JUICE aparecem como "Ariane 5" (`vehicleName`); `research/tree` traz `icon/short/tier/row`.
+- Cache: `sw.js` rede-primeiro com revalidação; Ajustes mostra versão, build e estado da atualização automática.
+- Verificação no navegador (375×812): novo jogo (ESA), contrato, eventos, sonda a asteroide próximo montada em 3 passos, cena de subida
+  até o resultado, pesquisa iniciada pelo grafo, mapa nos 4 níveis + Rotas + planejar Vênus, mapa-múndi, recarregar → continuar.
+
 ## Pendências (por prioridade)
 1. Mudanças de bloco continuam raras (0 em 10 sementes) e rupturas IA–IA ~2,3 por semente (alvo 3–6).
 2. Notícias: ~1,7 por semana e falhas de teste da Starship ainda frequentes no feed; margens de contrato não escalam com a fatia de mercado.
 3. Chance mostrada fica ~6 p.p. abaixo da real em chegadas difíceis com Comando cheio.
 4. Griffin-1 sem status real de nov/2026 confirmado (título agora diz "baseado no calendário real de 2026").
-5. Cache do navegador pode misturar versões de módulos depois de um deploy (não há service worker nem versão nos imports).
+5. Primeira visita (antes do service worker) ainda depende do cache HTTP do GitHub Pages (max-age=600).
 6. A estimativa de semanas na pesquisa (~16) difere do prazo sorteado (18).
+7. NASA IA ainda supera a CNSA na Tabela mesmo sem sondas herdadas; marcos novos não estão em `ai.goals` dos atores.
+8. Ariane 5 é um substituto (`ariane6` + `vehicleName`); um veículo aposentado próprio seria mais limpo.
+9. Mapa: Vênus fica meio coberta pelo cartão em 320×640; animação parada em segundo plano não verificada no navegador.
 
 ## Decisões
 - Plataforma: navegador (mobile-first, retrato), GitHub Pages, sem build step, JS puro em ES modules; testes com `node --test`.

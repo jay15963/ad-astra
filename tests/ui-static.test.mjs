@@ -9,7 +9,7 @@ import { loadDataNode } from '../src/core/data.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const UI = path.join(root, 'src', 'ui');
-const OWNED = ['app', 'store', 'components', 'portrait', 'dashboard', 'missions-tab', 'research-tab', 'world-tab', 'crew-view', 'decisions', 'newgame', 'settings'];
+const OWNED = ['app', 'store', 'components', 'portrait', 'dashboard', 'missions-tab', 'research-tab', 'world-tab', 'crew-view', 'decisions', 'newgame', 'settings', 'worldmap', 'map', 'launch-scene', 'audio'];
 
 /** Names exported by a module source (regex, good enough for our code style). */
 function exportsOf(src) {
