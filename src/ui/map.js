@@ -100,6 +100,25 @@ export function activeLevelFor(levels, span, follow, parentOf = () => null) {
   return null;
 }
 
+/**
+ * Camera span for a level so the whole level fits the part of a W×H stage the overlays leave free (`bottom`: window
+ * chips / warnings stacked at the foot, `top`: anything over the top edge). On a short phone (320×640) the free
+ * height is less than the width the level spans were fitted to, so the span grows (by at most `kMax`, and never so
+ * much that the level pill would jump to the next level). `dy`: screen px the level centre must sit above the stage
+ * centre to be in the middle of the free area. Pure: exported for tests.
+ */
+export function fitLevel(level, levels, W, H, { bottom = 0, top = 0 } = {}) {
+  const w = Math.max(1, W || 1);
+  const h = Math.max(1, H || 1);
+  const minDim = Math.min(w, h);
+  const freeH = Math.max(h * 0.4, h - Math.max(0, bottom) - Math.max(0, top));
+  const i = levels.indexOf(level);
+  const next = i >= 0 ? levels[i + 1] : null;
+  const kMax = next ? Math.min(1.6, Math.sqrt(next.span / level.span) * 0.97) : 1.6;
+  const k = clamp(minDim / Math.min(w, freeH), 1, Math.max(1, kMax));
+  return { span: level.span * k, dy: h / 2 - (Math.max(0, top) + freeH / 2), k };
+}
+
 /** Level whose span is nearest (log scale) to `span`. */
 export function levelForSpan(levels, span) {
   let best = levels[0];
@@ -405,7 +424,23 @@ function launchInWindow(state, data, destId, launchTurn, q) {
   return launchTurn >= w.openTurn && launchTurn <= w.closeTurn ? true : w;
 }
 
-/** One window line per body ("próxima janela para Marte em 9 meses"). */
+/**
+ * Can a mission launched in window `w` (earliest: now or when it opens) to any of `destIds` still arrive by the end of
+ * the scenario? Same rule as the sim's 'missions/nextWindow' (launch + transitWeeks <= endTurn).
+ * → { arrivalTurn, late, lateText } (lateText: "Não dá para chegar antes do fim de 2030").
+ */
+export function lateInfo(state, data, destIds, w) {
+  const end = Number.isFinite(state?.endTurn) ? state.endTurn : Infinity;
+  if (!w || !Number.isFinite(end)) return { arrivalTurn: null, late: false, lateText: null };
+  const tw = Math.min(...asList(destIds).map((id) => Number(destById(data, id)?.transitWeeks) || 0));
+  const launch = Math.max(state?.turn ?? 0, w.openTurn);
+  const arrivalTurn = launch + (Number.isFinite(tw) ? tw : 0);
+  const late = launch >= end || arrivalTurn > end;
+  const endYear = (state?.startYear ?? data?.scenario?.startYear ?? 2026) + Math.floor(end / 52);
+  return { arrivalTurn, late, lateText: late ? `Não dá para chegar antes do fim de ${endYear}` : null, endYear };
+}
+
+/** One window line per body ("próxima janela para Marte em 9 meses"); windows that arrive too late go last. */
 export function windowSummaries(state, data, q) {
   const groups = new Map();
   const ids = new Set([...getDestinations(data).map((d) => d.id), ...Object.keys(destAnchors(data))]);
@@ -427,7 +462,8 @@ export function windowSummaries(state, data, q) {
   };
   return out
     .filter((w) => (seen.has(w.bodyId) ? false : (seen.add(w.bodyId), true)))
-    .sort((a, b) => (b.open - a.open) || dist(a.bodyId) - dist(b.bodyId))
+    .map((w) => ({ ...w, ...lateInfo(state, data, w.destIds, w) }))
+    .sort((a, b) => (a.late - b.late) || (b.open - a.open) || dist(a.bodyId) - dist(b.bodyId))
     .map((w) => ({
       ...w,
       bodyName: bodyById(data, w.bodyId)?.name || destName(data, w.bodyId),
@@ -769,7 +805,7 @@ function hashAngle(key) {
 }
 
 /* Persistent view across re-renders (app.js re-renders the tab on every state change). */
-const MEM = { mode: 'map', cam: null, selected: null, metroRegion: null, legend: false, prog: {}, intro: false };
+const MEM = { mode: 'map', cam: null, selected: null, metroRegion: null, legend: false, prog: {}, intro: false, camAuto: false };
 /* Pre-rendered layers shared across re-renders: background per size, belt particles per body. */
 const CACHE = { bgKey: '', bg: null, belts: {} };
 
@@ -944,7 +980,11 @@ export function render(container, store) {
     if (!fr.length || !f) return { ox: 0, oy: 0 };
     return { ox: fr.reduce((t, p) => t + p.x, 0) / fr.length - f.x, oy: fr.reduce((t, p) => t + p.y, 0) / fr.length - f.y };
   }
-  if (!MEM.cam) MEM.cam = { follow: levels[1]?.focus || levels[0].focus, ...levelOffset(levels[1] || levels[0]), span: (levels[1] || levels[0]).span };
+  // first visit: the inner system; `camAuto` keeps it re-fitted to the free stage area until the player moves the map
+  if (!MEM.cam) {
+    MEM.cam = { follow: levels[1]?.focus || levels[0].focus, ...levelOffset(levels[1] || levels[0]), span: (levels[1] || levels[0]).span };
+    MEM.camAuto = true;
+  }
   // max zoom: Earth about 64 px with its orbits (LEO, ISS, SSO, GTO) readable on a 375 px phone
   const spanMin = Math.min(levels[0].span * 0.21, 24);
   const spanMax = levels[levels.length - 1].span * 1.3;
@@ -979,6 +1019,7 @@ export function render(container, store) {
   const parentOf = (id) => bodyIdx[id]?.parent ?? null;
 
   function moveTo(to, dur = 650) {
+    MEM.camAuto = false;
     const cam = camNow();
     to.span = clamp(to.span, spanMin, spanMax);
     if (reduceMotion() || !W) {
@@ -993,12 +1034,25 @@ export function render(container, store) {
   }
 
   /** Smoothly move to a level. */
-  function goLevel(level) {
+  function levelCam(level) {
     const o = levelOffset(level);
-    // the window chips cover the bottom of the stage: centre the level in the area above them
-    const under = Math.min(H * 0.3, winBox.getBoundingClientRect?.().height || 0);
-    if (H) o.oy += under / 2 / (minDim() / level.span);
-    moveTo({ follow: level.focus, ...o, span: level.span }, 700);
+    if (!W || !H) return { follow: level.focus, ...o, span: level.span };
+    // the window chips / warnings cover the bottom of the stage: fit and centre the level in the area above them
+    // (320x640: the inner system used to run under them, Vênus half hidden)
+    const wh = winBox.getBoundingClientRect?.().height || 0;
+    const f = fitLevel(level, levels, W, H, { bottom: wh ? wh + 12 : 0 });
+    o.oy += f.dy / (minDim() / f.span);
+    return { follow: level.focus, ...o, span: f.span };
+  }
+  function goLevel(level) {
+    moveTo(levelCam(level), 700);
+  }
+  /** While the first-visit view is untouched, keep it fitted (stage resized, window chips changed). */
+  function refitAuto() {
+    if (!MEM.camAuto || tween || !W || !H || MEM.mode !== 'map') return;
+    MEM.cam = levelCam(levels[1] || levels[0]);
+    updateLevelBar();
+    invalidate();
   }
 
   /** Frame a body with its moons (semantic zoom: its destinations appear), above the card when one is open. */
@@ -1042,6 +1096,7 @@ export function render(container, store) {
   function zoomAt(sx, sy, factor) {
     const cam = camNow();
     tween = null;
+    MEM.camAuto = false;
     MEM.cam = zoomedCam(cam, sx, sy, factor);
     updateLevelBar();
     invalidate();
@@ -1052,6 +1107,7 @@ export function render(container, store) {
   function panBy(dx, dy) {
     const cam = camNow();
     tween = null;
+    MEM.camAuto = false;
     MEM.cam = { ...MEM.cam, ox: MEM.cam.ox - dx / cam.s, oy: MEM.cam.oy - dy / cam.s, span: cam.span };
     invalidate();
   }
@@ -1082,6 +1138,7 @@ export function render(container, store) {
     scene.width = canvas.width;
     scene.height = canvas.height;
     sceneKey = '';
+    refitAuto();
     invalidate();
   }
 
@@ -1998,12 +2055,15 @@ export function render(container, store) {
     // nearest window gets the full sentence; the others become compact chips in one scrollable row
     const chips = model.windows.slice(0, 5).map((w, i) => {
       const txt = i === 0 ? w.text : w.open ? `${w.bodyName} · aberta` : `${w.bodyName} · ${weeksToText(w.weeksToOpen)}`;
-      return `<button type="button" class="map-win ${w.open ? 'is-open' : ''} ${i ? 'is-compact' : ''}" data-body="${esc(w.bodyId)}" aria-label="${esc(w.text)}">
-        <span class="map-win__txt">${esc(txt)}</span>
+      // too late for the era: the full chip says so on its own line, compact ones carry a ⌛ (the sentence is in aria-label)
+      const late = w.late && i === 0 ? `<span class="map-win__late">${esc(w.lateText)}</span>` : '';
+      return `<button type="button" class="map-win ${w.open ? 'is-open' : ''} ${i ? 'is-compact' : ''} ${w.late ? 'is-late' : ''}" data-body="${esc(w.bodyId)}" aria-label="${esc(w.late ? `${w.text}. ${w.lateText}.` : w.text)}">
+        <span class="map-win__txt">${esc(txt)}${i && w.late ? ' ⌛' : ''}</span>${late}
         <span class="map-win__bar" aria-hidden="true"><i style="width:${Math.round(w.cycle * 100)}%"></i></span></button>`;
     });
     if (chips.length) parts.push(`<div class="map-win-row">${chips.join('')}</div>`);
     winBox.innerHTML = parts.join('');
+    if (MEM.camAuto) refitAuto();
     legend.classList.toggle('is-open', !!MEM.legend);
     legend.innerHTML = MEM.legend ? legendHtml() : '';
   }
@@ -2129,6 +2189,12 @@ export function render(container, store) {
   function windowChip(destId) {
     const v = q('catalog/window', destId);
     const w = windowFor(state, data, destId, q);
+    const li = lateInfo(state, data, [destId], w || { openTurn: state?.turn ?? 0 });
+    if (li.late) {
+      // "não dá para chegar antes do fim de 2030": same rule as the mission builder's warning
+      const when = w ? (w.open ? 'Janela aberta' : `Janela em ${weeksToText(w.weeksToOpen)}`) : 'Sempre aberta';
+      return `<span class="map-wchip is-late" title="${esc(li.lateText)}">${esc(when)} · chega depois de ${li.endYear}</span>`;
+    }
     if (v?.alwaysOpen || (!w && !v)) return '<span class="map-wchip is-always">Sempre aberta</span>';
     if (w?.open) return `<span class="map-wchip is-open">Janela aberta · ${esc(weeksToText(w.weeksLeft))}</span>`;
     if (w) return `<span class="map-wchip">Janela em ${esc(weeksToText(w.weeksToOpen))}</span>`;

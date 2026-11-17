@@ -339,3 +339,6 @@ body.reduce-motion .ls-overlay *, body.reduce-motion .ls-overlay, [data-reduce-m
 /* climax zoom keeps names readable */
 .ls-overlay[data-view="climax"] .ls-face figcaption,
 .ls-overlay.ls-hush .ls-face figcaption { margin-top: 12px; }
+
+/* crew-loss risk chip (crewed flights only) */
+.ls-chip.ls-crewrisk { font-weight: 600; background: color-mix(in srgb, var(--ls-warn) 12%, transparent); }

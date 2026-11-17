@@ -3,7 +3,7 @@
 // HTTP cache must send If-None-Match / If-Modified-Since). The last good copy of each file is kept in
 // Cache Storage only as an offline fallback.
 // Keep SW_VERSION equal to APP_VERSION in src/ui/settings.js (tests/sw.test.mjs checks it).
-const SW_VERSION = '0.2.0';
+const SW_VERSION = '0.3.0';
 const CACHE = `adastra-${SW_VERSION}`;
 
 self.addEventListener('install', () => { self.skipWaiting(); });

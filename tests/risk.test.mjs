@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadDataNode } from '../src/core/data.js';
 import { newGame } from '../src/core/engine.js';
 import { makeRng } from '../src/core/rng.js';
-import { missionRisk } from '../src/sim/risk.js';
+import { missionRisk, sceneOdds, escapeChance, SCENE } from '../src/sim/risk.js';
 import { quickOutcome, OUTCOMES, FAILURE_TYPES, FAILURE_LABELS, OUTCOME_LABELS, pickFailureType } from '../src/core/outcome.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -70,9 +70,11 @@ test('Falcon 9 to LEO is very reliable and valid', () => {
     assert.deepEqual(Object.keys(w).sort(), [...FAILURE_TYPES].sort());
     assert.ok(Math.abs(Object.values(w).reduce((a, b) => a + b, 0) - 1) < 0.02);
   }
-  // product of milestones = p
+  // product of milestones = raw chance; the chance shown (p) is the real one of the scene (sceneOdds), a bit higher:
+  // a partial result counts as success and the flight director's cards save some anomalies
   const prod = r.milestones.reduce((p, m) => p * (1 - m.pFail), 1);
-  assert.ok(Math.abs(prod - r.p) < 0.005);
+  assert.ok(Math.abs(prod - r.pRaw) < 0.005);
+  assert.ok(r.p >= prod - 0.005 && r.p < 1, `p=${r.p} raw=${prod}`);
 });
 
 test('missionRisk is pure (does not mutate state)', () => {
@@ -86,7 +88,8 @@ test('new vehicles are noticeably riskier with wider bands', () => {
   const f9 = missionRisk(nasa, data, plan(nasa));
   for (const id of ['starship', 'new_glenn', 'sls_b1b'].filter((x) => has('vehicles', x))) {
     const r = missionRisk(nasa, data, plan(nasa, { vehicleId: id }));
-    assert.ok(r.p < f9.p - 0.02, `${id} p=${r.p} vs f9 ${f9.p}`);
+    // compared in failure space: the real chance compresses differences near 100%
+    assert.ok(1 - r.p > (1 - f9.p) * 1.8, `${id} p=${r.p} vs f9 ${f9.p}`);
     assert.ok(r.high - r.low > f9.high - f9.low, `${id} band`);
   }
 });
@@ -186,4 +189,43 @@ test('missing data never throws', () => {
   assert.ok(Number.isFinite(r.p));
   const r2 = missionRisk({}, { index: {} }, {});
   assert.equal(r2.valid, false);
+});
+
+test('crewed plans show the crew risk; bold choices raise it; sceneOdds matches the shares', () => {
+  if (!has('vehicles', 'long_march_10') || !has('spacecraft', 'lanyue')) return;
+  const cn = newGame(data, { seed: 7, playerId: 'cnsa' });
+  const c = crewOf(cn, 'cnsa');
+  const r = (strategy, fuelMargin) => missionRisk(cn, data, {
+    actorId: 'cnsa', type: 'crewed', crewed: true, destination: 'lunar_surface', vehicleId: 'long_march_10', spacecraftId: 'lanyue',
+    crew: { flightDirector: c.flightDirector, commander: c.commander, astronauts: [c.commander] }, config: { strategy, fuelMargin }, launchTurn: 200, createdTurn: 100,
+  });
+  const safe = r('conservative', 0.08);
+  const bold = r('aggressive', 0);
+  assert.ok(safe.pCrewLoss > 0.01 && safe.pCrewLoss < 0.15, `safe ${safe.pCrewLoss}`);
+  assert.ok(bold.pCrewLoss > safe.pCrewLoss * 1.3, `bold ${bold.pCrewLoss} vs ${safe.pCrewLoss}`);
+  assert.match(safe.warnings[0], /perder a tripulação/);
+  assert.ok(safe.milestones.every((m) => m.pEscape > 0 && m.pEscape < 1));
+  // uncrewed: no crew risk, no warning
+  const robot = missionRisk(nasa, data, plan(nasa));
+  assert.equal(robot.pCrewLoss, 0);
+  assert.ok(!robot.warnings.some((w) => /tripulação/.test(w)));
+});
+
+test('sceneOdds: exact on simple cases; Command points and escape behave', () => {
+  const ms = [{ id: 'maxq', pFail: 0.1, anomalyBand: 0 }];
+  // one milestone, no band, no Command: forced scare is harmless, critical fails, so p = 1 - pf
+  const o = sceneOdds(ms, { phase: 'ascent', cp: 0, hasFD: true, acc: 1 });
+  assert.ok(Math.abs(o.p - 0.9) < 1e-9, `p=${o.p}`);
+  // contingency saves part of the critical zone
+  const o2 = sceneOdds(ms, { phase: 'ascent', cp: 2, hasFD: true, acc: 1 });
+  assert.ok(Math.abs(o2.p - (1 - 0.1 * (SCENE.SUDDEN + (SCENE.CONTINGENCY_FAIL - SCENE.SUDDEN)))) < 1e-9, `p=${o2.p}`);
+  // crew: maxq failures are catastrophic; with no Command a crew aborts on a critical card, so only sudden
+  // failures can kill: loss = pf * SUDDEN * (1 - escape)
+  const o3 = sceneOdds(ms, { phase: 'ascent', crewed: true, cp: 0, hasFD: true, acc: 1, escape: () => 0.6 });
+  assert.ok(Math.abs(o3.pCrewLoss - 0.1 * SCENE.SUDDEN * 0.4) < 1e-9, `loss=${o3.pCrewLoss}`);
+  // escape chance: margin and caution help, boldness hurts
+  const e = (o) => escapeChance(data, { phase: 'ascent', early: true, ...o });
+  assert.ok(e({ fuelMargin: 0.2 }) > e({ fuelMargin: 0.1 }) && e({ fuelMargin: 0 }) < e({ fuelMargin: 0.1 }));
+  assert.ok(e({ strategy: 'aggressive' }) < e({ strategy: 'balanced' }) && e({ strategy: 'conservative' }) > e({ strategy: 'balanced' }));
+  assert.ok(escapeChance(data, { phase: 'arrival' }) < e({}));
 });

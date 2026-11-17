@@ -13,7 +13,12 @@ export const PROPOSAL_TYPES = [...BILATERAL_TYPES, ...NORM_TYPES, 'join_bloc'];
 const ACCEPT_T = 8;      // acceptance threshold (utility)
 const PROPOSE_T = 24;    // AI only proposes when the best option clears this
 const BREAK_T = 22;      // AI breaks a treaty above this
-const LEAVE_T = 16;      // AI leaves its bloc above this
+const LEAVE_T = 2;       // AI leaves its bloc above this (the drivers are real causes: government, tension, money)
+const LEAVE_INERTIA = 20; // base reluctance to walk out of a bloc (utility points)
+const ALIGN_NEUTRAL = 0.35; // government alignment (politics) at which the bloc is neither a pull nor a push
+const ALIGN_W = 30;       // utility per point of alignment below/above ALIGN_NEUTRAL
+const NEW_GOV_W = 16;     // a new government reviews its commitments (decays over NEW_GOV_WEEKS)
+const NEW_GOV_WEEKS = 52;
 const SEEDED_GRACE_WEEKS = 26; // default protection of the starting treaties
 const STRAIN_K = 0.04;   // monthly chance factor of an AI-AI rupture under strain (rivalry above trust)
 const STRAIN_OFFSET = 25; // even a lukewarm partnership (trust barely above rivalry) can sour
@@ -24,6 +29,7 @@ const PROPOSAL_TTL = 6;          // weeks the player has to answer
 const REJECT_MEMORY = 26;        // weeks an actor remembers a refusal
 const REFUSAL_TRUST = 1;         // trust lost when a player proposal is refused (2x for a counter-proposal)
 const BREAK_MEMORY = 156;        // weeks an actor remembers a betrayal
+const INCIDENT_MEMORY = 52;     // weeks before the same actor stars in the same kind of incident again
 
 const DEFAULT_REL = { trust: 0, dependence: 0, rivalry: 10 };
 
@@ -45,7 +51,8 @@ function programDef(data, id) {
 const milestoneLabel = (data, id) => {
   if (!id) return '';
   const base = String(id).split(':')[0];
-  return A(data).milestones?.[id] || A(data).milestones?.[base] || id;
+  // actors.json lists the race milestones; events.json / bodies.json name the solar-system ones (never show a raw id)
+  return A(data).milestones?.[id] || A(data).milestones?.[base] || data?.events?.milestones?.[base] || data?.bodies?.milestoneLabels?.[base] || id;
 };
 const short = (state, id) => state.actors?.[id]?.short || id;
 const listNames = (state, ids) => {
@@ -348,6 +355,8 @@ function joinBlocUtility(state, data, self, other, terms, role) {
     if (mates.length) f.add('afinidade com membros', mates.reduce((s, m) => s + relation(state, member, m).trust, 0) / mates.length * 0.15);
     f.add('proteção de um bloco', 6 + budgetPressure(state, member) * 8);
     if (remembers(state, member, 'withdrew', bloc.id, 104)) f.add('saiu há pouco', -20);
+    const lean = politics.blocAlignment?.(state, data, member, bloc.id);
+    if (lean != null) f.add('alinhamento do governo', (lean - ALIGN_NEUTRAL) * ALIGN_W);
   } else {
     // leader (or any member) judging the applicant
     const v = view(state, self, member);
@@ -575,8 +584,9 @@ function onElection(state, data, s, rng) {
   const ac = state.actors[s.actorId];
   if (!ac || isPlayer(state, s.actorId)) return;
   ac.ai.nextEvalTurn = state.turn;
-  if (s.result && s.result !== 'reelected' && s.result !== 'same') {
-    // a new government reshuffles priorities a little
+  if (s.result === 'change') {
+    // a new government reviews alliances for a year (leaveUtility) and reshuffles priorities a little
+    memoryOf(state, s.actorId).newGovTurn = state.turn;
     ac.ai.cooperation = round(clamp((ac.ai.cooperation ?? 0.5) + rng.range(-0.12, 0.12), 0.1, 0.95), 2);
     ac.ai.aggression = round(clamp((ac.ai.aggression ?? 0.5) + rng.range(-0.1, 0.1), 0.05, 0.95), 2);
   }
@@ -627,8 +637,10 @@ function expireTreaties(state, data, rng) {
     t.status = 'expired';
     t.endedTurn = state.turn;
     const involvesPlayer = t.parties.includes(state.playerId);
+    const headline = txt(data, rng, 'expired', null, { treaty: t.name, parties: listNames(state, t.parties) });
+    if (!involvesPlayer) { log(state, `diplomacia: ${headline}`); continue; } // routine AI-AI expiry: log only
     addNews(state, {
-      headline: txt(data, rng, 'expired', null, { treaty: t.name, parties: listNames(state, t.parties) }),
+      headline,
       body: involvesPlayer ? 'Se quiser manter o acordo, proponha uma renovação na aba Mundo.' : '',
       tags: ['diplomacia', 'tratado'], actors: t.parties.slice(), importance: involvesPlayer ? 2 : 1, icon: '⌛',
     });
@@ -738,6 +750,16 @@ function incidents(state, data, rng) {
     const swap = kind === 'friction' ? (sb.aggression ?? 0.5) + budgetPressure(state, b) > (sa.aggression ?? 0.5) + budgetPressure(state, a)
       : (sb.cooperation ?? 0.5) > (sa.cooperation ?? 0.5);
     if (swap ^ rng.chance(0.25)) [a, b] = [b, a];
+    // bloc-vs-bloc frictions (export controls, state media) are acts of governments: the subject is an agency
+    if (d.requires === 'opposing' && isCompany(state, a)) {
+      if (isCompany(state, b)) continue;
+      [a, b] = [b, a];
+    }
+    // no-repeat window: the same actor does not star in the same kind of incident twice within a year
+    const mem = memoryOf(state, a);
+    mem.incidents = mem.incidents || {};
+    if (mem.incidents[d.id] != null && state.turn - mem.incidents[d.id] < INCIDENT_MEMORY) continue;
+    mem.incidents[d.id] = state.turn;
     const prog = partners.find((t) => t.terms?.program);
     const program = prog ? programDef(data, prog.terms.program)?.name : (partners[0]?.name || 'o programa conjunto');
     bumpRelation(state, a, b, { trust: d.trust || 0, rivalry: d.rivalry || 0, dependence: d.dependence || 0 });
@@ -781,7 +803,9 @@ function aiEvaluate(state, data, id, rng) {
   const myBloc = blocOf(state, id);
   if (myBloc && myBloc.leader !== id) {
     const f = leaveUtility(state, data, id, myBloc);
-    cands.push({ kind: 'leave', bloc: myBloc.id, u: f.u + rng.normal(0, NOISE), t: LEAVE_T, f });
+    const c = { kind: 'leave', bloc: myBloc.id, u: f.u + rng.normal(0, NOISE), t: LEAVE_T, f };
+    // leaving a bloc is a strategic decision, not one more deal on the table: when it clears, it happens
+    if (c.u > c.t) { executeAi(state, data, id, c, rng); return c; }
   }
   if (!myBloc) {
     for (const b of Object.values(state.blocs)) {
@@ -852,11 +876,13 @@ function canProposeToPlayer(state) {
   return last == null || state.turn - last >= PLAYER_PROPOSAL_GAP;
 }
 
-function leaveUtility(state, data, id, bloc) {
+export function leaveUtility(state, data, id, bloc) {
   const S = state.actors[id];
   const v = view(state, id, bloc.leader);
   const f = new Factors();
-  f.add('inércia', -24);
+  // companies are associates: they follow their country's policy, they do not walk out on their own
+  if (isCompany(state, id)) return f.add('empresa associada', -999);
+  f.add('inércia', -LEAVE_INERTIA);
   f.add('confiança no líder', -v.trust * 0.4);
   f.add('rivalidade com o líder', v.rivalry * 0.3);
   f.add('tensão com o líder', v.tension * 15);
@@ -865,7 +891,23 @@ function leaveUtility(state, data, id, bloc) {
   if (v.trust < -20) f.add('relação rompida com o líder', 8 + (-20 - v.trust) * 0.4);
   const outside = Object.values(state.blocs).filter((b) => b.id !== bloc.id && b.leader);
   for (const b of outside) f.add(`atração do ${b.short || b.name}`, Math.max(0, relation(state, id, b.leader).trust - v.trust) * 0.25);
+  // the government's view of the bloc (politics: faction alignment) and a fresh government reviewing commitments
+  const lean = politics.blocAlignment?.(state, data, id, bloc.id);
+  if (lean != null) f.add('alinhamento do governo', (ALIGN_NEUTRAL - lean) * ALIGN_W);
+  const ng = newGovernmentWeight(state, id);
+  if (ng > 0) f.add('governo novo revê compromissos', ng * NEW_GOV_W);
+  f.add('verba apertada', budgetPressure(state, id) * 6);
+  const ls = state.actors[bloc.leader]?.support;
+  if (typeof ls === 'number' && ls < 45) f.add('líder do bloco desgastado', (45 - ls) * 0.3);
   return f;
+}
+
+/** 1..0: how fresh the actor's new government is (election with a change of government in the last year). */
+function newGovernmentWeight(state, id) {
+  const t = state.actors?.[id]?.ai?.memory?.newGovTurn;
+  if (t == null) return 0;
+  const age = state.turn - t;
+  return age < 0 || age >= NEW_GOV_WEEKS ? 0 : 1 - age / NEW_GOV_WEEKS;
 }
 
 function accedeUtility(state, data, id, t) {

@@ -55,6 +55,7 @@ function worldMapSection(store, setCleanup) {
   const geo = store.tryQuery('geo/state', null);
   const conflicts = geo?.conflicts?.length || 0;
   const changed = (geo?.zones || []).filter((z) => z.changedTurn != null).length;
+  const blocMoves = (store.state?.geo?.blocChanges || []).filter((c) => c.kind === 'country').length;
   const body = h('div', { class: 'wm-body' });
   const sec = h('section', { class: ['wm-section', mapOpen && 'open'] });
   const toggle = () => {
@@ -67,7 +68,8 @@ function worldMapSection(store, setCleanup) {
   const head = h('button', { class: 'wm-head', type: 'button', 'aria-expanded': String(mapOpen), onclick: toggle },
     h('span', { class: 'wm-head-title' }, '🗺️ Mapa-múndi'),
     h('span', { class: 'wm-head-chips' },
-      changed ? chip(`${changed} mudança${changed > 1 ? 's' : ''} de controle`, 'warn') : null),
+      changed ? chip(`${changed} mudança${changed > 1 ? 's' : ''} de controle`, 'warn') : null,
+      blocMoves ? chip(`🏳️ ${blocMoves} mudança${blocMoves > 1 ? 's' : ''} de bloco`, 'muted', { title: `${blocMoves} mudança${blocMoves > 1 ? 's' : ''} de bloco desde o início` }) : null),
     h('span', { class: 'wm-chev', 'aria-hidden': 'true' }, '▾'));
   // the conflict chip is its own button (outside the collapse toggle): it opens the map on the hottest conflict
   const hottest = (geo?.conflicts || []).slice().sort((a, b) => (b.intensity || 0) - (a.intensity || 0))[0] || null;

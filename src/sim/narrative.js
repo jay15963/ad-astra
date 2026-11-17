@@ -28,7 +28,14 @@ const OP_CHANCE = 1;            // missions already rolls its own weekly chance 
 const OP_MAX_PER_MISSION = 2;
 const JOURNAL_CAP = 120;
 
-export const PLACEHOLDERS = ['actor', 'person', 'mission', 'rival', 'year'];
+export const PLACEHOLDERS = ['actor', 'person', 'mission', 'rival', 'year', 'country', 'bloc', 'zone'];
+// No-repeat rules (besides each event's cooldownWeeks and the weight decay):
+// - per-campaign cap: event.maxCount, default DEFAULT_MAX_COUNT[mode] for events that are not 'once';
+// - shared window: events with the same event.group wait data.events.groups[group] weeks (default GROUP_COOLDOWN)
+//   after any of them was shown (e.g. three different "rival chegou primeiro" cards never land back to back);
+// - event.variants [{title?, text?}]: the 2nd, 3rd... showing of a repeatable event reads differently.
+export const DEFAULT_MAX_COUNT = { random: 2, signal: 3 };
+const GROUP_COOLDOWN = 16;
 const ACTOR_FIELDS = ['support', 'reputation', 'culture', 'prestige', 'budget'];
 const RELATION_FIELDS = ['trust', 'dependence', 'rivalry'];
 const CREW_FIELDS = ['skill', 'morale', 'loyalty', 'ambition', 'experience'];
@@ -47,7 +54,7 @@ const ROLE_LABELS = { engineer: 'engenheiro(a)', flight_director: 'diretor(a) de
 
 // Schemas used by validateEvent (unknown keys are errors).
 const EVENT_KEYS = ['id', 'kind', 'title', 'text', 'portrait', 'trigger', 'weight', 'cooldownWeeks', 'once', 'choices', 'chain',
-  'subject', 'rival', 'tags', 'defaultChoice', 'urgency'];
+  'subject', 'rival', 'tags', 'defaultChoice', 'urgency', 'group', 'maxCount', 'variants'];
 const TRIGGER_KEYS = ['minTurn', 'maxTurn', 'actors', 'requiresFlags', 'forbidsFlags', 'signal', 'signalWhere', 'chance',
   'condition', 'destinations', 'crewed', 'scheduledOnly'];
 const CHOICE_KEYS = ['id', 'label', 'preview', 'requires', 'effects'];
@@ -91,6 +98,28 @@ const eventList = (data) => data?.events?.events || [];
 export function getEvent(data, id) {
   return data?.index?.events?.[id] || eventList(data).find((e) => e.id === id) || null;
 }
+
+const groupCache = new WeakMap();
+/** Event ids per group (cached per data object). */
+function groupMembers(data, group) {
+  let m = data && groupCache.get(data);
+  if (!m) {
+    m = {};
+    for (const e of eventList(data)) if (e.group) (m[e.group] ||= []).push(e.id);
+    if (data) groupCache.set(data, m);
+  }
+  return m[group] || [];
+}
+/** Turn when any event of the group was last shown (null if never). */
+export function groupLastTurn(state, data, group) {
+  let last = null;
+  for (const id of groupMembers(data, group)) {
+    const t = state.events?.history?.[id]?.lastTurn;
+    if (t != null && (last == null || t > last)) last = t;
+  }
+  return last;
+}
+const groupCooldown = (data, group) => data?.events?.groups?.[group] ?? GROUP_COOLDOWN;
 
 const playerActor = (state) => state.actors?.[state.playerId] || {};
 
@@ -232,7 +261,7 @@ const needsCache = new WeakMap();
 /** What context an event needs, inferred from its text and effects. */
 function analyzeNeeds(event) {
   if (needsCache.has(event)) return needsCache.get(event);
-  const texts = [event.title, event.text, ...(event.choices || []).flatMap((c) => [c.label, c.preview])].join(' ');
+  const texts = [event.title, event.text, ...(event.variants || []).flatMap((v) => [v?.title, v?.text]), ...(event.choices || []).flatMap((c) => [c.label, c.preview])].join(' ');
   const effects = (event.choices || []).flatMap((c) => c.effects || []);
   const newsTexts = effects.map((e) => `${e.news || ''} ${e.album || ''}`).join(' ');
   const all = `${texts} ${newsTexts}`;
@@ -289,6 +318,7 @@ export function buildContext(state, data, event, rng, base = {}) {
     c.rival = pick.id;
   }
   if (base.milestone) c.milestone = base.milestone;
+  for (const key of ['country', 'bloc', 'zone']) if (typeof base[key] === 'string' && base[key]) c[key] = base[key];
   return c;
 }
 
@@ -303,6 +333,9 @@ export function renderText(state, data, text, context = {}) {
       case 'mission': return missionName(state, data, context.mission) || 'a missão';
       case 'year': return String((state.startYear || 2026) + Math.floor((state.turn || 0) / 52));
       case 'milestone': return milestoneLabel(data, context.milestone);
+      case 'country': return context.country || 'um país vizinho';
+      case 'bloc': return context.bloc || 'o bloco';
+      case 'zone': return context.zone || 'a região disputada';
       default: return m;
     }
   });
@@ -375,6 +408,12 @@ export function eligibleContext(state, data, event, { mode = 'random', base = {}
   if (mode !== 'scheduled') {
     if (isFollowUp(event)) return null;
     if (h?.lastTurn != null && state.turn - h.lastTurn < (event.cooldownWeeks ?? 26)) return null;
+    const cap = event.maxCount ?? (event.once ? 1 : DEFAULT_MAX_COUNT[mode]);
+    if (cap != null && (h?.count || 0) >= cap) return null;
+    if (event.group) {
+      const g = groupLastTurn(state, data, event.group);
+      if (g != null && state.turn - g < groupCooldown(data, event.group)) return null;
+    }
     if (t.minTurn != null && state.turn < t.minTurn) return null;
     if (t.maxTurn != null && state.turn > t.maxTurn) return null;
   }
@@ -442,17 +481,21 @@ function pushEventDecision(state, data, event, context, source) {
   if (event.portrait === 'crew' && context.person) portrait = { crewId: context.person };
   else if (event.portrait === 'actor') portrait = { actorId: context.rival || state.playerId };
   const op = event.kind === 'operation';
+  // repeat showings cycle through the text variants (the first showing uses the main text)
+  const V = Array.isArray(event.variants) ? event.variants : [];
+  const k = V.length ? (h.count - 1) % (V.length + 1) : 0;
+  const vt = k ? V[k - 1] : null;
   const d = pushDecision(state, {
     kind: `event/${event.id}`,
-    title: R(event.title),
-    body: R(event.text),
+    title: R(vt?.title || event.title),
+    body: R(vt?.text || event.text),
     portrait,
     choices,
     urgency: event.urgency ?? (op ? 3 : 2),
     blocking: false,
     expiresTurn: state.turn + (op ? OPERATION_EXPIRE_WEEKS : NARRATIVE_EXPIRE_WEEKS),
     defaultChoice: def?.id,
-    payload: { eventId: event.id, context, source, eventKind: event.kind || 'narrative' },
+    payload: { eventId: event.id, context, source, eventKind: event.kind || 'narrative', ...(k ? { variant: k } : {}) },
   });
   state.stats ||= {};
   state.stats['narrative.shown'] = (state.stats['narrative.shown'] || 0) + 1;
@@ -665,6 +708,9 @@ function signalContext(state, sig) {
   if (actor && actor !== state.playerId) base.rival = actor;
   if (sig.type === 'tension/changed') base.rival = sig.a === state.playerId ? sig.b : sig.a;
   if (sig.milestoneId) base.milestone = sig.milestoneId;
+  if (sig.countryName) base.country = sig.countryName;
+  if (sig.zoneName) base.zone = sig.zoneName;
+  if (sig.blocId && state.blocs?.[sig.blocId]) base.bloc = state.blocs[sig.blocId].short || state.blocs[sig.blocId].name;
   return base;
 }
 
@@ -882,6 +928,19 @@ export function validateEvent(event, data, eventIds) {
   if (event.rival != null && !Array.isArray(event.rival)) errors.push(`${w}: rival precisa ser lista`);
   if (event.tags != null && !Array.isArray(event.tags)) errors.push(`${w}: tags precisa ser lista`);
   if (event.urgency != null && ![1, 2, 3].includes(event.urgency)) errors.push(`${w}: urgency 1..3`);
+  if (event.group != null && !/^[a-z0-9_]+$/.test(String(event.group))) errors.push(`${w}: group inválido`);
+  if (event.maxCount != null && !(Number.isInteger(event.maxCount) && event.maxCount >= 1)) errors.push(`${w}: maxCount >= 1`);
+  if (event.variants != null) {
+    if (!Array.isArray(event.variants)) errors.push(`${w}: variants precisa ser lista`);
+    else event.variants.forEach((v, i) => {
+      const vw = `${w}.variants[${i}]`;
+      if (!v || typeof v !== 'object' || (!v.title && !v.text)) { errors.push(`${vw}: precisa de title ou text`); return; }
+      for (const k2 of Object.keys(v)) if (!['title', 'text'].includes(k2)) errors.push(`${vw}: chave desconhecida "${k2}"`);
+      if (v.text && (v.text.length < 120 || v.text.length > 700)) errors.push(`${vw}: texto fora de 120..700`);
+      checkPlaceholders(v.title, `${vw}.title`, errors);
+      checkPlaceholders(v.text, `${vw}.text`, errors);
+    });
+  }
   const t = event.trigger || {};
   if (event.trigger != null && typeof event.trigger !== 'object') errors.push(`${w}: trigger`);
   for (const k of Object.keys(t)) if (!TRIGGER_KEYS.includes(k)) errors.push(`${w}.trigger: chave desconhecida "${k}"`);

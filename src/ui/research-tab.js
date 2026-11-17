@@ -1,5 +1,7 @@
-// Pesquisa: árvore de tecnologia em grafo (estilo KSP). Colunas = níveis (profundidade de pré-requisitos),
-// faixas = ramos, conectores em cotovelo num SVG atrás dos nós. Arrastar = mover, pinça/roda = zoom
+// Pesquisa: árvore de tecnologia em grafo (estilo KSP). No celular em retrato os níveis (profundidade de
+// pré-requisitos) descem de cima para baixo e cada ramo é um grupo de colunas; os grupos quebram em linhas
+// (3 por linha num 375x812, escolhido por pickLayout para a visão geral caber grande). layoutTree (níveis da
+// esquerda para a direita, ramos em faixas) continua exportado. Conectores em cotovelo num SVG atrás dos nós. Arrastar = mover, pinça/roda = zoom
 // (só `transform` no "mundo"; nada é re-renderizado durante o gesto). Toque num nó destaca a cadeia
 // (o que ele exige e o que ele libera) e abre a folha com abordagens Segura/Ousada.
 // Layout/cadeia são funções puras exportadas (testadas em Node, tests/techtree.test.mjs).
@@ -123,6 +125,54 @@ export function edgeState(from, to) {
 }
 
 /**
+ * Lane (row in the left→right tree, column in the top→bottom one) of every node of one branch: lanes follow the
+ * barycenter of same-branch parents (so chains run straight), then roots move next to the children they feed;
+ * an integer `row` on the node overrides. Returns { rows: {id: lane}, R: lane count }.
+ */
+function branchRows(list, bid, tiers, maxTier, byId, kids) {
+  const rowOf = {};
+  const cols = Array.from({ length: maxTier + 1 }, () => []);
+  for (const n of list) cols[tiers[n.id]].push(n);
+  let R = Math.max(1, ...cols.map((c) => c.length));
+  for (const n of list) if (Number.isInteger(n.row) && n.row >= 0) R = Math.max(R, n.row + 1);
+  const mean = (ids) => {
+    const v = ids.filter((x) => byId[x]?.branch === bid && rowOf[x] != null).map((x) => rowOf[x]);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const assign = (col, keyFn) => {
+    const taken = new Set();
+    for (const n of col) if (Number.isInteger(n.row) && n.row >= 0 && !taken.has(n.row)) { rowOf[n.id] = n.row; taken.add(n.row); }
+    const rest = col.filter((n) => !(Number.isInteger(n.row) && rowOf[n.id] === n.row && taken.has(n.row)))
+      .map((n, i) => ({ n, i, k: keyFn(n) }));
+    const keyed = rest.filter((e) => e.k != null).sort((a, b) => a.k - b.k || a.i - b.i);
+    const free = rest.filter((e) => e.k == null);
+    for (const e of keyed) {
+      const want = Math.max(0, Math.min(R - 1, Math.round(e.k)));
+      let pick = null;
+      for (let d = 0; d < R && pick == null; d++) {
+        if (want - d >= 0 && !taken.has(want - d)) pick = want - d;
+        else if (want + d < R && !taken.has(want + d)) pick = want + d;
+      }
+      rowOf[e.n.id] = pick ?? 0;
+      taken.add(rowOf[e.n.id]);
+    }
+    for (const e of free) {
+      let r = 0;
+      while (taken.has(r) && r < R) r++;
+      rowOf[e.n.id] = r;
+      taken.add(r);
+    }
+  };
+  const forward = () => { for (let t = 1; t <= maxTier; t++) assign(cols[t], (n) => mean(n.requires || [])); };
+  assign(cols[0], () => null);
+  forward();
+  // second sweep: roots move next to the children they feed, then the rest follows again
+  assign(cols[0], (n) => mean(kids[n.id] || []));
+  forward();
+  return { rows: rowOf, R };
+}
+
+/**
  * Graph layout. Returns { pos: {id: {x, y, tier, row, branch}}, bands: [{id, name, icon, color, y, h, rows}],
  * edges: [{from, to, d, points}], width, height, tiers }.
  * Rows inside a branch band follow the barycenter of same-branch parents (so chains run straight), `row` overrides.
@@ -141,44 +191,8 @@ export function layoutTree(nodes, branches = [], geom = {}) {
   for (const bid of order) {
     const list = nodes.filter((n) => n.branch === bid);
     if (!list.length) continue;
-    const cols = Array.from({ length: maxTier + 1 }, () => []);
-    for (const n of list) cols[tiers[n.id]].push(n);
-    let R = Math.max(1, ...cols.map((c) => c.length));
-    for (const n of list) if (Number.isInteger(n.row) && n.row >= 0) R = Math.max(R, n.row + 1);
-    const mean = (ids) => {
-      const v = ids.filter((x) => byId[x]?.branch === bid && rowOf[x] != null).map((x) => rowOf[x]);
-      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
-    };
-    const assign = (col, keyFn) => {
-      const taken = new Set();
-      for (const n of col) if (Number.isInteger(n.row) && n.row >= 0 && !taken.has(n.row)) { rowOf[n.id] = n.row; taken.add(n.row); }
-      const rest = col.filter((n) => !(Number.isInteger(n.row) && rowOf[n.id] === n.row && taken.has(n.row)))
-        .map((n, i) => ({ n, i, k: keyFn(n) }));
-      const keyed = rest.filter((e) => e.k != null).sort((a, b) => a.k - b.k || a.i - b.i);
-      const free = rest.filter((e) => e.k == null);
-      for (const e of keyed) {
-        const want = Math.max(0, Math.min(R - 1, Math.round(e.k)));
-        let pick = null;
-        for (let d = 0; d < R && pick == null; d++) {
-          if (want - d >= 0 && !taken.has(want - d)) pick = want - d;
-          else if (want + d < R && !taken.has(want + d)) pick = want + d;
-        }
-        rowOf[e.n.id] = pick ?? 0;
-        taken.add(rowOf[e.n.id]);
-      }
-      for (const e of free) {
-        let r = 0;
-        while (taken.has(r) && r < R) r++;
-        rowOf[e.n.id] = r;
-        taken.add(r);
-      }
-    };
-    const forward = () => { for (let t = 1; t <= maxTier; t++) assign(cols[t], (n) => mean(n.requires || [])); };
-    assign(cols[0], () => null);
-    forward();
-    // second sweep: roots move next to the children they feed, then the rest follows again
-    assign(cols[0], (n) => mean(kids[n.id] || []));
-    forward();
+    const { rows, R } = branchRows(list, bid, tiers, maxTier, byId, kids);
+    Object.assign(rowOf, rows);
     const style = BRANCH_STYLE[bid] || {};
     const b = branches.find((x) => x.id === bid) || {};
     const hgt = G.bandPadT + R * G.rowH - (G.rowH - G.tile) + G.bandPadB;
@@ -231,6 +245,128 @@ export function layoutTree(nodes, branches = [], geom = {}) {
 function pathOf(pts) {
   const clean = pts.filter((p, i) => i === 0 || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]);
   return clean.map((p, i) => `${i ? 'L' : 'M'}${Math.round(p[0] * 10) / 10} ${Math.round(p[1] * 10) / 10}`).join(' ');
+}
+
+/** Geometry of the portrait (top→bottom) layout: tiers are rows, a branch's lanes are columns. */
+export const VGEOM = { tile: 80, colW: 96, rowH: 110, bandPadT: 30, bandPadB: 12, padL: 8, padR: 8, groupGap: 10, rowGap: 12, padT: 4, padB: 6, padX: 4 };
+
+/**
+ * Branch order for the grid: data order, except that a branch whose nodes require another branch's nodes comes
+ * after it (stable topological sort), so cross-branch lines run forward (right / down) between neighbours.
+ */
+export function branchOrder(nodes, branches = []) {
+  const order = branches.map((b) => b.id);
+  for (const n of nodes) if (!order.includes(n.branch)) order.push(n.branch);
+  const present = order.filter((bid) => nodes.some((n) => n.branch === bid));
+  const branchOf = Object.fromEntries(nodes.map((n) => [n.id, n.branch]));
+  const deps = Object.fromEntries(present.map((b) => [b, new Set()]));
+  for (const n of nodes) {
+    for (const r of n.requires || []) {
+      const rb = branchOf[r];
+      if (rb && rb !== n.branch && deps[n.branch] && deps[rb]) deps[n.branch].add(rb);
+    }
+  }
+  const out = [];
+  const left = [...present];
+  while (left.length) {
+    // earliest branch (data order) whose feeders are all placed; a cycle falls back to data order
+    let i = left.findIndex((b) => [...deps[b]].every((d) => out.includes(d)));
+    if (i < 0) i = 0;
+    out.push(left.splice(i, 1)[0]);
+  }
+  return out;
+}
+
+/**
+ * Portrait layout: tiers run top→bottom, each branch is a column group (its lanes side by side) and the groups wrap
+ * `perRow` to a grid row. Same return shape as layoutTree (+ orient 'v', bands carry x/w, pos carries col/grid).
+ * Lines leave a node's bottom and enter the child's top, bending only in the empty gutters between tiers and lanes.
+ */
+export function layoutGrid(nodes, branches = [], perRow = 3, geom = {}) {
+  const G = { ...VGEOM, ...geom };
+  const tiers = computeTiers(nodes);
+  const kids = childrenMap(nodes);
+  const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  const order = branchOrder(nodes, branches);
+  const maxTier = Math.max(0, ...Object.values(tiers));
+  const per = Math.max(1, Math.min(order.length || 1, Math.round(perRow) || 1));
+  const groups = order.map((bid) => {
+    const list = nodes.filter((n) => n.branch === bid);
+    const { rows, R } = branchRows(list, bid, tiers, maxTier, byId, kids);
+    return { bid, list, rows, R, w: G.padL + R * G.colW - (G.colW - G.tile) + G.padR, deep: Math.max(0, ...list.map((n) => tiers[n.id])) };
+  });
+  const pos = {};
+  const bands = [];
+  const grids = [];
+  let y = G.padT;
+  let width = 0;
+  for (let g = 0; g * per < groups.length; g++) {
+    const row = groups.slice(g * per, g * per + per);
+    const deep = Math.max(0, ...row.map((x) => x.deep));
+    const hgt = G.bandPadT + (deep + 1) * G.rowH - (G.rowH - G.tile) + G.bandPadB;
+    let x = G.padX;
+    for (const gr of row) {
+      const style = BRANCH_STYLE[gr.bid] || {};
+      const b = branches.find((q) => q.id === gr.bid) || {};
+      bands.push({ id: gr.bid, name: b.name || gr.bid, icon: b.icon || style.icon || '✦', color: b.color || style.color || '#98a3bf', x, y, w: gr.w, h: hgt, rows: gr.R, grid: g });
+      for (const n of gr.list) {
+        const col = gr.rows[n.id];
+        pos[n.id] = { x: x + G.padL + col * G.colW, y: y + G.bandPadT + tiers[n.id] * G.rowH, tier: tiers[n.id], row: col, col, grid: g, branch: n.branch };
+      }
+      x += gr.w + G.groupGap;
+    }
+    width = Math.max(width, x - G.groupGap + G.padX);
+    grids.push({ y, h: hgt });
+    y += hgt + G.rowGap;
+  }
+  const height = y - G.rowGap + G.padB;
+  const vgap = G.rowH - G.tile, hgap = G.colW - G.tile, half = G.tile / 2;
+  // some node sits in column x of grid row g strictly between two tiers
+  const blocked = (x, g, t0, t1) => Object.values(pos).some((q) => q.x === x && q.grid === g && q.tier > t0 && q.tier < t1);
+  const edges = [];
+  for (const n of nodes) {
+    const c = pos[n.id];
+    if (!c) continue;
+    for (const rid of n.requires || []) {
+      const p = pos[rid];
+      if (!p) continue;
+      const pcx = p.x + half, ccx = c.x + half, pB = p.y + G.tile, cT = c.y;
+      // cross-branch runs bend nearer the node they leave/enter, so they never share a gutter line with a branch's own
+      const off = p.branch !== c.branch ? vgap / 4 : 0;
+      const below = pB + vgap / 2 - off; // gutter under the parent's tier
+      const above = cT - vgap / 2 + off; // gutter over the child's tier
+      const laneP = p.x + G.tile + hgap / 2; // empty lane right of the parent
+      const laneC = c.x - hgap / 2; // empty lane left of the child
+      let pts;
+      if (p.grid === c.grid && c.tier > p.tier) {
+        if (c.tier === p.tier + 1) pts = [[pcx, pB], [pcx, below], [ccx, below], [ccx, cT]];
+        else if (!blocked(p.x, p.grid, p.tier, c.tier)) pts = [[pcx, pB], [pcx, above], [ccx, above], [ccx, cT]];
+        else if (!blocked(c.x, c.grid, p.tier, c.tier)) pts = [[pcx, pB], [pcx, below], [ccx, below], [ccx, cT]];
+        else pts = [[pcx, pB], [pcx, below], [laneC, below], [laneC, above], [ccx, above], [ccx, cT]];
+      } else if (c.grid > p.grid) {
+        // down the parent's lane to the channel between grid rows, across, then down the child's lane
+        const ch = grids[c.grid].y - G.rowGap / 2;
+        pts = [[pcx, pB], [pcx, below], [laneP, below], [laneP, ch], [laneC, ch], [laneC, above], [ccx, above], [ccx, cT]];
+      } else {
+        // backwards (branch cycle or odd tier overrides): around through the lanes
+        pts = [[pcx, pB], [pcx, below], [laneP, below], [laneP, above], [ccx, above], [ccx, cT]];
+      }
+      edges.push({ from: rid, to: n.id, points: pts, d: pathOf(pts) });
+    }
+  }
+  return { pos, bands, edges, width, height, tiers, geom: G, orient: 'v', perRow: per };
+}
+
+/** The portrait grid (branches per row from 1 to all) that shows the whole tree biggest in a vw×vh viewport. */
+export function pickLayout(nodes, branches, vw, vh) {
+  const n = Math.max(1, branchOrder(nodes, branches).length);
+  let best = null;
+  for (let k = 1; k <= n; k++) {
+    const lay = layoutGrid(nodes, branches, k);
+    const s = Math.min(vw / Math.max(1, lay.width), vh / Math.max(1, lay.height));
+    if (!best || s > best.s + 1e-9) best = { s, lay };
+  }
+  return best.lay;
 }
 
 /** Transform that fits world rect {x, y, w, h} in a vw×vh viewport (scale clamped to [min, max]). */
@@ -337,8 +473,21 @@ function legend() {
       h('span', { class: `tt-leg ns-${s}` }, h('i', { 'aria-hidden': 'true' }, STATE_GLYPH[s]), STATE_LABELS[s])));
 }
 
+/**
+ * Rough size of the tree viewport before it is laid out (fitHeight sets the real one), used to pick how many branch
+ * groups go side by side: 375x812 → 3 per row, a phone on its side → wider rows.
+ */
+function viewportGuess() {
+  const W = attempt(() => window.innerWidth, 375) || 375;
+  const H = attempt(() => window.innerHeight, 812) || 812;
+  const w = Math.min(W, 480) - 26; // .view-pad padding + borders (.shell is capped at 480px)
+  const h = Math.max(160, H - (H < 700 ? 300 : 340)); // header, science card, legend, action bar
+  return { w, h };
+}
+
 function treeView(store, nodes, branches) {
-  const lay = layoutTree(nodes, branches);
+  const guess = viewportGuess();
+  const lay = pickLayout(nodes, branches, guess.w, guess.h);
   const G = lay.geom;
   const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
   const NS = 'http://www.w3.org/2000/svg';
@@ -360,7 +509,9 @@ function treeView(store, nodes, branches) {
     edgeEls.push({ el: p, from: e.from, to: e.to });
   }
   const bands = lay.bands.map((b) => h('div', {
-    class: 'tt-band', style: { top: `${b.y}px`, height: `${b.h}px`, width: `${lay.width}px`, '--band': b.color },
+    class: `tt-band${b.x != null ? ' tt-band-col' : ''}`,
+    style: { left: `${b.x ?? 0}px`, top: `${b.y}px`, height: `${b.h}px`, width: `${b.w ?? lay.width}px`, '--band': b.color },
+    title: b.name,
   }, h('span', { class: 'tt-band-label' }, h('span', { 'aria-hidden': 'true' }, b.icon), ` ${b.name}`)));
   const tiles = {};
   for (const n of nodes) {

@@ -102,9 +102,21 @@ export function isHistoricFirst(state, milestoneId) {
   return !!state?.firstsHistory?.[String(milestoneId).split(':')[0]];
 }
 
+/**
+ * Share of the destination's first points a milestone pays (data/scenario.json firstShares, default 1): a sub-first
+ * of a bigger feat (people at the lunar south pole, after people on the Moon) is worth less than the feat itself.
+ */
+export function milestoneShare(data, milestoneId) {
+  const v = data?.scenario?.firstShares?.[String(milestoneId).split(':')[0]];
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+}
+
 /** Prestige the first actor of the era gets for a milestone (full for true firsts, a share for historic ones). */
 export function firstValue(state, milestoneId, prestigeFirst = 30) {
-  return isHistoricFirst(state, milestoneId) ? Math.round(prestigeFirst * HISTORIC_FIRST_SHARE) : prestigeFirst;
+  if (!isHistoricFirst(state, milestoneId)) return prestigeFirst;
+  // a historic feat may carry its own share (scenario.historicalFirsts[id].share): the race's headline feat is worth more
+  const share = state.firstsHistory[String(milestoneId).split(':')[0]]?.share;
+  return Math.round(prestigeFirst * (Number.isFinite(share) ? share : HISTORIC_FIRST_SHARE));
 }
 
 /**

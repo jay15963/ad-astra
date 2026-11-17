@@ -12,18 +12,14 @@ import { rngFor, hash32 } from '../core/rng.js';
 import { OUTCOME_LABELS, FAILURE_LABELS, FAILURE_DESCRIPTIONS, pickFailureType } from '../core/outcome.js';
 
 // ---------- tuning ----------
-export const MAX_INTERVENTIONS = 3;
-const SUDDEN = 0.3; // share of the failure zone that fails with no warning
-const REDUCE_FAIL = 0.72; // reduce: critical anomaly still fails if roll < pf * this (tuned so the shown chance stays honest)
-const CONTINGENCY_FAIL = 0.6; // contingency: same, stronger fix; on a minor anomaly it burns margin (overreaction)
+// Resolution numbers live in risk.SCENE: risk.sceneOdds computes the shown chance from the same rules (honest odds).
+const { SUDDEN, REDUCE_FAIL, CONTINGENCY_FAIL, MINOR_MAINTAIN_FAIL, REDUCE_PF_MULT, SENSOR_PF_MULT } = risk.SCENE;
+export const MAX_INTERVENTIONS = risk.SCENE.MAX_INTERVENTIONS;
 const CONTINGENCY_MARGIN = 0.08; // margin burned by a contingency on a minor anomaly (overreaction has a price)
 // Command points are a pool shared by every scene (GDD: "um recurso escasso"): spent points come back
 // one at a time, every CP_REGEN_WEEKS weeks, up to the cap set by the best flight director (crew.commandPointsFor).
 export const CP_REGEN_WEEKS = 4;
-const MINOR_MAINTAIN_FAIL = 0.5; // maintaining through a minor anomaly: fails if 2nd roll < pf * this
 const REDUCE_MARGIN = 0.07; // margin consumed by each reduction
-const REDUCE_PF_MULT = 1.12; // later milestones get riskier after a reduction
-const SENSOR_PF_MULT = 1.4;
 
 const STRATEGY_IDS = ['conservative', 'balanced', 'aggressive'];
 const STRATEGY_LABELS = { conservative: 'Conservadora', balanced: 'Equilibrada', aggressive: 'Agressiva' };
@@ -199,7 +195,7 @@ function nameSaysDest(al) {
 
 // ---------- helpers ----------
 
-const r3 = (x) => Math.round(x * 1000) / 1000;
+const r3 = (x) => Math.round(x * 1000) / 1000 + 0; // + 0: never -0 (JSON round-trip)
 const pct = (x) => `${Math.round(x * 100)}%`;
 /** Small risks keep a decimal ("0,4%", "<0,1%") so a cause never reads "risco de 0%". */
 const pctFine = (x) => {
@@ -229,15 +225,7 @@ function pick(seed, list, ...labels) {
 }
 
 function groupOf(id) {
-  if (MS_RADIO[id] && PROMPTS[id]) return id;
-  const s = String(id);
-  if (/insert|loi|moi|capture|captura|orbit/.test(s)) return 'insertion';
-  if (/touch|land|pouso|contact/.test(s)) return 'landing';
-  if (/descent|descida|pdi|braking/.test(s)) return 'descent';
-  if (/entry|edl|reentr|atmos|aero/.test(s)) return 'entry';
-  if (/dock|acopl|rendez/.test(s)) return 'dock';
-  if (/deploy|rover|ops|science|sample|amostra/.test(s)) return 'deploy';
-  return 'generic';
+  return risk.msGroup(id);
 }
 
 function personName(state, id) {
@@ -318,11 +306,17 @@ function commandPointsFor(state, data, crewSel) {
 /** Recompute estimate + milestone risks from the current lineup/weather (only while milestones are pending). */
 function rebuild(state, data, al) {
   const mission = findMission(state, al.missionId) || al.snapshot;
-  const est = risk.missionRisk(state, data, planFor(state, mission, al));
+  // the lineup sets the ceiling; the agency's pool (what earlier scenes left) sets what is really there
+  const cap = commandPointsFor(state, data, { ...(mission?.crew || {}), flightDirector: al.lineup.flightDirector, commander: al.lineup.commander });
+  al.commandPoints = Math.max(0, Math.min(cap, Number.isFinite(al.pool) ? al.pool : cap));
+  al.commandPointsCap = cap;
+  al.commandPointsStart = al.commandPoints;
+  state.commandPoints = al.commandPoints;
+  const est = risk.missionRisk(state, data, { ...planFor(state, mission, al), commandPoints: al.commandPoints });
   const list = (est.milestones || []).filter((m) => m.phase === al.phase);
-  let ms = list.map((m) => ({ id: m.id, label: m.label, t: m.t, pFail: m.pFail, anomalyBand: m.anomalyBand, failureWeights: m.failureWeights, phase: m.phase, status: 'pending', radio: [], ...(m.radio ? { dataRadio: m.radio } : {}) }));
+  let ms = list.map((m) => ({ id: m.id, label: m.label, t: m.t, pFail: m.pFail, anomalyBand: m.anomalyBand, failureWeights: m.failureWeights, phase: m.phase, status: 'pending', radio: [], ...(Number.isFinite(m.pEscape) ? { pEscape: m.pEscape } : {}), ...(m.radio ? { dataRadio: m.radio } : {}) }));
   if (!ms.length) {
-    const pf = al.phase === 'arrival' ? clamp(1 - (est.pArrival ?? 0.97), 0.01, 0.5) : clamp(1 - (est.p ?? 0.9), 0.01, 0.6);
+    const pf = al.phase === 'arrival' ? clamp(1 - (est.pArrivalRaw ?? est.pArrival ?? 0.97), 0.01, 0.5) : clamp(1 - (est.pRaw ?? est.p ?? 0.9), 0.01, 0.6);
     ms = [{ id: al.phase === 'arrival' ? 'arrival' : 'orbit', label: al.phase === 'arrival' ? 'Chegada' : 'Inserção orbital', t: 10, pFail: pf, anomalyBand: 0.06, failureWeights: { propulsion: 0.35, structure: 0.2, software: 0.25, human: 0.1, environment: 0.1 }, phase: al.phase, status: 'pending', radio: [] }];
   }
   ms[ms.length - 1].climax = true;
@@ -338,24 +332,86 @@ function rebuild(state, data, al) {
   }
   // keep statuses/radio of already-resolved milestones (rebuild is only called before the first step)
   al.milestones = ms;
-  const pPhase = ms.reduce((p, m) => p * (1 - m.pFail), 1);
-  const shift = modFactor ? modFactor.delta : 0;
-  al.estimate = { p: r3(clamp(est.p + shift, 0.01, 0.995)), low: r3(clamp(est.low + shift, 0.01, 0.99)), high: r3(clamp(est.high + shift, 0.02, 0.995)), factors: modFactor ? [...est.factors, modFactor] : est.factors, warnings: est.warnings, errors: est.errors, valid: est.valid, pPhase: r3(pPhase), pAscent: est.pAscent, pArrival: est.pArrival };
+  al.pRawPhase = r3(ms.reduce((p, m) => p * (1 - m.pFail), 1));
+  // mission-level numbers (risk.missionRisk) the phase chance is derived from
+  al.mission = { p: est.p, low: est.low, high: est.high, pArrival: est.pArrival ?? 1, modFactor, factors: est.factors || [], warnings: est.warnings || [] };
+  al.estimate = { errors: est.errors, valid: est.valid, pAscent: est.pAscent, pArrival: est.pArrival };
   al.prestigeMult = est.prestigeMult ?? 1;
   al.scienceMult = est.scienceMult ?? 1;
   al.vehicleFlights = est.vehicleFlights ?? 0;
-  // the lineup sets the ceiling; the agency's pool (what earlier scenes left) sets what is really there
-  const cap = commandPointsFor(state, data, { ...(mission?.crew || {}), flightDirector: al.lineup.flightDirector, commander: al.lineup.commander });
-  al.commandPoints = Math.max(0, Math.min(cap, Number.isFinite(al.pool) ? al.pool : cap));
-  al.commandPointsCap = cap;
-  al.commandPointsStart = al.commandPoints;
-  state.commandPoints = al.commandPoints;
+  phaseOdds(state, data, al);
   return al;
 }
 
+/** Index of the milestone a real sensor fault makes riskier ('go' through a sensor hold). */
+function sensorIndexOf(n) {
+  return Math.min(n - 1, Math.max(1, Math.floor(n / 2)));
+}
+
+/** Escape chance at milestone i when the estimate did not carry one (fallback milestones). */
+function escapeAt(state, data, al, i) {
+  const m = al.milestones[i];
+  if (Number.isFinite(m?.pEscape)) return m.pEscape;
+  const orbit = al.milestones.findIndex((x) => x.id === 'orbit');
+  return risk.escapeChance(data, {
+    phase: al.phase, early: al.phase === 'ascent' && i < orbit, crewSafety: crewSafety(state),
+    fuelMargin: al.lineup.fuelMargin, strategy: al.lineup.strategy, survival: safe(crew.survivalBonus, [state, data, al.crewIds], 0),
+  });
+}
+
+/**
+ * The chance shown in the scene: exact odds of THIS phase (risk.sceneOdds, same rules as the rolls) with the
+ * scene's Command points, frozen nerves and the flight director's standard play. Also freezes al.nervesMult.
+ */
+function phaseOdds(state, data, al) {
+  al.nervesMult = r3(risk.nervesMult(al.nerves));
+  const n = al.milestones.length;
+  const fd = al.lineup.flightDirector;
+  const hasCrew = al.crewed && al.crewIds.length > 0;
+  if (hasCrew) al.milestones.forEach((m, i) => { if (!Number.isFinite(m.pEscape)) m.pEscape = r3(escapeAt(state, data, al, i)); });
+  const opts = {
+    phase: al.phase, crewed: al.crewed, cp: al.commandPoints, hasFD: !!fd, acc: risk.hintAccuracy(fd ? skillOf(state, fd) : NaN),
+    nervesMult: al.nervesMult, pfMult: al.pfMult || 1, escape: (i) => (hasCrew ? al.milestones[i].pEscape : 1),
+  };
+  let o = risk.sceneOdds(al.milestones, opts);
+  if (al.hold?.reason === 'sensor' && al.hold.choice === 'go' && n > 1) {
+    // nobody knows if the alarm was real: half the time it was
+    const o2 = risk.sceneOdds(al.milestones, { ...opts, sensorIndex: sensorIndexOf(n) });
+    o = { p: (o.p + o2.p) / 2, pCrewLoss: (o.pCrewLoss + o2.pCrewLoss) / 2 };
+  }
+  const M = al.mission || { p: o.p, low: o.p, high: o.p, pArrival: 1, factors: [], warnings: [] };
+  // band: same width in failure space as the mission estimate
+  const rl = M.p < 0.9999 ? (1 - M.low) / (1 - M.p) : 1.3;
+  const rh = M.p < 0.9999 ? (1 - M.high) / (1 - M.p) : 0.7;
+  const p = clamp(o.p, 0.01, 0.995);
+  const kPhase = al.pRawPhase < 0.9999 ? clamp((1 - p) / (1 - al.pRawPhase), 0.2, 3) : 1;
+  const mf = M.modFactor ? { ...M.modFactor, delta: r3(M.modFactor.delta * kPhase) } : null;
+  const pMission = al.phase === 'ascent' && al.arrivalAhead ? p * (M.pArrival ?? 1) : p;
+  const pCrewLoss = hasCrew ? o.pCrewLoss : 0;
+  const warnings = (M.warnings || []).filter((w) => !String(w).startsWith('Risco estimado de perder a tripulação'));
+  const extra = [];
+  if (hasCrew) extra.push(`Risco de perder a tripulação ${al.phase === 'arrival' ? 'na chegada' : 'nesta subida'}: ${risk.pctFine ? risk.pctFine(pCrewLoss) : pct(pCrewLoss)}.`);
+  if (al.phase === 'ascent' && al.arrivalAhead) extra.push(`A chance mostrada é da subida; com a chegada, a missão completa tem ~${pct(pMission)}.`);
+  const base = al.estimate || {};
+  al.estimate = {
+    ...base,
+    p: r3(p),
+    low: r3(clamp(1 - (1 - p) * rl, 0.01, p)),
+    high: r3(clamp(1 - (1 - p) * rh, p, 0.995)),
+    factors: mf ? [...(M.factors || []), mf] : [...(M.factors || [])],
+    warnings: [...extra, ...warnings],
+    pPhase: r3(p),
+    pPhaseRaw: al.pRawPhase,
+    pMission: r3(pMission),
+    pCrewLoss: r3(pCrewLoss),
+    commandPoints: al.commandPoints,
+  };
+  return al.estimate;
+}
+
 function initialMood(al) {
-  const p = al.estimate?.pPhase ?? 0.9;
-  al.nerves = Math.round(clamp(22 + (1 - p) * 90 + (al.weather?.risk ?? 0) * 30 + (al.crewed ? 10 : 0), 5, 90));
+  const p = al.pRawPhase ?? 0.9;
+  al.nerves = risk.initialNerves(p, al.weather?.risk ?? 0, al.crewed);
   al.confidence = Math.round(clamp(p * 100 - 8, 10, 95));
 }
 
@@ -368,9 +424,10 @@ function bump(al, dn, dc) {
 function effPF(al, i) {
   const m = al.milestones[i];
   let pf = m.pFail * (al.pfMult || 1);
-  pf *= 1 + Math.max(0, al.nerves - 60) / 200; // nervous room = human factor
+  // nervous room = human factor (frozen when the countdown ends, so the shown chance can price it)
+  pf *= Number.isFinite(al.nervesMult) ? al.nervesMult : risk.nervesMult(al.nerves);
   if (al.sensorIssue && al.sensorIssue.index === i) pf *= SENSOR_PF_MULT;
-  return clamp(pf, 0, 0.95);
+  return clamp(pf, 0, risk.SCENE.PF_MAX);
 }
 
 /** 'sudden' | 'critical' | 'minor' | 'ok' for milestone i at failure probability pf. */
@@ -382,14 +439,13 @@ function classify(al, i, pf) {
   return 'ok';
 }
 
-/** Ensure 1-3 interventions: force a minor anomaly if none happened and none is coming. */
+/**
+ * At least one card per scene: a clean roll at the countdown's forcedIndex becomes a scare (a minor-looking
+ * anomaly that is a false alarm: riding it out is safe) when no card came before it. No look-ahead, so
+ * risk.sceneOdds can price it exactly.
+ */
 function shouldForce(al, i) {
-  if (al.interventions.length > 0 || al.forcedIndex == null || i < al.forcedIndex) return false;
-  for (let j = i + 1; j < al.milestones.length; j++) {
-    const k = classify(al, j, effPF(al, j));
-    if (k === 'critical' || k === 'minor') return false;
-  }
-  return true;
+  return al.forcedIndex != null && i === al.forcedIndex && al.interventions.length === 0 && !(al.autoHandled || []).length;
 }
 
 // ---------- scene lifecycle ----------
@@ -452,6 +508,7 @@ export function openScene(state, data, missionId, phase = 'ascent') {
   state.activeLaunch = al;
   rebuild(state, data, al);
   initialMood(al);
+  phaseOdds(state, data, al);
   const s0 = hash32(state.seed, 'intro', missionId, phase, state.turn);
   pushLog(state, al, -60, 'radio', pick(s0, phase === 'arrival' ? RADIO.introArrival : RADIO.intro, 'intro'));
   pushLog(state, al, -60, 'telemetry', `Clima: ${al.weather.label}`);
@@ -566,7 +623,10 @@ function resolveNext(state, data, al) {
   const pf = effPF(al, i);
   m.pEff = r3(pf);
   let kind = classify(al, i, pf);
-  if (kind === 'ok' && shouldForce(al, i)) kind = 'minor';
+  if (kind === 'ok' && shouldForce(al, i)) {
+    kind = 'minor';
+    m.forced = true;
+  }
   if (kind === 'sudden') return milestoneFail(state, al, i, 'sudden');
   if (kind === 'ok') return milestoneOk(state, al, i, 'clean');
   // anomaly
@@ -614,7 +674,7 @@ function applyOption(state, al, i, optionId, auto = false) {
     bump(al, -10, 4);
   } else {
     // maintain
-    fail = severity === 'critical' || roll(al.seed, 'ms2', i) < pf * MINOR_MAINTAIN_FAIL;
+    fail = severity === 'critical' || (!m.forced && roll(al.seed, 'ms2', i) < pf * MINOR_MAINTAIN_FAIL);
     bump(al, 6, -2);
   }
   if (rec) rec.saved = !fail && severity === 'critical';
@@ -640,25 +700,12 @@ function concludeSuccess(state, al) {
 
 function concludeFailure(state, al, i, ft, how) {
   const m = al.milestones[i];
-  const g = groupOf(m.id);
-  const sev = roll(al.seed, 'sev', i);
-  let level;
-  if (al.phase === 'ascent') {
-    if (m.id === 'ignition') level = sev < 0.8 ? 'recoverable' : 'catastrophic';
-    else if (m.id === 'fairing_or_les' || m.id === 'orbit') level = sev < 0.45 ? 'partial' : sev < 0.6 ? 'recoverable' : 'catastrophic';
-    else if (m.id === 'tli') level = sev < 0.5 ? 'partial' : sev < 0.8 ? 'recoverable' : 'catastrophic';
-    else level = 'catastrophic';
-    if (al.crewed && level === 'partial') level = 'recoverable'; // crew comes home early
-  } else if (g === 'insertion') level = sev < 0.35 ? 'partial' : 'catastrophic';
-  else if (g === 'landing' || g === 'descent' || g === 'entry') level = sev < 0.3 ? 'partial' : 'catastrophic';
-  else level = sev < 0.5 ? 'partial' : 'catastrophic';
-
+  // how a failure ends (partial / recoverable / catastrophic) and the escape chance come from risk.js,
+  // the same tables risk.sceneOdds uses for the chance and the crew risk shown before launch
+  const level = risk.failureLevel(risk.failureSplit(m.id, al.phase, al.crewed), roll(al.seed, 'sev', i));
   const extra = { how };
   if (level === 'catastrophic' && al.crewed && al.crewIds.length) {
-    // escape system / abort-to-orbit chance (better before orbit, plus research crewSafety)
-    const early = al.phase === 'ascent' && i < al.milestones.findIndex((x) => x.id === 'orbit');
-    const surv = clamp((early ? 0.7 : al.phase === 'ascent' ? 0.35 : 0.2) + crewSafety(state), 0, 0.95);
-    if (roll(al.seed, 'survive', i) < surv) {
+    if (roll(al.seed, 'survive', i) < (Number.isFinite(m.pEscape) ? m.pEscape : 0.2)) {
       extra.escaped = true;
     } else {
       extra.crewLost = al.crewIds.slice();
@@ -872,6 +919,7 @@ export const actions = {
     }
     rebuild(state, data, al);
     initialMood(al);
+    phaseOdds(state, data, al);
     return { ok: true, estimate: al.estimate };
   },
 
@@ -882,6 +930,7 @@ export const actions = {
     if (al.act !== 'prelaunch') return { ok: false, error: 'A contagem já começou.' };
     rebuild(state, data, al); // final numbers with today's weather
     initialMood(al);
+    phaseOdds(state, data, al);
     // milestone rolls are locked per attempt (scrubbing does not re-roll the flight: "Justiça da sorte");
     // the countdown itself (holds, sensor glitches) is a new day after each scrub
     al.seed = hash32(state.seed, 'launch', al.missionId, al.phase, al.attempt);
@@ -918,6 +967,7 @@ export const actions = {
     if (al.pendingHold) {
       pushLog(state, al, -5, 'event', al.pendingHold.text);
       bump(al, 8, -4);
+      phaseOdds(state, data, al);
     }
     return { ok: true, hold: al.pendingHold, seedLocked: true };
   },
@@ -940,6 +990,7 @@ export const actions = {
     if (choice === 'hold') {
       pushLog(state, al, -4, 'radio', pick(al.seed, RADIO.hold, 'hold'));
       bump(al, -10, 3);
+      phaseOdds(state, data, al);
       if (h.reason === 'weather') {
         if (roll(al.countSeed ?? al.seed, 'holdclear') < 0.72) {
           al.weather = { ...al.weather, risk: r3(al.weather.risk * 0.35), label: `${al.weather.label} (melhorando)` };
@@ -957,6 +1008,7 @@ export const actions = {
     } else {
       pushLog(state, al, -4, 'radio', pick(al.seed, RADIO.goAnyway, 'go'));
       bump(al, 12, -6);
+      phaseOdds(state, data, al);
       if (h.reason === 'sensor' && roll(al.countSeed ?? al.seed, 'sensorReal') < 0.5) {
         const n = al.milestones.length;
         al.sensorIssue = { index: Math.min(n - 1, Math.max(1, Math.floor(n / 2))) };
@@ -1055,6 +1107,7 @@ function rebuildRisks(state, data, al) {
   al.nerves = keep.nerves;
   al.confidence = keep.conf;
   state.commandPoints = al.commandPoints;
+  phaseOdds(state, data, al);
 }
 
 // ---------- decisions ----------

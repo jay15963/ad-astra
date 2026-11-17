@@ -82,13 +82,217 @@ export const EXPECTED_WEATHER_RISK = 0.1;
 /** Fail probability added per unit of weather risk at a fully sensitive milestone. */
 const WEATHER_FAIL = 0.035;
 
+// ---------- launch-scene mechanics (single source for launch.js and for the shown chance) ----------
+
+/**
+ * Tuning of the Dia de Lançamento resolution. launch.js resolves milestones with these numbers and sceneOdds()
+ * computes, from the same numbers, the exact probability the scene ends well: the chance shown is the real one.
+ */
+export const SCENE = {
+  MAX_INTERVENTIONS: 3,
+  SUDDEN: 0.3, // share of the failure zone that fails with no warning
+  REDUCE_FAIL: 0.72, // reduce: a critical anomaly still fails if roll < pf * this
+  CONTINGENCY_FAIL: 0.6, // contingency: same, stronger fix
+  MINOR_MAINTAIN_FAIL: 0.5, // maintaining through a real minor anomaly: fails if 2nd roll < pf * this
+  REDUCE_PF_MULT: 1.12, // later milestones get riskier after a reduction
+  SENSOR_PF_MULT: 1.4,
+  PF_MAX: 0.95,
+  NERVES_FROM: 60, // a nervous room (nerves above this, frozen at the countdown) raises every milestone's risk
+  NERVES_DIV: 200,
+};
+
+const KNOWN_GROUPS = new Set(['ignition', 'liftoff', 'maxq', 'staging', 'fairing_or_les', 'orbit', 'tli', 'insertion', 'descent', 'landing', 'entry', 'dock', 'deploy', 'generic']);
+
+/** Milestone family from its id (radio, prompts and how a failure ends). */
+export function msGroup(id) {
+  const s = String(id);
+  if (KNOWN_GROUPS.has(s)) return s;
+  if (/insert|loi|moi|capture|captura|orbit/.test(s)) return 'insertion';
+  if (/touch|land|pouso|contact/.test(s)) return 'landing';
+  if (/descent|descida|pdi|braking/.test(s)) return 'descent';
+  if (/entry|edl|reentr|atmos|aero/.test(s)) return 'entry';
+  if (/dock|acopl|rendez/.test(s)) return 'dock';
+  if (/deploy|rover|ops|science|sample|amostra/.test(s)) return 'deploy';
+  return 'generic';
+}
+
+/** How a failure at this milestone ends: shares of {partial, recoverable, catastrophic} (sum 1). */
+export function failureSplit(id, phase, crewed) {
+  let s;
+  if (phase === 'ascent') {
+    if (id === 'ignition') s = { partial: 0, recoverable: 0.8, catastrophic: 0.2 };
+    else if (id === 'fairing_or_les' || id === 'orbit') s = { partial: 0.45, recoverable: 0.15, catastrophic: 0.4 };
+    else if (id === 'tli') s = { partial: 0.5, recoverable: 0.3, catastrophic: 0.2 };
+    else s = { partial: 0, recoverable: 0, catastrophic: 1 };
+    if (crewed && s.partial) s = { partial: 0, recoverable: s.recoverable + s.partial, catastrophic: s.catastrophic }; // crew comes home early
+  } else {
+    const g = msGroup(id);
+    if (g === 'insertion') s = { partial: 0.35, recoverable: 0, catastrophic: 0.65 };
+    else if (g === 'landing' || g === 'descent' || g === 'entry') s = { partial: 0.3, recoverable: 0, catastrophic: 0.7 };
+    else s = { partial: 0.5, recoverable: 0, catastrophic: 0.5 };
+  }
+  return s;
+}
+
+/** Level of a failure from its share table and a uniform roll. */
+export function failureLevel(split, r) {
+  if (r < split.partial) return 'partial';
+  if (r < split.partial + split.recoverable) return 'recoverable';
+  return 'catastrophic';
+}
+
+/**
+ * Chance that the crew survives a catastrophic failure (escape tower, abort to orbit, lifeboat).
+ * opts = { phase, early (before orbit insertion), crewSafety, fuelMargin, strategy, survival (traits) }.
+ * Tuning in data/crew.json config.escape: less margin and a bold strategy leave less room to save the crew.
+ */
+export function escapeChance(data, { phase = 'ascent', early = false, crewSafety = 0, fuelMargin = 0.1, strategy = 'balanced', survival = 0 } = {}) {
+  const E = safe(crew.escapeConfig, [data], null) || { beforeOrbit: 0.7, afterOrbit: 0.35, arrival: 0.2, marginRef: 0.1, perMargin: 0.8, strategy: {}, min: 0.02, max: 0.95 };
+  let s = phase === 'arrival' ? E.arrival : early ? E.beforeOrbit : E.afterOrbit;
+  s += (clamp(Number(fuelMargin) || 0, 0, 0.3) - E.marginRef) * E.perMargin;
+  s += E.strategy?.[strategy] ?? 0;
+  s += (Number(crewSafety) || 0) + (Number(survival) || 0);
+  return clamp(s, E.min, E.max);
+}
+
+/** How often the flight director reads an anomaly's real severity. */
+export function hintAccuracy(fdSkill) {
+  return Number.isFinite(fdSkill) ? clamp(0.55 + fdSkill / 250, 0.55, 0.95) : 0.5;
+}
+
+/** Nerves (0..100) at the start of a scene, from the raw chance of the phase (same formula the scene shows). */
+export function initialNerves(pRaw, weatherRisk = 0, crewed = false) {
+  return Math.round(clamp(22 + (1 - pRaw) * 90 + weatherRisk * 30 + (crewed ? 10 : 0), 5, 90));
+}
+
+export function nervesMult(nerves) {
+  return 1 + Math.max(0, (Number(nerves) || 0) - SCENE.NERVES_FROM) / SCENE.NERVES_DIV;
+}
+
+/**
+ * The flight director's standard play (the reference behind the shown chance, and the 'smart' policy of
+ * tools/sim-launches.mjs): an anomaly read as critical gets contingency (2 points, needs a flight director),
+ * else a reduction (1 point), else an abort if there is a crew aboard, else maintain; an anomaly read as minor is
+ * ridden out (maintain).
+ */
+export function standardChoice(hint, cp, hasFD, crewed) {
+  if (hint !== 'critical') return 'maintain';
+  if (cp >= 2 && hasFD) return 'contingency';
+  if (cp >= 1) return 'reduce';
+  if (crewed) return 'abort';
+  return 'maintain';
+}
+
+/**
+ * Exact odds of one scene (one phase) under the standard play, from the same rules launch.js rolls.
+ * milestones: [{id, pFail, anomalyBand}]; opts = { phase, crewed, cp, hasFD, acc (hint accuracy), nervesMult,
+ * pfMult, sensorIndex, forcedIndex (null = averaged like the countdown draws it), escape(i) -> survival chance }.
+ * Returns { p (total or partial), pCrewLoss, pCatastrophic, pAbort }.
+ */
+export function sceneOdds(milestones, opts = {}) {
+  const ms = milestones || [];
+  const n = ms.length;
+  if (!n) return { p: 1, pCrewLoss: 0, pCatastrophic: 0, pAbort: 0 };
+  const phase = opts.phase || 'ascent';
+  const crewed = !!opts.crewed;
+  const hasFD = !!opts.hasFD;
+  const acc = Number.isFinite(opts.acc) ? opts.acc : 0.5;
+  const nm = Number.isFinite(opts.nervesMult) ? opts.nervesMult : 1;
+  const pfm = Number.isFinite(opts.pfMult) ? opts.pfMult : 1;
+  const cp0 = Math.max(0, Math.floor(Number(opts.cp) || 0));
+  const escape = typeof opts.escape === 'function' ? opts.escape : () => 0;
+  const S = SCENE;
+  // per-milestone end of a failure: [success share, crew-loss share, catastrophic share]
+  const ends = ms.map((m, i) => {
+    const sp = failureSplit(m.id, phase, crewed);
+    const lost = crewed ? sp.catastrophic * (1 - clamp(escape(i), 0, 1)) : 0;
+    return [sp.partial, lost, sp.catastrophic];
+  });
+  const ONE = [1, 0, 0, 0];
+  const abortOk = phase === 'arrival' ? 1 : 0; // an aborted arrival is a partial success; an aborted ascent is not
+  // the countdown draws forcedIndex uniformly in 1..n-1 (0 when n = 1). Reaching milestone i with no card yet means
+  // forcedIndex >= i, so the scare comes at i with probability 1 / (n - i): one exact pass, no averaging
+  const forcedAt = (i) => {
+    if (Number.isInteger(opts.forcedIndex)) return i === opts.forcedIndex ? 1 : 0;
+    if (n === 1) return i === 0 ? 1 : 0;
+    return i >= 1 ? 1 / (n - i) : 0;
+  };
+  const FC = (S.CONTINGENCY_FAIL - S.SUDDEN) / (1 - S.SUDDEN); // critical anomaly, contingency: share that still fails
+  const FR = (S.REDUCE_FAIL - S.SUDDEN) / (1 - S.SUDDEN); // critical anomaly, reduction
+  const memo = new Map();
+  // go(i, cp, nc, nr) -> [pSuccess, pCrewLoss, pCat, pAbort] from milestone i on (cp: Command left, nc: cards so far,
+  // nr: reductions so far). Plain loops, no closures: this runs on every estimate refresh.
+  const go = (i, cp, nc, nr) => {
+    if (i >= n) return ONE;
+    const key = ((i * 16 + cp) * 8 + nc) * 16 + nr;
+    const hit = memo.get(key);
+    if (hit) return hit;
+    let pf = (Number(ms[i].pFail) || 0) * pfm * Math.pow(S.REDUCE_PF_MULT, nr) * nm;
+    if (opts.sensorIndex === i) pf *= S.SENSOR_PF_MULT;
+    pf = clamp(pf, 0, S.PF_MAX);
+    const band = clamp(Number(ms[i].anomalyBand) || 0, 0, 1 - pf);
+    const e = ends[i];
+    let wFail = pf * S.SUDDEN; // total weight of paths that fail here
+    let wAbort = 0;
+    const o = [0, 0, 0, 0];
+    const cont = (w, nx) => { o[0] += w * nx[0]; o[1] += w * nx[1]; o[2] += w * nx[2]; o[3] += w * nx[3]; };
+    const crit = pf * (1 - S.SUDDEN);
+    const okW = Math.max(0, 1 - pf - band);
+    if (nc >= S.MAX_INTERVENTIONS) {
+      // no more cards: the team rides it out
+      const nx = go(i + 1, cp, nc, nr);
+      const mf = pf * S.MINOR_MAINTAIN_FAIL;
+      wFail += crit + band * mf;
+      cont(band * (1 - mf) + okW, nx);
+    } else {
+      const q = nc === 0 ? forcedAt(i) : 0;
+      // severity 0 critical, 1 real minor, 2 forced scare; the hint is right with probability acc
+      const sevW = [crit, band, okW * q];
+      for (let sev = 0; sev < 3; sev++) {
+        const w = sevW[sev];
+        if (w <= 0) continue;
+        for (let h = 0; h < 2; h++) {
+          const wh = h === 0 ? acc : 1 - acc;
+          if (wh <= 0) continue;
+          const hintCritical = (sev === 0) === (h === 0);
+          const choice = standardChoice(hintCritical ? 'critical' : 'minor', cp, hasFD, crewed);
+          const ww = w * wh;
+          if (choice === 'abort') { wAbort += ww; continue; }
+          let pFail;
+          if (sev === 0) pFail = choice === 'maintain' ? 1 : choice === 'reduce' ? FR : FC;
+          else if (sev === 1) pFail = choice === 'maintain' ? pf * S.MINOR_MAINTAIN_FAIL : 0;
+          else pFail = 0; // forced false alarm
+          wFail += ww * pFail;
+          if (pFail < 1) cont(ww * (1 - pFail), go(i + 1, cp - (choice === 'contingency' ? 2 : choice === 'reduce' ? 1 : 0), nc + 1, nr + (choice === 'reduce' ? 1 : 0)));
+        }
+      }
+      if (q < 1) cont(okW * (1 - q), go(i + 1, cp, nc, nr));
+    }
+    o[0] += wFail * e[0] + wAbort * abortOk;
+    o[1] += wFail * e[1];
+    o[2] += wFail * e[2];
+    o[3] += wAbort;
+    memo.set(key, o);
+    return o;
+  };
+  const res = go(0, cp0, 0, 0);
+  return { p: res[0], pCrewLoss: res[1], pCatastrophic: res[2], pAbort: res[3] };
+}
+
 // ---------- small helpers ----------
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const H = (p) => -Math.log(clamp(p, 1e-6, 1)); // success prob -> hazard
 const P = (h) => Math.exp(-h);
-const r3 = (x) => Math.round(x * 1000) / 1000;
+const r3 = (x) => Math.round(x * 1000) / 1000 + 0; // + 0: never -0 (JSON round-trip)
 const pct = (x) => `${Math.round(x * 100)}%`;
+/** Small risks keep a decimal ("0,4%", "<0,1%"). */
+export const pctFine = (x) => {
+  const v = (Number(x) || 0) * 100;
+  if (v < 0.1) return '<0,1%';
+  if (v < 10) return `${(Math.round(v * 10) / 10).toString().replace('.', ',')}%`;
+  return `${Math.round(v)}%`;
+};
 
 /** Call a cross-module function if it exists; swallow errors from modules still in progress. */
 function safe(fn, args, fallback) {
@@ -454,9 +658,52 @@ export function missionRisk(state, data, plan = {}) {
 
   const hAsc = milestones.filter((m) => m.phase === 'ascent').reduce((s, m) => s + H(1 - m.pFail), 0);
   const hArr = milestones.filter((m) => m.phase === 'arrival').reduce((s, m) => s + H(1 - m.pFail), 0);
-  const p = P(hAsc + hArr);
+  const pRaw = P(hAsc + hArr);
   if (weatherRisk !== EXPECTED_WEATHER_RISK || plan.weather) {
-    factors.push({ label: plan.weather?.label ? `Clima: ${plan.weather.label}` : 'Clima', delta: r3(p - P(hAsc + hArr - weatherHazard(milestones, weatherRisk))), kind: 'environment' });
+    factors.push({ label: plan.weather?.label ? `Clima: ${plan.weather.label}` : 'Clima', delta: r3(pRaw - P(hAsc + hArr - weatherHazard(milestones, weatherRisk))), kind: 'environment' });
+  }
+
+  // --- the chance shown is the real one: exact odds of the scenes under the flight director's standard play ---
+  const crewIds = [crewSel.commander, ...astronauts].filter((x, i, a) => x && a.indexOf(x) === i);
+  const fdP = crewSel.flightDirector ? state?.crew?.[crewSel.flightDirector] : null;
+  const hasFD = !!(fdP && (!fdP.status || fdP.status === 'active'));
+  const cpCap = clamp(Math.floor(safe(crew.commandPointsFor, [state, data, crewSel], 2)), 1, 5);
+  const pool = actorId === state?.playerId && Number.isFinite(state?.commandPoints) ? state.commandPoints : cpCap;
+  const cp = Number.isFinite(plan.commandPoints) ? Math.max(0, Math.floor(plan.commandPoints)) : Math.max(0, Math.min(cpCap, pool));
+  const escOpts = {
+    crewSafety: clamp(safe(research.techBonus, [state, actorId, 'crewSafety'], 0) || 0, 0, 0.4),
+    fuelMargin: margin,
+    strategy: STRATEGIES[cfg.strategy] ? cfg.strategy : 'balanced',
+    survival: crewed ? safe(crew.survivalBonus, [state, data, crewIds], 0) : 0,
+  };
+  const orbitIdx = milestones.findIndex((m) => m.id === 'orbit');
+  milestones.forEach((m, i) => {
+    if (crewed) m.pEscape = r3(escapeChance(data, { ...escOpts, phase: m.phase, early: m.phase === 'ascent' && i < orbitIdx }));
+  });
+  const ascMs = milestones.filter((m) => m.phase === 'ascent');
+  const arrMs = milestones.filter((m) => m.phase === 'arrival');
+  const acc = hintAccuracy(hasFD ? fdP.skill ?? 50 : NaN);
+  const oddsOf = (list, phase, cpX) => {
+    const raw = list.reduce((q, m) => q * (1 - m.pFail), 1);
+    return sceneOdds(list, {
+      phase, crewed, cp: cpX, hasFD, acc,
+      nervesMult: nervesMult(Number.isFinite(plan.nerves) ? plan.nerves : initialNerves(raw, weatherRisk, crewed)),
+      escape: (i) => list[i].pEscape ?? 0,
+    });
+  };
+  const oA = oddsOf(ascMs, 'ascent', cp);
+  const oB = arrMs.length ? oddsOf(arrMs, 'arrival', cp) : { p: 1, pCrewLoss: 0 };
+  const p = oA.p * oB.p;
+  const pCrewLoss = crewed ? clamp(oA.pCrewLoss + oA.p * oB.pCrewLoss, 0, 1) : 0;
+  // factors and band were priced on the raw hazards: carry them into the real scale (failure space)
+  const k = pRaw < 0.9999 ? clamp((1 - p) / (1 - pRaw), 0.2, 3) : 1;
+  for (const f of factors) f.delta = r3(f.delta * k);
+  if (cp > 0) {
+    const p0 = oddsOf(ascMs, 'ascent', 0).p * (arrMs.length ? oddsOf(arrMs, 'arrival', 0).p : 1);
+    if (p - p0 >= 0.0005) factors.push({ label: `Reserva de Comando: ${cp} ponto${cp === 1 ? '' : 's'}`, delta: r3(p - p0), kind: 'decision', info: true });
+  }
+  if (crewed && crewIds.length) {
+    warnings.unshift(`Risco estimado de perder a tripulação: ${pctFine(pCrewLoss)}.`);
   }
 
   // --- uncertainty band ---
@@ -467,10 +714,11 @@ export function missionRisk(state, data, plan = {}) {
   w *= 1 - narrowing;
   if (!crewSel.flightDirector) w *= 1.25;
   w = clamp(w, 0.008, 0.3);
-  const low = clamp(p - w, 0.01, p);
-  const high = clamp(p + w * 0.7, p, 0.995);
+  // the band lives in failure space too: a 90% shown with a 0.5-point failure band, not a 5-point one
+  const low = clamp(1 - (1 - (pRaw - w)) * k, 0.01, p);
+  const high = clamp(1 - (1 - (pRaw + w * 0.7)) * k, p, 0.995);
 
-  for (const f of cm.factors || []) factors.push({ label: f.label, delta: r3(f.delta || 0), kind: 'crew', info: true });
+  for (const f of cm.factors || []) factors.push({ label: f.label, delta: r3((f.delta || 0) * k), kind: 'crew', info: true });
 
   return {
     p: r3(p),
@@ -483,8 +731,13 @@ export function missionRisk(state, data, plan = {}) {
     errors,
     // extras (not in the minimum contract, safe to ignore)
     baseP: r3(baseP),
-    pAscent: r3(P(hAsc)),
-    pArrival: r3(P(hArr)),
+    pAscent: r3(oA.p),
+    pArrival: r3(oB.p),
+    pRaw: r3(pRaw),
+    pAscentRaw: r3(P(hAsc)),
+    pArrivalRaw: r3(P(hArr)),
+    pCrewLoss: r3(pCrewLoss),
+    commandPoints: cp,
     crewed,
     payload: { payloadT: r3(payloadT), capacityT: r3(capacityT), effectiveT: r3(effectiveT) },
     prestigeMult: strat.prestige,

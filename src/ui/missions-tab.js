@@ -175,8 +175,10 @@ function missionCard(store, m) {
     ascent ? chip(ascent.outcome === 'total' ? '✓ subida ok' : `subida: ${(OUTCOME_TEXT[ascent.outcome] || ascent.outcome).toLowerCase()}`, outcomeKindOf(ascent.outcome)) : null,
     m.launchTurn != null && !m.result ? chip(`🗓 ${fmtMonth(m.launchTurn, st.startYear)} · ${fmtIn(m.launchTurn, st.turn)}`, 'muted') : null,
     m.estimate && !m.result ? chip(`Chance ${fmtBand(m.estimate.low, m.estimate.high)}`, 'info') : null,
+    !m.result && crewRiskOf(m.estimate) != null ? chip(crewRiskText(crewRiskOf(m.estimate)), 'warn', { class: 'ms-crewrisk-chip' }) : null,
     m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : null,
     m.paid === false && m.status === 'planning' ? chip('não paga', 'warn') : null,
+    m.stranded && m.status === 'planning' ? chip('sem data antes do fim', 'bad') : null,
     Number.isFinite(m.readyTurn) && m.readyTurn > st.turn && !m.result ? chip(`hardware pronto em ${fmtMonth(m.readyTurn, st.startYear)}`, 'warn') : null),
   m.transit && m.status === 'transit' ? bar(((st.turn - m.transit.departTurn) / Math.max(1, m.transit.arriveTurn - m.transit.departTurn)) * 100, { key: `mt.${m.id}`, label: `Chegada ${fmtIn(m.transit.arriveTurn, st.turn)}`, kind: 'accent' }) : null);
 }
@@ -270,6 +272,30 @@ function crewMini(store, id) {
     h('div', { class: 'small' }, c.name?.split(' ')[0] || c.id), h('div', { class: 'muted tiny' }, ROLE_LABELS[c.role] || c.role));
 }
 
+/** Crew-loss probability of a crewed estimate (sim omits it, or sends 0, for robotic flights); null when not crewed. */
+function crewRiskOf(est) {
+  const x = Number(est?.pCrewLoss);
+  return Number.isFinite(x) && x > 0 ? x : null;
+}
+
+/** "Risco à tripulação ~2%" (small risks keep a decimal: "~0,4%", "<0,1%"). */
+function crewRiskText(x) {
+  const v = Math.max(0, Math.min(1, x)) * 100;
+  const s = v < 0.1 ? '<0,1%' : v < 10 ? `~${(Math.round(v * 10) / 10).toString().replace('.', ',')}%` : `~${Math.round(v)}%`;
+  return `Risco à tripulação ${s}`;
+}
+
+/** The sim's own crew-loss warning line, redundant once the gauge shows the crew risk. */
+const isCrewLossWarning = (w) => /^Risco (estimado )?de perder a tripulação/.test(String(w));
+
+function crewRiskLine(est) {
+  const x = crewRiskOf(est);
+  if (x == null) return null;
+  return h('div', { class: 'ms-crewrisk', role: 'note' },
+    h('span', { 'aria-hidden': 'true' }, '⚠'), ' ', h('b', null, crewRiskText(x)),
+    h('span', { class: 'muted' }, ' · chance de perder alguém a bordo'));
+}
+
 function chanceGauge(est, { invalid = false } = {}) {
   if (!est) return null;
   if (invalid) {
@@ -286,6 +312,7 @@ function chanceGauge(est, { invalid = false } = {}) {
     h('div', { class: 'gauge-value' }, fmtBand(low, high)),
     h('div', { class: 'gauge-track', 'aria-hidden': 'true' },
       h('div', { class: 'gauge-band', style: { left: `${lp * 100}%`, width: `${Math.max(1.5, (hp - lp) * 100)}%` } })),
+    crewRiskLine(est),
     h('div', { class: 'muted tiny' }, 'Seus engenheiros nunca têm certeza: a faixa estreita com equipe e pesquisa melhores.'));
 }
 
@@ -741,6 +768,9 @@ function step3(store, d, optsBase, rerender) {
   const arr = ui.launchTurn != null && dest?.transitWeeks ? arrivalOf(dest, ui.launchTurn, st.endTurn) : null;
   const lateNote = arr?.late ? `A nave chega em ${fmtMonth(arr.arriveTurn, st.startYear)}, depois do fim da campanha (${st.startYear + Math.floor(st.endTurn / 52)}): o lançamento conta, mas a chegada e a ciência dela ficam fora do jogo.` : null;
   const est = opts.estimate;
+  // the gauge shows the crew risk itself: drop the sim's duplicate warning line when it does
+  const showsCrewRisk = !!est && errors.length === 0 && crewRiskOf(est) != null;
+  const warnings = showsCrewRisk ? opts.warnings.filter((w) => !isCrewLossWarning(w)) : opts.warnings;
   const factors = (est?.factors || []).slice().sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0)).slice(0, 6);
 
   const create = (schedule) => {
@@ -778,7 +808,7 @@ function step3(store, d, optsBase, rerender) {
     est ? chanceGauge(est, { invalid: errors.length > 0 }) : h('p', { class: 'muted small' }, 'A estimativa de chance aparece quando o módulo de risco estiver pronto.'),
     factors.length ? h('ul', { class: 'factors' }, factors.map((f) => h('li', { class: (f.delta || 0) >= 0 ? 'pos' : 'neg' },
       h('span', null, (f.delta || 0) >= 0 ? '▲' : '▼'), ' ', f.label, h('span', { class: 'muted' }, ` ${f.delta > 0 ? '+' : ''}${fmtPct(f.delta)}`)))) : null,
-    opts.warnings.length || lateNote ? h('div', { class: 'notes warn' }, [...(lateNote ? [lateNote] : []), ...opts.warnings].map((w) => h('div', null, `⚠ ${w}`))) : null,
+    warnings.length || lateNote ? h('div', { class: 'notes warn' }, [...(lateNote ? [lateNote] : []), ...warnings].map((w) => h('div', null, `⚠ ${w}`))) : null,
     errors.length ? h('div', { class: 'notes bad' }, errors.map((w) => h('div', null, `✕ ${w}`))) : null,
     sectionTitle('Data de lançamento'),
     dates.length ? h('div', { class: 'chips wrap' }, dates.map((o) => chip(o.label, ui.launchTurn === o.turn ? 'accent' : '', { onclick: () => { ui.launchTurn = o.turn; rerender(); } }))) : null,

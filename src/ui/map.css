@@ -210,6 +210,16 @@
 .map-win.is-open .map-win__bar i {
   background: var(--map-accent);
 }
+/* window that opens but cannot arrive before the end of the scenario */
+.map-win.is-late {
+  border-left-color: var(--map-muted);
+}
+.map-win__late {
+  display: block;
+  font-size: 0.86em;
+  color: var(--map-warn);
+  white-space: normal;
+}
 .map-warn {
   padding: 6px 10px;
   font-size: 0.85em;
@@ -769,6 +779,12 @@ ul.map-lines {
 .map-wchip.is-open {
   color: #06101e;
   background: var(--map-accent);
+}
+.map-wchip.is-late {
+  color: var(--map-text);
+  background: rgba(255, 138, 91, 0.22);
+  border: 1px solid rgba(255, 138, 91, 0.55);
+  white-space: normal;
 }
 .map-wchip.is-always {
   color: var(--map-muted);

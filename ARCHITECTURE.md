@@ -126,7 +126,7 @@ launch.js   ← risk.js, missions.js, crew.js, research.js, helpers, rng
 | `blocs` | diplomacy | `{[blocId]: {id, name, members: [actorId], leader}}` (ex.: `artemis_accords`, `ilrs`) |
 | `treaties` | diplomacy | `[{id, type, name, parties: [ids], signedTurn, status: 'active'|'broken'|'expired', terms}]` |
 | `proposals` | diplomacy | propostas em aberto `[{id, from, to, type, terms, createdTurn, expiresTurn}]` |
-| `geo` | politics | `{zones: {[id]: {controller, status: 'stable'|'contested'|'conflict'|'ceasefire', since, conflictId, changedTurn, history}}, conflicts: [...], events, shifts}` (ver Sistema Solar e mapas) |
+| `geo` | politics | `{zones: {[id]: {controller, status: 'stable'|'contested'|'conflict'|'ceasefire', since, conflictId, changedTurn, history}}, conflicts: [...], events, shifts, blocChanges: [...], blocNextTurn}` (ver "Geo: mapa-múndi e blocos vivos") |
 | `world` | politics | `{globalTension: 0..4, economy: {[actorId]: {growth, crisis: null|{type, untilTurn}}}, conflicts: [...]}` |
 | `politics` | politics | `{[actorId]: {government, stance: -1..1 (apoio ao espaço), nextElectionTurn, priority}}` |
 | `tension` | politics | `{[relKey]: 0..4}` (0 normal, 1 tensão, 2 crise, 3 conflito regional, 4 guerra aberta) |
@@ -194,7 +194,8 @@ ganymede_orbit, uranus_orbit` são inéditos. Nenhum ator tem esses marcos em `a
   `{ id, name, operator: actorId, country, availableFrom: {year, month}, availableUntil?: {year, month}, truthLayer, costM, cadencePerYear,
      history: {flights, failures} (até 2025/2026, real), estimatedReliability?: 0..1 (para veículos novos), reusable, crewRated,
      capacity: { leo, gto, tli, mars, outer } (toneladas; 0 = não alcança), notes }`
-  Ex.: `falcon9, falconheavy, starship, sls_b1, sls_b1b, new_glenn, vulcan, ariane6, h3, lvm3, long_march_5, long_march_10, soyuz2, angara_a5, electron`.
+  Ex.: `falcon9, falconheavy, starship, sls_b1, sls_b1b, new_glenn, vulcan, ariane6, h3, lvm3, long_march_5, long_march_10, soyuz2, angara_a5, electron`;
+  `ariane5` é aposentado (`retired: true`, `availableUntil` jul/2023): só histórico (BepiColombo, JUICE), nunca aparece para compra.
 - Spacecraft (data/spacecraft.json `{spacecraft:[...]}`):
   `{ id, name, operator, kind: 'capsule'|'lander'|'probe'|'cargo'|'station_module'|'rover'|'satellite', crew (0..n), massT, costM,
      availableFrom, truthLayer, estimatedReliability, destinations: [destId], notes }`
@@ -247,6 +248,13 @@ Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), de
   (`research.techBonus(...,'chanceBand')`, skill do diretor de voo). `valid=false` com `errors` se a carga excede a capacidade, nave incompatível, etc.
 - `MilestoneRisk = { id, label, pFail, anomalyBand, failureWeights: {propulsion, ...} }`. Marcos de subida padrão:
   `ignition, liftoff, maxq, staging, fairing_or_les, orbit` (+ `tli` se destino lunar/além); marcos de chegada vêm de `destinations.arrivalMilestones`.
+- **v0.3.0 — chance mostrada = chance real.** `p` é a chance exata de sucesso (total ou parcial) jogando a cena com a escolha padrão do
+  diretor de voo (`standardChoice`), já com Comando, cartões e reduções (`sceneOdds(milestones, opts)` enumera todos os caminhos, sem
+  amostragem). Campos novos: `pRaw` (produto bruto dos marcos), `pAscentRaw`, `pArrivalRaw`, `pCrewLoss`, `commandPoints`; numa
+  subida de missão com chegada, `p` é só a subida e `pMission` a missão inteira. Marcos tripulados trazem `pEscape`. Para voos
+  tripulados `warnings[0]` é "Risco estimado de perder a tripulação: X%". launch.js usa as mesmas regras (`SCENE`, `failureSplit`,
+  `failureLevel`, `msGroup`, `escapeChance`, `hintAccuracy`, `initialNerves`, `nervesMult`): nervos congelados na contagem, primeira
+  carta garantida é um falso alarme inofensivo (sem olhar o futuro). `mission.estimate` guarda `{p, low, high, pCrewLoss?}`.
 
 **src/sim/calendar.js** [catalog]
 - `vehicleReliability(state, data, vehicleId)` → `{mean, low, high, flights}` (Beta a partir de `vehicleStats` + prior estimado).
@@ -285,6 +293,9 @@ Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), de
 - `commandPointsFor(state, data, crewSel)` → inteiro 1..5 (diretor de voo + experiência + `techBonus('commandPoints')`).
 - `applyMissionToCrew(state, data, mission, outcome)` → experiência, moral, lendas; em falha catastrófica tripulada pode matar (respeita `crewSafety`),
   adiciona ao `memorial`, emite sinal `crew/died`.
+- v0.3.0: `survivalBonus(state, data, crewIds)` (traços resistente/pé-quente/saúde frágil), `escapeConfig(data)` (`crew.json config.escape`:
+  antes da órbita 0,55, depois 0,25, chegada 0,12; margem, estratégia e `crewSafety` mexem) e `backgroundCrewLoss(data, {phase, landing,
+  safety})` (`config.backgroundCrewLoss`: chance de perder a tripulação numa falha resolvida sem cena — usada por calendar.js).
 - `availableCrew(state, role)`.
 - actions: `'crew/hire' {candidateId}`, `'crew/fire' {crewId}`, `'crew/train' {crewId}`; queries: `'crew/roster'`, `'crew/candidates'`, `'crew/memorial'`, `'crew/person' (id)`.
 - data/crew.json: `{ firstNames: {[culture]: [..]}, lastNames: {[culture]: [..]}, actorCulture: {[actorId]: culture}, traits: [{id, name, description, effects}], roster: {[actorId]: [Person parcial]} (pessoas iniciais), portraitParts: {...} }`.
@@ -300,7 +311,9 @@ Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), de
 - actions: `'mission/create' {draft}` → `{ok, missionId}`, `'mission/update' {missionId, patch}`, `'mission/schedule' {missionId, launchTurn}`
   (cobra o custo via `budget.spend`), `'mission/cancel' {missionId}`, `'mission/estimate' {draft}` → `{estimate}` (não muta).
 - queries: `'missions/list'`, `'missions/get' (id)`, `'missions/draftOptions' (draft)` → veículos/naves/destinos válidos, custo, janela e chance (passo 3 do resumo),
-  `'missions/nextWindow'`, `'missions/contracts'`.
+  `'missions/nextWindow' (destId?, fromTurn?)`, `'missions/contracts'`. `nextWindow` traz `{destination, name, openTurn, closeTurn, weeks,
+  open, launchTurn, arrivalTurn, late, lateText}`; sem destino devolve a janela mais cedo que ainda chega antes do fim (ou a mais cedo,
+  marcada `late`). `lateText` é o aviso pt-BR ("Não dá para chegar antes do fim de 2030: …").
 
 **src/sim/launch.js** [launch-core] — ver "Dia de Lançamento".
 - decisionHandlers: `'launch/ready'` — choices `go` (abre a sala de controle: cria `state.activeLaunch`) e `scrub` (adia 1-2 semanas, custa apoio).
@@ -339,6 +352,10 @@ Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), de
   `{news: headline, importance}` | `{album: title}` | `{tension: actorId, delta}` | `{unlockTech: nodeId}`.
   `Condition`: `{culture: '>20'}`, `{tech: nodeId}`, `{flag: key}`, `{hasRole: 'engineer'}`, `{cash: '>500'}`, `{support: '<40'}`, `{all: [...]}`, `{any: [...]}`.
 - queries: `'narrative/album'`, `'narrative/flags'`.
+- v0.3.0 (variedade): chaves opcionais de Event `maxCount` (teto por campanha; padrão `DEFAULT_MAX_COUNT` = 2 aleatórios / 3 por sinal,
+  `once` = 1), `group` (eventos do mesmo grupo dividem o intervalo `events.json groups[grupo]`, padrão 16 semanas) e `variants:
+  [{title?, text?}]` (2ª, 3ª… aparição lê diferente). Marcadores novos `{country}`, `{bloc}`, `{zone}` (vêm dos sinais `geo/*`).
+  `validateEvents` checa as três chaves.
 
 ## Sinais (cross-módulo)
 `emitSignal(state, type, payload)`; ficam visíveis em `state.signals` durante o **próximo** tick, para todos os módulos.
@@ -346,7 +363,9 @@ Cause: `{ kind: 'part'|'decision'|'luck'|'environment'|'crew', label (pt-BR), de
 Tipos: `mission/launched {missionId, actorId}`, `mission/resolved {missionId?, calendarId?, actorId, destination, missionType, crewed, outcome, failureType, phase}`,
 `crew/died {crewId, missionId}`, `crew/legend {crewId}`, `first {milestoneId, actorId}`, `treaty/signed {treatyId}`, `treaty/broken {treatyId, by}`,
 `tension/changed {a, b, from, to}`, `election {actorId, result}`, `budget/changed {actorId, from, to}`, `research/completed {nodeId, actorId}`,
-`calendar/delayed {calendarId, weeks}`, `contract/awarded {contractId, winner}`.
+`calendar/delayed {calendarId, weeks}`, `contract/awarded {contractId, winner}`,
+`diplomacy/blocChanged {actorId, blocId, joined}`, `geo/blocSignup {iso, countryName, bloc, blocId, joined, from, to, actorId, withPlayer}`,
+`geo/zoneChanged {zoneId, zoneName, from, to, conflictId, actorId, nations}` (ver "Geo").
 
 ## Dia de Lançamento (src/sim/launch.js + src/ui/launch-scene.js)
 
@@ -407,7 +426,10 @@ o `id` para ajustar o enquadramento. "Planejar missão aqui" chama `store.ui.pla
 e abre `#missoes/nova`; o montador lê e limpa).
 **worldmap.js** (aba Mundo, seção recolhível) usa `'geo/state' (turn?)` e `'geo/history'`; `opts.focus` foca um conflito.
 **research-tab.js** desenha o grafo estilo KSP; `research/tree` traz também `icon, short, tier, row` de tech.json (opcionais; `tier`/`row`
-forçam coluna/linha do layout).
+forçam coluna/linha do layout). v0.3.0: layout em retrato (`pickLayout(nodes, branches, vw, vh)` testa 1–6 ramos por linha e fica com
+o que mostra a árvore maior; `layoutGrid`; níveis de cima para baixo, ramos como grupos de colunas); `layoutTree` (antigo, da esquerda
+para a direita) segue exportado e igual. **map.js**: `fitLevel()` encaixa cada nível no espaço acima dos chips de janela; janelas que
+chegam depois do fim aparecem por último com o aviso `lateText`.
 **settings.js** exporta `APP_VERSION` (= package.json = `SW_VERSION` de sw.js), `BUILD_DATE`, `BUILD`; Ajustes mostra versão, build e o
 estado do service worker.
 **sw.js** (raiz, registrado por app.js com `updateViaCache: 'none'`): GET da mesma origem → rede primeiro com `cache: 'no-cache'`
@@ -477,10 +499,34 @@ Decisões tomadas ao juntar os módulos. Onde este bloco contradiz o texto acima
   Huygens, Salyut 1, Chandrayaan-3). `claimFirst` marca `era: true` e paga 35% (`HISTORIC_FIRST_SHARE`) por esses; feitos inéditos
   (tripulação no polo sul, estação comercial, amostras de Marte, base lunar...) pagam inteiro. `helpers.isHistoricFirst`, `firstValue`.
   Notícia: `calendar.news.firstEra` ("Primeira vez neste século").
-- **Rivais reagem** (calendar, slice `state.rivalOps = {pending, flights, react}`): todo mês cada IA com caixa pode encomendar uma
-  missão própria (sonda/lander genéricos, alvo pelos `ai.goals`), paga do caixa, voa após 6–9 meses de construção e pontua na mesma
-  escala. Um "primeiro" do jogador antecipa 4–8 semanas os programas rivais que buscam o mesmo marco e puxa as missões próprias deles.
-  Ajuste em `data/calendar.json` `rivalOps: {enabled, cashShare, budgetShare, startTurn}`.
+  Ajustes por marco (dados): `scenario.historicalFirsts[id].share` troca os 35% de um feito histórico (pouso tripulado: 0,75, a manchete
+  da corrida); `scenario.firstShares[id]` paga só parte dos pontos de "primeiro" do destino (pessoas no polo sul: 0,35, um marco dentro
+  do pouso tripulado), via `helpers.milestoneShare(data, id)` em todo `claimFirst` (calendar e missions). Itens do calendário com
+  `contract: true` (landers CLPS) pagam prestígio como contrato (metade da novidade) para a IA e para o jogador.
+- **Rivais reagem** (calendar, slice `state.rivalOps = {pending, flights, react, raced, fund, score, tries, saving}`): todo mês cada IA
+  com caixa pode encomendar uma missão própria (sonda/lander genéricos), paga do caixa, voa após 6–9 meses de construção e pontua na
+  mesma escala. Alvos (`opsOptions`): prestígio da missão + "primeiros" abertos (menos se um rival chega antes, mais se é meta ou dá
+  para ganhar a corrida). Fora de `ai.goals` o valor é multiplicado por `ai.scienceInterest` (padrão 1 para agências, 0,3 para
+  empresas: SpaceX e Blue Origin não caçam ciência planetária); visitas repetidas pesam menos (`opsRepeatK`) e cada IA encomenda no
+  máximo `maxOpsPerDest` (2, +1 num destino de meta) missões ao mesmo destino por campanha (`tries`); alvos com nota abaixo de
+  `minScore` ficam de fora. Alvo caro demais para o caixa vira **plano de poupança** (`saving[id] = {destination, cost, banked,
+  untilTurn, milestoneId}`): a IA tira dinheiro do caixa todo mês para a conta do projeto (fora do gasto abstrato do budget.js) até
+  poder pagar; se o alvo some, o "primeiro" é tomado ou passam `saveWeeks` (52), o dinheiro volta. Missões agendadas do jogador
+  contam como ameaça em `rivalEta`, exceto as que o jogador já adiou (`mission.redated`, marcado por `scheduleMission`).
+  Um "primeiro" do jogador antecipa 4–8 semanas os programas rivais que buscam o mesmo marco e puxa as missões próprias deles.
+  Ajuste em `data/calendar.json` `rivalOps`: `enabled`, `startTurn` e qualquer chave de `OPS_TUNING` em calendar.js (`cashShare` e
+  `budgetShare` antigos saíram). Exportados: `goalDest(data, goal)` (meta → destino; tira o sufixo `:ator`), `rivalEta`,
+  `racePressure` (líder confortável alivia, quem está atrás aperta; mais suave quando o líder é o jogador), `opsOptions`.
+  Passo de corrida (`opsRace`): programa da IA que perderia um "primeiro" aberto para um voo rival anterior paga hora extra uma vez
+  (`raced`) e antecipa até `raceMaxWeeks` (26). Cada IA tem fundo discricionário (`fund`, cresce com √verba, encolhe com os programas
+  próprios nos próximos 2 anos).
+- **Notícias do calendário (v0.3.0)**: templates de `calendar.news` podem ser listas de variantes (escolha por hash, não muda
+  resultado); chaves novas `reactPlayer`, `raceAccelerate`, `opsAnnounce`, `opsRace`, `opsLost`. Falha de veículo em voo de teste vira
+  manchete no máximo 1×/ano, de frota operacional 2×/ano e nunca 2× no mesmo trimestre (o resto vai ao balanço trimestral). Marcos de
+  voos do catálogo ("chega ao Nº voo") a cada 100 até 500 e depois a cada 250.
+- **Tripulações dos rivais**: um voo tripulado do calendário que falha (recuperável ou catastrófico) perde a tripulação com a chance de
+  `crew.backgroundCrewLoss` (subida 0,25, chegada em órbita 0,4, pouso 0,55, menos metade do bônus `crewSafety` do dono), sorteada no
+  rng do item; `inst.history[].lostCrew` marca a perda. `crewSafety` não aumenta mais a chance de sucesso do voo da IA (igual ao jogador).
 - **Comando** (launch): `state.commandPoints` é um **estoque** da agência; a cena usa min(estoque, teto da escalação) e devolve o que
   sobrou; +1 a cada `CP_REGEN_WEEKS` (4) semanas até o teto do melhor diretor de voo (`state.commandPointsWeeks`). Contingência numa
   anomalia menor queima 8% de margem. Contagem regressiva usa `al.countSeed` (muda a cada adiamento); marcos continuam presos a `al.seed`.
@@ -501,3 +547,32 @@ Decisões tomadas ao juntar os módulos. Onde este bloco contradiz o texto acima
 - `diplomacy/preview` e `diplomacy/proposalTypes` trazem `refusalTrust` (e `counterRefusalTrust` na prévia).
 - `missions/draftOptions` traz `autoName`; naves fora de `compatibleVehicles` do foguete escolhido vêm `valid: false`.
 - destinations.json: `emLabel` ("na órbita lunar") e `toLabel` ("à órbita lunar") para manchetes.
+
+## Geo: mapa-múndi e blocos vivos (state.geo, dono: politics)
+
+- **Forma**: `state.geo = {zones, conflicts, events, shifts, blocChanges, blocNextTurn}`. `zones/conflicts/events/shifts` como na tabela de
+  slices. Campos novos (nov/2026, saves antigos ganham os padrões no próximo tick):
+  - `blocChanges`: lista datada (teto `blocDynamics.cap`, 60) de mudanças de bloco, de dois tipos:
+    - país fora das agências: `{turn, kind: 'country', iso, bloc: 'artemis'|'ilrs', joined, from, to, cause}` (`from/to` são chaves do mapa:
+      `artemis|ilrs|both|neutral`);
+    - agência do jogo (registrada a partir do sinal `diplomacy/blocChanged`): `{turn, kind: 'agency', actorId, blocId, bloc, joined, isos}`.
+  - `blocNextTurn`: turno mínimo para a próxima mudança de país (intervalo `blocDynamics.minGapWeeks`).
+  - `events` (linha do tempo) ganha `kind: 'bloc_join' | 'bloc_leave'` (com `iso` ou `actorId`, `bloc`, `text` pronto em pt-BR).
+- **Mapa**: `'geo/state' (turn?)` → `countryBloc` agora é datado: listas estáticas de `geopolitics.blocs` + `blocChanges` de países até o
+  turno pedido + agências cujo bloco no turno difere do inicial (recolorem os países de `actorCountries`). A forma da resposta não mudou.
+- **Dinâmica de países** (`data/geopolitics.json` `blocDynamics`, mensal, sem roteiro): chance base `signupHazard` × impulso (tensão global,
+  atração dos blocos = fatia de prestígio do líder + "primeiros" recentes de membros). Candidatos com `lean {artemis, ilrs}`; país já num
+  bloco pode assinar o outro (vira "Ambos"). Com tensão >= `sideMinLevel` entre as nações dos dois líderes, um país "Ambos" escolhe um lado.
+  Teto `maxChanges` (3) por campanha. Cada mudança: notícia (`news.bloc_*`, nunca cortada pelo teto mensal: `pnews` opção `always`),
+  evento na linha do tempo (`timeline.bloc_join/bloc_leave`), reputação ±1 para o líder do bloco e o sinal `geo/blocSignup`.
+- **Territórios**: `model.shiftHazard` subiu (2: 0,0004; 3: 0,0045); toda mudança de controle continua com notícia + evento e agora emite
+  `geo/zoneChanged`.
+- **Sinais novos** (emitidos por politics): `geo/blocSignup {iso, countryName, bloc, blocId, joined, from, to, actorId (líder do bloco),
+  withPlayer (o jogador está nesse bloco)}`, `geo/zoneChanged {zoneId, zoneName, from, to, conflictId, actorId (agência do lado que ganhou),
+  nations}`. narrative usa os dois (cartas `bloc_*`, `map_redrawn`) e os marcadores `{country}`, `{bloc}`, `{zone}`.
+- **Alinhamento de governo**: facções em `data/politics.json` têm `alignment: {blocId: -1..1}`. `politics.blocAlignment(state, data, actorId,
+  blocId)` → número ou `null` (empresas, sem nação). diplomacy usa em `leaveUtility` (fator "alinhamento do governo") e na adesão de quem
+  está sem bloco; eleição com `result: 'change'` grava `actor.ai.memory.newGovTurn` (fator "governo novo revê compromissos" por 52 semanas).
+  Sair de um bloco é decisão estratégica: quando passa do limiar, acontece antes de outras propostas. Empresas não saem por conta própria.
+- **Medir**: `node tools/sim-world.mjs 30 --engine --player=all` (eventos de bloco e territórios por campanha, manchetes e cartas mais
+  repetidas); `node tools/sim-diplomacy.mjs 1 5 --quiet --seeds=10` (mudanças de bloco de agências e de países por semente).

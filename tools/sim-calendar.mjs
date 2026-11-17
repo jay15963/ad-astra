@@ -62,6 +62,8 @@ const per = {}; // id -> {launch: [], delays: [], status: {}}
 const firsts = {};
 const bg = {};
 let news = 0;
+let calNews = 0;
+const calTags = {};
 let weeks = 0;
 let worstWeek = 0;
 const templates = {};
@@ -75,6 +77,11 @@ for (let s = 1; s <= nSeeds; s++) {
   const perWeek = {};
   for (const n of newsLog) {
     perWeek[n.turn] = (perWeek[n.turn] || 0) + 1;
+    if ((n.tags || []).some((t) => t === 'calendar' || t === 'catalog')) {
+      calNews++;
+      const k = (n.tags || []).filter((t) => t !== 'calendar' && t !== 'catalog').join('/') || '-';
+      calTags[k] = (calTags[k] || 0) + 1;
+    }
     templates[n.headline] = (templates[n.headline] || 0) + 1;
   }
   worstWeek = Math.max(worstWeek, ...Object.values(perWeek), 0);
@@ -115,6 +122,7 @@ for (const [v, b] of Object.entries(bg).sort((a, b) => b[1].flights - a[1].fligh
   console.log('  ', v.padEnd(16), `${(b.flights / nSeeds).toFixed(1).padStart(6)} voos  ${(b.failures / nSeeds).toFixed(2).padStart(5)} falhas`);
 }
 console.log(`\nNotícias por semente (todas as fontes, contadas ao nascer): ${(news / nSeeds).toFixed(0)} · ${(news / Math.max(1, weeks)).toFixed(2)} por semana · pior semana: ${worstWeek}`);
+console.log(`Notícias do calendário/catálogo por semente: ${(calNews / nSeeds).toFixed(0)} (${Object.entries(calTags).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, c]) => `${k} ${(c / nSeeds).toFixed(1)}`).join(', ')})`);
 const rep = Object.entries(templates).filter(([, c]) => c / nSeeds >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8);
 if (rep.length) {
   console.log('Manchetes mais repetidas (média por semente):');

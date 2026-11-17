@@ -11,7 +11,7 @@ let WORLD = null;          // parsed world.json
 let WORLD_P = null;        // pending fetch
 let WORLD_ERR = null;
 let PROJ = null;           // [{id, name, polys: [[Float32Array]], bbox}]
-const V = { k: 1, cx: null, cy: null, turn: null, sel: null, legend: false };
+const V = { k: 1, cx: null, cy: null, turn: null, sel: null, legend: false, hl: null };
 let CURRENT = null;         // cleanup of the live map (internal re-renders replace it)
 const stopCurrent = () => { const c = CURRENT; CURRENT = null; try { c?.(); } catch { /* */ } };
 
@@ -99,6 +99,49 @@ function projectWorld(w) {
 
 // ------------------------------------------------------------------ helpers
 
+const BLOC_KINDS = new Set(['bloc_join', 'bloc_leave']);
+/** Timeline event about a bloc change (country signing/leaving or an agency switching). Pure: exported for tests. */
+export const isBlocEvent = (e) => !!e && BLOC_KINDS.has(e.kind);
+const BLOC_ICON = { bloc_join: '🏳️', bloc_leave: '🏳️' };
+// fallback only: the game data (geopolitics.blocDynamics.blocForms) wins, so labels match the sim's own timeline text
+const BLOC_NAME = { artemis: { name: 'Acordos Artemis', art: 'os' }, ilrs: { name: 'ILRS', art: 'o' } };
+const A_CONTRACT = { o: 'ao', a: 'à', os: 'aos', as: 'às' };
+const blocFormsOf = (store) => store?.data?.geopolitics?.blocDynamics?.blocForms || null;
+
+/**
+ * Countries a bloc event is about: the country itself, or the countries of the agency that switched.
+ * Pure: exported for tests.
+ */
+export function blocEventIsos(e, actorCountries = {}) {
+  if (!isBlocEvent(e)) return [];
+  if (e.iso) return [e.iso];
+  return e.actorId ? (actorCountries?.[e.actorId] || []).slice() : [];
+}
+
+/**
+ * pt-BR label of a bloc event ("Brasil adere ao ILRS", "Índia deixa os Acordos Artemis"). The sim already writes
+ * `text`; this is the fallback for records without it. Pure: exported for tests.
+ */
+export function blocEventLabel(e, who = '', forms = null) {
+  if (!isBlocEvent(e)) return e?.text || '';
+  if (e.text) return e.text;
+  const b = forms?.[e.bloc] || BLOC_NAME[e.bloc] || { name: e.bloc || 'bloco', art: null };
+  const name = who || e.iso || e.actorId || 'País';
+  if (e.kind === 'bloc_join') return `${name} adere ${b.art ? `${A_CONTRACT[b.art]} ${b.name}` : `a ${b.name}`}`;
+  return `${name} deixa ${b.art ? `${b.art} ${b.name}` : b.name}`;
+}
+
+/**
+ * Country -> bloc key at turn T rebuilt from today's map plus the dated country records of geo.blocChanges
+ * (undo every change after T, newest first). Pure: exported for tests.
+ */
+export function countryBlocsAt(today, blocChanges, T) {
+  const out = { ...(today || {}) };
+  const later = (blocChanges || []).filter((c) => c?.kind === 'country' && c.iso && c.turn > T);
+  for (let i = later.length - 1; i >= 0; i--) out[later[i].iso] = later[i].from || 'neutral';
+  return out;
+}
+
 const clampN = (x, a, b) => Math.max(a, Math.min(b, x));
 const pctFmt = (v, digits = 1) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(digits).replace('.', ',')}%`;
 
@@ -175,6 +218,22 @@ export function render(container, store, opts = {}) {
   const hist = store.tryQuery('geo/history', null) || { events: [] };
   const byIso = actorsByCountry(geo, st);
   const playerIsos = new Set(geo.playerCountries || []);
+  // scrubbing back: geo/state(T) already colors by the bloc of that turn; the country records of blocChanges are
+  // replayed on top (same result, and old saves whose query is not dated still show the past), and countries whose
+  // bloc at T differs from today's get a dashed outline in today's color
+  const geoNow = geo.isPast ? store.tryQuery('geo/state', null) : geo;
+  const blocDiff = new Map();
+  if (geo.isPast && geoNow) {
+    // geo/state(T) is already dated (and also applies agency switches, which a country-record replay would undo):
+    // countryBlocsAt is kept as a pure helper only, never applied on top of it
+    for (const iso of new Set([...Object.keys(geo.countryBloc || {}), ...Object.keys(geoNow.countryBloc || {})])) {
+      const a = geo.countryBloc[iso] || 'neutral', b = geoNow.countryBloc?.[iso] || 'neutral';
+      if (a !== b) blocDiff.set(iso, b);
+    }
+  }
+  // the bloc changes of the week being viewed (and the one focused from the timeline) are highlighted
+  const blocHl = new Set(V.hl || []);
+  for (const e of hist.events || []) if (isBlocEvent(e) && e.turn === T) for (const iso of blocEventIsos(e, geo.actorCountries)) blocHl.add(iso);
 
   const canvas = h('canvas', { class: 'wm-canvas', role: 'img', 'aria-label': 'Mapa-múndi com blocos, sedes, bases de lançamento, tensões e zonas disputadas. Toque num país para detalhes.' });
   const card = h('div', { class: 'wm-card', hidden: true });
@@ -190,6 +249,7 @@ export function render(container, store, opts = {}) {
 
   /** Center the map on what an event is about (zone, incident area). */
   function focusEvent(e) {
+    if (isBlocEvent(e)) return focusCountries(blocEventIsos(e, geo.actorCountries));
     const z = geo.zones.find((x) => (e.zoneIds || []).includes(x.id) || x.id === e.zoneId);
     const c = geo.conflicts.find((x) => x.id === e.conflictId);
     const at = z?.label || c?.area || null;
@@ -198,6 +258,26 @@ export function render(container, store, opts = {}) {
     V.cx = x; V.cy = y; V.k = Math.max(V.k, 3);
     if (z) V.sel = { type: 'zone', id: z.id };
     else if (c) V.sel = { type: 'conflict', id: c.id };
+    clampView(); showCard(); draw();
+  }
+
+  /** Frame and highlight the countries of a bloc change; the first one gets its card. */
+  function focusCountries(isos) {
+    const list = (isos || []).filter((iso) => PROJ.some((c) => c.id === iso));
+    if (!list.length || !W) return;
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const iso of list) {
+      const c = PROJ.find((x) => x.id === iso);
+      minx = Math.min(minx, c.bbox[0]); miny = Math.min(miny, c.bbox[1]); maxx = Math.max(maxx, c.bbox[2]); maxy = Math.max(maxy, c.bbox[3]);
+    }
+    // small countries: zoom in (up to 6x), big ones: fit; the card covers the bottom part of the stage
+    const fit = Math.min((W * 0.7) / Math.max(1e-4, (maxx - minx) * s0), (H * 0.45) / Math.max(1e-4, (maxy - miny) * s0));
+    V.k = clampN(Math.min(fit, 6), Math.min(V.k, 1.5), 16);
+    V.cx = (minx + maxx) / 2;
+    V.cy = (miny + maxy) / 2 + (H * 0.15) / (s0 * V.k);
+    V.hl = list;
+    for (const iso of list) blocHl.add(iso);
+    V.sel = { type: 'country', id: list[0] };
     clampView(); showCard(); draw();
   }
 
@@ -351,6 +431,16 @@ export function render(container, store, opts = {}) {
     }
     // player's countries and selection on top
     for (const e of paths) {
+      if (blocDiff.has(e.id)) {
+        const k = blocDiff.get(e.id);
+        ctx.setLineDash([3, 3]); ctx.strokeStyle = k === 'neutral' ? '#c7cede' : (BLOC_STYLE[k] || BLOC_STYLE.neutral).fill;
+        ctx.lineWidth = 1.8; ctx.stroke(e.p); ctx.setLineDash([]);
+      }
+      if (blocHl.has(e.id)) {
+        const k = geo.countryBloc[e.id] || 'neutral';
+        ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.lineWidth = 4.2 + pulse * 1.2; ctx.stroke(e.p);
+        ctx.strokeStyle = k === 'neutral' ? '#56d4ff' : (BLOC_STYLE[k] || BLOC_STYLE.neutral).fill; ctx.lineWidth = 2.2; ctx.stroke(e.p);
+      }
       if (playerIsos.has(e.id)) { ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 1.6; ctx.stroke(e.p); }
       if (V.sel?.type === 'country' && V.sel.id === e.id) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.4; ctx.stroke(e.p); }
     }
@@ -565,12 +655,13 @@ export function render(container, store, opts = {}) {
     }
   }
   function select(sel) {
+    if (V.hl && !(sel?.type === 'country' && V.hl.includes(sel.id))) { for (const iso of V.hl) blocHl.delete(iso); V.hl = null; }
     V.sel = sel;
     showCard();
     draw();
   }
   function showCard() {
-    const content = V.sel ? attempt(() => cardFor(store, geo, byIso, V.sel, opts), null) : null;
+    const content = V.sel ? attempt(() => cardFor(store, geo, byIso, V.sel, opts, geoNow), null) : null;
     if (!content) { card.hidden = true; card.replaceChildren(); return; }
     card.replaceChildren(
       h('button', { class: 'wm-card-close', type: 'button', 'aria-label': 'Fechar', onclick: () => select(null) }, '✕'),
@@ -652,9 +743,9 @@ function pill(ctx, x, y, text, { fs = 11, bg, border, color = '#fff', bold = fal
 
 // ------------------------------------------------------------------ cards
 
-function cardFor(store, geo, byIso, sel, opts) {
+function cardFor(store, geo, byIso, sel, opts, geoNow = geo) {
   const st = store.state;
-  if (sel.type === 'country') return countryCard(store, geo, byIso, sel.id, opts);
+  if (sel.type === 'country') return countryCard(store, geo, byIso, sel.id, opts, geoNow);
   if (sel.type === 'hq') {
     const q = geo.hqs.find((x) => x.actorId === sel.id);
     return h('div', null, actorBlock(store, geo, sel.id, opts, true), q?.city ? h('p', { class: 'tiny muted' }, `Sede: ${q.city}`) : null);
@@ -694,9 +785,11 @@ function tensionEffect(store, level) {
   return lv?.description || '';
 }
 
-function countryCard(store, geo, byIso, iso, opts) {
+function countryCard(store, geo, byIso, iso, opts, geoNow = geo) {
   const st = store.state;
   const bloc = geo.countryBloc[iso] || 'neutral';
+  const blocToday = geoNow?.countryBloc?.[iso] || 'neutral';
+  const changes = (st.geo?.blocChanges || []).filter((c) => c.kind === 'country' && c.iso === iso && c.turn <= geo.turn);
   const actors = byIso[iso] || [];
   const zones = geo.zones.filter((z) => z.claimants.includes(iso) || z.controller === iso);
   const mine = (geo.playerCountries || []).includes(iso);
@@ -706,6 +799,9 @@ function countryCard(store, geo, byIso, iso, opts) {
     h('div', { class: 'chips' },
       h('span', { class: `chip wm-bloc b-${bloc}` }, h('span', { class: `wm-swatch b-${bloc}`, 'aria-hidden': 'true' }), ` ${geo.blocLabels[bloc] || bloc}`),
       (geo.esaAssociates || []).includes(iso) ? chip('associado à ESA', 'muted') : null),
+    geo.isPast && blocToday !== bloc ? h('p', { class: 'tiny wm-changed' }, `Hoje: ${geo.blocLabels[blocToday] || blocToday}`) : null,
+    changes.length ? h('div', { class: 'wm-bloc-hist' }, changes.slice(-3).map((c) => h('div', { class: ['tiny', 'wm-bloc-ev', c.joined ? 'join' : 'leave'] },
+      `${BLOC_ICON[c.joined ? 'bloc_join' : 'bloc_leave']} ${fmtMonth(c.turn, st.startYear)}: ${blocEventLabel({ kind: c.joined ? 'bloc_join' : 'bloc_leave', bloc: c.bloc }, countryName(geo, iso), blocFormsOf(store))}`))) : null,
     actors.length ? actors.filter((id, i) => i === 0 || st.actors[id].kind !== 'company' || actors.length <= 3).map((id) => actorBlock(store, geo, id, opts)) : h('p', { class: 'tiny muted' }, 'Sem agência no jogo.'),
     sites.length ? h('p', { class: 'tiny muted' }, `▲ Bases: ${sites.map((x) => x.name).join(', ')}`) : null,
     zones.length ? h('div', { class: 'wm-zones' }, h('div', { class: 'tiny muted' }, 'Áreas disputadas'),
@@ -769,6 +865,10 @@ function legendContent(geo) {
     row(sw('z-ceasefire'), '⏸ cessar-fogo (tracejada)'),
     row(sw('z-contested'), '◈ disputada (pontilhada)'),
     row(sw('z-changed'), 'mudou de controle (contorno azul)'),
+    h('div', { class: 'wm-leg-title' }, 'Mudanças de bloco'),
+    row(h('span', { class: 'wm-leg-ico' }, h('span', { class: 'wm-bloc-mark join b-ilrs', 'aria-hidden': 'true' })), 'adesão (losango cheio na linha do tempo)'),
+    row(h('span', { class: 'wm-leg-ico' }, h('span', { class: 'wm-bloc-mark leave b-artemis', 'aria-hidden': 'true' })), 'saída (losango vazado)'),
+    row(sw('bloc-diff'), 'no passado: bloco diferente do de hoje (tracejado na cor de hoje)'),
     h('div', { class: 'wm-leg-title' }, 'Marcadores'),
     row(h('span', { class: 'wm-leg-ico' }, '🇺🇸 NASA'), 'sede de agência (bandeira + sigla)'),
     row(h('span', { class: 'wm-leg-ico' }, '▲'), 'base de lançamento'),
@@ -796,9 +896,16 @@ function timeline(store, geo, hist, T, onScrub, onFocus) {
     pend = setTimeout(() => onScrub(v), 120);
   });
   range.addEventListener('change', () => { clearTimeout(pend); onScrub(Number(range.value)); });
+  const who = (e) => (e.iso ? countryName(geo, e.iso) : e.actorId ? st.actors?.[e.actorId]?.short || st.actors?.[e.actorId]?.name || e.actorId : '');
+  const evText = (e) => (isBlocEvent(e) ? blocEventLabel(e, who(e), blocFormsOf(store)) : e.text);
+  // bloc changes: a diamond in the bloc's color above the track (filled = joined, hollow = left)
   const ticks = h('div', { class: 'wm-ticks', 'aria-hidden': 'true' }, evs.map((e) => h('span', {
-    class: ['wm-tick', `k-${e.kind}`], style: { left: `${(e.turn / max) * 100}%` }, title: e.text,
+    class: isBlocEvent(e)
+      ? ['wm-tick', 'wm-bloc-mark', `k-${e.kind}`, e.kind === 'bloc_join' ? 'join' : 'leave', `b-${e.bloc || 'neutral'}`, e.turn === T && T < now && 'cur']
+      : ['wm-tick', `k-${e.kind}`],
+    style: { left: `${(e.turn / max) * 100}%` }, title: evText(e),
   })));
+  const canFocus = (e) => (isBlocEvent(e) ? blocEventIsos(e, geo.actorCountries).length > 0 : !!(e.zoneIds?.length || e.zoneId || e.conflictId));
   const label = h('span', { class: 'wm-when' }, T >= now ? `Hoje · ${fmtMonth(now, st.startYear)}` : fmtMonth(T, st.startYear));
   return h('div', { class: 'wm-timeline' },
     h('div', { class: 'wm-tl-row' },
@@ -806,6 +913,8 @@ function timeline(store, geo, hist, T, onScrub, onFocus) {
       h('div', { class: 'wm-track' }, ticks, range),
       h('button', { class: 'wm-btn small', type: 'button', 'aria-label': 'Próximo evento', disabled: !next && T >= now, onclick: () => onScrub(next ? next.turn : now) }, '▶')),
     h('div', { class: 'wm-tl-caption' }, label,
-      at ? h('span', { class: 'tiny wm-ev' }, ` · ${fmtMonth(at.turn, st.startYear)}: ${at.text} `,
-        (at.zoneIds?.length || at.zoneId || at.conflictId) ? h('button', { class: 'wm-link', type: 'button', onclick: () => onFocus?.(at) }, 'ver no mapa') : null) : h('span', { class: 'tiny muted' }, evs.length ? '' : ' · Nenhuma mudança no mapa desde o início da campanha.')));
+      at ? h('span', { class: ['tiny', 'wm-ev', isBlocEvent(at) && 'wm-ev-bloc'] }, ' · ',
+        isBlocEvent(at) ? h('span', { class: ['wm-bloc-mark', 'inline', at.kind === 'bloc_join' ? 'join' : 'leave', `b-${at.bloc || 'neutral'}`], 'aria-hidden': 'true' }) : null,
+        `${fmtMonth(at.turn, st.startYear)}: ${evText(at)} `,
+        canFocus(at) ? h('button', { class: 'wm-link', type: 'button', onclick: () => onFocus?.(at) }, 'ver no mapa') : null) : h('span', { class: 'tiny muted' }, evs.length ? '' : ' · Nenhuma mudança no mapa desde o início da campanha.')));
 }

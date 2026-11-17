@@ -75,7 +75,8 @@ function runOne(seed) {
   const lines = [];
   const seen = new Map(state.treaties.map((t) => [t.id, `${t.status}|${t.parties.join(',')}`]));
   let blocsSeen = JSON.stringify(Object.values(state.blocs).map((b) => [b.id, b.members.slice().sort()]));
-  const counts = { signed: 0, broken: 0, expired: 0, acceded: 0, withdrawn: 0, bloc: 0, toPlayer: 0, playerAnswered: 0 };
+  const counts = { signed: 0, broken: 0, expired: 0, acceded: 0, withdrawn: 0, bloc: 0, countries: 0, toPlayer: 0, playerAnswered: 0 };
+  let geoSeen = 0; // state.geo.blocChanges (countries signing/leaving a bloc; politics module)
   const choiceCycle = ['accept', 'counter', 'reject'];
   const coop = new Map(); // first time each rival pair is seen cooperating while racing
   let guard = 0;
@@ -119,6 +120,13 @@ function runOne(seed) {
       lines.push(`${fmt(state, turn)}  🏳️  BLOCOS    ${Object.values(state.blocs).map((b) => `${b.short || b.id}: ${b.members.map((m) => sh(state, m)).join(', ')}`).join(' | ')}`);
       blocsSeen = bs;
     }
+    const gc = (state.geo?.blocChanges || []).filter((c) => c.kind === 'country');
+    for (const c of gc.slice(geoSeen)) {
+      counts.countries++;
+      const name = data.geopolitics?.countries?.[c.iso]?.name || c.iso;
+      lines.push(`${fmt(state, c.turn)}  🌍 PAÍS      ${name}: ${c.from} → ${c.to}${c.cause ? ` (${c.cause})` : ''}`);
+    }
+    geoSeen = gc.length;
   }
   return { state, lines, counts, coop: [...coop.values()] };
 }
@@ -126,7 +134,7 @@ function runOne(seed) {
 /** Rival pairs (rivalry >= 35 or rival blocs) with an active bilateral treaty that also race for a shared, unclaimed milestone. */
 function coopWhileCompeting(state) {
   const out = [];
-  const ms = data.actors.milestones || {};
+  const ms = { ...(data.bodies?.milestoneLabels || {}), ...(data.events?.milestones || {}), ...(data.actors.milestones || {}) };
   for (const t of state.treaties) {
     if (t.status !== 'active' || t.terms?.multilateral || t.parties.length !== 2 || t.type === 'peaceful_use') continue;
     const [a, b] = t.parties;
@@ -145,7 +153,7 @@ function coopWhileCompeting(state) {
   return out;
 }
 
-const totals = { signed: 0, broken: 0, bloc: 0, toPlayer: 0, coop: 0 };
+const totals = { signed: 0, broken: 0, bloc: 0, countries: 0, toPlayer: 0, coop: 0 };
 for (let i = 0; i < nSeeds; i++) {
   const seed = seed0 + i;
   const { state, lines, counts, coop } = runOne(seed);
@@ -153,7 +161,7 @@ for (let i = 0; i < nSeeds; i++) {
   totals.coop += coop.length;
   console.log(`\n=== Ad Astra · diplomacia · semente ${seed} · ${years} anos · ${engine ? 'motor completo' : 'só diplomacia'} ===`);
   if (!quiet) for (const l of lines) console.log(l);
-  console.log(`\nResumo: ${counts.signed} assinados, ${counts.acceded} adesões, ${counts.broken} rompidos, ${counts.withdrawn} saídas, ${counts.expired} expirados, ${counts.bloc} mudanças de bloco, ${counts.toPlayer} propostas ao jogador.`);
+  console.log(`\nResumo: ${counts.signed} assinados, ${counts.acceded} adesões, ${counts.broken} rompidos, ${counts.withdrawn} saídas, ${counts.expired} expirados, ${counts.bloc} mudanças de bloco de agências, ${counts.countries} de países, ${counts.toPlayer} propostas ao jogador.`);
   console.log(`\nRivais que cooperam em um programa e competem em outro (${coop.length} casos em ${years} anos):`);
   for (const l of coop.slice(0, 10)) console.log(`  · ${l}`);
   if (!quiet) {
@@ -169,4 +177,4 @@ for (let i = 0; i < nSeeds; i++) {
   const errs = state.log.filter((l) => l.includes('erro'));
   if (errs.length) console.log(`\nErros no log: ${errs.slice(0, 3).join(' | ')}`);
 }
-if (nSeeds > 1) console.log(`\nTotal em ${nSeeds} sementes: ${totals.signed} assinados, ${totals.broken} rompidos, ${totals.bloc} mudanças de bloco, ${totals.toPlayer} propostas ao jogador, ${totals.coop} casos de rivais cooperando e competindo.`);
+if (nSeeds > 1) console.log(`\nTotal em ${nSeeds} sementes: ${totals.signed} assinados, ${totals.broken} rompidos, ${totals.bloc} mudanças de bloco de agências, ${totals.countries} de países (${((totals.bloc + totals.countries) / nSeeds).toFixed(2)} por semente), ${totals.toPlayer} propostas ao jogador, ${totals.coop} casos de rivais cooperando e competindo.`);

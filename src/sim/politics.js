@@ -109,6 +109,19 @@ export function nationOf(state, id) {
   if (w.nations?.[id]) return id;
   return null;
 }
+/**
+ * How warmly the actor's current government sees a bloc, -1..1 (faction `alignment` in data/politics.json),
+ * or null when unknown (companies, actors without a nation, factions without the field). Read by diplomacy.
+ */
+export function blocAlignment(state, data, actorId, blocId) {
+  const nid = nationOf(state, actorId);
+  if (!nid || isCompany(state, data, actorId)) return null;
+  const nd = nationDef(data, nid);
+  const exec = state.world?.nations?.[nid]?.government?.exec;
+  const v = factionDef(nd, exec)?.alignment?.[blocId];
+  return typeof v === 'number' ? clamp(v, -1, 1) : null;
+}
+
 /** Known actor ids of a nation (data-listed + state actors mapped to it). */
 function actorsOfNation(state, nid) {
   const m = state.world?.actorNation || {};
@@ -155,16 +168,23 @@ function pnews(state, data, key, vars = {}, opts = {}) {
   const per = pd.news?.perMonth ?? 4;
   const hard = pd.news?.hardMax ?? 6;
   const importance = opts.importance ?? 1;
-  if ((!opts.force && w.newsMonth.count >= per) || (w.newsMonth.count >= hard && importance < 3)) {
+  // opts.always: rare structural changes (a country changing bloc) are never dropped by the monthly caps
+  if (!opts.always && ((!opts.force && w.newsMonth.count >= per) || (w.newsMonth.count >= hard && importance < 3))) {
     state.stats['politics.newsDropped'] = (state.stats['politics.newsDropped'] || 0) + 1;
     return null;
   }
   const rng = rngFor(state.seed, state.turn, 'politics', 'tpl', key, w.newsMonth.count);
   let idx = Math.floor(rng.next() * list.length);
   const tplKey = opts.tplKey || key;
-  if (list.length > 1 && w.tplLast?.[tplKey] === idx) idx = (idx + 1) % list.length;
+  // no-repeat window: none of the last `noRepeat` variants of this key (old saves only know the last one)
   w.tplLast = w.tplLast || {};
+  w.tplRecent = w.tplRecent || {};
+  const recent = w.tplRecent[tplKey] || (w.tplLast[tplKey] != null ? [w.tplLast[tplKey]] : []);
+  const win = Math.min(recent.length, list.length - 1, pd.news?.noRepeat ?? 2);
+  const banned = win > 0 ? recent.slice(-win) : [];
+  for (let g = 0; g < list.length && banned.includes(idx); g++) idx = (idx + 1) % list.length;
   w.tplLast[tplKey] = idx;
+  w.tplRecent[tplKey] = [...recent, idx].slice(-3);
   w.newsMonth.count += 1;
   return addNews(state, {
     headline: capFirst(fill(list[idx], vars)),
@@ -1128,6 +1148,9 @@ function processSignals(state, data, ctx) {
         }
         if (nationOf(state, pid) === rival) pnews(state, data, 'sputnik_moment', { ...nv(data, rival, 'N'), rival: actorShort(state, s.actorId) }, { importance: 2, tags: ['race'] });
       }
+    } else if (s.type === 'diplomacy/blocChanged') {
+      if (!state.geo?.zones) initGeo(state, data);
+      recordAgencyBlocChange(state, data, s);
     } else if (s.type === 'treaty/broken' || s.type === 'treaty/signed') {
       const t = (state.treaties || []).find((x) => x.id === s.treatyId);
       const parties = t?.parties || [];
@@ -1415,7 +1438,7 @@ function isoVars(data, iso, K) {
 
 export function initGeo(state, data) {
   const G = GD(data);
-  const geo = { zones: {}, conflicts: [], events: [], shifts: 0 };
+  const geo = { zones: {}, conflicts: [], events: [], shifts: 0, blocChanges: [], blocNextTurn: null };
   for (const zd of G.zones || []) {
     if (!zd?.id || !Array.isArray(zd.claimants) || !zd.claimants.length) continue;
     const controller = zd.claimants.includes(zd.controller) ? zd.controller : zd.claimants[0];
@@ -1607,6 +1630,10 @@ function tryShift(state, data, g, zoneId, rng) {
     actors: (g.nations || []).map((n) => leadActor(state, data, n)).filter((id) => state.actors?.[id]),
     body: zd.desc ? `Mapa atualizado. Contexto: ${zd.desc}` : '',
   });
+  emitSignal(state, 'geo/zoneChanged', {
+    zoneId, zoneName: zd.name || zoneId, from, to: target, conflictId: g.id,
+    actorId: leadActor(state, data, lead), nations: [...(g.nations || [])],
+  });
   log(state, `politics/geo: ${zoneId} ${from}→${target}`);
 }
 
@@ -1647,6 +1674,7 @@ function geoTick(state, data, ctx) {
       }
     } else if (!g.settled && g.endCause === 'ceasefire') settleConflict(state, data, g, rng);
   }
+  geoBlocTick(state, data, rng);
   // keep the list short: drop the oldest settled conflicts
   if (geo.conflicts.length > 30) {
     const drop = new Set(geo.conflicts.filter((g) => g.endTurn != null && g.settled).slice(0, geo.conflicts.length - 30).map((g) => g.id));
@@ -1654,19 +1682,207 @@ function geoTick(state, data, ctx) {
   }
 }
 
-/** Country -> bloc key for the map (static signatory lists; agencies that changed bloc recolor their countries). */
-function countryBlocs(state, data) {
+// ---------------------------------------------------------------- geo: living blocs (countries and agencies)
+//
+// Countries outside the game's agencies sign the Artemis Accords or the ILRS (or, under a crisis between the two
+// bloc leaders, a country that sat in both picks a side). Monthly hazard from state: recent "firsts" of each bloc,
+// the leader's prestige, global tension. Agencies that change bloc (diplomacy) are recorded here too, so the map
+// can be scrubbed through time. Record shape (state.geo.blocChanges):
+//   country: {turn, kind:'country', iso, bloc, joined, from, to, cause}   (bloc/from/to = map keys)
+//   agency:  {turn, kind:'agency', actorId, blocId, bloc, joined, isos}   (blocId = state.blocs id)
+
+const BLOC_CONTRACT = { o: 'ao', a: 'à', os: 'aos', as: 'às' };
+const blocDyn = (data) => GD(data).blocDynamics || null;
+const blocMapOf = (data) => GD(data).blocMap || { artemis_accords: 'artemis', ilrs: 'ilrs' };
+function blocIdOfKey(data, key) {
+  return Object.entries(blocMapOf(data)).find(([, k]) => k === key)?.[0] || null;
+}
+function blocKeyOfActor(state, data, actorId) {
+  const b = state.actors?.[actorId]?.bloc;
+  return b ? blocMapOf(data)[b] || null : null;
+}
+function blocVars(data, key, K = 'Bloc') {
+  const bf = blocDyn(data)?.blocForms?.[key] || { name: GD(data).blocLabels?.[key] || key, art: null };
+  const f = forms(bf.name, bf.art);
+  return {
+    [K]: bf.name, ['o' + K]: f.the, ['O' + K]: capFirst(f.the), ['de' + K]: f.of,
+    ['a' + K]: bf.art ? `${BLOC_CONTRACT[bf.art]} ${bf.name}` : `a ${bf.name}`,
+  };
+}
+
+/** Static map keys from the signatory lists (data), before any change. */
+function staticCountryBlocs(data) {
   const G = GD(data);
   const out = {};
   for (const iso of G.blocs?.artemis || []) out[iso] = 'artemis';
   for (const iso of G.blocs?.ilrs || []) out[iso] = out[iso] === 'artemis' ? 'both' : 'ilrs';
-  const map = G.blocMap || { artemis_accords: 'artemis', ilrs: 'ilrs' };
+  return out;
+}
+/** Map key of a country now (or at turn T): static lists + recorded country changes. */
+function countryKeyAt(state, data, iso, T = state.turn) {
+  let k = staticCountryBlocs(data)[iso] || 'neutral';
+  for (const c of state.geo?.blocChanges || []) if (c.kind === 'country' && c.iso === iso && c.turn <= T) k = c.to;
+  return k;
+}
+const memberOfKey = (mapKey, bloc) => mapKey === bloc || mapKey === 'both';
+const addKey = (mapKey, bloc) => (mapKey === 'neutral' || mapKey === bloc ? bloc : 'both');
+function dropKey(mapKey, bloc) {
+  if (mapKey === 'both') return bloc === 'artemis' ? 'ilrs' : 'artemis';
+  return mapKey === bloc ? 'neutral' : mapKey;
+}
+
+/** Attraction of a bloc (>= 0.6): its leader's share of the race and its members' recent firsts. */
+function blocAttraction(state, data, key, BD) {
+  const bloc = state.blocs?.[blocIdOfKey(data, key)];
+  if (!bloc) return 0;
+  const win = BD.momentumWeeks ?? 52;
+  let firsts = 0;
+  for (const f of Object.values(state.firsts || {})) {
+    if (f?.turn == null || f.turn < 0 || state.turn - f.turn > win) continue;
+    if (bloc.members?.includes(f.actorId)) firsts++;
+  }
+  const leaders = Object.keys(blocMapOf(data)).map((id) => state.blocs?.[id]?.leader).filter((id) => state.actors?.[id]);
+  const total = leaders.reduce((a, id) => a + Math.max(1, state.actors[id].prestige || 0), 0) || 1;
+  const share = state.actors?.[bloc.leader] ? Math.max(1, state.actors[bloc.leader].prestige || 0) / total : 0.5;
+  return 0.6 + share + Math.min(4, firsts) * (BD.firstBoost ?? 0.25);
+}
+
+/** Tension level between the nations of the two bloc leaders (0 when unknown). */
+function leaderPairLevel(state, data) {
+  const ids = Object.keys(blocMapOf(data)).map((id) => state.blocs?.[id]?.leader).filter(Boolean);
+  if (ids.length < 2) return 0;
+  const na = nationOf(state, ids[0]), nb = nationOf(state, ids[1]);
+  if (!na || !nb || na === nb) return 0;
+  return state.world.pairs?.[relKey(na, nb)]?.level ?? 0;
+}
+
+const countryName = (data, iso) => GD(data).countries?.[iso]?.name || GD(data).countryNames?.[iso] || iso;
+
+/** Record + publish one country change (news, timeline, signal). */
+function applyCountryChange(state, data, iso, bloc, joined, cause, extra = {}) {
+  const G = GD(data);
+  const BD = blocDyn(data) || {};
+  const from = countryKeyAt(state, data, iso);
+  const to = joined ? addKey(from, bloc) : dropKey(from, bloc);
+  if (to === from) return null;
+  const rec = { turn: state.turn, kind: 'country', iso, bloc, joined, from, to, cause };
+  pushCapped(state.geo.blocChanges, rec, BD.cap ?? 60);
+  const other = bloc === 'artemis' ? 'ilrs' : 'artemis';
+  const vars = { ...isoVars(data, iso, 'Country'), ...blocVars(data, bloc), ...blocVars(data, other, 'Other') };
+  const key = !joined ? 'pick_side' : to === 'both' ? 'both' : `join_${bloc}`;
+  const tl = G.timeline?.[joined ? 'bloc_join' : 'bloc_leave'] || '{Country}: {Bloc}';
+  geoEvent(state, data, { kind: joined ? 'bloc_join' : 'bloc_leave', iso, bloc, from, to, zoneIds: [], text: capFirst(fill(tl, vars)) });
+  const leader = state.blocs?.[blocIdOfKey(data, bloc)]?.leader;
+  const now = countryBlocs(state, data);
+  const n = Object.values(now).filter((k) => memberOfKey(k, bloc)).length;
+  const bodyTpl = BD.body?.[joined ? 'join' : 'leave'] || '';
+  pnews(state, data, `geo:bloc_${key}`, vars, {
+    headlines: G.news?.[`bloc_${key}`] || G.news?.bloc_join_artemis, tplKey: `geo:bloc_${key}`, importance: extra.importance ?? 2, force: true, always: true,
+    tags: ['geo', 'bloco', 'diplomacia'], actors: leader && state.actors?.[leader] ? [leader] : [], icon: '🏳️',
+    body: fill(bodyTpl, { ...vars, n }),
+  });
+  if (leader && state.actors?.[leader]) changeActor(state, leader, 'reputation', (joined ? 1 : -1) * (BD.leaderReputation ?? 1));
+  emitSignal(state, 'geo/blocSignup', {
+    iso, countryName: countryName(data, iso), bloc, blocId: blocIdOfKey(data, bloc), joined, from, to,
+    actorId: leader || null, withPlayer: !!(leader && blocKeyOfActor(state, data, state.playerId) === bloc),
+  });
+  state.stats['politics.blocChanges'] = (state.stats['politics.blocChanges'] || 0) + 1;
+  log(state, `politics/geo: ${iso} ${from}→${to} (${cause})`);
+  return rec;
+}
+
+/** Monthly: maybe one country signs a bloc (or picks a side under a crisis between the leaders). */
+function geoBlocTick(state, data, rng) {
+  const BD = blocDyn(data);
+  const geo = state.geo;
+  if (!BD || !geo) return;
+  geo.blocChanges ||= [];
+  if (state.turn < (BD.startTurn ?? 8)) return;
+  if (geo.blocChanges.filter((c) => c.kind === 'country').length >= (BD.maxChanges ?? 3)) return;
+  if (geo.blocNextTurn != null && state.turn < geo.blocNextTurn) return;
+  const keys = ['artemis', 'ilrs'].filter((k) => state.blocs?.[blocIdOfKey(data, k)]);
+  if (!keys.length) return;
+  const attract = Object.fromEntries(keys.map((k) => [k, blocAttraction(state, data, k, BD)]));
+  const crisis = leaderPairLevel(state, data);
+  const agencyIsos = new Set(Object.values(GD(data).actorCountries || {}).flat());
+  // a crisis between the two leaders: countries that sat in both blocs feel the pressure to pick one
+  if (crisis >= (BD.sideMinLevel ?? 3) && keys.length === 2) {
+    const map = countryBlocs(state, data);
+    const both = Object.keys(map).filter((iso) => map[iso] === 'both' && !agencyIsos.has(iso)).sort();
+    if (both.length && rng.chance(Math.min(0.5, (BD.sideHazard ?? 0.04) * both.length))) {
+      const iso = rng.pick(both);
+      const lean = (BD.candidates || []).find((c) => c.iso === iso)?.lean || {};
+      const score = (k) => (lean[k] ?? 0.5) * attract[k];
+      const drop = score('artemis') >= score('ilrs') ? 'ilrs' : 'artemis';
+      const rec = applyCountryChange(state, data, iso, drop, false, 'crise entre os líderes dos blocos');
+      if (rec) geo.blocNextTurn = state.turn + (BD.minGapWeeks ?? 16);
+      return;
+    }
+  }
+  const gt = state.world.globalTension ?? 0;
+  const momentum = 1 + Math.max(0, gt - 1) * (BD.tensionBoost ?? 0.2)
+    + Object.values(attract).reduce((a, v) => a + Math.max(0, v - 1.1), 0) * (BD.momentumBoost ?? 0.5);
+  if (!rng.chance((BD.signupHazard ?? 0.02) * momentum)) return;
+  const options = [];
+  for (const c of BD.candidates || []) {
+    if (agencyIsos.has(c.iso)) continue;
+    const now = countryKeyAt(state, data, c.iso);
+    for (const k of keys) {
+      if (memberOfKey(now, k)) continue;
+      const lean = c.lean?.[k] ?? 0;
+      if (lean <= 0) continue;
+      // a country already in the other bloc signs this one too less often (and hardly in a crisis)
+      const hedge = now === 'neutral' ? 1 : (BD.hedgeFactor ?? 0.5) * (crisis >= 3 ? 0.2 : 1);
+      options.push({ iso: c.iso, bloc: k, weight: (c.weight ?? 1) * lean * lean * attract[k] * hedge });
+    }
+  }
+  const pick = rng.weighted(options);
+  if (!pick) return;
+  const rec = applyCountryChange(state, data, pick.iso, pick.bloc, true, 'adesão');
+  if (rec) geo.blocNextTurn = state.turn + (BD.minGapWeeks ?? 16);
+}
+
+/** An agency changed bloc (diplomacy signal): keep a dated record for the map history and timeline. */
+function recordAgencyBlocChange(state, data, s) {
+  const geo = state.geo;
+  if (!geo || !s?.actorId || !s.blocId) return;
+  geo.blocChanges ||= [];
+  const turn = s.turn ?? state.turn;
+  const joined = !!s.joined;
+  if (geo.blocChanges.some((c) => c.kind === 'agency' && c.actorId === s.actorId && c.blocId === s.blocId && c.turn === turn && c.joined === joined)) return;
+  const bloc = blocMapOf(data)[s.blocId] || null;
+  pushCapped(geo.blocChanges, { turn, kind: 'agency', actorId: s.actorId, blocId: s.blocId, bloc, joined, isos: (GD(data).actorCountries?.[s.actorId] || []).slice() }, blocDyn(data)?.cap ?? 60);
+  const vars = { actor: actorShort(state, s.actorId), ...blocVars(data, bloc || s.blocId) };
+  const tl = GD(data).timeline?.[joined ? 'agency_join' : 'agency_leave'] || '{actor}: {Bloc}';
+  pushCapped(geo.events, { turn, kind: joined ? 'bloc_join' : 'bloc_leave', actorId: s.actorId, bloc, zoneIds: [], text: capFirst(fill(tl, vars)) }, GD(data).model?.eventsCap ?? 80);
+}
+
+/** Bloc id of an agency at turn T (current bloc, undoing recorded changes after T). */
+function actorBlocAt(state, actorId, T) {
+  let b = state.actors?.[actorId]?.bloc ?? null;
+  if (T >= state.turn) return b;
+  const list = (state.geo?.blocChanges || []).filter((c) => c.kind === 'agency' && c.actorId === actorId && c.turn > T);
+  for (let i = list.length - 1; i >= 0; i--) b = list[i].joined ? null : list[i].blocId;
+  return b;
+}
+
+/**
+ * Country -> bloc key for the map at turn T (default now): static signatory lists, countries that signed or
+ * left during the campaign, and agencies whose bloc differs from the start recolor their countries.
+ */
+function countryBlocs(state, data, T = state.turn) {
+  const G = GD(data);
+  const out = staticCountryBlocs(data);
+  for (const c of state.geo?.blocChanges || []) if (c.kind === 'country' && c.turn <= T) out[c.iso] = c.to;
+  const map = blocMapOf(data);
   const initial = Object.fromEntries((data?.actors?.actors || []).map((a) => [a.id, a.bloc ?? null]));
   for (const [aid, isos] of Object.entries(G.actorCountries || {})) {
     const a = state.actors?.[aid];
-    if (!a || a.kind === 'company' || (a.bloc ?? null) === (initial[aid] ?? null)) continue;
-    const b = a.bloc ? map[a.bloc] || 'neutral' : 'neutral';
-    for (const iso of isos) out[iso] = b;
+    if (!a || a.kind === 'company') continue;
+    const b = actorBlocAt(state, aid, T);
+    if ((b ?? null) === (initial[aid] ?? null)) continue;
+    const k = b ? map[b] || 'neutral' : 'neutral';
+    for (const iso of isos) out[iso] = k;
   }
   return out;
 }
@@ -1735,7 +1951,7 @@ function geoStateQuery(state, data, atTurn) {
   });
   return {
     turn: T, now: state.turn, isPast: T < state.turn, startYear: state.startYear,
-    zones, conflicts, countryBloc: countryBlocs(state, data), blocLabels: G.blocLabels || {}, statusLabels: labels,
+    zones, conflicts, countryBloc: countryBlocs(state, data, T), blocLabels: G.blocLabels || {}, statusLabels: labels,
     actorCountries: G.actorCountries || {}, esaAssociates: G.esaAssociates || [], countryNames: G.countryNames || {},
     hqs, sites: G.launchSites || [], tensionLines, playerId: state.playerId, playerNation: pNation,
     playerCountries: G.actorCountries?.[state.playerId] || [], shifts: geo.shifts || 0, asOf: G.asOf || null, source: G.source || null,

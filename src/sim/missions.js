@@ -14,7 +14,7 @@ import * as crewMod from './crew.js';
 import * as research from './research.js';
 import * as narrative from './narrative.js';
 import * as diplomacy from './diplomacy.js';
-import { clamp, nextId, addNews, pushDecision, emitSignal, claimFirst, firstValue, changeActor, log, relKey } from '../core/helpers.js';
+import { clamp, nextId, addNews, pushDecision, emitSignal, claimFirst, firstValue, milestoneShare, changeActor, log, relKey } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
 import { destPrestige as outcomeDestPrestige, missionPrestige } from '../core/outcome.js';
 import { turnToDate, formatTurn, weeksToText } from '../core/time.js';
@@ -664,7 +664,7 @@ function riskFor(state, data, d, launchTurn) {
   return r;
 }
 
-const estimateOf = (r) => ({ p: r.p, low: r.low ?? r.p, high: r.high ?? r.p });
+const estimateOf = (r) => ({ p: r.p, low: r.low ?? r.p, high: r.high ?? r.p, ...(r.pCrewLoss ? { pCrewLoss: r.pCrewLoss } : {}) });
 
 /** Mission-specific odds shift (+ = safer): missions' own riskMod minus narrative {missionRisk} effects (+ = riskier). */
 export function riskModOf(state, m) {
@@ -791,6 +791,8 @@ function scheduleMission(state, data, m, launchTurn) {
     m.paidM = v.cost.total;
   }
   const wasScheduled = m.status === 'scheduled';
+  // pushing a booked launch back is remembered: rivals stop treating that date as a credible threat (calendar.rivalEta)
+  if (wasScheduled && m.launchTurn != null && lt > m.launchTurn) m.redated = (m.redated || 0) + 1;
   m.status = 'scheduled';
   m.launchTurn = lt;
   m.windowTurn = v.window && Number.isFinite(v.window.closeTurn) ? v.window.openTurn : null;
@@ -811,7 +813,7 @@ function scheduleMission(state, data, m, launchTurn) {
   return { ok: true, missionId: m.id, launchTurn: lt, cost: m.cost, warnings: v.warnings };
 }
 
-function cancelMission(state, data, m, { reason = 'player' } = {}) {
+function cancelMission(state, data, m, { reason = 'player', penalty = true } = {}) {
   if (!['planning', 'scheduled', 'launch'].includes(m.status)) return { ok: false, error: 'A missão já voou: não dá para cancelar.' };
   if (state.activeLaunch?.missionId === m.id) return { ok: false, error: 'Lançamento em andamento.' };
   // remove pending launch card for it
@@ -828,9 +830,11 @@ function cancelMission(state, data, m, { reason = 'player' } = {}) {
   if (m.source === 'calendar' && m.calendarId) {
     const inst = (state.calendar || []).find((c) => c.id === m.calendarId);
     if (inst && inst.status === 'player') { inst.status = 'cancelled'; inst.resolvedTurn = state.turn; }
-    changeActor(state, pid, 'support', m.crewed ? -8 : -5);
-    changeActor(state, pid, 'reputation', -3);
-  } else if (m.paid) changeActor(state, pid, 'support', -2);
+    if (penalty) {
+      changeActor(state, pid, 'support', m.crewed ? -8 : -5);
+      changeActor(state, pid, 'reputation', -3);
+    }
+  } else if (m.paid && penalty) changeActor(state, pid, 'support', -2);
   if (m.contractId) defaultContract(state, data, m.contractId, 'cancel');
   if (reason === 'player') {
     addNews(state, {
@@ -960,7 +964,7 @@ function calendarDraft(state, data, inst, def) {
 
 const TRUTH_LABELS = { fato: 'fato', plano_oficial: 'plano oficial', projecao: 'projeção', especulacao: 'especulação' };
 
-function pushCalendarBriefing(state, data, inst, def) {
+function pushCalendarBriefing(state, data, inst, def, reach = null) {
   const target = inst.currentTurn ?? inst.plannedTurn ?? state.turn;
   const draft = calendarDraft(state, data, inst, def);
   const cost = computeCost(state, data, normalizeDraft(draft)).total;
@@ -976,6 +980,7 @@ function pushCalendarBriefing(state, data, inst, def) {
     `Custo estimado: ${fmtMoney(cost)}.`,
   ];
   if (prereqs.length) lines.push(`Depende de: ${prereqs.map((c) => calDef(data, c.id)?.name || c.id).join(', ')} (ainda não concluída).`);
+  if (reach?.lateArrival) lines.push(`Atenção: chega só em ${fmtT(state, reach.arriveTurn)}, depois do fim de ${turnToDate(state.endTurn, state.startYear).year}. Não pontua na Tabela da Era.`);
   pushDecision(state, {
     kind: 'briefing',
     title: `Briefing: ${def.name}`,
@@ -1033,7 +1038,9 @@ function calendarBriefings(state, data) {
     const target = inst.currentTurn ?? inst.plannedTurn ?? state.turn;
     const lead = rngFor(state.seed, 'missions', 'briefLead', inst.id).int(8, 16) + (def.crewed ? 2 : 0);
     if (target - state.turn > lead) continue;
-    pushCalendarBriefing(state, data, inst, def);
+    const reach = programReach(state, data, inst, def, calendarDraft(state, data, inst, def));
+    if (!reach.ok) { programBeyondEnd(state, data, inst, def, reach); continue; }
+    pushCalendarBriefing(state, data, inst, def, reach);
   }
 }
 
@@ -1071,6 +1078,12 @@ function resolveCalendarBriefing(state, data, dec, choiceId) {
     return { ok: true };
   }
   const d0 = draft || calendarDraft(state, data, inst, def || {});
+  // a briefing left open for weeks may no longer fit in the era: refuse instead of creating a mission that never flies
+  const reach = programReach(state, data, inst, def, d0);
+  if (!reach.ok) {
+    programBeyondEnd(state, data, inst, def, reach);
+    return { ok: true, beyondEnd: true };
+  }
   const res = createMission(state, data, { ...d0, readyTurn: programReadyTurn(state, data, inst, def) });
   if (res.ok) inst.missionId = res.missionId;
   return res;
@@ -1082,6 +1095,19 @@ function resolveCalendarBriefing(state, data, dec, choiceId) {
  */
 function programReadyTurn(state, data, inst, def) {
   const target = inst.currentTurn ?? inst.plannedTurn ?? state.turn;
+  const weeks = programSlipWeeks(state, inst, def);
+  if (weeks > 0) {
+    addNews(state, {
+      headline: `Hardware de ${def?.name || 'programa'} atrasa: pronto só em ${fmtT(state, target + weeks)}`,
+      body: 'Testes de qualificação acharam problemas. A equipe pede mais tempo antes do voo.',
+      tags: ['mission', 'delay'], actors: [state.playerId], importance: 2,
+    });
+  }
+  return Math.max(state.turn, target - PROGRAM_EARLY_WEEKS + weeks);
+}
+
+/** Readiness slip of a program, in weeks (pure: same seed + item give the same slip whenever it is asked). */
+function programSlipWeeks(state, inst, def) {
   const d = def?.delay || {};
   const rng = rngFor(state.seed, 'missions', 'readiness', inst.id);
   let weeks = 0;
@@ -1091,15 +1117,46 @@ function programReadyTurn(state, data, inst, def) {
     const months = clamp(rng.normal(d.meanMonths ?? 3, d.sdMonths ?? 2), 0.5, (d.meanMonths ?? 3) + 3 * (d.sdMonths ?? 2));
     weeks += Math.max(1, Math.round(months * 52 / 12));
   }
-  weeks = Math.min(weeks, Math.round((d.maxMonths ?? 24) * 52 / 12));
-  if (weeks > 0) {
-    addNews(state, {
-      headline: `Hardware de ${def?.name || 'programa'} atrasa: pronto só em ${fmtT(state, target + weeks)}`,
-      body: 'Testes de qualificação acharam problemas. A equipe pede mais tempo antes do voo.',
-      tags: ['mission', 'delay'], actors: [state.playerId], importance: 2,
-    });
-  }
-  return Math.max(state.turn, target - PROGRAM_EARLY_WEEKS + weeks);
+  return Math.min(weeks, Math.round((d.maxMonths ?? 24) * 52 / 12));
+}
+
+/**
+ * Can this program still fly inside the scenario? Earliest launch = hardware ready (slip included) + lead +
+ * planetary window; a launch must happen before the last week (`launchTurn < endTurn`, as validate demands).
+ * Returns { ok, readyTurn, launchTurn, arriveTurn, lateArrival }.
+ */
+function programReach(state, data, inst, def, draft) {
+  const target = inst.currentTurn ?? inst.plannedTurn ?? state.turn;
+  const readyTurn = Math.max(state.turn, target - PROGRAM_EARLY_WEEKS + programSlipWeeks(state, inst, def));
+  const end = Number.isFinite(state.endTurn) ? state.endTurn : Infinity;
+  let launchTurn = readyTurn;
+  try {
+    launchTurn = earliestLaunch(state, data, normalizeDraft({ ...(draft || {}), source: 'calendar', calendarId: inst.id, readyTurn }));
+  } catch { /* keep readyTurn */ }
+  const arriveTurn = launchTurn + (destDef(data, def?.destination)?.transitWeeks || 0);
+  return { ok: launchTurn < end, readyTurn, launchTurn, arriveTurn, lateArrival: arriveTurn > end };
+}
+
+/**
+ * The program's hardware is only ready after the era ends: no briefing the player could approve and never fly.
+ * The item leaves the player's plan with no political cost (the industry's schedule is nobody's fault), plus a card.
+ */
+function programBeyondEnd(state, data, inst, def, reach) {
+  if (!inst || inst.status !== 'player') return;
+  inst.status = 'cancelled';
+  inst.beyondEnd = true;
+  inst.resolvedTurn = state.turn;
+  state.decisions = state.decisions.filter((x) => !(x.kind === 'briefing' && x.payload?.calendarId === inst.id));
+  const year = turnToDate(state.endTurn, state.startYear).year;
+  const when = reach && Number.isFinite(reach.launchTurn) ? ` O primeiro lançamento possível seria em ${fmtT(state, reach.launchTurn)}.` : '';
+  issueCard(state, `${def?.name || 'Programa'} fica para depois de ${year}`,
+    `O hardware do programa não fica pronto a tempo de voar antes do fim de ${year}.${when}\nO programa sai do seu plano sem custo político: ninguém culpa a agência pelo cronograma da indústria.`);
+  addNews(state, {
+    headline: `${def?.name || 'Programa'} fica para depois de ${year}`,
+    body: 'Sem hardware pronto a tempo, a missão sai do cronograma desta era.',
+    tags: ['mission', 'delay'], actors: [state.playerId], importance: 1,
+  });
+  stat(state, 'programBeyondEnd');
 }
 
 // --- opportunities: windows, rival moves, custom targets, follow-ups ---
@@ -1801,7 +1858,9 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
       && ['operations', 'done'].includes(x.status) && ['total', 'partial'].includes(x.result?.outcome)).length;
     // contract deliveries are a service: they pay in cash and reputation more than in prestige
     // (same scale as the AI's calendar results: core/outcome.js missionPrestige)
-    const mp = missionPrestige(dest, { crewed: !!m.crewed, level, p: p0, repeats, strategyMult: stratMult, contract: m.source === 'contract' });
+    // a calendar program flagged "contract" (a bought delivery, such as CLPS) pays like a contract, same as for the AI
+    const bought = m.source === 'contract' || (m.calendarId && !!calDef(data, m.calendarId)?.contract);
+    const mp = missionPrestige(dest, { crewed: !!m.crewed, level, p: p0, repeats, strategyMult: stratMult, contract: bought });
     const { base, novelty, bold } = mp;
     // a probe inherited in flight (paid before 2026) pays only a share of the prestige: calendar.js, same rule
     const share = m.inheritedTransit ? (fn(calendar, 'inheritedShare')?.(data) ?? 0.35) : 1;
@@ -1817,7 +1876,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
       for (const id of [...new Set(ms)]) {
         if (state.firsts?.[id]?.actorId === pid || (state.stats?.[`missions.reached.${id}`] || 0) > 0) continue;
         stat(state, `reached.${id}`);
-        const firstPts = Math.round((30 + Math.round(base)) * share);
+        const firstPts = Math.round((30 + Math.round(base)) * share * milestoneShare(data, id));
         const laterPts = Math.round(5 * share);
         const wasFirst = claimFirst(state, id, pid, firstPts, laterPts);
         prestige += wasFirst ? firstValue(state, id, firstPts) : laterPts;
@@ -2052,11 +2111,42 @@ export function tick(state, data, ctx) {
   launchTick(state, data);
   transitTick(state, data, ctx);
   calendarBriefings(state, data);
+  strandedMissions(state, data);
   opportunities(state, data, ctx);
   contractOffers(state, data, ctx);
   // keep estimates fresh (research, crew and reliability change over time)
   if (state.turn % 4 === 0) {
     for (const m of state.missions) if (m.status === 'planning' || m.status === 'scheduled') m.estimate = estimateOf(riskFor(state, data, m, m.launchTurn ?? undefined));
+  }
+}
+
+/**
+ * Planning missions that can no longer launch before the end (earliest launch >= endTurn). Program missions
+ * (hardware date and destination locked) are cancelled with no political cost; custom/contract missions get the
+ * `stranded` flag and one card, since another destination or hardware may still save them.
+ */
+function strandedMissions(state, data) {
+  const end = state.endTurn;
+  if (!Number.isFinite(end)) return;
+  const year = turnToDate(end, state.startYear).year;
+  for (const m of state.missions) {
+    if (m.status !== 'planning') { if (m.stranded && m.status !== 'cancelled') m.stranded = false; continue; }
+    let lt;
+    try { lt = earliestLaunch(state, data, m); } catch { continue; }
+    if (lt < end) { if (m.stranded) m.stranded = false; continue; }
+    if (m.source === 'calendar') {
+      const res = cancelMission(state, data, m, { reason: 'stranded', penalty: false });
+      if (!res.ok) continue;
+      m.stranded = true;
+      const inst = (state.calendar || []).find((c) => c.id === m.calendarId);
+      if (inst) inst.beyondEnd = true;
+      issueCard(state, `${m.name}: não voa antes do fim de ${year}`,
+        `O hardware e a janela do programa só permitem lançar depois do fim de ${year}. A missão saiu do planejamento sem custo político.${res.refund ? ` Reembolso: ${fmtMoney(res.refund)}.` : ''}`);
+    } else if (!m.stranded) {
+      m.stranded = true;
+      issueCard(state, `${m.name}: sem data possível`,
+        `Com o preparo e a janela atuais, o primeiro lançamento seria depois do fim de ${year}. Troque destino ou hardware, ou cancele a missão.`);
+    }
   }
 }
 
@@ -2138,19 +2228,32 @@ export const queries = {
     return out;
   },
   'missions/draftOptions': (state, data, draft) => draftOptions(state, data, draft || {}),
+  // Next window for a destination, or (no destId) the earliest window whose mission still arrives by the end of the
+  // scenario. `late`: launching in it the craft arrives after the end (or it opens after the end) — `lateText` is the
+  // pt-BR warning the UI shows; with no reachable window at all the earliest one comes back marked late.
   'missions/nextWindow': (state, data, destId, fromTurn) => {
     const from = Number.isFinite(fromTurn) ? fromTurn : state.turn;
+    const end = Number.isFinite(state.endTurn) ? state.endTurn : Infinity;
+    const endYear = Number.isFinite(end) ? turnToDate(end, state.startYear).year : null;
     const one = (x) => {
       const w = windowFor(state, data, x.id, from);
-      return { destination: x.id, name: x.name, openTurn: w.openTurn, closeTurn: Number.isFinite(w.closeTurn) ? w.closeTurn : null, weeks: Math.max(0, w.openTurn - state.turn), open: inWindow(w, state.turn) };
+      const launchTurn = Math.max(state.turn, from, w.openTurn);
+      const arrivalTurn = launchTurn + (x.transitWeeks || 0);
+      const late = launchTurn >= end || arrivalTurn > end;
+      return {
+        destination: x.id, name: x.name, openTurn: w.openTurn, closeTurn: Number.isFinite(w.closeTurn) ? w.closeTurn : null,
+        weeks: Math.max(0, w.openTurn - state.turn), open: inWindow(w, state.turn),
+        launchTurn, arrivalTurn, late,
+        lateText: late ? `Não dá para chegar antes do fim de ${endYear}: ${launchTurn >= end ? 'a janela abre depois do fim do cenário' : `chegada só em ${fmtT(state, arrivalTurn)}`}.` : null,
+      };
     };
     if (destId) {
       const x = destDef(data, destId);
       return x ? one(x) : null;
     }
     const list = destList(data).filter((x) => x.window).map(one).filter((w) => w.closeTurn != null);
-    list.sort((a, b) => a.openTurn - b.openTurn);
-    return list[0] || null;
+    list.sort((a, b) => a.openTurn - b.openTurn || a.arrivalTurn - b.arrivalTurn);
+    return list.find((w) => !w.late) || list[0] || null;
   },
   'missions/contracts': (state) =>
     (state.contracts || []).slice().reverse().map((c) => {

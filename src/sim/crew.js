@@ -388,6 +388,36 @@ export function commandPointsFor(state, data, crewSel = {}) {
   return clamp(Math.floor(pts), 1, 5);
 }
 
+/** Mean 'survival' trait of the people aboard (resistente, pé-quente, saúde frágil): shifts the escape chance. */
+export function survivalBonus(state, data, crewIds = []) {
+  const ppl = (crewIds || []).map((id) => state?.crew?.[id]).filter((p) => p && alive(p));
+  if (!ppl.length) return 0;
+  return ppl.reduce((s, p) => s + trait(data, p, 'survival'), 0) / ppl.length;
+}
+
+/** Escape-system tuning from data/crew.json (config.escape), with safe defaults. */
+export function escapeConfig(data) {
+  const e = ccfg(data).escape || {};
+  return {
+    beforeOrbit: e.beforeOrbit ?? 0.7, afterOrbit: e.afterOrbit ?? 0.35, arrival: e.arrival ?? 0.2,
+    marginRef: e.marginRef ?? 0.1, perMargin: e.perMargin ?? 0.8,
+    strategy: { conservative: 0.05, balanced: 0, aggressive: -0.1, ...(e.strategy || {}) },
+    min: e.min ?? 0.02, max: e.max ?? 0.95,
+  };
+}
+
+/**
+ * For crewed flights resolved without a scene (AI / calendar, quickOutcome): chance the crew is lost GIVEN that the
+ * flight failed (level recoverable or catastrophic). Same order of magnitude the player's scenes produce
+ * (tools/sim-launches.mjs: deaths / failures). phase 'ascent'|'arrival'; landing = arrival on a surface.
+ * Tuning: data/crew.json config.backgroundCrewLoss. Pure; the caller rolls with its own rng.
+ */
+export function backgroundCrewLoss(data, { phase = 'ascent', landing = false, safety = 0 } = {}) {
+  const B = { ascent: 0.25, orbit: 0.4, landing: 0.55, ...(ccfg(data).backgroundCrewLoss || {}) };
+  const base = phase === 'arrival' ? (landing ? B.landing : B.orbit) : B.ascent;
+  return clamp(base - (Number(safety) || 0), 0, 1);
+}
+
 // ---------- mission results ----------
 
 const OK_LEVELS = ['total', 'partial'];

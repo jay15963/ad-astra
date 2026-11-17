@@ -238,3 +238,20 @@ test('integration: full engine, 60 weeks, crew stays consistent', () => {
     assert.ok(['active', 'injured', 'retired', 'dead', 'left'].includes(p.status));
   }
 });
+
+test('escape tuning, survival traits and crew loss for scene-less (AI) flights', () => {
+  const E = crew.escapeConfig(data);
+  assert.ok(E.beforeOrbit > E.afterOrbit && E.afterOrbit > E.arrival, 'escape is easier early in the ascent');
+  assert.ok(E.strategy.aggressive < 0 && E.strategy.conservative > 0);
+  const st = newGame(data, { seed: 3, playerId: 'nasa' });
+  const astro = Object.values(st.crew).find((p) => p.actorId === 'nasa' && p.role === 'astronaut');
+  astro.traits = ['resistente'];
+  assert.ok(crew.survivalBonus(st, data, [astro.id]) > 0);
+  astro.traits = ['saude_fragil'];
+  assert.ok(crew.survivalBonus(st, data, [astro.id]) < 0);
+  assert.equal(crew.survivalBonus(st, data, []), 0);
+  const asc = crew.backgroundCrewLoss(data, { phase: 'ascent' });
+  const land = crew.backgroundCrewLoss(data, { phase: 'arrival', landing: true });
+  assert.ok(asc > 0 && asc < land && land < 1);
+  assert.ok(crew.backgroundCrewLoss(data, { phase: 'ascent', safety: 0.1 }) < asc);
+});

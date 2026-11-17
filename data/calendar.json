@@ -1,8 +1,13 @@
 {
-  "_comment": "Calendário vivo 2026-2030. As datas oficiais vivem SÓ aqui (meses em base 1). planned = plano publicado até 17/nov/2026. delay = distribuição de atraso a partir do histórico real do programa: slipChance por revisão trimestral (só nos ~2 anos antes do voo), meanMonths/sdMonths por escorregão, maxMonths = teto do atraso acumulado, cancelChance opcional por revisão. launches = lançamentos do mesmo veículo por missão. refly = em caso de falha o dono repete o voo. historicalOutcome: resultado real, respeitado quando truthLayer = 'fato'. importance 1-3 controla o destaque das notícias. client = empresa contratada quando o dono no jogo é outro. inTransit: true = sonda já lançada antes do cenário (launched = data real do lançamento); planned = data de CHEGADA, sem atrasos de cronograma (física, não burocracia). Começa como \"Em trânsito\" (rival) ou como missão do jogador já em trânsito. vehicleName opcional: nome do lançador real quando o catálogo usa outro como substituto.",
+  "_comment": "Calendário vivo 2026-2030. As datas oficiais vivem SÓ aqui (meses em base 1). planned = plano publicado até 17/nov/2026. delay = distribuição de atraso a partir do histórico real do programa: slipChance por revisão trimestral (só nos ~2 anos antes do voo), meanMonths/sdMonths por escorregão, maxMonths = teto do atraso acumulado, cancelChance opcional por revisão. launches = lançamentos do mesmo veículo por missão. refly = em caso de falha o dono repete o voo. historicalOutcome: resultado real, respeitado quando truthLayer = 'fato'. importance 1-3 controla o destaque das notícias. client = empresa contratada quando o dono no jogo é outro. inTransit: true = sonda já lançada antes do cenário (launched = data real do lançamento); planned = data de CHEGADA, sem atrasos de cronograma (física, não burocracia). Começa como \"Em trânsito\" (rival) ou como missão do jogador já em trânsito. vehicleName opcional: nome do lançador real quando o catálogo usa outro como substituto. contract: true = entrega comprada (landers CLPS): paga prestígio como contrato (metade da novidade), para a IA e para o jogador.",
   "monthBase": 1,
   "news": {
-    "delayed": "Adiamento: {name} fica para {date}",
+    "delayed": [
+      "Adiamento: {name} fica para {date}",
+      "Novo atraso empurra {name} para {date}",
+      "{name} escorrega no cronograma: agora {date}",
+      "Revisão de cronograma: {name} só em {date}"
+    ],
     "delayedBody": "Nova revisão de cronograma: mais {weeks} de atraso. Plano original: {planned}.",
     "windowMissed": "{name} perde a janela e fica para {date}",
     "windowMissedBody": "O destino só fica alcançável de novo na próxima janela.",
@@ -14,22 +19,88 @@
     "suspendedBody": "Com a guerra, o governo desviou verba e pessoal. Retomada prevista para {date}.",
     "cancelled": "Cancelamento: {name}",
     "cancelledBody": "O programa não sobreviveu à revisão de prioridades.",
-    "launched": "{owner} lança {name}",
+    "launched": [
+      "{owner} lança {name}",
+      "{name} decola: missão da {owner} a caminho",
+      "Lançamento perfeito: {name} deixa a Terra",
+      "{owner} põe {name} no espaço"
+    ],
     "launchedBody": "Lançamento nominal no {vehicle}. Chegada prevista para {date}.",
-    "success": "{name}: sucesso!",
-    "partial": "{name}: sucesso parcial",
-    "failed": "{name} fracassa",
+    "success": [
+      "{name}: sucesso!",
+      "Missão cumprida: {name}",
+      "{name} funciona como planejado",
+      "Festa no controle: {name} dá certo"
+    ],
+    "partial": [
+      "{name}: sucesso parcial",
+      "{name} cumpre só parte dos objetivos",
+      "Meio sucesso para {name}"
+    ],
+    "failed": [
+      "{name} fracassa",
+      "Fracasso: {name} se perde",
+      "Dia ruim para a {owner}: {name} falha",
+      "{name} termina em fracasso"
+    ],
     "lostCrew": "Tragédia: tripulação perdida em {name}",
     "lostCrewBody": "{owner} suspende todos os voos tripulados enquanto investiga.",
     "first": "Feito inédito! {owner} conquista: {milestone}",
     "reflight": "{owner} vai repetir {name}: nova data {date}",
-    "bgFailure": "Falha do {vehicle} perde carga comercial",
+    "bgFailure": [
+      "Falha do {vehicle} perde carga comercial",
+      "{vehicle} falha e destrói satélite de cliente",
+      "Satélite perdido: {vehicle} falha na subida",
+      "Revés do {vehicle}: carga comercial perdida"
+    ],
     "bgFailureBody": "Frota em solo por cerca de {weeks} para investigação.",
-    "bgTestFailure": "{vehicle} explode em voo de teste",
+    "bgTestFailure": [
+      "{vehicle} explode em voo de teste",
+      "Protótipo do {vehicle} se perde em teste",
+      "Teste do {vehicle} termina em explosão",
+      "Mais um revés no programa de testes do {vehicle}"
+    ],
     "bgMilestone": "{vehicle} chega ao {n}º voo",
     "bgQuarter": "Balanço do trimestre: {summary}",
     "debut": "Estreia do {vehicle}: o novo foguete entra no catálogo",
-    "firstEra": "Primeira vez neste século: {owner} conquista {milestone}"
+    "firstEra": "Primeira vez neste século: {owner} conquista {milestone}",
+    "reactPlayer": [
+      "Resposta da {owner}: {name} é antecipada para {date}",
+      "{owner} reage e adianta {name} para {date}",
+      "Pressionada, a {owner} antecipa {name} para {date}"
+    ],
+    "reactPlayerBody": [
+      "Depois do feito do rival, o governo libera horas extras e verba de emergência.",
+      "O feito do rival virou questão de orgulho nacional: verba extra liberada."
+    ],
+    "raceAccelerate": [
+      "Corrida: {owner} antecipa {name} para {date}",
+      "{owner} acelera {name} para não perder {milestone}",
+      "Contra o relógio: {owner} adianta {name} para {date}"
+    ],
+    "raceAccelerateBody": [
+      "A meta é chegar antes de {rival}. Horas extras e turnos dobrados na fábrica.",
+      "Analistas dizem que a pressa é para não perder o feito para {rival}."
+    ],
+    "opsAnnounce": [
+      "{owner} anuncia missão própria {to}",
+      "{owner} aprova nova sonda {to}",
+      "Nova missão da {owner} mira {milestone}"
+    ],
+    "opsRace": [
+      "{owner} entra na disputa com {rival}: missão {to}",
+      "Corrida aberta: {owner} quer chegar antes de {rival}",
+      "{owner} desafia {rival} com missão {to}"
+    ],
+    "opsAnnounceBody": [
+      "Objetivo: {milestone}. Lançamento previsto para {date}.",
+      "A agência quer {milestone}; a nave deve partir em {date}."
+    ],
+    "opsLost": [
+      "Missão da {owner} se perde {em}",
+      "A {owner} perde contato com sua sonda {em}",
+      "Silêncio {em}: missão da {owner} falha"
+    ]
   },
   "milestoneLabels": {
     "crewed_lunar_flyby": "sobrevoo lunar tripulado",
@@ -69,6 +140,11 @@
     "neptune_flyby": "sobrevoo de Netuno",
     "pluto_flyby": "sobrevoo de Plutão",
     "kuiper_flyby": "sobrevoo no Cinturão de Kuiper"
+  },
+  "rivalOps": {
+    "_comment": "IA dos rivais (calendar.js OPS_TUNING): missões próprias, fundo discricionário, pressão da corrida. Qualquer chave de OPS_TUNING pode ser ajustada aqui.",
+    "enabled": true,
+    "startTurn": 8
   },
   "missions": [
     {
@@ -254,6 +330,7 @@
     },
     {
       "id": "im3",
+      "contract": true,
       "name": "IM-3",
       "owner": "nasa",
       "partners": [],
@@ -315,6 +392,7 @@
     },
     {
       "id": "griffin1",
+      "contract": true,
       "name": "Griffin-1",
       "owner": "nasa",
       "partners": [],
@@ -471,6 +549,7 @@
     },
     {
       "id": "blue_ghost2",
+      "contract": true,
       "name": "Blue Ghost Missão 2",
       "owner": "nasa",
       "partners": [
@@ -592,6 +671,7 @@
     },
     {
       "id": "im4",
+      "contract": true,
       "name": "IM-4",
       "owner": "nasa",
       "partners": [],
@@ -1005,7 +1085,7 @@
       "truthLayer": "plano_oficial",
       "delay": {
         "slipChance": 0.4,
-        "meanMonths": 4,
+        "meanMonths": 5,
         "sdMonths": 3,
         "maxMonths": 24
       },
@@ -1579,7 +1659,7 @@
       "owner": "esa",
       "type": "probe",
       "destination": "mercury_orbit",
-      "vehicleId": "ariane6",
+      "vehicleId": "ariane5",
       "vehicleName": "Ariane 5",
       "spacecraftId": "bepicolombo",
       "launched": {
@@ -1813,7 +1893,7 @@
       "owner": "esa",
       "type": "probe",
       "destination": "ganymede_orbit",
-      "vehicleId": "ariane6",
+      "vehicleId": "ariane5",
       "vehicleName": "Ariane 5",
       "spacecraftId": "juice",
       "launched": {

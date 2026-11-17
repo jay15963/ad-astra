@@ -1,5 +1,5 @@
 {
-  "_doc": "Economia, governos, eleições, escala de tensão 0-4, eventos exógenos e manchetes. Dono: módulo politics (src/sim/politics.js). Dinheiro em US$ milhões; growth/inflation em pontos percentuais ao ano; pct em fração (0.03 = 3%).",
+  "_doc": "Economia, governos, eleições, escala de tensão 0-4, eventos exógenos e manchetes. Dono: módulo politics (src/sim/politics.js). Dinheiro em US$ milhões; growth/inflation em pontos percentuais ao ano; pct em fração (0.03 = 3%). Facção: alignment { blocId: -1..1 } = quanto o governo dessa facção apoia cada bloco (lido por diplomacy para sair/aderir a blocos).",
   "levels": [
     {
       "level": 0,
@@ -125,6 +125,7 @@
           "spaceStance": 0.35,
           "priority": "crewed_prestige",
           "hawk": 0.65,
+          "alignment": { "artemis_accords": 0.9, "ilrs": -0.9 },
           "art": "o"
         },
         {
@@ -135,6 +136,7 @@
           "spaceStance": 0.3,
           "priority": "science",
           "hawk": 0.45,
+          "alignment": { "artemis_accords": 0.85, "ilrs": -0.8 },
           "art": "o"
         }
       ],
@@ -183,6 +185,7 @@
           "spaceStance": 0.8,
           "priority": "lunar_crewed",
           "hawk": 0.65,
+          "alignment": { "artemis_accords": -1, "ilrs": 1 },
           "art": "o"
         },
         {
@@ -193,6 +196,7 @@
           "spaceStance": 0.6,
           "priority": "commercial",
           "hawk": 0.45,
+          "alignment": { "artemis_accords": -0.6, "ilrs": 0.85 },
           "art": "o"
         }
       ],
@@ -242,6 +246,7 @@
           "spaceStance": 0.65,
           "priority": "human_spaceflight",
           "hawk": 0.6,
+          "alignment": { "artemis_accords": 0.55, "ilrs": -0.6 },
           "art": "a"
         },
         {
@@ -252,6 +257,7 @@
           "spaceStance": 0.45,
           "priority": "science",
           "hawk": 0.4,
+          "alignment": { "artemis_accords": 0.05, "ilrs": -0.3 },
           "art": "a"
         }
       ],
@@ -301,6 +307,7 @@
           "spaceStance": 0.4,
           "priority": "autonomy",
           "hawk": 0.45,
+          "alignment": { "artemis_accords": 0.45, "ilrs": -0.6 },
           "art": "a"
         },
         {
@@ -311,6 +318,7 @@
           "spaceStance": 0.15,
           "priority": "austerity",
           "hawk": 0.55,
+          "alignment": { "artemis_accords": 0.15, "ilrs": -0.5 },
           "art": "o"
         }
       ],
@@ -360,6 +368,7 @@
           "spaceStance": 0.3,
           "priority": "military",
           "hawk": 0.85,
+          "alignment": { "artemis_accords": -0.8, "ilrs": 0.6 },
           "art": "a"
         },
         {
@@ -370,6 +379,7 @@
           "spaceStance": 0.5,
           "priority": "station",
           "hawk": 0.55,
+          "alignment": { "artemis_accords": -0.2, "ilrs": 0.15 },
           "art": "a"
         }
       ],
@@ -420,6 +430,7 @@
           "spaceStance": 0.55,
           "priority": "artemis_partner",
           "hawk": 0.6,
+          "alignment": { "artemis_accords": 0.85, "ilrs": -0.8 },
           "art": "o"
         },
         {
@@ -430,6 +441,7 @@
           "spaceStance": 0.4,
           "priority": "science",
           "hawk": 0.35,
+          "alignment": { "artemis_accords": 0.5, "ilrs": -0.5 },
           "art": "o"
         }
       ],
@@ -1003,17 +1015,21 @@
     "election_upcoming": [
       "{Election}: faltam quatro semanas e o espaço entra no debate",
       "Campanha esquenta antes {ofElection}; programa espacial vira tema",
-      "Pesquisas apertadas na reta final {ofElection}"
+      "Pesquisas apertadas na reta final {ofElection}",
+      "Debate na TV inclui pergunta sobre a Lua antes {ofElection}",
+      "Candidatos disputam o voto de quem trabalha no setor espacial antes {ofElection}"
     ],
     "election_continuity": [
       "{party} vence {election} e mantém o rumo do programa espacial",
       "Continuidade: {party} segue no poder após {election}",
-      "{Election}: vitória {ofParty}; agências respiram aliviadas"
+      "{Election}: vitória {ofParty}; agências respiram aliviadas",
+      "{Election} confirma {party}; nada muda no calendário espacial"
     ],
     "election_change": [
       "Virada {inElection}: {party} assume e promete rever prioridades",
       "{party} vence {election}; agenda espacial passa a ser {priority}",
-      "Troca de poder após {election}: programa espacial entra em revisão"
+      "Troca de poder após {election}: programa espacial entra em revisão",
+      "Novo governo após {election}: {party} manda revisar contratos e parcerias"
     ],
     "legislative_hold": [
       "{party} mantém o controle {ofLegislature} {inElection}",
@@ -1063,12 +1079,14 @@
     "crisis_recession": [
       "Recessão {emN}: orçamento espacial sob pressão",
       "PIB encolhe {emN} e governo fala em cortes",
-      "Economia {deN} entra em recessão; agências temem cortes"
+      "Economia {deN} entra em recessão; agências temem cortes",
+      "Fábricas desaceleram {emN}; recessão chega às encomendas aeroespaciais"
     ],
     "crisis_inflation_shock": [
       "Choque de inflação {emN} corrói verbas públicas",
       "Preços disparam {emN}; juros sobem e projetos atrasam",
-      "Inflação em alta {emN} encarece contratos espaciais"
+      "Inflação em alta {emN} encarece contratos espaciais",
+      "Contas mais caras {emN}: inflação estoura metas e atinge contratos"
     ],
     "crisis_debt_crisis": [
       "Crise da dívida {emN}: governo anuncia austeridade",
@@ -1083,22 +1101,31 @@
     "funding_up": [
       "{actor} levanta {amount} em nova rodada de investimento",
       "Investidores apostam alto: {actor} capta {amount}",
-      "Rodada recorde: {actor} soma {amount} em caixa"
+      "Rodada recorde: {actor} soma {amount} em caixa",
+      "Fila de investidores: {actor} fecha rodada de {amount}",
+      "{actor} capta {amount} e promete acelerar o cronograma"
     ],
     "funding_founder": [
       "Fundador injeta {amount} na {actor}",
       "{actor} recebe aporte de {amount} do fundador",
-      "Novo cheque do fundador: {amount} para a {actor}"
+      "Novo cheque do fundador: {amount} para a {actor}",
+      "Dinheiro do dono: {actor} ganha reforço de {amount}",
+      "{actor} segue de pé com mais {amount} do bolso do fundador",
+      "Sem rodada no mercado, fundador banca {amount} para a {actor}"
     ],
     "funding_down": [
       "Rodada fraca: {actor} capta menos que o esperado e corta custos",
       "Investidores recuam e {actor} revisa planos",
-      "{actor} enfrenta rodada difícil; avaliação cai"
+      "{actor} enfrenta rodada difícil; avaliação cai",
+      "Mercado esfria para a {actor}: rodada sai menor e com desconto",
+      "{actor} adia contratações depois de rodada abaixo do esperado"
     ],
     "budget_digest": [
       "Orçamentos espaciais de {year}: {summary}",
       "Verbas de {year} definidas: {summary}",
-      "Mapa do dinheiro em {year}: {summary}"
+      "Mapa do dinheiro em {year}: {summary}",
+      "Balanço das verbas espaciais de {year}: {summary}",
+      "Quem ganhou e quem perdeu nos orçamentos de {year}: {summary}"
     ],
     "budget_player_up": [
       "{actor} terá {amount} em {year} ({pct})",
@@ -1123,7 +1150,9 @@
     "sputnik_moment": [
       "Feito da {rival} provoca 'momento Sputnik' {emN}",
       "{capN} reage ao marco da {rival}: políticos pedem mais verba",
-      "Conquista da {rival} acende alerta {emN}"
+      "Conquista da {rival} acende alerta {emN}",
+      "Marco da {rival} vira munição no parlamento {emN}",
+      "{capN} assiste ao feito da {rival} e cobra pressa das agências"
     ],
     "hearing_news": [
       "{Body} convoca a direção da {actor} após falha",

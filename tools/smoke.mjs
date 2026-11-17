@@ -1,7 +1,7 @@
 // Headless smoke test: plays full campaigns with a naive bot and checks invariants.
 // Usage: node tools/smoke.mjs [seeds=5] [actor=all]
 import { loadDataNode } from '../src/core/data.js';
-import { newGame, dispatch, isBlocked, serialize, deserialize } from '../src/core/engine.js';
+import { newGame, dispatch, query, isBlocked, serialize, deserialize } from '../src/core/engine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -45,7 +45,12 @@ for (const playerId of actors) {
         }
         if (state.activeLaunch) throw new Error('launch never finished');
         // schedule whatever is ready (exercises costs, launches, transit and arrivals)
-        for (const m of state.missions.filter((x) => x.status === 'planning')) dispatch(state, data, { type: 'mission/schedule', missionId: m.id });
+        // (only missions that can still fly before the end of the scenario: no "Data além do fim do cenário")
+        for (const m of state.missions.filter((x) => x.status === 'planning')) {
+          const opts = query(state, data, 'missions/draftOptions', { ...m, missionId: m.id });
+          if ((opts?.earliestLaunchTurn ?? state.turn) >= state.endTurn) continue;
+          dispatch(state, data, { type: 'mission/schedule', missionId: m.id });
+        }
         const r = dispatch(state, data, { type: 'time/advance', weeks: 4, stopOnEvent: true });
         if (!r.ok) throw new Error(`advance: ${r.error}`);
         if (r.advanced === 0 && isBlocked(state) === 'decision' && state.decisions.length === 0) throw new Error('blocked with no decisions');

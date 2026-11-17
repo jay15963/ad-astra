@@ -213,9 +213,14 @@ test('historic firsts: feats done before 2026 pay a share and are flagged as "fi
   assert.ok(isHistoricFirst(s, 'crewed_lunar_landing'));
   assert.ok(!isHistoricFirst(s, 'lunar_south_pole_crewed'));
   const p0 = s.actors.cnsa.prestige;
+  assert.equal(claimFirst(s, 'crewed_lunar_orbit', 'cnsa', 100, 5), true);
+  assert.equal(s.firsts.crewed_lunar_orbit.era, true);
+  assert.equal(Math.round(s.actors.cnsa.prestige - p0), 35);
+  // the race's headline feat carries its own share (scenario.historicalFirsts.crewed_lunar_landing.share)
+  const pL = s.actors.cnsa.prestige;
   assert.equal(claimFirst(s, 'crewed_lunar_landing', 'cnsa', 100, 5), true);
   assert.equal(s.firsts.crewed_lunar_landing.era, true);
-  assert.equal(Math.round(s.actors.cnsa.prestige - p0), 35);
+  assert.equal(Math.round(s.actors.cnsa.prestige - pL), Math.round(100 * data.scenario.historicalFirsts.crewed_lunar_landing.share));
   const p1 = s.actors.cnsa.prestige;
   claimFirst(s, 'lunar_south_pole_crewed', 'cnsa', 100, 5);
   assert.equal(Math.round(s.actors.cnsa.prestige - p1), 100);

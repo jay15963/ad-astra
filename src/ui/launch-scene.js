@@ -45,6 +45,13 @@ const CLIMAX_PRE = 3.2;     // s of slow motion + silence before the final miles
 // ---------------------------------------------------------------- pure helpers (tested in Node)
 
 /** 0..1 or 0..100 -> 0..100 (null if missing). */
+/** "Risco à tripulação ~2%" (small risks keep a decimal: "~0,4%", "<0,1%"). */
+export function crewRiskText(x) {
+  const v = Math.max(0, Math.min(1, Number(x) || 0)) * 100;
+  const s = v < 0.1 ? '<0,1%' : v < 10 ? `~${(Math.round(v * 10) / 10).toString().replace('.', ',')}%` : `~${Math.round(v)}%`;
+  return `Risco à tripulação ${s}`;
+}
+
 export function toPct(x) {
   if (x == null || !Number.isFinite(Number(x))) return null;
   const v = Number(x);
@@ -704,12 +711,19 @@ function createScene(store, key) {
     const factors = (est.factors || []).filter((f) => f && f.label && !ascentOnly(f)).slice().sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0)).slice(0, 7);
     const w = al.weather || {};
     const wRisk = toPct(w.risk);
+    // crew-loss risk (launch.js: estimate.pCrewLoss, 0 for robotic flights); the chip replaces the sim's warning line
+    const crewed = !!al.crewed && (al.crewIds || []).length > 0;
+    const loss = Number(est.pCrewLoss);
+    const crewRisk = crewed && Number.isFinite(loss) ? crewRiskText(loss) : null;
+    const warnings = (est.warnings || []).filter((x) => !(crewRisk && /^Risco (estimado )?de perder a tripulação/.test(String(x))));
+    const where = phase === 'arrival' ? 'na chegada' : 'nesta subida';
     box.innerHTML = '';
     put(box,
       el('div', { class: 'ls-band-head' },
         el('div', {}, el('div', { class: 'ls-label' }, 'Chance estimada'), el('div', { class: 'ls-band' }, formatBand(est))),
         el('div', { class: 'ls-chips' },
           w.label ? el('span', { class: `ls-chip${wRisk > 30 ? ' warn' : ''}` }, `Clima: ${w.label}`) : null,
+          crewRisk ? el('span', { class: 'ls-chip warn ls-crewrisk', title: `Chance estimada de perder a tripulação ${where}` }, `⚠ ${crewRisk}`) : null,
           el('span', { class: 'ls-chip', title: 'Pontos de Comando: a reserva da agência recarrega 1 ponto a cada 4 semanas' },
             Number.isFinite(al.pool) && al.pool > (al.commandPoints ?? 0)
               ? `Comando: ${al.commandPoints ?? 0} (agência: ${al.pool})`
@@ -720,7 +734,7 @@ function createScene(store, key) {
       el('p', { class: 'ls-note' }, 'Os engenheiros nunca têm certeza. Equipe e pesquisa melhores estreitam a faixa.'),
       factors.length ? el('ul', { class: 'ls-factors' }, factors.map((f) => el('li', { class: (f.delta || 0) >= 0 ? 'pos' : 'neg' },
         el('span', {}, f.label), el('b', {}, formatDelta(f.delta))))) : null,
-      (est.warnings || []).length ? el('div', { class: 'ls-warn' }, est.warnings.slice(0, 2).join(' · ')) : null,
+      warnings.length ? el('div', { class: 'ls-warn' }, warnings.slice(0, 2).join(' · ')) : null,
     );
   }
 

@@ -6,7 +6,7 @@
       "style": "Lidera o Artemis e contrata empresas",
       "description": "Lidera o programa Artemis e o bloco dos Acordos Artemis. Contrata SpaceX e Blue Origin para os pousos lunares.",
       "capabilities": { "crewed": true, "launchSites": ["Cabo Canaveral", "Kennedy", "Vandenberg", "Wallops"] },
-      "ai": { "cooperation": 0.65, "aggression": 0.45, "riskTolerance": 0.5, "goals": ["crewed_lunar_flyby", "crewed_lunar_landing", "lunar_south_pole_crewed", "lunar_base", "mars_sample_return"] }
+      "ai": { "cooperation": 0.65, "aggression": 0.45, "riskTolerance": 0.5, "goals": ["crewed_lunar_flyby", "crewed_lunar_landing", "lunar_south_pole_crewed", "lunar_base", "mars_sample_return", "europa_arrival", "psyche_arrival", "titan_arrival", "trojan_flyby", "apophis_rendezvous", "venus_entry_probe"] }
     },
     {
       "id": "spacex", "name": "SpaceX", "short": "SpaceX", "kind": "company", "country": "EUA", "flag": "🇺🇸", "color": "#E8E8E8",
@@ -14,7 +14,7 @@
       "style": "Rápida, arriscada",
       "description": "Cadência e preço imbatíveis. A Starship HLS é o lander do primeiro pouso do Artemis (Artemis IV) e a aposta para Marte.",
       "capabilities": { "crewed": true, "launchSites": ["Starbase", "Cabo Canaveral", "Kennedy", "Vandenberg"] },
-      "ai": { "cooperation": 0.45, "aggression": 0.75, "riskTolerance": 0.85, "goals": ["crewed_lunar_landing", "lunar_south_pole_landing", "mars_landing_robotic", "commercial_station"] }
+      "ai": { "cooperation": 0.45, "aggression": 0.75, "riskTolerance": 0.85, "goals": ["crewed_lunar_landing", "lunar_south_pole_landing", "mars_landing_robotic", "commercial_station"], "scienceInterest": 0.35 }
     },
     {
       "id": "blueorigin", "name": "Blue Origin", "short": "Blue Origin", "kind": "company", "country": "EUA", "flag": "🇺🇸", "color": "#56B4E9",
@@ -22,7 +22,7 @@
       "style": "Paciente, arriscada",
       "description": "New Glenn e Blue Moon. Disputa o pouso lunar com a SpaceX e sonha com a estação Orbital Reef.",
       "capabilities": { "crewed": false, "launchSites": ["Cabo Canaveral", "Vandenberg"] },
-      "ai": { "cooperation": 0.55, "aggression": 0.6, "riskTolerance": 0.65, "goals": ["lunar_south_pole_landing", "crewed_lunar_landing", "commercial_station"] }
+      "ai": { "cooperation": 0.55, "aggression": 0.6, "riskTolerance": 0.65, "goals": ["lunar_south_pole_landing", "crewed_lunar_landing", "commercial_station", "lunar_resource_demo"], "scienceInterest": 0.3 }
     },
     {
       "id": "cnsa", "name": "CNSA (China)", "short": "CNSA", "kind": "agency", "country": "China", "launchPolicy": "domestic", "flag": "🇨🇳", "color": "#D55E00",
@@ -30,7 +30,7 @@
       "style": "Metódica, prazos firmes",
       "description": "Pouso tripulado até 2030 com Mengzhou e Lanyue, Chang'e-7 e 8 no polo sul e a base lunar ILRS com a Rússia.",
       "capabilities": { "crewed": true, "launchSites": ["Wenchang", "Jiuquan", "Xichang", "Taiyuan"] },
-      "ai": { "cooperation": 0.45, "aggression": 0.55, "riskTolerance": 0.45, "goals": ["crewed_lunar_landing", "lunar_south_pole_landing", "lunar_resource_demo", "lunar_base", "mars_sample_return"] }
+      "ai": { "cooperation": 0.45, "aggression": 0.55, "riskTolerance": 0.45, "goals": ["crewed_lunar_landing", "lunar_south_pole_landing", "lunar_resource_demo", "lunar_base", "mars_sample_return", "asteroid_sample_return", "asteroid_rendezvous", "mars_landing_robotic", "jupiter_arrival"] }
     },
     {
       "id": "isro", "name": "ISRO (Índia)", "short": "ISRO", "kind": "agency", "country": "Índia", "flag": "🇮🇳", "color": "#E69F00",
@@ -38,7 +38,7 @@
       "style": "Frugal e persistente",
       "description": "Gaganyaan, a estação BAS e a Lua tripulada em 2040. Faz muito com pouco e rivaliza com a China na Ásia.",
       "capabilities": { "crewed": false, "launchSites": ["Sriharikota"] },
-      "ai": { "cooperation": 0.7, "aggression": 0.35, "riskTolerance": 0.45, "goals": ["crewed_orbit_national:isro", "national_station", "lunar_sample_return", "lunar_south_pole_landing"] }
+      "ai": { "cooperation": 0.7, "aggression": 0.35, "riskTolerance": 0.45, "goals": ["crewed_orbit_national:isro", "national_station", "lunar_sample_return", "lunar_south_pole_landing", "venus_orbit", "venus_flyby", "mars_landing_robotic"] }
     },
     {
       "id": "esa", "name": "ESA (Europa)", "short": "ESA", "kind": "agency", "country": "Europa", "flag": "🇪🇺", "color": "#009E73",
@@ -46,7 +46,7 @@
       "style": "Consenso lento",
       "description": "Ciência e parcerias: Módulo de Serviço da Orion, rover Rosalind Franklin e o lander Argonaut. Perdeu a Rússia no ExoMars em 2022.",
       "capabilities": { "crewed": false, "launchSites": ["Kourou"] },
-      "ai": { "cooperation": 0.85, "aggression": 0.2, "riskTolerance": 0.3, "goals": ["mars_landing_robotic", "lunar_resource_demo", "jupiter_arrival", "lunar_sample_return"] }
+      "ai": { "cooperation": 0.85, "aggression": 0.2, "riskTolerance": 0.3, "goals": ["mars_landing_robotic", "lunar_resource_demo", "jupiter_arrival", "lunar_sample_return", "mercury_orbit", "planetary_defense_survey", "apophis_rendezvous", "ganymede_orbit", "venus_orbit"] }
     },
     {
       "id": "roscosmos", "name": "Roscosmos (Rússia)", "short": "Roscosmos", "kind": "agency", "country": "Rússia", "launchPolicy": "domestic", "flag": "🇷🇺", "color": "#CC79A7",
@@ -54,7 +54,7 @@
       "style": "Isolada, orgulhosa",
       "description": "Planeja a estação ROS e as sondas Luna. Aliada da China no ILRS e cada vez mais isolada do Ocidente.",
       "capabilities": { "crewed": true, "launchSites": ["Baikonur", "Vostochny", "Plesetsk"] },
-      "ai": { "cooperation": 0.4, "aggression": 0.6, "riskTolerance": 0.55, "goals": ["national_station", "lunar_south_pole_landing", "lunar_base"] }
+      "ai": { "cooperation": 0.4, "aggression": 0.6, "riskTolerance": 0.55, "goals": ["national_station", "lunar_south_pole_landing", "lunar_base", "venus_entry_probe", "phobos_landing"] }
     },
     {
       "id": "jaxa", "name": "JAXA (Japão)", "short": "JAXA", "kind": "agency", "country": "Japão", "flag": "🇯🇵", "color": "#F0E442",
@@ -62,7 +62,7 @@
       "style": "Preciso e discreto",
       "description": "Parceira do programa lunar americano (rover pressurizado em troca de astronautas na Lua) e do LUPEX com a Índia.",
       "capabilities": { "crewed": false, "launchSites": ["Tanegashima", "Uchinoura"] },
-      "ai": { "cooperation": 0.8, "aggression": 0.2, "riskTolerance": 0.3, "goals": ["lunar_south_pole_landing", "lunar_resource_demo", "lunar_sample_return"] }
+      "ai": { "cooperation": 0.8, "aggression": 0.2, "riskTolerance": 0.3, "goals": ["lunar_south_pole_landing", "lunar_resource_demo", "lunar_sample_return", "phobos_landing", "asteroid_sample_return", "asteroid_rendezvous"] }
     }
   ],
 

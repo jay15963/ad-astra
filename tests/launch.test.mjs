@@ -7,6 +7,7 @@ import { loadDataNode } from '../src/core/data.js';
 import { newGame, dispatch, serialize, deserialize } from '../src/core/engine.js';
 import { pushDecision, cloneState } from '../src/core/helpers.js';
 import { openScene, autoplay, MAX_INTERVENTIONS } from '../src/sim/launch.js';
+import { standardChoice } from '../src/sim/risk.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const data = await loadDataNode(root);
@@ -273,4 +274,38 @@ test('actions without a scene fail cleanly', () => {
   assert.equal(s.log.filter((l) => l.includes('erro')).length, 0);
   const c = cloneState(s);
   assert.deepEqual(c, s);
+});
+
+test('the chance shown is the real one: hard arrival and crewed ascent, standard play', () => {
+  // standard play = risk.standardChoice on the flight director's hint (what the estimate assumes)
+  const pol = (pi, al) => standardChoice(pi.hint, al.commandPoints, !!al.lineup.flightDirector, al.crewed);
+  const measure = (mission, phase, n) => {
+    const s = setup({ mission });
+    let shown = 0;
+    let ok = 0;
+    let loss = 0;
+    let lossShown = 0;
+    let flown = 0;
+    for (let i = 0; i < n; i++) {
+      s.seed = 7000 + i * 13;
+      s.activeLaunch = null;
+      s.commandPoints = null;
+      openScene(s, data, 'test_m1', phase);
+      let read = false;
+      const out = play(s, pol, 'go', (al) => {
+        if (al.act === 'countdown' && !al.pendingHold && al.current === 0 && !read) { read = true; shown += al.estimate.p; lossShown += al.estimate.pCrewLoss || 0; }
+        return false;
+      });
+      if (out === 'scrubbed') continue;
+      flown++;
+      if (out.level === 'total' || out.level === 'partial') ok++;
+      if (out.crewLost?.length) loss++;
+    }
+    return { shown: shown / flown, real: ok / flown, loss: loss / flown, lossShown: lossShown / flown, flown };
+  };
+  const arr = measure({ type: 'lander', destination: 'lunar_surface', vehicleId: 'falconheavy', spacecraftId: 'generic_lander', status: 'arrival' }, 'arrival', 1500);
+  assert.ok(Math.abs(arr.shown - arr.real) < 0.03, `arrival shown ${arr.shown} real ${arr.real}`);
+  const crew = measure({ type: 'crewed', crewed: true, destination: 'leo', vehicleId: 'atlas_v', spacecraftId: 'starliner' }, 'ascent', 1500);
+  assert.ok(Math.abs(crew.shown - crew.real) < 0.025, `crewed shown ${crew.shown} real ${crew.real}`);
+  assert.ok(crew.lossShown > 0 && Math.abs(crew.lossShown - crew.loss) < 0.012, `crew loss shown ${crew.lossShown} real ${crew.loss}`);
 });

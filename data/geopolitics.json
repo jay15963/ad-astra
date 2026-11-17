@@ -75,7 +75,20 @@
     "GUY": { "name": "Guiana", "art": "a" }, "VEN": { "name": "Venezuela", "art": "a" }, "GBR": { "name": "Reino Unido", "art": "o" },
     "ARG": { "name": "Argentina", "art": "a" }, "MAR": { "name": "Marrocos", "art": "o" }, "ESH": { "name": "Saara Ocidental (Polisário)", "art": "o" },
     "ISR": { "name": "Israel", "art": null }, "SYR": { "name": "Síria", "art": "a" }, "KOS": { "name": "Kosovo", "art": "o" },
-    "SRB": { "name": "Sérvia", "art": "a" }, "USA": { "name": "EUA", "art": "os" }
+    "SRB": { "name": "Sérvia", "art": "a" }, "USA": { "name": "EUA", "art": "os" },
+    "THA": { "name": "Tailândia", "art": "a" }, "SEN": { "name": "Senegal", "art": "o" }, "IDN": { "name": "Indonésia", "art": "a" },
+    "KEN": { "name": "Quênia", "art": "o" }, "GHA": { "name": "Gana", "art": null }, "CRI": { "name": "Costa Rica", "art": "a" },
+    "GTM": { "name": "Guatemala", "art": "a" }, "MNG": { "name": "Mongólia", "art": "a" }, "GEO": { "name": "Geórgia", "art": "a" },
+    "MDA": { "name": "Moldávia", "art": "a" }, "MNE": { "name": "Montenegro", "art": null }, "NAM": { "name": "Namíbia", "art": "a" },
+    "TZA": { "name": "Tanzânia", "art": "a" }, "ZMB": { "name": "Zâmbia", "art": "a" }, "SLV": { "name": "El Salvador", "art": null },
+    "BOL": { "name": "Bolívia", "art": "a" }, "CUB": { "name": "Cuba", "art": null }, "IRN": { "name": "Irã", "art": "o" },
+    "DZA": { "name": "Argélia", "art": "a" }, "LAO": { "name": "Laos", "art": "o" }, "KHM": { "name": "Camboja", "art": "o" },
+    "MMR": { "name": "Mianmar", "art": null }, "KGZ": { "name": "Quirguistão", "art": "o" }, "TJK": { "name": "Tadjiquistão", "art": "o" },
+    "ZWE": { "name": "Zimbábue", "art": "o" }, "ETH": { "name": "Etiópia", "art": "a" }, "MLI": { "name": "Mali", "art": "o" },
+    "NER": { "name": "Níger", "art": "o" }, "LKA": { "name": "Sri Lanka", "art": "o" }, "NPL": { "name": "Nepal", "art": "o" },
+    "QAT": { "name": "Catar", "art": "o" }, "KWT": { "name": "Kuwait", "art": "o" }, "TUN": { "name": "Tunísia", "art": "a" },
+    "UGA": { "name": "Uganda", "art": null }, "KAZ": { "name": "Cazaquistão", "art": "o" }, "AZE": { "name": "Azerbaijão", "art": "o" },
+    "EGY": { "name": "Egito", "art": "o" }
   },
   "zones": [
     {
@@ -271,11 +284,72 @@
     "na Ásia Central": { "name": "Ásia Central", "lat": 43.0, "lon": 68.0, "radiusKm": 500 },
     "no Pacífico": { "name": "Pacífico", "lat": 20.0, "lon": 160.0, "radiusKm": 900 }
   },
+  "blocDynamics": {
+    "_doc": "Blocos vivos (dono: politics, slice state.geo.blocChanges). Taxas mensais. signupHazard = chance base de um país fora das agências assinar um bloco, multiplicada pelo impulso (tensão global acima de 1 × tensionBoost; atração dos blocos acima de 1,1 × momentumBoost). Atração de um bloco = 0,6 + fatia do líder no prestígio dos dois líderes + firstBoost por 'primeiro' de um membro nas últimas momentumWeeks semanas. Candidatos: lean { artemis, ilrs } 0..1 (peso ao quadrado); país já num bloco assina o outro com hedgeFactor (×0,2 em crise). Com tensão >= sideMinLevel entre as nações dos líderes, cada país 'Ambos' pode escolher um lado (sideHazard por país). maxChanges = teto de mudanças de países por campanha; minGapWeeks = intervalo mínimo entre elas. Lista de candidatos aproximada, posição de referência nov/2026.",
+    "startTurn": 8,
+    "signupHazard": 0.02,
+    "tensionBoost": 0.2,
+    "momentumBoost": 0.5,
+    "momentumWeeks": 52,
+    "firstBoost": 0.25,
+    "hedgeFactor": 0.5,
+    "sideMinLevel": 3,
+    "sideHazard": 0.04,
+    "maxChanges": 3,
+    "minGapWeeks": 16,
+    "leaderReputation": 1,
+    "cap": 60,
+    "blocForms": { "artemis": { "name": "Acordos Artemis", "art": "os" }, "ilrs": { "name": "ILRS", "art": "o" } },
+    "body": {
+      "join": "Mapa-múndi atualizado: {n} países aparecem agora ligados {aBloc}.",
+      "leave": "Mapa-múndi atualizado: {oCountry} fica só com {oOther}."
+    },
+    "candidates": [
+      { "iso": "IDN", "lean": { "artemis": 0.75, "ilrs": 0.6 }, "weight": 1.3 },
+      { "iso": "KEN", "lean": { "artemis": 0.85, "ilrs": 0.3 } },
+      { "iso": "GHA", "lean": { "artemis": 0.8, "ilrs": 0.3 } },
+      { "iso": "CRI", "lean": { "artemis": 0.9, "ilrs": 0.1 }, "weight": 0.8 },
+      { "iso": "GTM", "lean": { "artemis": 0.8, "ilrs": 0.1 }, "weight": 0.7 },
+      { "iso": "MNG", "lean": { "artemis": 0.6, "ilrs": 0.5 }, "weight": 0.8 },
+      { "iso": "GEO", "lean": { "artemis": 0.75, "ilrs": 0.1 }, "weight": 0.7 },
+      { "iso": "MDA", "lean": { "artemis": 0.8, "ilrs": 0.05 }, "weight": 0.6 },
+      { "iso": "MNE", "lean": { "artemis": 0.8, "ilrs": 0.05 }, "weight": 0.6 },
+      { "iso": "NAM", "lean": { "artemis": 0.5, "ilrs": 0.5 }, "weight": 0.7 },
+      { "iso": "TZA", "lean": { "artemis": 0.5, "ilrs": 0.55 }, "weight": 0.8 },
+      { "iso": "ZMB", "lean": { "artemis": 0.6, "ilrs": 0.45 }, "weight": 0.7 },
+      { "iso": "SLV", "lean": { "artemis": 0.8, "ilrs": 0.15 }, "weight": 0.6 },
+      { "iso": "BOL", "lean": { "artemis": 0.2, "ilrs": 0.8 } },
+      { "iso": "CUB", "lean": { "ilrs": 0.85 }, "weight": 0.8 },
+      { "iso": "IRN", "lean": { "ilrs": 0.8 }, "weight": 1.1 },
+      { "iso": "DZA", "lean": { "artemis": 0.2, "ilrs": 0.7 } },
+      { "iso": "LAO", "lean": { "artemis": 0.05, "ilrs": 0.9 }, "weight": 0.7 },
+      { "iso": "KHM", "lean": { "artemis": 0.1, "ilrs": 0.8 }, "weight": 0.7 },
+      { "iso": "MMR", "lean": { "ilrs": 0.7 }, "weight": 0.6 },
+      { "iso": "KGZ", "lean": { "artemis": 0.1, "ilrs": 0.8 }, "weight": 0.7 },
+      { "iso": "TJK", "lean": { "artemis": 0.05, "ilrs": 0.8 }, "weight": 0.6 },
+      { "iso": "ZWE", "lean": { "artemis": 0.1, "ilrs": 0.8 }, "weight": 0.7 },
+      { "iso": "ETH", "lean": { "artemis": 0.4, "ilrs": 0.7 }, "weight": 0.9 },
+      { "iso": "MLI", "lean": { "ilrs": 0.6 }, "weight": 0.5 },
+      { "iso": "NER", "lean": { "ilrs": 0.6 }, "weight": 0.5 },
+      { "iso": "LKA", "lean": { "artemis": 0.6, "ilrs": 0.6 }, "weight": 0.9 },
+      { "iso": "NPL", "lean": { "artemis": 0.5, "ilrs": 0.5 }, "weight": 0.6 },
+      { "iso": "QAT", "lean": { "artemis": 0.7, "ilrs": 0.35 }, "weight": 0.9 },
+      { "iso": "KWT", "lean": { "artemis": 0.6, "ilrs": 0.35 }, "weight": 0.7 },
+      { "iso": "TUN", "lean": { "artemis": 0.5, "ilrs": 0.5 }, "weight": 0.7 },
+      { "iso": "UGA", "lean": { "artemis": 0.4, "ilrs": 0.6 }, "weight": 0.7 },
+      { "iso": "KAZ", "lean": { "artemis": 0.45, "ilrs": 0.8 }, "weight": 0.7 },
+      { "iso": "AZE", "lean": { "artemis": 0.4, "ilrs": 0.7 }, "weight": 0.6 },
+      { "iso": "EGY", "lean": { "artemis": 0.4, "ilrs": 0.75 }, "weight": 0.7 },
+      { "iso": "THA", "lean": { "artemis": 0.6, "ilrs": 0.55 } },
+      { "iso": "SRB", "lean": { "artemis": 0.4, "ilrs": 0.6 } },
+      { "iso": "SEN", "lean": { "artemis": 0.6, "ilrs": 0.5 } }
+    ]
+  },
   "model": {
     "_doc": "Taxas mensais. shiftHazard por intensidade (2..4) vale para zonas 'shiftable' (intensidade mínima) depois de minConflictWeeks; multiplicada pela razão de força entre os lados (economia, crise, governo) limitada a ratioClamp. maxShifts = teto de mudanças de controle por campanha. Zona: shiftWeight multiplica o risco; shiftBias { ISO3: fator } pesa a direção (retomar área fortificada é mais raro que avançar). factCeasefire/treatyChance/resumeChance por nível de tensão dos pares que movem o conflito (0..4).",
     "startTurn": 0,
     "minConflictWeeks": 12,
-    "shiftHazard": { "2": 0.0002, "3": 0.0012, "4": 0.014 },
+    "shiftHazard": { "2": 0.0004, "3": 0.0045, "4": 0.014 },
     "ratioClamp": [0.4, 1.6],
     "maxShifts": 3,
     "shiftPressure": 0.3,
@@ -290,12 +364,15 @@
     "control_change": [
       "{Zone} passa ao controle {deTo}, segundo autoridades dos dois lados",
       "Mudança na linha de controle: {oZone} fica sob administração {deTo}",
-      "{OTo} assume o controle {deZone}; {oFrom} não reconhece a mudança"
+      "{OTo} assume o controle {deZone}; {oFrom} não reconhece a mudança",
+      "Linha de frente se move {place}: {oZone} muda de mãos",
+      "Imagens de satélite confirmam: {oZone} está sob controle {deTo}"
     ],
     "fact_ceasefire": [
       "Cessar-fogo entra em vigor {place}; linhas atuais ficam congeladas",
       "Partes anunciam trégua {place} após meses de negociação",
-      "Hostilidades são suspensas {place}; observadores acompanham a linha de contato"
+      "Hostilidades são suspensas {place}; observadores acompanham a linha de contato",
+      "Armas silenciam {place}: trégua começa à meia-noite, sob mediação internacional"
     ],
     "treaty": [
       "Acordo formal encerra o conflito {place}",
@@ -305,7 +382,30 @@
     "resumed": [
       "Cessar-fogo é rompido {place}; combates são retomados",
       "Trégua desaba {place} com acusações mútuas de violação",
-      "Hostilidades voltam {place} após o fim da trégua"
+      "Hostilidades voltam {place} após o fim da trégua",
+      "Fim da calmaria {place}: bombardeios recomeçam e mediadores deixam a mesa"
+    ],
+    "bloc_join_artemis": [
+      "{OCountry} assina os Acordos Artemis em cerimônia em Washington",
+      "Mais um signatário: {oCountry} adere aos Acordos Artemis",
+      "Diplomacia lunar: {oCountry} entra nos Acordos Artemis e promete transparência na Lua",
+      "{OCountry} se junta aos Acordos Artemis; Pequim fala em alinhamento automático"
+    ],
+    "bloc_join_ilrs": [
+      "{OCountry} assina memorando e entra no ILRS, o projeto lunar sino-russo",
+      "Pequim recebe {oCountry} como novo parceiro do ILRS",
+      "{OCountry} adere à Estação Internacional de Pesquisa Lunar (ILRS)",
+      "ILRS ganha mais um parceiro: {oCountry} promete cientistas e uma estação de rastreamento"
+    ],
+    "bloc_both": [
+      "{OCountry} assina também {oBloc} e mantém um pé em cada projeto lunar",
+      "Sem escolher lado: {oCountry} entra {aBloc} sem deixar {oOther}",
+      "{OCountry} aposta nos dois blocos e adere {aBloc}"
+    ],
+    "bloc_pick_side": [
+      "Sob pressão, {oCountry} deixa {oBloc} e fica só com {oOther}",
+      "Crise entre as potências força a escolha: {oCountry} sai {deBloc}",
+      "{OCountry} congela a participação {deBloc} e se alinha {aOther}"
     ]
   },
   "timeline": {
@@ -316,6 +416,10 @@
     "resumed": "Hostilidades retomadas {place}",
     "control_change": "{zone}: controle passa {deFrom} para {oTo}",
     "tension_up": "Tensão {A}–{B}: {level}",
-    "tension_down": "Tensão {A}–{B} cai para {level}"
+    "tension_down": "Tensão {A}–{B} cai para {level}",
+    "bloc_join": "{OCountry} adere {aBloc}",
+    "bloc_leave": "{OCountry} deixa {oBloc}",
+    "agency_join": "{actor} entra {aBloc}",
+    "agency_leave": "{actor} deixa {oBloc}"
   }
 }

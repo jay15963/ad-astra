@@ -39,6 +39,15 @@
   background: color-mix(in srgb, var(--band) 6%, transparent);
   border-top: 1px solid color-mix(in srgb, var(--band) 28%, transparent);
 }
+/* portrait grid: each branch is a column group (tiers run top to bottom), groups wrap into rows */
+.tt-band.tt-band-col {
+  border: 1px solid color-mix(in srgb, var(--band) 24%, transparent); border-top-width: 3px;
+  border-top-color: color-mix(in srgb, var(--band) 55%, transparent); border-radius: 12px;
+}
+.tt-band-col .tt-band-label {
+  left: 8px; right: 8px; top: 7px; font-size: .66rem; letter-spacing: .05em;
+  overflow: hidden; text-overflow: ellipsis;
+}
 .tt-band-label {
   position: absolute; left: 12px; top: 6px; font-family: var(--font-display); font-size: .72rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .1em; color: color-mix(in srgb, var(--band) 80%, var(--ink));

@@ -81,6 +81,8 @@
     "xp": { "base": 10, "total": 8, "partial": 4, "recoverable": 2, "catastrophic": 5, "engineer": 2 },
     "morale": { "baseline": 60, "total": 8, "partial": 3, "recoverable": -5, "catastrophic": -15, "death": -20 },
     "deathChance": 0.85,
+    "escape": { "_doc": "Chance de a tripulação sobreviver a uma falha catastrófica na cena (sistema de escape, aborto). Margem de combustível acima/abaixo de marginRef soma perMargin por ponto; estratégia soma o valor da tabela.", "beforeOrbit": 0.55, "afterOrbit": 0.25, "arrival": 0.12, "marginRef": 0.1, "perMargin": 0.8, "strategy": { "conservative": 0.05, "balanced": 0, "aggressive": -0.1 }, "min": 0.02, "max": 0.95 },
+    "backgroundCrewLoss": { "_doc": "Voos tripulados resolvidos sem cena (IA, calendário): chance de perder a tripulação quando o voo falha (resultado recuperável ou catastrófico). Medido nas cenas com tools/sim-launches.mjs (mortes / falhas).", "ascent": 0.25, "orbit": 0.4, "landing": 0.55 },
     "injury": { "recoverable": 0.15, "catastrophic": 0.5, "weekly": 0.0008, "weeks": [4, 16] },
     "poach": { "loyaltyBelow": 50, "ambitionAbove": 55, "weeklyChance": 0.006, "counterRaise": 0.4, "counterLoyalty": 25, "counterBonusWeeks": 6, "walkoutLoyalty": 12 },
     "retire": { "checkEvery": 13, "age": 60, "astronautAge": 54, "chance": 0.12 },

@@ -105,6 +105,15 @@
       "notes": "Acesso autônomo da Europa ao espaço. Cadência subindo devagar; a versão de quatro boosters leva cargas pesadas."
     },
     {
+      "id": "ariane5", "name": "Ariane 5", "operator": "esa", "provider": "Arianespace", "country": "Europa", "class": "heavy",
+      "availableFrom": { "year": 1996, "month": 6 }, "availableUntil": { "year": 2023, "month": 7 }, "retired": true, "truthLayer": "fato",
+      "costM": 180, "cadencePerYear": 0, "backgroundPerYear": 0,
+      "history": { "flights": 117, "failures": 2, "firstFlight": 1996 },
+      "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 18,
+      "capacity": { "leo": 21, "gto": 10.5, "tli": 7, "mars": 6.6, "outer": 2 },
+      "notes": "Aposentado em julho de 2023, depois de 117 voos. Histórico: lançou BepiColombo e JUICE, que ainda estão a caminho. Não pode ser contratado para missões novas."
+    },
+    {
       "id": "vega_c", "name": "Vega C", "operator": "esa", "provider": "Avio", "country": "Europa", "class": "small",
       "availableFrom": { "year": 2022, "month": 7 }, "truthLayer": "fato",
       "costM": 45, "cadencePerYear": 4, "backgroundPerYear": 3,
