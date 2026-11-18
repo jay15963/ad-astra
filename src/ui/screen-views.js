@@ -36,6 +36,19 @@ export function soonPanel(id, extra = null) {
     extra);
 }
 
+/** Page for a registered screen that exists but is not open yet in this year (e.g. Hangar before 1957). */
+export function lockedPanel(container, store, id, text) {
+  const d = screenById(id);
+  const [title, desc] = SOON_TEXT[id] || [d?.title || id, ''];
+  container.appendChild(h('div', { class: 'view-pad em-breve-pag' },
+    viewHead(d?.title || title, { lead: `Disponível ${text}.` }),
+    h('section', { class: 'card em-breve-card' },
+      h('div', { class: 'em-breve-topo' }, raw(iconSVG(d?.icon || 'info', 28), 'em-breve-ic'), chip(text, 'warn')),
+      h('h2', { class: 'em-breve-titulo' }, title),
+      h('p', { class: 'em-breve-texto' }, desc)),
+    button('Voltar ao Painel', () => store.ui?.navigate?.('painel'), { icon: 'voltar', big: true })));
+}
+
 export const stub = {
   render(container, store, route) {
     container.appendChild(soonPanel(route?.tab || 'hangar',

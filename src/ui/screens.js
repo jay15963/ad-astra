@@ -52,6 +52,11 @@ export function isAvailable(d, state, data) {
   try { return !!d.available(state, data); } catch { return false; }
 }
 
+/** lockedText guarded: a string while the screen is listed but not open yet, else null. */
+function safeLocked(d, state, data) {
+  try { return d.lockedText(state, data) || null; } catch { return null; }
+}
+
 /** Badge value guarded: 0 | true | n. */
 export function badgeOf(d, state, store) {
   if (!d || typeof d.badge !== 'function') return 0;
@@ -71,7 +76,8 @@ export function drawerSections(state, data) {
   const items = screens(state, data).filter((d) => d.nav === 'drawer');
   return GROUPS.map((g) => ({
     group: g.id, label: g.label,
-    items: items.filter((d) => d.group === g.id).sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)),
+    items: items.filter((d) => d.group === g.id).sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
+      .map((d) => (typeof d.lockedText === 'function' ? { ...d, lockedNow: safeLocked(d, state, data) } : d)),
   })).filter((s) => s.items.length);
 }
 
@@ -150,7 +156,17 @@ registerScreen({ id: 'identidade', title: 'Identidade e logo', icon: 'editar', g
 registerScreen({ id: 'financas', title: 'Finanças', icon: 'caixa', group: 'agencia', order: 40, load: () => import('./financas.js'), badge: (st) => ((st?.actors?.[st.playerId]?.cash ?? 0) < 0 ? true : 0) });
 
 registerScreen({ id: 'pesquisa', title: 'Pesquisa', icon: 'pesquisa', group: 'operacoes', order: 10, load: () => import('./research-tab.js') });
-registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', group: 'operacoes', order: 20, available: (st, data) => unlocked(st, data, 'builder'), load: orStub(() => import('./hangar.js')), badge: (st) => (designsInTest(st).length ? true : 0) });
+registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', group: 'operacoes', order: 20,
+  // always listed: before the scenario unlock year it shows "a partir de <ano>" and opens an explanation instead
+  lockedText: (st, data) => (unlocked(st, data, 'builder') ? null : `a partir de ${data.scenario.unlocks.builder.fromYear}`),
+  load: () => orStub(() => import('./hangar.js'))().then((m) => ({
+    render(container, store, route) {
+      const lt = screenById('hangar')?.lockedText?.(store.state, store.data);
+      if (lt) return views().then((v) => v.lockedPanel(container, store, 'hangar', lt));
+      return m.render(container, store, route);
+    },
+  })),
+  badge: (st) => (designsInTest(st).length ? true : 0) });
 registerScreen({ id: 'lancamentos', title: 'Calendário de lançamentos', short: 'Calendário', icon: 'calendario', group: 'operacoes', order: 30, load: () => import('./lancamentos.js'), badge: (st) => mandatesDueSoon(st).length });
 registerScreen({ id: 'veiculo', title: 'Falta o veículo', icon: 'alerta', group: 'operacoes', order: 5, go: 'missoes/lista', available: (st) => missionsNeedingVehicle(st).length > 0, badge: (st) => missionsNeedingVehicle(st).length });
 

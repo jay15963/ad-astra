@@ -44,7 +44,9 @@ test('registry: Conselho needs a cap table, Hangar follows the builder unlock, b
   assert.ok(ids(lunarState, lunar).includes('hangar'), 'Corrida Lunar (2026): the builder is open');
   const c = newGame(campaign, { seed: 3, playerId: campaign.scenario.playableActors[0] });
   assert.equal(screens.unlocked(c, campaign, 'builder'), false, '1950: builder unlocks in 1957');
-  assert.ok(!ids(c, campaign).includes('hangar'));
+  assert.ok(ids(c, campaign).includes('hangar'), 'Hangar is always listed (shown as locked before 1957)');
+  const hg = screens.drawerSections(c, campaign).flatMap((x) => x.items).find((d) => d.id === 'hangar');
+  assert.equal(hg.lockedNow, 'a partir de 1957');
   assert.equal(screens.unlocked({ ...c, turn: 7 * 52 }, campaign, 'builder'), true);
   assert.equal(screens.unlocked(c, campaign, 'nada'), true, 'no unlock entry = open');
   // badges

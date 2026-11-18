@@ -103,7 +103,7 @@ export function createDrawer({ onPick, onOpenChange, header } = {}) {
           },
           raw(iconSVG(d.icon, 20), 'gaveta-ic'),
           h('span', { class: 'gaveta-rotulo' }, d.title),
-          d.soon ? h('span', { class: 'gaveta-breve' }, 'em breve') : null,
+          d.soon ? h('span', { class: 'gaveta-breve' }, 'em breve') : (d.lockedNow ? h('span', { class: 'gaveta-breve' }, d.lockedNow) : null),
           dot));
         }
       }
