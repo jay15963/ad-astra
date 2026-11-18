@@ -14,6 +14,7 @@ import { vehicleDef, spacecraftDef, vehicleAvailable, listVehicles, listSpacecra
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readRaw = (n) => JSON.parse(fs.readFileSync(path.join(root, 'data', `${n}.json`), 'utf8'));
+const readRawOpt = (n) => (fs.existsSync(path.join(root, 'data', `${n}.json`)) ? readRaw(n) : null);
 const manifest = readRaw('packs');
 
 test('loadDataNode(root) with no options is the Corrida Lunar with today\'s legacy data, value for value', async () => {
@@ -73,7 +74,8 @@ test('campaign: e1 seed facts are merged and stamped; legacy data untouched', as
   assert.equal(data.index.calendar.vostok1.fromYear, undefined, 'has an absolute date: no fromYear');
   // legacy items keep identity and are not stamped
   assert.equal(data.index.vehicles.soyuz2.era, undefined);
-  assert.equal(data.vehicles.vehicles.length, readRaw('vehicles').vehicles.length + readRaw('eras/e1/vehicles').vehicles.length);
+  const eraVehicles = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'].reduce((n, e) => n + (readRawOpt(`eras/${e}/vehicles`)?.vehicles?.length || 0), 0);
+  assert.equal(data.vehicles.vehicles.length, readRaw('vehicles').vehicles.length + eraVehicles);
   assert.deepEqual(erasLoaded(data).sort(), ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7']);
   assert.equal(data.eraPacks.e1.from, 1950);
   // raw files were not mutated by stamping
@@ -149,7 +151,8 @@ test('eraOfYear follows the manifest windows; jan/3000 is in the last era', () =
 test('listScenarios: campaign and Corrida Lunar, ordered, the loaded one marked', async () => {
   const data = await loadDataNode(root);
   const list = listScenarios(data);
-  assert.deepEqual(list.map((s) => s.id), ['campaign', 'lunar_race']);
+  assert.deepEqual(list.map((s) => s.id), ['campaign', 'a_corrida', 'estacoes', 'nova_economia', 'lunar_race', 'decada_lunar',
+    'fronteira_marciana', 'primeira_estrela', 'grande_silencio']);
   assert.equal(list.find((s) => s.id === 'lunar_race').loaded, true);
   for (const s of list) assert.ok(manifest.scenarios[s.id], `${s.id} has a file`);
   // tolerant without an index

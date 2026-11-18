@@ -1,0 +1,7 @@
+{
+  "_doc": "Arquétipos de investidor da era 1 (mescla com data/core/investors.json \"investors\"; dono C1). Valem até 1975 (untilYear) para não depender de que o pacote e1 esteja carregado nas eras seguintes; o vocabulário (core/vocab.json) congela kind e eras.",
+  "monthBase": 1,
+  "investors": [
+    {"id":"servico_meteorologico","kind":"government","eras":["e1","e2","e3"],"untilYear":1975,"weight":2,"playerKinds":["agency"],"names":["Serviço Meteorológico Nacional","Instituto Nacional de Meteorologia","Escritório de Previsão do Tempo"],"profile":"ciencia","pct":[2,8],"premium":0.9,"termYears":6,"emblem":{"shape":"roundel","division":"band","glyph":"globe","fields":["#3a5f7c","#5d7c3a"],"glyphColor":"#f4f1e8"},"source":"https://en.wikipedia.org/wiki/TIROS-1"}
+  ]
+}

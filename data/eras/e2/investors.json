@@ -1,0 +1,29 @@
+{
+  "_doc": "Pacote e2: investidores típicos da era (arquétipos do core/vocab.json com primeira era e2) e modelos de mandato que só fazem sentido a partir de 1976. Mescla por id com data/core/investors.json (Fase B, src/sim/investors.js). {pais} = país da agência do jogador.",
+  "investors": [
+    { "id": "estatal_telecom", "kind": "government", "eras": ["e2", "e3"], "weight": 3, "playerKinds": ["agency", "company"],
+      "names": ["Companhia Estatal de Telecomunicações", "Empresa Nacional de Telefonia ({pais})", "Telecomunicações do Estado"],
+      "profile": "comunicacoes", "pct": [3, 12], "premium": 1, "termYears": 6,
+      "emblem": { "shape": "roundel", "division": "band", "glyph": "orbit", "fields": ["#3f5f6b", "#5b4a3e", "#4a4f57"], "glyphColor": "#e6e1d3" } },
+    { "id": "consorcio_satelites", "kind": "consortium", "eras": ["e2", "e3"], "weight": 2,
+      "names": ["Consórcio Internacional de Satélites", "Organização Regional de Comunicações por Satélite", "Consórcio de Televisão por Satélite"],
+      "profile": "comunicacoes", "pct": [4, 15], "premium": 1.05, "termYears": 7,
+      "emblem": { "shape": "hex", "division": "half", "glyph": "globe", "fields": ["#2f4d6b", "#6b5a2f", "#3a3f46"], "glyphColor": "#f1ead6" } }
+  ],
+  "profiles": {
+    "estado": { "templates": [
+      { "id": "gov_outer_planets", "title": "Sonda aos planetas externos", "type": "probe", "destinations": ["saturn_flyby", "uranus_flyby", "jupiter"], "years": 4, "reward": 0.14, "fromYear": 1977 },
+      { "id": "gov_station_crew", "title": "Expedição de longa duração", "type": "crewed", "destinations": ["mir", "iss"], "years": 3, "reward": 0.12, "fromYear": 1986 }
+    ] },
+    "ciencia": { "templates": [
+      { "id": "sci_space_telescope", "title": "Telescópio em órbita", "type": "satellite", "destinations": ["leo", "gto"], "years": 3, "reward": 0.1, "fromYear": 1978 },
+      { "id": "sci_solar_l1", "title": "Observatório solar em L1", "type": "probe", "destinations": ["sun_earth_l1"], "years": 3, "reward": 0.09, "fromYear": 1978 }
+    ] },
+    "comunicacoes": { "templates": [
+      { "id": "com_direct_tv", "title": "Satélite de televisão direta", "type": "satellite", "destinations": ["gto"], "years": 2, "reward": 0.09, "fromYear": 1983 }
+    ] },
+    "defesa": { "templates": [
+      { "id": "def_navigation", "title": "Satélites de navegação", "type": "satellite", "destinations": ["meo"], "years": 2, "reward": 0.09, "fromYear": 1978 }
+    ] }
+  }
+}

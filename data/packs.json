@@ -1,17 +1,247 @@
 {
-  "_doc": "Manifesto dos pacotes de dados (docs/EXPANSION.md §4). Ordem = ordem de mescla. 'always' = sempre carregado; pacotes de era ('era' + 'years' [de, até]) são carregados sob demanda (src/core/data.js). 'legacy-e4' são os arquivos de hoje em data/, intocados.",
+  "_doc": "Manifesto dos pacotes de dados (docs/EXPANSION.md §4). Ordem = ordem de mescla. 'always' = sempre carregado; pacotes de era ('era' + 'years' [de, até]) são carregados sob demanda (src/core/data.js). 'legacy-e4' são os arquivos de hoje em data/, intocados. Um pacote com \"eras\" (lista) e sem \"era\" é carregado junto de qualquer uma dessas eras (colônias: só a partir de 2051).",
   "version": 1,
   "packs": [
-    { "id": "core", "always": true, "dir": "core/", "files": ["eras", "lineages", "lifecycle", "nations", "actor-gen", "ending", "emblem-parts", "emblems", "hq-sites", "investors", "parts"] },
-    { "id": "legacy-e4", "era": "e4", "always": true, "legacy": true, "dir": "",
-      "files": ["actors", "vehicles", "spacecraft", "destinations", "calendar", "politics", "geopolitics", "tech", "events", "crew", "bodies"] },
-    { "id": "e1", "era": "e1", "years": [1950, 1975], "dir": "eras/e1/", "files": ["era", "snapshot", "vehicles", "spacecraft", "calendar"] },
-    { "id": "e2", "era": "e2", "years": [1976, 1999], "dir": "eras/e2/", "files": ["era"] },
-    { "id": "e3", "era": "e3", "years": [2000, 2025], "dir": "eras/e3/", "files": ["era"] },
-    { "id": "e4", "era": "e4", "years": [2026, 2050], "dir": "eras/e4/", "files": ["era"] },
-    { "id": "e5", "era": "e5", "years": [2051, 2199], "dir": "eras/e5/", "files": ["era"] },
-    { "id": "e6", "era": "e6", "years": [2200, 2599], "dir": "eras/e6/", "files": ["era"] },
-    { "id": "e7", "era": "e7", "years": [2600, 2999], "dir": "eras/e7/", "files": ["era"] }
+    {
+      "id": "core",
+      "always": true,
+      "dir": "core/",
+      "files": [
+        "eras",
+        "lineages",
+        "lifecycle",
+        "nations",
+        "actor-gen",
+        "ending",
+        "emblem-parts",
+        "emblems",
+        "hq-sites",
+        "investors",
+        "parts",
+        "eco"
+      ]
+    },
+    {
+      "id": "legacy-e4",
+      "era": "e4",
+      "always": true,
+      "legacy": true,
+      "dir": "",
+      "files": [
+        "actors",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "calendar",
+        "politics",
+        "geopolitics",
+        "tech",
+        "events",
+        "crew",
+        "bodies"
+      ]
+    },
+    {
+      "id": "e1",
+      "era": "e1",
+      "years": [
+        1950,
+        1975
+      ],
+      "dir": "eras/e1/",
+      "files": [
+        "era",
+        "snapshot",
+        "parts",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "calendar",
+        "tech",
+        "events",
+        "crew",
+        "investors",
+        "patches"
+      ]
+    },
+    {
+      "id": "e2",
+      "era": "e2",
+      "years": [
+        1976,
+        1999
+      ],
+      "dir": "eras/e2/",
+      "files": [
+        "era",
+        "snapshot",
+        "parts",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "bodies",
+        "calendar",
+        "tech",
+        "events",
+        "crew",
+        "investors",
+        "patches"
+      ]
+    },
+    {
+      "id": "e3",
+      "era": "e3",
+      "years": [
+        2000,
+        2025
+      ],
+      "dir": "eras/e3/",
+      "files": [
+        "era",
+        "snapshot",
+        "parts",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "bodies",
+        "calendar",
+        "tech",
+        "events",
+        "crew",
+        "investors"
+      ]
+    },
+    {
+      "id": "e4",
+      "era": "e4",
+      "years": [
+        2026,
+        2050
+      ],
+      "dir": "eras/e4/",
+      "files": [
+        "era",
+        "snapshot",
+        "lineages",
+        "lifecycle",
+        "parts",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "calendar",
+        "tech",
+        "events",
+        "crew",
+        "investors"
+      ]
+    },
+    {
+      "id": "colonies",
+      "eras": [
+        "e5",
+        "e6",
+        "e7"
+      ],
+      "dir": "core/",
+      "files": [
+        "colonies"
+      ]
+    },
+    {
+      "id": "gen",
+      "eras": [
+        "e5",
+        "e6",
+        "e7"
+      ],
+      "dir": "gen/",
+      "files": [
+        "gen-events"
+      ]
+    },
+    {
+      "id": "e5",
+      "era": "e5",
+      "years": [
+        2051,
+        2199
+      ],
+      "dir": "eras/e5/",
+      "files": [
+        "era",
+        "snapshot",
+        "lineages",
+        "lifecycle",
+        "parts",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "calendar",
+        "tech",
+        "events",
+        "crew",
+        "investors",
+        "patches"
+      ]
+    },
+    {
+      "id": "e6",
+      "era": "e6",
+      "years": [
+        2200,
+        2599
+      ],
+      "dir": "eras/e6/",
+      "files": [
+        "era",
+        "snapshot",
+        "lineages",
+        "lifecycle",
+        "parts",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "calendar",
+        "tech",
+        "events",
+        "crew",
+        "investors"
+      ]
+    },
+    {
+      "id": "e7",
+      "era": "e7",
+      "years": [
+        2600,
+        2999
+      ],
+      "dir": "eras/e7/",
+      "files": [
+        "era",
+        "snapshot",
+        "lineages",
+        "lifecycle",
+        "parts",
+        "vehicles",
+        "spacecraft",
+        "destinations",
+        "calendar",
+        "tech",
+        "events",
+        "crew",
+        "investors"
+      ]
+    }
   ],
-  "scenarios": { "lunar_race": "scenario.json", "campaign": "scenarios/campaign.json" }
+  "scenarios": {
+    "lunar_race": "scenario.json",
+    "campaign": "scenarios/campaign.json",
+    "a_corrida": "scenarios/a_corrida.json",
+    "estacoes": "scenarios/estacoes.json",
+    "nova_economia": "scenarios/nova_economia.json",
+    "decada_lunar": "scenarios/decada_lunar.json",
+    "fronteira_marciana": "scenarios/fronteira_marciana.json",
+    "primeira_estrela": "scenarios/primeira_estrela.json",
+    "grande_silencio": "scenarios/grande_silencio.json"
+  }
 }

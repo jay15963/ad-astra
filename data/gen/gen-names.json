@@ -1,0 +1,1454 @@
+{
+ "_doc": "Gramática de nomes dos geradores (docs/EXPANSION.md §14, C8; src/gen/names.js). Cada era tem estilos por tipo de ator; cada estilo é um molde com marcadores ({root}, {surname}, {surname2}, {place}, {placeOf}, {of}, {sector}) e uma regra de sigla (short). Palavras-chave ({root}, {surname}, {place}) nunca se repetem entre atores vivos e lápides: não existem três 'Tycho Recursos'. Sucessores de linhagens reais (depois de 2050) usam moldes que funcionam com qualquer sigla e nunca acrescentam 'do Espaço' a quem já é agência espacial. Dono: C8.",
+ "version": 1,
+ "archetypeStyle": {
+  "emerging_agency": "agency",
+  "megacorp": "company",
+  "mining_consortium": "mining",
+  "interplanetary_authority": "authority",
+  "colony_gov": "colony",
+  "colegio_silencio": "fixed"
+ },
+ "fixed": {
+  "colegio_silencio": {
+   "name": "Colégio do Silêncio",
+   "short": "Colégio"
+  }
+ },
+ "eraOf": [
+  [
+   2031,
+   "e4"
+  ],
+  [
+   2051,
+   "e5"
+  ],
+  [
+   2200,
+   "e6"
+  ],
+  [
+   2600,
+   "e7"
+  ]
+ ],
+ "functionWords": [
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "e",
+  "&",
+  "a",
+  "o",
+  "as",
+  "os"
+ ],
+ "generic": [
+  "Agência",
+  "Espacial",
+  "Espaciais",
+  "Espaço",
+  "Instituto",
+  "Nacional",
+  "Comissão",
+  "Atividades",
+  "Autoridade",
+  "Exploração",
+  "Orbital",
+  "Orbitais",
+  "Aeroespacial",
+  "Lançadores",
+  "Propulsão",
+  "Sistemas",
+  "Indústrias",
+  "Logística",
+  "Dinâmica",
+  "Mineração",
+  "Mineradora",
+  "Metais",
+  "Cooperativa",
+  "Consórcio",
+  "Irmãos",
+  "Extração",
+  "Recursos",
+  "Interplanetária",
+  "Interplanetário",
+  "Liga",
+  "Profundo",
+  "Diretório",
+  "Estelar",
+  "Estelares",
+  "Galáctico",
+  "Galáctica",
+  "República",
+  "Governo",
+  "Autônomo",
+  "Comuna",
+  "Cidade",
+  "Livre",
+  "Federação",
+  "Habitats",
+  "Concórdia",
+  "Corporação-Estado",
+  "Casa",
+  "Estaleiros",
+  "Travessias",
+  "Guilda",
+  "Arquivo",
+  "Linhagem",
+  "Conselho",
+  "Assembleia",
+  "Companhia",
+  "Grupo",
+  "Holding",
+  "Nova",
+  "Novo",
+  "Administração",
+  "Sistema",
+  "Solar",
+  "Observatório",
+  "Conglomerado",
+  "Fundação",
+  "Herdeiros",
+  "Navegadores",
+  "Rede",
+  "Coro",
+  "Colégio",
+  "Silêncio",
+  "Transportes",
+  "Mundos",
+  "Estrelas",
+  "Interestelar",
+  "Interestelares"
+ ],
+ "styles": {
+  "e4": {
+   "agency": [
+    {
+     "id": "ae",
+     "w": 5,
+     "name": "Agência Espacial {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "inst",
+     "w": 2,
+     "name": "Instituto Nacional do Espaço {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "auth",
+     "w": 2,
+     "name": "Autoridade Espacial {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "conae",
+     "w": 1,
+     "name": "Comissão Nacional de Atividades Espaciais {of}",
+     "short": "{acr}"
+    }
+   ],
+   "company": [
+    {
+     "id": "root_sector",
+     "w": 5,
+     "name": "{root} {sector}",
+     "short": "{root}"
+    },
+    {
+     "id": "brand",
+     "w": 2,
+     "name": "{root}",
+     "short": "{root}"
+    },
+    {
+     "id": "founder",
+     "w": 2,
+     "name": "{surname} {sector}",
+     "short": "{surname}"
+    },
+    {
+     "id": "partners",
+     "w": 1,
+     "name": "{surname} & {surname2}",
+     "short": "{i1}&{i2}"
+    }
+   ],
+   "mining": [
+    {
+     "id": "root_min",
+     "w": 3,
+     "name": "{root} Mineração",
+     "short": "{root}"
+    },
+    {
+     "id": "mineradora",
+     "w": 2,
+     "name": "Mineradora {root}",
+     "short": "{root}"
+    },
+    {
+     "id": "metais",
+     "w": 2,
+     "name": "Metais {placeOf}",
+     "short": "{place}"
+    }
+   ]
+  },
+  "e5": {
+   "agency": [
+    {
+     "id": "ae",
+     "w": 4,
+     "name": "Agência Espacial {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "auth",
+     "w": 3,
+     "name": "Autoridade Espacial {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "inst",
+     "w": 2,
+     "name": "Instituto Nacional do Espaço {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "aee",
+     "w": 1,
+     "name": "Agência de Exploração do Sistema Solar {of}",
+     "short": "{acr}"
+    }
+   ],
+   "company": [
+    {
+     "id": "root_sector",
+     "w": 4,
+     "name": "{root} {sector}",
+     "short": "{root}"
+    },
+    {
+     "id": "brand",
+     "w": 2,
+     "name": "{root}",
+     "short": "{root}"
+    },
+    {
+     "id": "founder",
+     "w": 2,
+     "name": "{surname} {sector}",
+     "short": "{surname}"
+    },
+    {
+     "id": "partners",
+     "w": 1,
+     "name": "{surname} & {surname2}",
+     "short": "{i1}&{i2}"
+    },
+    {
+     "id": "transportes",
+     "w": 1,
+     "name": "Transportes {placeOf}",
+     "short": "{place}"
+    }
+   ],
+   "mining": [
+    {
+     "id": "root_min",
+     "w": 3,
+     "name": "{root} Mineração",
+     "short": "{root}"
+    },
+    {
+     "id": "mineradora",
+     "w": 2,
+     "name": "Mineradora {root}",
+     "short": "{root}"
+    },
+    {
+     "id": "metais",
+     "w": 2,
+     "name": "Metais {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "coop",
+     "w": 2,
+     "name": "Cooperativa {placeOf}",
+     "short": "Coop {place}"
+    },
+    {
+     "id": "irmaos",
+     "w": 1,
+     "name": "Irmãos {surname} Extração",
+     "short": "{surname}"
+    }
+   ],
+   "authority": [
+    {
+     "id": "auth",
+     "w": 3,
+     "name": "Autoridade Interplanetária {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "liga",
+     "w": 2,
+     "name": "Liga {root} do Espaço Profundo",
+     "short": "Liga {root}"
+    }
+   ],
+   "colony": [
+    {
+     "id": "rep",
+     "w": 3,
+     "name": "República {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "gov",
+     "w": 2,
+     "name": "Governo Autônomo {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "comuna",
+     "w": 2,
+     "name": "Comuna {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "cidade",
+     "w": 1,
+     "name": "Cidade Livre {placeOf}",
+     "short": "{place}"
+    }
+   ]
+  },
+  "e6": {
+   "agency": [
+    {
+     "id": "dir",
+     "w": 3,
+     "name": "Diretório Interplanetário {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "cons",
+     "w": 2,
+     "name": "Conselho do Espaço Profundo {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "ae",
+     "w": 2,
+     "name": "Agência Espacial {of}",
+     "short": "{acr}"
+    }
+   ],
+   "company": [
+    {
+     "id": "corp_estado",
+     "w": 3,
+     "name": "Corporação-Estado {root}",
+     "short": "{root}"
+    },
+    {
+     "id": "habitats",
+     "w": 2,
+     "name": "{root} Habitats",
+     "short": "{root}"
+    },
+    {
+     "id": "casa",
+     "w": 2,
+     "name": "Casa {surname}",
+     "short": "{surname}"
+    },
+    {
+     "id": "estaleiros",
+     "w": 2,
+     "name": "Estaleiros {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "travessias",
+     "w": 1,
+     "name": "{root} Travessias",
+     "short": "{root}"
+    }
+   ],
+   "mining": [
+    {
+     "id": "coop",
+     "w": 3,
+     "name": "Cooperativa {placeOf}",
+     "short": "Coop {place}"
+    },
+    {
+     "id": "root_min",
+     "w": 2,
+     "name": "{root} Mineração",
+     "short": "{root}"
+    },
+    {
+     "id": "linhagem",
+     "w": 1,
+     "name": "Linhagem {surname} Extração",
+     "short": "{surname}"
+    }
+   ],
+   "authority": [
+    {
+     "id": "auth",
+     "w": 2,
+     "name": "Autoridade Interplanetária {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "dir",
+     "w": 3,
+     "name": "Diretório Estelar {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "liga",
+     "w": 2,
+     "name": "Liga {root} do Espaço Profundo",
+     "short": "Liga {root}"
+    },
+    {
+     "id": "assembleia",
+     "w": 1,
+     "name": "Assembleia dos Mundos {placeOf}",
+     "short": "{place}"
+    }
+   ],
+   "colony": [
+    {
+     "id": "rep",
+     "w": 2,
+     "name": "República {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "fed",
+     "w": 2,
+     "name": "Federação dos Habitats {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "concordia",
+     "w": 2,
+     "name": "Concórdia {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "comuna",
+     "w": 1,
+     "name": "Comuna {placeOf}",
+     "short": "{place}"
+    }
+   ]
+  },
+  "e7": {
+   "agency": [
+    {
+     "id": "obs",
+     "w": 3,
+     "name": "Observatório Profundo {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "cons",
+     "w": 2,
+     "name": "Conselho das Estrelas {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "dir",
+     "w": 1,
+     "name": "Diretório Galáctico {of}",
+     "short": "{acr}"
+    }
+   ],
+   "company": [
+    {
+     "id": "guilda",
+     "w": 3,
+     "name": "Guilda {root}",
+     "short": "{root}"
+    },
+    {
+     "id": "casa",
+     "w": 2,
+     "name": "Casa {surname}",
+     "short": "{surname}"
+    },
+    {
+     "id": "arquivo",
+     "w": 2,
+     "name": "Arquivo {root}",
+     "short": "{root}"
+    },
+    {
+     "id": "navegadores",
+     "w": 1,
+     "name": "Navegadores {placeOf}",
+     "short": "{place}"
+    }
+   ],
+   "mining": [
+    {
+     "id": "coop",
+     "w": 2,
+     "name": "Cooperativa {placeOf}",
+     "short": "Coop {place}"
+    },
+    {
+     "id": "linhagem",
+     "w": 2,
+     "name": "Linhagem {surname} Extração",
+     "short": "{surname}"
+    },
+    {
+     "id": "guilda",
+     "w": 1,
+     "name": "Guilda {root} de Extração",
+     "short": "{root}"
+    }
+   ],
+   "authority": [
+    {
+     "id": "dir",
+     "w": 2,
+     "name": "Diretório Galáctico {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "rede",
+     "w": 2,
+     "name": "Rede {root} dos Mundos",
+     "short": "Rede {root}"
+    },
+    {
+     "id": "assembleia",
+     "w": 2,
+     "name": "Assembleia dos Mundos {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "coro",
+     "w": 1,
+     "name": "Coro {root}",
+     "short": "{root}"
+    }
+   ],
+   "colony": [
+    {
+     "id": "concordia",
+     "w": 2,
+     "name": "Concórdia {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "rep",
+     "w": 2,
+     "name": "República {placeOf}",
+     "short": "{place}"
+    },
+    {
+     "id": "mundo",
+     "w": 2,
+     "name": "Mundo Livre {placeOf}",
+     "short": "{place}"
+    }
+   ]
+  }
+ },
+ "sectors": {
+  "e4": [
+   "Orbital",
+   "Aeroespacial",
+   "Lançadores",
+   "Propulsão",
+   "Sistemas Espaciais",
+   "Logística Orbital"
+  ],
+  "e5": [
+   "Orbital",
+   "Aeroespacial",
+   "Lançadores",
+   "Propulsão",
+   "Logística Orbital",
+   "Indústrias Orbitais",
+   "Transportes Interplanetários"
+  ],
+  "e6": [
+   "Habitats",
+   "Travessias"
+  ],
+  "e7": []
+ },
+ "roots": {
+  "e4": [
+   "Helion",
+   "Vértice",
+   "Zênite",
+   "Meridiano",
+   "Áurea",
+   "Boreal",
+   "Austral",
+   "Cóndor",
+   "Equinócio",
+   "Solstício",
+   "Nadir",
+   "Perseu",
+   "Lyra",
+   "Altair",
+   "Rigel",
+   "Vega",
+   "Kepler",
+   "Tycho",
+   "Halley",
+   "Galileu",
+   "Copérnico",
+   "Ícaro",
+   "Guaraci",
+   "Jaci",
+   "Tupã",
+   "Polaris",
+   "Sirius",
+   "Órion",
+   "Atlas",
+   "Astra",
+   "Aurora"
+  ],
+  "e5": [
+   "Carcará",
+   "Jacarandá",
+   "Ipê",
+   "Tropeiro",
+   "Jangada",
+   "Sertão",
+   "Aroeira",
+   "Mandacaru",
+   "Pampa",
+   "Cerrado",
+   "Araucária",
+   "Sabiá",
+   "Baobá",
+   "Sequoia",
+   "Monção",
+   "Siroco",
+   "Basalto",
+   "Granito",
+   "Quartzo",
+   "Ferrugem",
+   "Bigorna",
+   "Fornalha",
+   "Tenaz",
+   "Picareta",
+   "Lanterna",
+   "Bússola",
+   "Alvorada",
+   "Estiva",
+   "Caravela",
+   "Trilha",
+   "Fronteira",
+   "Pioneira",
+   "Rocinante",
+   "Kestrel",
+   "Albatroz",
+   "Gaivota",
+   "Andorinha",
+   "Caravana",
+   "Ventania",
+   "Âncora",
+   "Malaquita",
+   "Obsidiana",
+   "Cobalto",
+   "Irídio",
+   "Ósmio",
+   "Paládio",
+   "Turmalina",
+   "Hematita"
+  ],
+  "e6": [
+   "Paciência",
+   "Travessia",
+   "Ressonância",
+   "Maré",
+   "Farol",
+   "Abismo",
+   "Semente",
+   "Colmeia",
+   "Litoral",
+   "Horizonte",
+   "Aliança",
+   "Constância",
+   "Lonjura",
+   "Arquipélago",
+   "Manancial",
+   "Raiz",
+   "Floresta",
+   "Ninho",
+   "Correnteza",
+   "Relicário",
+   "Longa Noite",
+   "Remanso",
+   "Vigia",
+   "Estuário",
+   "Quilha",
+   "Cardume",
+   "Sementeira",
+   "Bonança",
+   "Leme",
+   "Pairo",
+   "Delta",
+   "Sargaço",
+   "Calmaria",
+   "Viveiro",
+   "Clareira",
+   "Tecelã"
+  ],
+  "e7": [
+   "Limiar",
+   "Penumbra",
+   "Lúmen",
+   "Antífona",
+   "Cântico",
+   "Véu",
+   "Ápice",
+   "Nebular",
+   "Esfinge",
+   "Orvalho",
+   "Âmbar",
+   "Cinza",
+   "Fractal",
+   "Quietude",
+   "Murmúrio",
+   "Ondina",
+   "Vazio",
+   "Sextante",
+   "Astrolábio",
+   "Clepsidra",
+   "Labirinto",
+   "Oráculo",
+   "Lacuna",
+   "Silente",
+   "Altura",
+   "Distância",
+   "Memória",
+   "Brasa",
+   "Vigília",
+   "Ressaca",
+   "Sereno",
+   "Crepúsculo",
+   "Aurora Fria",
+   "Elipse",
+   "Prisma"
+  ]
+ },
+ "surnames": [
+  "Okafor",
+  "Tanaka",
+  "Ribeiro",
+  "Moreau",
+  "Adeyemi",
+  "Kowalski",
+  "Haddad",
+  "Nakamura",
+  "Oliveira",
+  "Mendes",
+  "Petrova",
+  "Singh",
+  "Chen",
+  "Nguyen",
+  "Ferreira",
+  "Lindqvist",
+  "Okonkwo",
+  "Rahman",
+  "Kaur",
+  "Suzuki",
+  "Mwangi",
+  "Quispe",
+  "Mamani",
+  "Torres",
+  "Navarro",
+  "Abdi",
+  "Demir",
+  "Yilmaz",
+  "Park",
+  "Sato",
+  "Ivanova",
+  "Novak",
+  "Horvat",
+  "Barros",
+  "Teixeira",
+  "Almeida",
+  "Oyelaran",
+  "Banda",
+  "Phiri",
+  "Mensah",
+  "Asante",
+  "Diallo",
+  "Traoré",
+  "Farouk",
+  "Ortega",
+  "Castillo",
+  "Ramírez",
+  "Varga",
+  "Lund",
+  "Dubois",
+  "Laurent",
+  "Rossi",
+  "Bianchi",
+  "Weber",
+  "Hoffmann",
+  "Iyer",
+  "Menon",
+  "Pereira",
+  "Wong",
+  "Lim",
+  "Santos",
+  "Kaplan",
+  "Moreno",
+  "Duarte",
+  "Valente",
+  "Sandoval",
+  "Achterberg",
+  "Halvorsen"
+ ],
+ "places": {
+  "e4": [
+   {
+    "name": "Shackleton",
+    "of": "de Shackleton"
+   },
+   {
+    "name": "Malapert",
+    "of": "de Malapert"
+   },
+   {
+    "name": "Tranquilidade",
+    "of": "da Tranquilidade"
+   },
+   {
+    "name": "Apófis",
+    "of": "de Apófis"
+   },
+   {
+    "name": "Psique",
+    "of": "de Psique"
+   },
+   {
+    "name": "Fobos",
+    "of": "de Fobos"
+   }
+  ],
+  "e5": [
+   {
+    "name": "Tharsis",
+    "of": "de Tharsis"
+   },
+   {
+    "name": "Hellas",
+    "of": "de Hellas"
+   },
+   {
+    "name": "Elísio",
+    "of": "do Elísio"
+   },
+   {
+    "name": "Utopia",
+    "of": "de Utopia"
+   },
+   {
+    "name": "Arcádia",
+    "of": "de Arcádia"
+   },
+   {
+    "name": "Jezero",
+    "of": "de Jezero"
+   },
+   {
+    "name": "Valles",
+    "of": "de Valles"
+   },
+   {
+    "name": "Ceres",
+    "of": "de Ceres"
+   },
+   {
+    "name": "Vesta",
+    "of": "de Vesta"
+   },
+   {
+    "name": "Palas",
+    "of": "de Palas"
+   },
+   {
+    "name": "Higeia",
+    "of": "de Higeia"
+   },
+   {
+    "name": "Cinturão",
+    "of": "do Cinturão"
+   },
+   {
+    "name": "Deimos",
+    "of": "de Deimos"
+   },
+   {
+    "name": "Calisto",
+    "of": "de Calisto"
+   },
+   {
+    "name": "Ganimedes",
+    "of": "de Ganimedes"
+   },
+   {
+    "name": "Europa",
+    "of": "de Europa"
+   },
+   {
+    "name": "Titã",
+    "of": "de Titã"
+   },
+   {
+    "name": "Encélado",
+    "of": "de Encélado"
+   },
+   {
+    "name": "Tritão",
+    "of": "de Tritão"
+   },
+   {
+    "name": "Caronte",
+    "of": "de Caronte"
+   },
+   {
+    "name": "Kraken",
+    "of": "do Kraken"
+   },
+   {
+    "name": "Ligeia",
+    "of": "de Ligeia"
+   }
+  ],
+  "e6": [
+   {
+    "name": "Titânia",
+    "of": "de Titânia"
+   },
+   {
+    "name": "Oberon",
+    "of": "de Oberon"
+   },
+   {
+    "name": "Miranda",
+    "of": "de Miranda"
+   },
+   {
+    "name": "Sedna",
+    "of": "de Sedna"
+   },
+   {
+    "name": "Éris",
+    "of": "de Éris"
+   },
+   {
+    "name": "Oort",
+    "of": "de Oort"
+   },
+   {
+    "name": "Proxima",
+    "of": "de Proxima"
+   },
+   {
+    "name": "Barnard",
+    "of": "de Barnard"
+   },
+   {
+    "name": "Lalande",
+    "of": "de Lalande"
+   },
+   {
+    "name": "Wolf",
+    "of": "de Wolf"
+   },
+   {
+    "name": "Ross",
+    "of": "de Ross"
+   },
+   {
+    "name": "Eridani",
+    "of": "de Eridani"
+   },
+   {
+    "name": "Teegarden",
+    "of": "de Teegarden"
+   },
+   {
+    "name": "Luyten",
+    "of": "de Luyten"
+   },
+   {
+    "name": "Kapteyn",
+    "of": "de Kapteyn"
+   }
+  ],
+  "e7": [
+   {
+    "name": "Trappist",
+    "of": "de Trappist"
+   },
+   {
+    "name": "Fomalhaut",
+    "of": "de Fomalhaut"
+   },
+   {
+    "name": "Altair",
+    "of": "de Altair"
+   },
+   {
+    "name": "Híades",
+    "of": "das Híades"
+   },
+   {
+    "name": "Plêiades",
+    "of": "das Plêiades"
+   },
+   {
+    "name": "Deneb",
+    "of": "de Deneb"
+   },
+   {
+    "name": "Carina",
+    "of": "de Carina"
+   },
+   {
+    "name": "Cygnus",
+    "of": "de Cygnus"
+   },
+   {
+    "name": "Kruger",
+    "of": "de Kruger"
+   },
+   {
+    "name": "Pavonis",
+    "of": "de Pavonis"
+   },
+   {
+    "name": "Draconis",
+    "of": "de Draconis"
+   },
+   {
+    "name": "Cassiopeia",
+    "of": "de Cassiopeia"
+   },
+   {
+    "name": "Antares",
+    "of": "de Antares"
+   },
+   {
+    "name": "Órion Profundo",
+    "of": "de Órion Profundo"
+   }
+  ]
+ },
+ "successors": {
+  "_doc": "Moldes de sucessores especulativos das linhagens reais (EXPANSION.md §3.2 successors). {short} = sigla da linhagem (NASA, SpaceX); {of} = nação da linhagem ('dos EUA'). 'once': o molde só vale uma vez por linhagem. Nenhum molde acrescenta 'Espaço' ou 'Espacial': agências já são espaciais.",
+  "agency": {
+   "e5": [
+    {
+     "id": "interplan",
+     "w": 3,
+     "name": "{short} Interplanetária",
+     "short": "{short}"
+    },
+    {
+     "id": "auth",
+     "w": 2,
+     "name": "Autoridade Interplanetária {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "adm",
+     "w": 1,
+     "name": "Administração do Sistema Solar {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "nova",
+     "w": 1,
+     "name": "Nova {short}",
+     "short": "Nova {short}",
+     "once": true,
+     "nameMasc": "Novo {short}",
+     "shortMasc": "Novo {short}"
+    }
+   ],
+   "e6": [
+    {
+     "id": "estelar",
+     "w": 3,
+     "name": "{short} Estelar",
+     "short": "{short}"
+    },
+    {
+     "id": "dir",
+     "w": 2,
+     "name": "Diretório Estelar {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "cons",
+     "w": 2,
+     "name": "Conselho Interestelar {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "longo_curso",
+     "w": 1,
+     "name": "{short} de Longo Curso",
+     "short": "{short}"
+    }
+   ],
+   "e7": [
+    {
+     "id": "rede",
+     "w": 2,
+     "name": "Rede {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "obs",
+     "w": 2,
+     "name": "Observatório Profundo {of}",
+     "short": "{acr}"
+    },
+    {
+     "id": "vigilia",
+     "w": 1,
+     "name": "Vigília {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "interestelar",
+     "w": 1,
+     "name": "{short} Interestelar",
+     "short": "{short}"
+    }
+   ]
+  },
+  "company": {
+   "e5": [
+    {
+     "id": "interplan",
+     "w": 3,
+     "name": "{short} Interplanetária",
+     "short": "{short}"
+    },
+    {
+     "id": "grupo",
+     "w": 2,
+     "name": "Grupo {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "holding",
+     "w": 1,
+     "name": "Holding {short} Orbital",
+     "short": "{short}"
+    },
+    {
+     "id": "nova",
+     "w": 1,
+     "name": "Nova {short}",
+     "short": "Nova {short}",
+     "once": true,
+     "nameMasc": "Novo {short}",
+     "shortMasc": "Novo {short}"
+    }
+   ],
+   "e6": [
+    {
+     "id": "estelar",
+     "w": 3,
+     "name": "{short} Estelar",
+     "short": "{short}"
+    },
+    {
+     "id": "corp_estado",
+     "w": 2,
+     "name": "Corporação-Estado {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "conglomerado",
+     "w": 1,
+     "name": "Conglomerado {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "longo_curso",
+     "w": 1,
+     "name": "Companhia {short} de Longo Curso",
+     "short": "{short}"
+    }
+   ],
+   "e7": [
+    {
+     "id": "casa",
+     "w": 2,
+     "name": "Casa {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "guilda",
+     "w": 2,
+     "name": "Guilda {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "fundacao",
+     "w": 1,
+     "name": "Fundação {short}",
+     "short": "{short}"
+    },
+    {
+     "id": "rede",
+     "w": 1,
+     "name": "Rede {short}",
+     "short": "{short}"
+    }
+   ]
+  }
+ },
+ "emblem": {
+  "agency": {
+   "shapes": [
+    "roundel",
+    "shield",
+    "star"
+   ],
+   "glyphs": [
+    "rocket",
+    "globe",
+    "star",
+    "orbit"
+   ],
+   "divisions": [
+    "none",
+    "band",
+    "half"
+   ]
+  },
+  "company": {
+   "shapes": [
+    "wordmark",
+    "hex",
+    "chevron",
+    "wing"
+   ],
+   "glyphs": [
+    "rocket",
+    "comet",
+    "orbit",
+    "atom"
+   ],
+   "divisions": [
+    "none",
+    "chevron",
+    "band"
+   ]
+  },
+  "mining": {
+   "shapes": [
+    "hex",
+    "shield"
+   ],
+   "glyphs": [
+    "planet",
+    "comet",
+    "atom"
+   ],
+   "divisions": [
+    "quarter",
+    "half",
+    "none"
+   ]
+  },
+  "authority": {
+   "shapes": [
+    "star",
+    "roundel",
+    "wing"
+   ],
+   "glyphs": [
+    "star",
+    "planet",
+    "orbit"
+   ],
+   "divisions": [
+    "band",
+    "chevron",
+    "none"
+   ]
+  },
+  "colony": {
+   "shapes": [
+    "shield",
+    "roundel"
+   ],
+   "glyphs": [
+    "planet",
+    "wreath",
+    "globe"
+   ],
+   "divisions": [
+    "half",
+    "band"
+   ]
+  },
+  "fixed": {
+   "shapes": [
+    "roundel"
+   ],
+   "glyphs": [
+    "wreath"
+   ],
+   "divisions": [
+    "none"
+   ]
+  }
+ },
+ "palettes": {
+  "e4": [
+   [
+    "#1B3A6B",
+    "#F2C14E"
+   ],
+   [
+    "#0B6E4F",
+    "#F5F5F5"
+   ],
+   [
+    "#0F172A",
+    "#38BDF8"
+   ],
+   [
+    "#1F2937",
+    "#F43F5E"
+   ]
+  ],
+  "e5": [
+   [
+    "#5B3A29",
+    "#F4E1C1"
+   ],
+   [
+    "#7A1F2B",
+    "#E8C07D"
+   ],
+   [
+    "#3B2F1E",
+    "#F28C28"
+   ],
+   [
+    "#264653",
+    "#E9C46A"
+   ],
+   [
+    "#4A2C17",
+    "#D9A441"
+   ],
+   [
+    "#2F3E46",
+    "#F4A261"
+   ]
+  ],
+  "e6": [
+   [
+    "#2D2D5F",
+    "#9AD1D4"
+   ],
+   [
+    "#1E1B4B",
+    "#A5B4FC"
+   ],
+   [
+    "#0B3954",
+    "#BFD7EA"
+   ],
+   [
+    "#14532D",
+    "#A7F3D0"
+   ],
+   [
+    "#312E81",
+    "#FDE68A"
+   ]
+  ],
+  "e7": [
+   [
+    "#0F0A1E",
+    "#C4B5FD"
+   ],
+   [
+    "#111827",
+    "#E5E7EB"
+   ],
+   [
+    "#1A1033",
+    "#F0ABFC"
+   ],
+   [
+    "#0B1320",
+    "#94A3B8"
+   ],
+   [
+    "#18181B",
+    "#FCD34D"
+   ]
+  ]
+ },
+ "articles": {
+  "_doc": "Gênero/número da primeira palavra do nome para artigos ('a NASA', 'o Governo Autônomo de Titã', 'os Estaleiros de Oberon'). Padrão: feminino singular (agência, empresa).",
+  "masc": [
+   "Governo",
+   "Instituto",
+   "Consórcio",
+   "Diretório",
+   "Conselho",
+   "Observatório",
+   "Grupo",
+   "Conglomerado",
+   "Arquivo",
+   "Coro",
+   "Mundo",
+   "Programa",
+   "Comando",
+   "CNES",
+   "DLR",
+   "INCOSPAR"
+  ],
+  "mascPl": [
+   "Navegadores",
+   "Irmãos",
+   "Estaleiros",
+   "Metais",
+   "Transportes",
+   "Herdeiros"
+  ],
+  "femPl": []
+ }
+}

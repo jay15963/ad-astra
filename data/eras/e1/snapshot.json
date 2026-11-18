@@ -1,17 +1,19 @@
 {
-  "note": "Valores iniciais de jan/1950 das linhagens vivas (EXPANSION.md §2.1 'snapshot'). Atores fora desta lista e vivos na data usam lineages.json (budgetSeries + start). Relações sobrescrevem os pares listados; blocs/treaties substituem os de 2026 (em 1950 não há blocos espaciais nem tratados). Verbas em US$ milhões do jogo (valores constantes de 2026). Dono: lifecycle.",
+  "note": "Valores iniciais de jan/1950 das linhagens vivas (EXPANSION.md §2.1 \"snapshot\"; dono C1). Verbas em US$ milhões do jogo (valores de 2026), iguais à budgetSeries das linhagens em 1950. O cenário A Corrida (1957) usa o mesmo snapshot: herda relações e a ausência de blocos e tratados. Atores fora desta lista usam lineages.json. As entradas só valem para atores vivos na data de início.",
   "era": "e1",
-  "date": { "year": 1950, "month": 0 },
+  "date": {"year":1950,"month":0},
   "actors": {
-    "nasa": { "budget": 250, "cash": 60, "support": 45, "reputation": 60, "culture": 15, "prestige": 0, "fixedCostShare": 0.6,
-      "capabilities": { "crewed": false, "launchSites": ["Wallops"] },
-      "ai": { "cooperation": 0.45, "aggression": 0.4, "riskTolerance": 0.4, "goals": [] } },
-    "roscosmos": { "budget": 300, "cash": 75, "support": 70, "reputation": 50, "culture": -20, "prestige": 0, "fixedCostShare": 0.55,
-      "capabilities": { "crewed": false, "launchSites": ["Kapustin Yar"] },
-      "ai": { "cooperation": 0.2, "aggression": 0.7, "riskTolerance": 0.65, "goals": [] } }
+    "nasa": {"budget":250,"cash":60,"support":45,"reputation":60,"culture":15,"prestige":0,"fixedCostShare":0.6,"capabilities":{"crewed":false,"launchSites":["Cabo Canaveral","Wallops"]},"ai":{"cooperation":0.45,"aggression":0.4,"riskTolerance":0.4,"goals":["first_satellite","first_crewed_orbit","first_orbital_rendezvous","first_docking","crewed_lunar_orbit","crewed_lunar_landing"]}},
+    "roscosmos": {"budget":300,"cash":75,"support":70,"reputation":50,"culture":-20,"prestige":0,"fixedCostShare":0.55,"capabilities":{"crewed":false,"launchSites":["Kapustin Yar","Baikonur"]},"ai":{"cooperation":0.2,"aggression":0.7,"riskTolerance":0.65,"goals":["first_satellite","first_animal_in_orbit","lunar_impact","first_crewed_orbit","first_woman_in_space","first_eva","lunar_surface_robotic","first_space_station"]}},
+    "abma": {"support":55,"reputation":55,"culture":25,"capabilities":{"crewed":false,"launchSites":["Cabo Canaveral"]},"ai":{"cooperation":0.3,"aggression":0.7,"riskTolerance":0.6,"goals":["first_satellite","lunar_flyby_robotic"]}},
+    "cnsa": {"support":70,"reputation":40,"culture":5,"capabilities":{"crewed":false,"launchSites":["Jiuquan"]},"ai":{"cooperation":0.3,"aggression":0.5,"riskTolerance":0.45,"goals":["first_satellite"]}}
   },
   "relations": [
-    { "a": "nasa", "b": "roscosmos", "trust": -40, "dependence": 0, "rivalry": 60 }
+    {"a":"nasa","b":"roscosmos","trust":-40,"dependence":0,"rivalry":60},
+    {"a":"abma","b":"nasa","trust":30,"dependence":20,"rivalry":35},
+    {"a":"abma","b":"roscosmos","trust":-40,"dependence":0,"rivalry":55},
+    {"a":"cnsa","b":"roscosmos","trust":35,"dependence":30,"rivalry":10},
+    {"a":"cnsa","b":"nasa","trust":-50,"dependence":0,"rivalry":30}
   ],
   "blocs": [],
   "treaties": []

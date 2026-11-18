@@ -39,7 +39,9 @@ const isOn = (data) => data?.scenario?.lifecycle === 'on';
 const CACHE = new WeakMap();
 /** Per-data lookups: lineages by id, events sorted by date, nations by id, birth/death by lineage. */
 function tables(data) {
-  if (data && CACHE.has(data)) return CACHE.get(data);
+  // keyed by data, checked against the source lists: a lazy pack load rebuilds data in place (src/core/data.js)
+  const c = data && CACHE.get(data);
+  if (c && c.src[0] === data.lineages && c.src[1] === data.lifecycle && c.src[2] === data.nations) return c;
   const lineages = {};
   for (const l of lineagesOf(data)) if (l?.id) lineages[l.id] = l;
   const nations = {};
@@ -54,7 +56,7 @@ function tables(data) {
     if (e.op === 'merge') for (const id of e.from || []) if (!death[id]) death[id] = { date: e.date, into: e.into, cause: 'merge' };
     if (e.op === 'dissolve' && e.actor && !death[e.actor]) death[e.actor] = { date: e.date, into: null, cause: 'dissolve' };
   }
-  const t = { lineages, nations, events: events.map((x) => x.e), birth, death };
+  const t = { lineages, nations, events: events.map((x) => x.e), birth, death, src: [data?.lineages, data?.lifecycle, data?.nations] };
   if (data) CACHE.set(data, t);
   return t;
 }

@@ -1,0 +1,30 @@
+{
+  "note": "Valores iniciais dos atores para cenários que começam na era 6 (EXPANSION.md §2.1). Datado de jan/2200; um ator só entra se estiver vivo na data de início do cenário. Verbas em US$ milhões do jogo (escala da era 6). Os sucessores das agências reais usam estes números; as linhagens da era 6 também. Dono: C6.",
+  "era": "e6",
+  "date": {"year":2200,"month":0},
+  "actors": {
+    "nasa": {"budget":3800,"cash":1520,"support":55,"reputation":60,"culture":10,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.55,"aggression":0.45,"riskTolerance":0.45,"goals":["first_interstellar_probe_arrival"]}},
+    "cnsa": {"budget":4200,"cash":1680,"support":65,"reputation":60,"culture":-10,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.45,"aggression":0.55,"riskTolerance":0.5,"goals":["first_crewed_interstellar_launch"]}},
+    "esa": {"budget":3200,"cash":1280,"support":55,"reputation":65,"culture":5,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.75,"aggression":0.3,"riskTolerance":0.4,"goals":["first_exoplanet_closeup"]}},
+    "isro": {"budget":2600,"cash":1040,"support":60,"reputation":58,"culture":0,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.6,"aggression":0.4,"riskTolerance":0.45,"goals":["first_dyson_swarm_segment"]}},
+    "jaxa": {"budget":1800,"cash":720,"support":55,"reputation":62,"culture":-5,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.65,"aggression":0.3,"riskTolerance":0.35,"goals":["first_interstellar_round_trip_message"]}},
+    "spacex": {"budget":3000,"cash":1200,"support":60,"reputation":55,"culture":70,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.4,"aggression":0.7,"riskTolerance":0.75,"goals":["first_crewed_interstellar_launch"]}},
+    "heliopausa": {"budget":1600,"cash":640,"support":60,"reputation":60,"culture":25,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":false,"launchSites":[]},"ai":{"cooperation":0.7,"aggression":0.3,"riskTolerance":0.45,"goals":["first_beamed_sail","first_interstellar_probe_arrival"]}},
+    "habitats_vivos": {"budget":1200,"cash":480,"support":70,"reputation":55,"culture":-5,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.75,"aggression":0.25,"riskTolerance":0.35,"goals":["first_dyson_swarm_segment"]}},
+    "longa_viagem": {"budget":1400,"cash":560,"support":65,"reputation":60,"culture":10,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.6,"aggression":0.3,"riskTolerance":0.6,"goals":["first_generation_ship_launch"]}},
+    "proxima": {"budget":2200,"cash":880,"support":65,"reputation":55,"culture":0,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.65,"aggression":0.3,"riskTolerance":0.55,"goals":["first_crewed_interstellar_arrival","exoplanet_crewed_landing"]}},
+    "republica_ceres": {"budget":1100,"cash":440,"support":75,"reputation":45,"culture":35,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":[]},"ai":{"cooperation":0.45,"aggression":0.5,"riskTolerance":0.55,"goals":["first_independent_colony"]}}
+  },
+  "relations": [
+    {"a":"heliopausa","b":"habitats_vivos","trust":40,"dependence":30,"rivalry":15},
+    {"a":"heliopausa","b":"proxima","trust":55,"dependence":45,"rivalry":10},
+    {"a":"heliopausa","b":"longa_viagem","trust":30,"dependence":20,"rivalry":25},
+    {"a":"proxima","b":"longa_viagem","trust":20,"dependence":10,"rivalry":45},
+    {"a":"habitats_vivos","b":"proxima","trust":50,"dependence":40,"rivalry":15},
+    {"a":"habitats_vivos","b":"republica_ceres","trust":-10,"dependence":30,"rivalry":50},
+    {"a":"nasa","b":"cnsa","trust":10,"dependence":10,"rivalry":40},
+    {"a":"esa","b":"heliopausa","trust":45,"dependence":20,"rivalry":10}
+  ],
+  "blocs": [],
+  "treaties": []
+}

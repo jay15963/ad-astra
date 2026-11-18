@@ -1,42 +1,27 @@
 {
-  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e3 em data/packs.json).",
-  "id": "e3",
-  "name": "A Era Comercial",
-  "from": 2000,
-  "to": 2025,
-  "truthLayers": [
-    "fato"
-  ],
-  "closingMilestone": "Reuso de foguetes vira rotina",
-  "palette": "aco",
-  "chapters": [
-    {
-      "from": {
-        "year": 2000,
-        "month": 0
-      },
-      "title": "A estação habitada"
-    },
-    {
-      "from": {
-        "year": 2008,
-        "month": 8
-      },
-      "title": "Empresas chegam à órbita"
-    },
-    {
-      "from": {
-        "year": 2015,
-        "month": 11
-      },
-      "title": "Foguetes que voltam"
-    },
-    {
-      "from": {
-        "year": 2020,
-        "month": 4
-      },
-      "title": "Táxis para a órbita"
-    }
-  ]
+"_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e3 em data/packs.json). \"newsTone\" = tom das manchetes da era (corporativo e limpo, como releases de empresa e de agência): modelos com os mesmos marcadores de data/calendar.json \"news\"; o módulo de notícias pode preferi-los enquanto data.eraPacks.e3 for a era atual.",
+"id": "e3",
+"name": "A Era Comercial",
+"from": 2000,
+"to": 2025,
+"truthLayers": ["fato"],
+"closingMilestone": "Reuso de foguetes vira rotina",
+"palette": "aco",
+"paletteDoc": "Aço escovado, branco de sala limpa e o azul das apresentações para investidores (src/ui/css/era-3.css).",
+"chapters": [
+{"from":{"year":2000,"month":0},"title":"A estação habitada"},
+{"from":{"year":2008,"month":8},"title":"Empresas chegam à órbita"},
+{"from":{"year":2015,"month":11},"title":"Foguetes que voltam"},
+{"from":{"year":2020,"month":4},"title":"Táxis para a órbita"}
+],
+"chapterBlurbs": {
+"2000-0": "A ISS ganha moradores permanentes e o ônibus espacial carrega as peças. O espaço ainda é coisa de governos.",
+"2008-8": "O quarto Falcon 1 chega à órbita. A NASA passa a comprar serviços em vez de foguetes.",
+"2015-11": "Um primeiro estágio pousa em pé. O preço de um quilo em órbita começa a cair de verdade.",
+"2020-4": "Astronautas voam em cápsulas de empresas, civis vão à órbita e o reuso vira rotina."
+},
+"newsTone": {
+"style": "corporativo",
+"templates": {"launched":["{owner} confirma lançamento de {name}","{name} decola dentro da janela prevista","Lançamento nominal: {name} a caminho","{owner} lança {name}; equipes monitoram a separação"],"launchedBody":"Veículo {vehicle}. Próxima etapa prevista para {date}.","success":["{name} cumpre todos os objetivos","Missão cumprida: {name}","Sucesso confirmado para {name}","{owner} comemora {name}: dados dentro do esperado"],"partial":["{name} cumpre parte dos objetivos","Resultado parcial para {name}; equipes analisam os dados"],"failed":["Anomalia: {name} é perdida","{owner} confirma perda de {name}","{name} termina em falha; investigação aberta","Dia difícil para a {owner}: {name} falha"],"delayed":["Novo cronograma: {name} fica para {date}","{owner} ajusta a data de {name} para {date}","Revisão técnica adia {name} para {date}"],"first":["Marco histórico: {owner} conquista {milestone}","Primeira vez: {owner} alcança {milestone}"],"debut":["Estreia do {vehicle}","{vehicle} entra em serviço"],"bgMilestone":["{vehicle} chega ao {n}º voo","Mais um marco para o {vehicle}: {n} voos"]}
+}
 }

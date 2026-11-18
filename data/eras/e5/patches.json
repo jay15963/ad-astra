@@ -1,0 +1,13 @@
+{
+  "_doc": "Remendos da era 5: identidades depois de 2050 e metas de IA da era 5 (eraProfiles.e5) das linhagens reais de core/lineages.json. Identidades são acrescentadas ao fim da lista.",
+  "lineages": [
+    {"$op":"patch","id":"nasa","identities":[{"from":{"year":2074,"month":6},"name":"NASA Interplanetária (EUA)","short":"NASA-I","description":"A velha agência vira operadora de rotas: Marte, o cinturão e a ciência que ninguém mais paga.","style":"Grande, lenta, ainda a referência"}],"eraProfiles":{"e5":{"ai":{"goals":["mars_outpost","crewed_asteroid_visit","ceres_crewed_landing","solar_gravity_lens_telescope","deimos_landing"]}}}},
+    {"$op":"patch","id":"cnsa","identities":[{"from":{"year":2069,"month":9},"name":"Administração Espacial do Sistema Solar (China)","short":"AESS","description":"A CNSA ganha mandato para o Sistema Solar inteiro: bases em Marte, Ceres e nas luas de Júpiter.","style":"Metódica, de longo prazo"}],"eraProfiles":{"e5":{"ai":{"goals":["mars_outpost","europa_landing","pluto_orbit","mars_base","crewed_jupiter_system"]}}}},
+    {"$op":"patch","id":"esa","identities":[{"from":{"year":2083,"month":0},"name":"Autoridade Espacial Europeia","short":"AEE","description":"A ESA se torna autoridade com orçamento próprio: ciência no Sistema Solar exterior e regras para a mineração.","style":"Consenso, ciência acima de tudo"}],"eraProfiles":{"e5":{"ai":{"goals":["ceres_landing","titan_sea_landing","neptune_orbit","europa_ocean_reached","first_interstellar_probe_launch"]}}}},
+    {"$op":"patch","id":"roscosmos","identities":[{"from":{"year":2063,"month":0},"name":"Consórcio Orbital Eurasiático","short":"COE","kind":"consortium","description":"A Roscosmos se funde com parceiros asiáticos num consórcio de lançadores baratos e reatores nucleares.","style":"Nuclear, barata, isolada"}],"eraProfiles":{"e5":{"ai":{"goals":["deimos_landing","crewed_asteroid_visit","mercury_landing"]}}}},
+    {"$op":"patch","id":"isro","eraProfiles":{"e5":{"ai":{"goals":["mercury_landing","ganymede_landing","crewed_asteroid_visit"]}}}},
+    {"$op":"patch","id":"jaxa","eraProfiles":{"e5":{"ai":{"goals":["io_flyby","titan_orbit","callisto_landing","lunar_lava_tube_landing"]}}}},
+    {"$op":"patch","id":"spacex","eraProfiles":{"e5":{"ai":{"goals":["first_asteroid_mining","first_rotating_habitat","mars_outpost"]}}}},
+    {"$op":"patch","id":"blueorigin","eraProfiles":{"e5":{"ai":{"goals":["first_rotating_habitat","first_orbital_shipyard","first_space_elevator"]}}}}
+  ]
+}

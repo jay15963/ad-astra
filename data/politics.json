@@ -1162,7 +1162,7 @@
   },
   "events": [
     {
-      "id": "sanctions_package",
+      "id": "sanctions_package", "maxYear": 2200,
       "target": "pair",
       "weight": 3,
       "cooldownMonths": 8,
@@ -1217,7 +1217,7 @@
       ]
     },
     {
-      "id": "export_control",
+      "id": "export_control", "minYear": 1980, "maxYear": 2150,
       "target": "pair",
       "weight": 3,
       "cooldownMonths": 6,
@@ -1264,7 +1264,7 @@
       ]
     },
     {
-      "id": "asat_test",
+      "id": "asat_test", "minYear": 1968, "maxYear": 2150,
       "target": "pair",
       "weight": 1.2,
       "cooldownMonths": 14,
@@ -1314,7 +1314,7 @@
       ]
     },
     {
-      "id": "debris_incident",
+      "id": "debris_incident", "minYear": 1970,
       "target": "pair",
       "weight": 1.8,
       "cooldownMonths": 8,
@@ -1359,7 +1359,7 @@
       ]
     },
     {
-      "id": "trade_war",
+      "id": "trade_war", "maxYear": 2200,
       "target": "pair",
       "weight": 2.2,
       "cooldownMonths": 12,
@@ -1407,7 +1407,7 @@
       ]
     },
     {
-      "id": "summit_detente",
+      "id": "summit_detente", "maxYear": 2200,
       "target": "pair",
       "weight": 2.4,
       "cooldownMonths": 8,
@@ -1428,7 +1428,7 @@
       ]
     },
     {
-      "id": "arms_control_talks",
+      "id": "arms_control_talks", "minYear": 1958, "maxYear": 2200,
       "target": "pair",
       "weight": 1.2,
       "cooldownMonths": 12,
@@ -1460,7 +1460,7 @@
       ]
     },
     {
-      "id": "border_skirmish",
+      "id": "border_skirmish", "maxYear": 2200,
       "target": "pair",
       "weight": 1.6,
       "cooldownMonths": 10,
@@ -1505,7 +1505,7 @@
       ]
     },
     {
-      "id": "naval_standoff",
+      "id": "naval_standoff", "maxYear": 2200,
       "target": "pair",
       "weight": 1.6,
       "cooldownMonths": 8,
@@ -1544,7 +1544,7 @@
       ]
     },
     {
-      "id": "military_buildup",
+      "id": "military_buildup", "maxYear": 2200,
       "target": "pair",
       "weight": 1.4,
       "cooldownMonths": 10,
@@ -1575,7 +1575,7 @@
       ]
     },
     {
-      "id": "cyberattack_ground",
+      "id": "cyberattack_ground", "minYear": 1990, "maxYear": 2300,
       "target": "pair",
       "weight": 1.6,
       "cooldownMonths": 8,
@@ -1621,7 +1621,7 @@
       ]
     },
     {
-      "id": "spy_scandal",
+      "id": "spy_scandal", "maxYear": 2200,
       "target": "pair",
       "weight": 1.4,
       "cooldownMonths": 10,
@@ -1661,7 +1661,7 @@
       ]
     },
     {
-      "id": "sanctions_relief",
+      "id": "sanctions_relief", "maxYear": 2200,
       "target": "pair",
       "weight": 1.3,
       "cooldownMonths": 10,
@@ -1688,7 +1688,7 @@
       ]
     },
     {
-      "id": "escalation_war",
+      "id": "escalation_war", "maxYear": 2200,
       "target": "pair",
       "weight": 1.5,
       "cooldownMonths": 18,
@@ -1718,7 +1718,7 @@
       ]
     },
     {
-      "id": "ceasefire_talks",
+      "id": "ceasefire_talks", "maxYear": 2200,
       "target": "pair",
       "weight": 3,
       "cooldownMonths": 4,
@@ -1739,7 +1739,7 @@
       ]
     },
     {
-      "id": "joint_rescue",
+      "id": "joint_rescue", "minYear": 1975, "maxYear": 2300,
       "target": "pair",
       "weight": 0.8,
       "cooldownMonths": 18,
@@ -1764,7 +1764,7 @@
       ]
     },
     {
-      "id": "external_war",
+      "id": "external_war", "minYear": 1990, "maxYear": 2100,
       "target": "global",
       "weight": 1.2,
       "cooldownMonths": 18,
@@ -1787,7 +1787,7 @@
       ]
     },
     {
-      "id": "oil_shock",
+      "id": "oil_shock", "minYear": 2005, "maxYear": 2080,
       "target": "global",
       "weight": 1,
       "cooldownMonths": 20,
@@ -1821,7 +1821,7 @@
       ]
     },
     {
-      "id": "stock_crash",
+      "id": "stock_crash", "minYear": 2000, "maxYear": 2200,
       "target": "global",
       "weight": 0.9,
       "cooldownMonths": 24,
@@ -1850,7 +1850,7 @@
       ]
     },
     {
-      "id": "tech_boom",
+      "id": "tech_boom", "minYear": 2000, "maxYear": 2300,
       "target": "global",
       "weight": 1.1,
       "cooldownMonths": 18,
@@ -1873,7 +1873,7 @@
       ]
     },
     {
-      "id": "space_law_agreement",
+      "id": "space_law_agreement", "maxYear": 2300,
       "target": "global",
       "minYear": 1990,
       "weight": 0.9,
@@ -1891,7 +1891,7 @@
       ]
     },
     {
-      "id": "pandemic_shock",
+      "id": "pandemic_shock", "maxYear": 2300,
       "target": "global",
       "weight": 0.08,
       "once": true,
@@ -1922,7 +1922,7 @@
       ]
     },
     {
-      "id": "political_scandal",
+      "id": "political_scandal", "maxYear": 2200,
       "target": "nation",
       "weight": 1.5,
       "cooldownMonths": 12,
@@ -1954,7 +1954,7 @@
       ]
     },
     {
-      "id": "government_shutdown",
+      "id": "government_shutdown", "maxYear": 2200,
       "target": "nation",
       "weight": 2.5,
       "cooldownMonths": 10,
@@ -1984,7 +1984,7 @@
       ]
     },
     {
-      "id": "stimulus_package",
+      "id": "stimulus_package", "maxYear": 2200,
       "target": "nation",
       "weight": 1.3,
       "cooldownMonths": 14,
@@ -2012,7 +2012,7 @@
       ]
     },
     {
-      "id": "space_race_speech",
+      "id": "space_race_speech", "minYear": 1957, "maxYear": 2040,
       "target": "nation",
       "weight": 1.4,
       "cooldownMonths": 12,
@@ -2038,7 +2038,7 @@
       ]
     },
     {
-      "id": "currency_crisis",
+      "id": "currency_crisis", "maxYear": 2200,
       "target": "nation",
       "weight": 0.8,
       "cooldownMonths": 24,

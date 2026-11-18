@@ -1,0 +1,33 @@
+{
+  "_comment": "Pacote e2: corpos novos do mapa (cometas da era). Mesmo formato de data/bodies.json.",
+  "bodies": [
+    {
+      "id": "halley",
+      "name": "Cometa Halley",
+      "kind": "comet",
+      "group": "outer",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {"radius": 700, "periodWeeks": 3961, "angle0": 300, "aAU": 17.8, "periodDays": 27510, "eccentricity": 0.967, "note": "periélio em fev/1986"},
+      "display": {"radius": 0.8, "minPx": 3, "maxPx": 12, "color": "#b8d4e3", "glow": "#e3f2ff", "ring": null},
+      "physical": {"radiusKm": 5.5, "gravityG": 0.00002},
+      "ficha": {"tipo": "Cometa de período longo (76 anos)", "gravidade": "Quase nula", "atmosfera": "Coma de vapor de água e poeira perto do Sol", "temperatura": "De -200 °C longe do Sol a cerca de 50 °C no núcleo escuro", "recursos": ["Gelo de água e compostos orgânicos", "Poeira intacta desde a formação do Sistema Solar"], "perigos": ["Poeira a 70 km/s", "Jatos de gás que mudam de direção"], "historia": "Edmond Halley previu sua volta em 1758. Em março de 1986, Vega 1, Vega 2, Suisei, Sakigake e Giotto foram ao seu encontro: o núcleo era escuro como carvão, 15 km de comprimento."},
+      "milestones": ["comet_nucleus_flyby"],
+      "destinations": [{"id": "halley", "anchor": "ring", "r": 3, "angle": 0, "label": "Halley"}]
+    },
+    {
+      "id": "giacobini_zinner",
+      "name": "Cometa Giacobini-Zinner",
+      "kind": "comet",
+      "group": "outer",
+      "fog": "fog",
+      "parent": "sun",
+      "orbit": {"radius": 520, "periodWeeks": 345, "angle0": 40, "aAU": 3.5, "periodDays": 2400, "eccentricity": 0.71},
+      "display": {"radius": 0.8, "minPx": 3, "maxPx": 12, "color": "#b8d4e3", "glow": "#e3f2ff", "ring": null},
+      "physical": {"radiusKm": 1, "gravityG": 0.00001},
+      "ficha": {"tipo": "Cometa de período curto (6,6 anos)", "gravidade": "Quase nula", "atmosfera": "Coma e cauda de plasma perto do Sol", "temperatura": "Muito frio longe do Sol", "recursos": ["Laboratório natural do vento solar"], "perigos": ["Poeira e plasma na cauda"], "historia": "Em 11 de setembro de 1985 a ICE, antiga ISEE-3, atravessou sua cauda a 7.800 km do núcleo: a primeira nave a encontrar um cometa."},
+      "milestones": ["comet_flyby"],
+      "destinations": [{"id": "giacobini_zinner", "anchor": "ring", "r": 3, "angle": 0, "label": "Giacobini-Zinner"}]
+    }
+  ]
+}

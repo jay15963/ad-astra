@@ -57,7 +57,8 @@ function offerOf(dec, choice) {
 function answerRound(state, data, engine, dec, opts) {
   const pct = state.cap?.playerPct ?? 100;
   const cash = state.actors?.[state.playerId]?.cash ?? 0;
-  const floor = cash < 200 ? Math.min(opts.minPct, 30) : opts.minPct;
+  // a bot that does not fly its own missions (--fast) cannot honour binding mandates: it never gives up autonomy
+  const floor = cash < 200 && opts.schedule !== false && !opts.keepControl ? Math.min(opts.minPct, 30) : opts.minPct;
   const choices = (dec.choices || []).filter((c) => !c.disabled);
   const decline = choices.find((c) => /decline|recusar|pass|none/.test(c.id)) || null;
   let best = null;

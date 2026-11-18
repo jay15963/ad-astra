@@ -1,5 +1,5 @@
 {
-  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e4 em data/packs.json).",
+  "_doc": "Metadados da era 4 (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo nos arquivos ao lado (pacote e4 em data/packs.json). \"news\" = tom das manchetes da era (gancho para missions.js/politics.js: data.eraPacks.e4.news); \"palette\" = src/ui/css/era-4.css.",
   "id": "e4",
   "name": "A Década Lunar",
   "from": 2026,
@@ -21,6 +21,13 @@
     },
     {
       "from": {
+        "year": 2031,
+        "month": 0
+      },
+      "title": "Depois da ISS"
+    },
+    {
+      "from": {
         "year": 2036,
         "month": 0
       },
@@ -33,5 +40,54 @@
       },
       "title": "Uma base que não fecha"
     }
-  ]
+  ],
+  "tone": "Disputa entre blocos, poeira lunar, urgência. Até 2035 o noticiário cita planos oficiais e prazos que escorregam; depois, projeções: a pergunta deixa de ser \"quem volta\" e passa a ser \"quem fica\".",
+  "news": {
+    "missionHeadlines": {
+      "first": [
+        "{actor} faz história: {milestone}",
+        "Primeira vez: {actor} conquista {milestone}",
+        "{mission} põe a {actor} à frente na Lua"
+      ],
+      "total": [
+        "{mission}: sucesso total para a {actor}",
+        "{mission} cumpre o plano; a base cresce mais um pouco",
+        "{actor} acerta em cheio com {mission}"
+      ],
+      "partial": [
+        "{mission} cumpre parte dos objetivos",
+        "Sucesso parcial para {mission}; poeira e prazos cobram a conta",
+        "{mission} chega, mas não como planejado"
+      ],
+      "recoverable": [
+        "{mission} falha, mas a {actor} salva o essencial",
+        "Falha de {failure} interrompe {mission}",
+        "Revés para a {actor}: {mission} não cumpre a missão"
+      ],
+      "catastrophic": [
+        "Perdemos {mission}: falha de {failure}",
+        "Desastre: {mission} atrasa a base da {actor} em anos",
+        "Fim abrupto para {mission}; investigação começa hoje"
+      ],
+      "death": [
+        "Luto na {actor}: tripulação de {mission} morre em acidente",
+        "Tragédia: {mission} termina com {deaths} morte(s)",
+        "A Lua cobra o preço: a {actor} perde astronautas em {mission}"
+      ],
+      "transit": [
+        "{mission} deixa a Terra rumo {to}",
+        "{mission} a caminho; chegada prevista em {arrive}"
+      ],
+      "rival": [
+        "{rival} reage: \"a Lua não tem dono\"",
+        "{rival} promete acelerar a própria base",
+        "Pressão sobe na {rival} depois do feito da {actor}"
+      ]
+    },
+    "chapterHeadlines": {
+      "e4_2031": "A ISS cai no Pacífico; em órbita baixa, agora, quem quiser espaço paga aluguel",
+      "e4_2036": "Os prazos oficiais acabaram: daqui em diante, o calendário é de quem cumprir",
+      "e4_2045": "A base que não fecha: há sempre alguém acordado na Lua"
+    }
+  }
 }

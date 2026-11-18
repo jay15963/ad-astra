@@ -1,0 +1,346 @@
+{
+  "_doc": "Equipes iniciais de 2026 das agências que ainda não tinham elenco próprio (mescla com data/crew.json \"roster\"). Pessoas fictícias.",
+  "roster": {
+    "roscosmos": [
+      {
+        "id": "ros_volkova",
+        "name": "Irina Volkova",
+        "gender": "f",
+        "role": "flight_director",
+        "skill": 80,
+        "experience": 58,
+        "age": 54,
+        "traits": [
+          "veterano",
+          "cabeca_fria"
+        ],
+        "loyalty": 82,
+        "ambition": 30,
+        "morale": 64,
+        "bio": "Dirigiu acoplamentos de Progress em noites de inverno em Korolev. Nunca levanta a voz.",
+        "missions": 7,
+        "successes": 7
+      },
+      {
+        "id": "ros_belov",
+        "name": "Pavel Belov",
+        "gender": "m",
+        "role": "flight_director",
+        "skill": 63,
+        "experience": 18,
+        "age": 43,
+        "traits": [
+          "ambicioso",
+          "teimoso"
+        ],
+        "loyalty": 55,
+        "ambition": 78,
+        "morale": 64,
+        "bio": "Quer a estação ROS pronta antes de se aposentar e acha que ninguém mais tem pressa."
+      },
+      {
+        "id": "ros_tikhonov",
+        "name": "Grigori Tikhonov",
+        "gender": "m",
+        "role": "engineer",
+        "skill": 78,
+        "experience": 46,
+        "age": 51,
+        "traits": [
+          "metodico",
+          "veterano"
+        ],
+        "loyalty": 80,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Conhece cada solda do Angara. Guarda os relatórios de falha numa pasta de couro."
+      },
+      {
+        "id": "ros_safina",
+        "name": "Dilyara Safina",
+        "gender": "f",
+        "role": "engineer",
+        "skill": 66,
+        "experience": 14,
+        "age": 34,
+        "traits": [
+          "inventivo",
+          "workaholic"
+        ],
+        "loyalty": 65,
+        "ambition": 66,
+        "morale": 64,
+        "bio": "Trocou um emprego em Moscou pelo cosmódromo de Vostochny para trabalhar com o Amur."
+      },
+      {
+        "id": "ros_orlov",
+        "name": "Konstantin Orlov",
+        "gender": "m",
+        "role": "astronaut",
+        "skill": 76,
+        "experience": 40,
+        "age": 47,
+        "traits": [
+          "piloto_testes",
+          "ex_militar"
+        ],
+        "loyalty": 65,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Duas expedições longas na ISS. Diz que a melhor janela do mundo é a da cúpula.",
+        "missions": 2,
+        "successes": 2
+      },
+      {
+        "id": "ros_markova",
+        "name": "Yelena Markova",
+        "gender": "f",
+        "role": "astronaut",
+        "skill": 70,
+        "experience": 12,
+        "age": 38,
+        "traits": [
+          "resistente",
+          "leal"
+        ],
+        "loyalty": 78,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Médica de bordo, campeã de esqui de fundo. Treina para o primeiro voo da Orel."
+      },
+      {
+        "id": "ros_gusev",
+        "name": "Artem Gusev",
+        "gender": "m",
+        "role": "astronaut",
+        "skill": 64,
+        "experience": 6,
+        "age": 33,
+        "traits": [
+          "impulsivo",
+          "carismatico"
+        ],
+        "loyalty": 65,
+        "ambition": 70,
+        "morale": 64,
+        "bio": "Engenheiro de voo novato, sucesso nas redes sociais da Roscosmos."
+      }
+    ],
+    "jaxa": [
+      {
+        "id": "jaxa_morita",
+        "name": "Keiko Morita",
+        "gender": "f",
+        "role": "flight_director",
+        "skill": 81,
+        "experience": 55,
+        "age": 52,
+        "traits": [
+          "perfeccionista",
+          "cabeca_fria"
+        ],
+        "loyalty": 85,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Comandou o pouso de precisão da SLIM: cem metros de erro numa cratera inclinada.",
+        "missions": 5,
+        "successes": 5
+      },
+      {
+        "id": "jaxa_ishida",
+        "name": "Daisuke Ishida",
+        "gender": "m",
+        "role": "flight_director",
+        "skill": 62,
+        "experience": 16,
+        "age": 41,
+        "traits": [
+          "metodico",
+          "avesso_midia"
+        ],
+        "loyalty": 65,
+        "ambition": 45,
+        "morale": 64,
+        "bio": "Prefere o centro de controle de Tsukuba vazio, às três da manhã."
+      },
+      {
+        "id": "jaxa_hayashi",
+        "name": "Ren Hayashi",
+        "gender": "m",
+        "role": "engineer",
+        "skill": 77,
+        "experience": 42,
+        "age": 47,
+        "traits": [
+          "inventivo",
+          "perfeccionista"
+        ],
+        "loyalty": 80,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Projetou o sistema de amostragem do MMX. Fala de Fobos como se fosse um parente."
+      },
+      {
+        "id": "jaxa_sato",
+        "name": "Aya Sato",
+        "gender": "f",
+        "role": "engineer",
+        "skill": 68,
+        "experience": 15,
+        "age": 35,
+        "traits": [
+          "workaholic",
+          "cientista_campo"
+        ],
+        "loyalty": 65,
+        "ambition": 62,
+        "morale": 64,
+        "bio": "Trabalhou com a Toyota no Lunar Cruiser. Testa pneus de metal em areia vulcânica."
+      },
+      {
+        "id": "jaxa_kimura",
+        "name": "Takeshi Kimura",
+        "gender": "m",
+        "role": "astronaut",
+        "skill": 75,
+        "experience": 35,
+        "age": 46,
+        "traits": [
+          "veterano",
+          "mentor"
+        ],
+        "loyalty": 65,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Uma expedição na ISS e mil horas de simulador lunar. Candidato natural ao primeiro assento japonês no Artemis.",
+        "missions": 1,
+        "successes": 1
+      },
+      {
+        "id": "jaxa_nakamura",
+        "name": "Mio Nakamura",
+        "gender": "f",
+        "role": "astronaut",
+        "skill": 69,
+        "experience": 10,
+        "age": 36,
+        "traits": [
+          "resistente",
+          "intuicao"
+        ],
+        "loyalty": 65,
+        "ambition": 72,
+        "morale": 64,
+        "bio": "Ex-pilota de testes da Força Aérea. Quer ser a primeira japonesa na Lua."
+      }
+    ],
+    "blueorigin": [
+      {
+        "id": "bo_hartley",
+        "name": "Megan Hartley",
+        "gender": "f",
+        "role": "flight_director",
+        "skill": 74,
+        "experience": 34,
+        "age": 45,
+        "traits": [
+          "cabeca_fria",
+          "metodico"
+        ],
+        "loyalty": 65,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Coordenou as recuperações do primeiro estágio do New Glenn no Atlântico.",
+        "missions": 3,
+        "successes": 3
+      },
+      {
+        "id": "bo_navarro",
+        "name": "Luis Navarro",
+        "gender": "m",
+        "role": "flight_director",
+        "skill": 60,
+        "experience": 12,
+        "age": 39,
+        "traits": [
+          "ambicioso",
+          "carismatico"
+        ],
+        "loyalty": 52,
+        "ambition": 76,
+        "morale": 64,
+        "bio": "Saiu da SpaceX para dirigir os voos do Blue Moon. Ainda torce contra o ex-chefe."
+      },
+      {
+        "id": "bo_okafor",
+        "name": "Chidi Okafor",
+        "gender": "m",
+        "role": "engineer",
+        "skill": 76,
+        "experience": 30,
+        "age": 44,
+        "traits": [
+          "inventivo",
+          "teimoso"
+        ],
+        "loyalty": 72,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Pai do sistema de pouso do Blue Moon. Desenha soluções em guardanapos."
+      },
+      {
+        "id": "bo_lindqvist",
+        "name": "Freya Lindqvist",
+        "gender": "f",
+        "role": "engineer",
+        "skill": 65,
+        "experience": 10,
+        "age": 31,
+        "traits": [
+          "workaholic",
+          "perfeccionista"
+        ],
+        "loyalty": 65,
+        "ambition": 60,
+        "morale": 64,
+        "bio": "Especialista em hidrogênio líquido: mantém o propelente frio por meses."
+      },
+      {
+        "id": "bo_reyes",
+        "name": "Daniel Reyes",
+        "gender": "m",
+        "role": "astronaut",
+        "skill": 66,
+        "experience": 8,
+        "age": 40,
+        "traits": [
+          "piloto_testes",
+          "pe_quente"
+        ],
+        "loyalty": 65,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Ex-piloto da Marinha, voou duas vezes no New Shepard. Quer a primeira vaga orbital da empresa.",
+        "missions": 2,
+        "successes": 2
+      },
+      {
+        "id": "bo_tanaka",
+        "name": "Hana Tanaka-Wells",
+        "gender": "f",
+        "role": "astronaut",
+        "skill": 62,
+        "experience": 4,
+        "age": 34,
+        "traits": [
+          "cientista_campo",
+          "leal"
+        ],
+        "loyalty": 74,
+        "ambition": 50,
+        "morale": 64,
+        "bio": "Geóloga planetária, contratada para treinar tripulações de superfície."
+      }
+    ]
+  }
+}

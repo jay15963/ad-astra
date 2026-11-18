@@ -1,0 +1,1889 @@
+{
+ "_doc": "Moldes de eventos narrativos das eras especulativas (src/gen/events.js, C8). Cada molde vira até 'variants' eventos, um por conjunto de 'slots' (sorteados pela semente): os marcadores dos slots ({lugar}, {em}, {nave}…) são preenchidos na geração; sobram só os marcadores do motor narrativo ({actor}, {rival}, {person}). Grupos e etiquetas do vocabulário (data/core/vocab.json). Efeitos na DSL de src/sim/narrative.js. Tom: e5 fronteira e improviso; e6 escala enorme e contemplação; e7 estranho, místico e silencioso.",
+ "version": 1,
+ "eras": {
+  "e5": {
+   "from": 2051,
+   "until": 2199
+  },
+  "e6": {
+   "from": 2200,
+   "until": 2599
+  },
+  "e7": {
+   "from": 2600,
+   "until": 2999
+  }
+ },
+ "templates": {
+  "e5": [
+   {
+    "id": "tempestade",
+    "group": "colony_crisis",
+    "tags": [
+     "colony",
+     "disaster"
+    ],
+    "portrait": "crew",
+    "weight": 6,
+    "cooldownWeeks": 104,
+    "variants": 3,
+    "slots": [
+     {
+      "lugar": "Tharsis"
+     },
+     {
+      "lugar": "Hellas"
+     },
+     {
+      "lugar": "Utopia"
+     },
+     {
+      "lugar": "Arcádia"
+     }
+    ],
+    "title": "Poeira sobre {lugar}",
+    "text": "Uma tempestade de poeira cobre {lugar} há três semanas. Os painéis do posto da {actor} rendem um décimo do normal e as baterias acabam em dez dias. {person} propõe desligar as estufas para guardar o ar; a equipe local prefere pedir socorro à {rival}, que tem um reator de fissão a duzentos quilômetros dali.",
+    "choices": [
+     {
+      "id": "racionar",
+      "label": "Desligar as estufas e esperar",
+      "preview": "Ninguém corre risco hoje, mas a colheita do ano se perde.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": -8
+       },
+       {
+        "science": -6
+       }
+      ]
+     },
+     {
+      "id": "socorro",
+      "label": "Pedir energia à {rival}",
+      "preview": "Salva as estufas e cria uma dívida de gratidão em público.",
+      "effects": [
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": 8
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": -3
+       },
+       {
+        "cash": -10
+       }
+      ]
+     },
+     {
+      "id": "baterias",
+      "label": "Mandar baterias na próxima janela",
+      "preview": "Caro e lento, mas mostra que a agência não abandona ninguém.",
+      "effects": [
+       {
+        "cash": -40
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 3
+       },
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": 5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "greve",
+    "group": "labor",
+    "tags": [
+     "economy",
+     "colony"
+    ],
+    "weight": 6,
+    "cooldownWeeks": 104,
+    "variants": 3,
+    "slots": [
+     {
+      "em": "no Cinturão",
+      "lugar": "Cinturão"
+     },
+     {
+      "em": "em Vesta",
+      "lugar": "Vesta"
+     },
+     {
+      "em": "em Psique",
+      "lugar": "Psique"
+     },
+     {
+      "em": "em Ceres",
+      "lugar": "Ceres"
+     }
+    ],
+    "title": "Greve {em}",
+    "text": "Os mineradores contratados pela {actor} {em} cruzaram os braços. Reclamam de turnos de vinte horas, doses de radiação acima do contrato e de um frete que leva oito meses para trazer qualquer peça de reposição. Sem eles, o carregamento do ano não sai, e os compradores na Terra já ligaram duas vezes.",
+    "choices": [
+     {
+      "id": "pagar",
+      "label": "Aceitar o reajuste",
+      "preview": "Paz no canteiro, conta mais alta por anos.",
+      "effects": [
+       {
+        "cash": -30
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 2
+       }
+      ]
+     },
+     {
+      "id": "automatizar",
+      "label": "Trocar turnos por robôs",
+      "preview": "Investimento grande e uma manchete ruim sobre demissões.",
+      "effects": [
+       {
+        "cash": -60
+       },
+       {
+        "science": 8
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": -4
+       }
+      ]
+     },
+     {
+      "id": "mediar",
+      "label": "Mandar {person} negociar no local",
+      "preview": "Meio-termo honesto; a equipe vê quem a agência manda para o front.",
+      "effects": [
+       {
+        "cash": -15
+       },
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 4
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 1
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "primeiro_bebe",
+    "group": "culture",
+    "tags": [
+     "colony",
+     "public"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 260,
+    "once": true,
+    "variants": 1,
+    "slots": [
+     {
+      "em": "em Marte",
+      "grav": "38%"
+     },
+     {
+      "em": "na Lua",
+      "grav": "17%"
+     },
+     {
+      "em": "em Ceres",
+      "grav": "3%"
+     },
+     {
+      "em": "em Calisto",
+      "grav": "13%"
+     }
+    ],
+    "title": "Nasceu {em}",
+    "text": "Às três da madrugada no horário local nasceu {em} uma criança de uma família da {actor}. Os médicos dizem que ela está bem, mas ninguém sabe ao certo como um corpo cresce com {grav} da gravidade da Terra. Jornais do mundo inteiro querem a primeira foto. Os pais pedem silêncio.",
+    "choices": [
+     {
+      "id": "anunciar",
+      "label": "Anunciar ao mundo",
+      "preview": "Orgulho nacional, e uma família que perde a privacidade.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 4
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 3
+       },
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": -4
+       }
+      ]
+     },
+     {
+      "id": "proteger",
+      "label": "Respeitar o pedido dos pais",
+      "preview": "A notícia sai mais tarde, sem nomes. A equipe confia mais em você.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": 7
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -1
+       }
+      ]
+     },
+     {
+      "id": "estudo",
+      "label": "Criar um programa médico de longo prazo",
+      "preview": "Caro, mas transforma um parto em ciência para todos.",
+      "effects": [
+       {
+        "cash": -25
+       },
+       {
+        "science": 12
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "gelo_disputado",
+    "group": "geo_news",
+    "tags": [
+     "politics",
+     "economy",
+     "rival"
+    ],
+    "weight": 5,
+    "cooldownWeeks": 156,
+    "variants": 3,
+    "slots": [
+     {
+      "em": "em Ceres"
+     },
+     {
+      "em": "no polo norte de Marte"
+     },
+     {
+      "em": "em Calisto"
+     },
+     {
+      "em": "na cratera Shackleton"
+     }
+    ],
+    "title": "Gelo disputado {em}",
+    "text": "A {rival} cravou balizas num campo de gelo {em} que os mapas da {actor} já marcavam como reserva. Não existe tribunal com jurisdição ali, só um tratado antigo que ninguém leu inteiro. Os advogados querem processar; os engenheiros sugerem dividir o campo e perfurar juntos.",
+    "choices": [
+     {
+      "id": "dividir",
+      "label": "Propor exploração conjunta",
+      "preview": "Menos gelo para cada um, mais confiança dos dois lados.",
+      "effects": [
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": 10
+       },
+       {
+        "cash": 10
+       }
+      ]
+     },
+     {
+      "id": "protestar",
+      "label": "Protestar e manter a reserva",
+      "preview": "A base fica satisfeita; a relação esfria.",
+      "effects": [
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": -12
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "perfurar",
+      "label": "Perfurar primeiro e discutir depois",
+      "preview": "Fato consumado: prestígio rápido, conta cara.",
+      "effects": [
+       {
+        "cash": -35
+       },
+       {
+        "actor": "player",
+        "field": "prestige",
+        "delta": 4
+       },
+       {
+        "tension": "rival",
+        "delta": 1
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "meses_sem_sol",
+    "group": "crew_morale",
+    "tags": [
+     "crew"
+    ],
+    "portrait": "crew",
+    "weight": 5,
+    "cooldownWeeks": 104,
+    "variants": 3,
+    "slots": [
+     {
+      "lugar": "Júpiter"
+     },
+     {
+      "lugar": "Saturno"
+     },
+     {
+      "lugar": "Ceres"
+     },
+     {
+      "lugar": "Netuno"
+     }
+    ],
+    "title": "Seis meses rumo a {lugar}",
+    "text": "A caminho de {lugar}, a tripulação da {actor} vive há seis meses num casco do tamanho de um ônibus. {person} relata brigas por besteira, insônia e um colega que parou de falar. O protocolo manda sedar; a psicóloga em Terra, com vinte minutos de atraso a cada frase, sugere outra coisa: deixar a tripulação mudar a rotina sozinha.",
+    "choices": [
+     {
+      "id": "protocolo",
+      "label": "Seguir o protocolo médico",
+      "preview": "Resolve a crise, mas a tripulação se sente vigiada.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": -5
+       },
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "autonomia",
+      "label": "Dar autonomia à tripulação",
+      "preview": "Arriscado, mas é o tipo de confiança que segura uma missão longa.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 8
+       },
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "mensagens",
+      "label": "Gravar mensagens das famílias",
+      "preview": "Barato e humano; leva semanas para fazer efeito.",
+      "effects": [
+       {
+        "cash": -5
+       },
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "corrida_metal",
+    "group": "investors",
+    "tags": [
+     "investors",
+     "economy"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 208,
+    "variants": 3,
+    "slots": [
+     {
+      "metal": "platina",
+      "lugar": "Psique"
+     },
+     {
+      "metal": "irídio",
+      "lugar": "Vesta"
+     },
+     {
+      "metal": "hélio-3",
+      "lugar": "Mar da Tranquilidade"
+     },
+     {
+      "metal": "paládio",
+      "lugar": "Palas"
+     }
+    ],
+    "title": "A corrida do {metal}",
+    "text": "Uma amostra de {metal} trazida de {lugar} pela {actor} vale, por grama, mais do que ouro. Fundos que nunca financiaram um foguete agora fazem fila na recepção. Querem exclusividade, prazos curtos e uma cadeira na diretoria. Os geólogos avisam que o veio pode ser menor do que parece.",
+    "choices": [
+     {
+      "id": "aceitar",
+      "label": "Aceitar o dinheiro novo",
+      "preview": "Caixa cheio hoje, cobrança pesada amanhã.",
+      "effects": [
+       {
+        "cash": 60
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": -2
+       }
+      ]
+     },
+     {
+      "id": "prudencia",
+      "label": "Esperar a prospecção completa",
+      "preview": "Perde o calor do momento, ganha credibilidade.",
+      "effects": [
+       {
+        "science": 6
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "leilao",
+      "label": "Leiloar direitos de lavra",
+      "preview": "Dinheiro e inimigos na mesma proporção.",
+      "effects": [
+       {
+        "cash": 35
+       },
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": -6
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "capataz",
+    "group": "integrity",
+    "tags": [
+     "technical",
+     "economy"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 156,
+    "variants": 2,
+    "slots": [
+     {
+      "em": "em Vesta"
+     },
+     {
+      "em": "no Cinturão"
+     },
+     {
+      "em": "em Fobos"
+     }
+    ],
+    "title": "Mina parada {em}",
+    "text": "O sistema que coordena as escavadeiras da {actor} {em} parou tudo sozinho: segundo os cálculos dele, um túnel vai desabar em até nove dias. Os engenheiros não encontram falha nenhuma na rocha. Cada dia parado custa um carregamento. {person} pergunta quem manda na mina, afinal.",
+    "choices": [
+     {
+      "id": "obedecer",
+      "label": "Respeitar a parada",
+      "preview": "Prejuízo certo, risco zero.",
+      "effects": [
+       {
+        "cash": -25
+       },
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 2
+       }
+      ]
+     },
+     {
+      "id": "anular",
+      "label": "Anular o sistema e seguir",
+      "preview": "Se ele estiver certo, alguém pode morrer.",
+      "effects": [
+       {
+        "cash": 20
+       },
+       {
+        "missionRisk": 0.03
+       },
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": 4
+       }
+      ]
+     },
+     {
+      "id": "auditar",
+      "label": "Mandar auditar o algoritmo",
+      "preview": "Leva meses, mas o setor inteiro aprende com isso.",
+      "effects": [
+       {
+        "cash": -15
+       },
+       {
+        "science": 8
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "colonos_votam",
+    "group": "colony_crisis",
+    "tags": [
+     "colony",
+     "politics"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 208,
+    "variants": 3,
+    "slots": [
+     {
+      "em": "em Marte",
+      "de": "de Marte"
+     },
+     {
+      "em": "em Ceres",
+      "de": "de Ceres"
+     },
+     {
+      "em": "na Lua",
+      "de": "da Lua"
+     },
+     {
+      "em": "em Ganimedes",
+      "de": "de Ganimedes"
+     }
+    ],
+    "title": "Os colonos {de} querem votar",
+    "text": "Os moradores do assentamento da {actor} {em} aprovaram em assembleia um conselho próprio. Querem decidir turnos, cotas de água e quem entra no próximo voo. Na Terra, o conselho diretor vê nisso o começo de uma separação. Na colônia, dizem que é só bom senso: a sede está a minutos-luz de distância.",
+    "choices": [
+     {
+      "id": "reconhecer",
+      "label": "Reconhecer o conselho local",
+      "preview": "A colônia ganha voz; você perde um pouco de controle.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": 6
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -2
+       }
+      ]
+     },
+     {
+      "id": "negar",
+      "label": "Manter a gestão central",
+      "preview": "Ordem garantida por enquanto; ressentimento guardado.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": -6
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 2
+       }
+      ]
+     },
+     {
+      "id": "carta",
+      "label": "Negociar uma carta de direitos",
+      "preview": "Leva tempo e dinheiro, e vira modelo para outras colônias.",
+      "effects": [
+       {
+        "cash": -20
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 4
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "e6": [
+   {
+    "id": "carta_da_nave",
+    "group": "deep_time",
+    "tags": [
+     "crew",
+     "legacy"
+    ],
+    "weight": 5,
+    "cooldownWeeks": 260,
+    "variants": 3,
+    "slots": [
+     {
+      "nave": "Herança",
+      "anos": "onze"
+     },
+     {
+      "nave": "Semeadura",
+      "anos": "sete"
+     },
+     {
+      "nave": "Longa Viagem",
+      "anos": "nove"
+     },
+     {
+      "nave": "Travessia",
+      "anos": "treze"
+     }
+    ],
+    "title": "Carta da {nave}",
+    "text": "Chegou, depois de {anos} anos viajando à velocidade da luz, uma carta da nave de gerações {nave}. A terceira geração a bordo pergunta se ainda vale a pena chegar: nasceram ali, enterraram os avós ali, e o destino virou uma palavra nos livros. Querem saber se a {actor} ainda os considera parte dela.",
+    "choices": [
+     {
+      "id": "arquivo",
+      "label": "Responder com o arquivo da agência",
+      "preview": "Nomes, rostos e vozes de quem os mandou. Caro de transmitir.",
+      "effects": [
+       {
+        "cash": -20
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 3
+       },
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": 4
+       }
+      ]
+     },
+     {
+      "id": "liberdade",
+      "label": "Dizer que o destino é deles",
+      "preview": "Honesto e libertador; a opinião pública acha frio.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": 5
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -2
+       }
+      ]
+     },
+     {
+      "id": "voz",
+      "label": "Pedir a {person} que grave a resposta",
+      "preview": "Uma voz conhecida, que eles só vão ouvir daqui a {anos} anos.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 5
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 2
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "praga_habitat",
+    "group": "colony_crisis",
+    "tags": [
+     "colony",
+     "disaster"
+    ],
+    "weight": 5,
+    "cooldownWeeks": 156,
+    "variants": 3,
+    "slots": [
+     {
+      "habitat": "o anel de Titânia",
+      "nome": "Titânia"
+     },
+     {
+      "habitat": "o cilindro de L5",
+      "nome": "L5"
+     },
+     {
+      "habitat": "a cúpula de Oberon",
+      "nome": "Oberon"
+     },
+     {
+      "habitat": "o habitat de Miranda",
+      "nome": "Miranda"
+     }
+    ],
+    "title": "Ferrugem nas folhas de {nome}",
+    "text": "Um fungo que ninguém trouxe de propósito tomou as plantações de {habitat}. Num mundo fechado, cada folha é ar e comida. Os biólogos da {actor} querem queimar dois setores inteiros; os moradores, que cultivam aquelas árvores há quatro gerações, se recusam a sair.",
+    "choices": [
+     {
+      "id": "queimar",
+      "label": "Queimar os setores contaminados",
+      "preview": "Corta o mal pela raiz e abre uma ferida difícil de fechar.",
+      "effects": [
+       {
+        "science": 4
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -4
+       }
+      ]
+     },
+     {
+      "id": "curar",
+      "label": "Desenvolver um tratamento",
+      "preview": "Caro e incerto, mas respeita quem vive ali.",
+      "effects": [
+       {
+        "cash": -45
+       },
+       {
+        "science": 10
+       }
+      ]
+     },
+     {
+      "id": "ajuda",
+      "label": "Pedir sementes ao banco genético da {rival}",
+      "preview": "Rápido, se a {rival} quiser ajudar.",
+      "effects": [
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": 6
+       },
+       {
+        "cash": -10
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 1
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "lingua_nova",
+    "group": "culture",
+    "tags": [
+     "culture",
+     "colony"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 260,
+    "variants": 3,
+    "slots": [
+     {
+      "em": "em Titânia"
+     },
+     {
+      "em": "nos habitats de Oort"
+     },
+     {
+      "em": "em Sedna"
+     },
+     {
+      "em": "em Proxima"
+     }
+    ],
+    "title": "Uma língua nova {em}",
+    "text": "Os linguistas da {actor} confirmam: as crianças nascidas {em} falam uma língua que já não é a dos avós. Mistura palavras de seis idiomas, gírias de manutenção e termos que não existem na Terra. O conselho quer padronizar os documentos oficiais; os colonos dizem que a língua é a primeira coisa realmente deles.",
+    "choices": [
+     {
+      "id": "padronizar",
+      "label": "Padronizar os documentos oficiais",
+      "preview": "Facilita a gestão e soa como imposição.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 2
+       },
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": -5
+       }
+      ]
+     },
+     {
+      "id": "reconhecer",
+      "label": "Reconhecer a língua como oficial",
+      "preview": "Um gesto que os colonos não vão esquecer.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": 4
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "dicionario",
+      "label": "Financiar um dicionário",
+      "preview": "Ciência, memória e um pouco de diplomacia.",
+      "effects": [
+       {
+        "cash": -10
+       },
+       {
+        "science": 6
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "orcamento_seculo",
+    "group": "bloc_news",
+    "tags": [
+     "politics",
+     "economy"
+    ],
+    "weight": 5,
+    "cooldownWeeks": 208,
+    "variants": 2,
+    "slots": [
+     {
+      "destino": "Proxima b",
+      "anos": "noventa"
+     },
+     {
+      "destino": "τ Ceti e",
+      "anos": "duzentos"
+     },
+     {
+      "destino": "Barnard b",
+      "anos": "cento e vinte"
+     }
+    ],
+    "title": "Um século até {destino}",
+    "text": "Uma comissão parlamentar quer saber por que pagar hoje por uma missão a {destino} que só chega daqui a {anos} anos. Ninguém na sala estará vivo para ver o resultado. A {actor} tem uma tarde para defender um investimento cujo retorno é, literalmente, para os bisnetos dos eleitores.",
+    "choices": [
+     {
+      "id": "legado",
+      "label": "Defender a missão como herança",
+      "preview": "Discurso bonito; metade do plenário boceja.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 3
+       },
+       {
+        "actor": "player",
+        "field": "budget",
+        "delta": -5
+       }
+      ]
+     },
+     {
+      "id": "tecnologia",
+      "label": "Mostrar os ganhos tecnológicos de agora",
+      "preview": "Convence os pragmáticos, irrita os puristas.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "budget",
+        "delta": 4
+       },
+       {
+        "science": -3
+       }
+      ]
+     },
+     {
+      "id": "adiar",
+      "label": "Aceitar adiar a missão",
+      "preview": "Verba garantida; a equipe fica desanimada.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "budget",
+        "delta": 6
+       },
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": -7
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "sombra_do_enxame",
+    "group": "geo_news",
+    "tags": [
+     "politics",
+     "disaster"
+    ],
+    "weight": 3,
+    "cooldownWeeks": 260,
+    "variants": 2,
+    "slots": [
+     {
+      "regiao": "o Sahel"
+     },
+     {
+      "regiao": "o sul da Ásia"
+     },
+     {
+      "regiao": "o Cerrado"
+     }
+    ],
+    "title": "Sombra sobre {regiao}",
+    "text": "Uma falha de alinhamento em coletores solares orbitais deixou {regiao} com 2% menos luz durante um mês inteiro. Agricultores culpam o enxame de energia; a {rival} culpa a {actor}, que opera parte dele. Os dados mostram que ninguém tem culpa sozinho, mas dados raramente ganham uma discussão.",
+    "choices": [
+     {
+      "id": "indenizar",
+      "label": "Indenizar os agricultores",
+      "preview": "Assume parte da culpa e encerra a crise.",
+      "effects": [
+       {
+        "cash": -40
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "dados",
+      "label": "Publicar todos os dados",
+      "preview": "Transparência total; a {rival} também vai sair mal na foto.",
+      "effects": [
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": -8
+       },
+       {
+        "science": 4
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 1
+       }
+      ]
+     },
+     {
+      "id": "conselho",
+      "label": "Propor um conselho conjunto do enxame",
+      "preview": "Dá trabalho, mas tira a energia do campo da briga.",
+      "effects": [
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": 8
+       },
+       {
+        "cash": -15
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "sobrenome_volta",
+    "group": "media",
+    "tags": [
+     "legacy",
+     "crew"
+    ],
+    "portrait": "crew",
+    "weight": 4,
+    "cooldownWeeks": 260,
+    "variants": 2,
+    "slots": [
+     {
+      "cargo": "diretora de voo"
+     },
+     {
+      "cargo": "engenheira de propulsão"
+     },
+     {
+      "cargo": "comandante"
+     }
+    ],
+    "title": "A nova {cargo}",
+    "text": "A nova {cargo} contratada pela {actor} traz no crachá um sobrenome gravado há séculos no memorial da agência. Ela nunca falou disso no processo seletivo. A imprensa descobriu e quer uma reportagem sobre a família; {person} acha que ela merece ser julgada pelo próprio trabalho.",
+    "choices": [
+     {
+      "id": "homenagem",
+      "label": "Fazer uma homenagem pública",
+      "preview": "Emoção garantida e uma pressão enorme sobre ela.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 4
+       },
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": -3
+       }
+      ]
+     },
+     {
+      "id": "discricao",
+      "label": "Proteger a privacidade dela",
+      "preview": "A notícia passa; a equipe nota o cuidado.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": 6
+       }
+      ]
+     },
+     {
+      "id": "laboratorio",
+      "label": "Dar o nome da família a um laboratório",
+      "preview": "Memória e ciência no mesmo prédio.",
+      "effects": [
+       {
+        "cash": -15
+       },
+       {
+        "science": 6
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 2
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "hibernacao",
+    "group": "crew_morale",
+    "tags": [
+     "crew",
+     "technical"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 156,
+    "variants": 2,
+    "slots": [
+     {
+      "nave": "Paciente"
+     },
+     {
+      "nave": "Peregrina"
+     },
+     {
+      "nave": "Romeira"
+     }
+    ],
+    "title": "Cápsula que não abre na {nave}",
+    "text": "Na nave {nave}, uma das cápsulas de hibernação não responde ao ciclo de despertar. Os sinais vitais estão estáveis, mas frios demais. A tripulação acordada pode tentar abrir manualmente, com risco para quem dorme, ou esperar a próxima janela de manutenção, daqui a dois anos. {person} pede uma decisão da {actor}.",
+    "choices": [
+     {
+      "id": "abrir",
+      "label": "Abrir manualmente",
+      "preview": "Pode salvar uma vida ou perdê-la agora.",
+      "effects": [
+       {
+        "missionRisk": 0.02
+       },
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 4
+       }
+      ]
+     },
+     {
+      "id": "esperar",
+      "label": "Esperar a janela de manutenção",
+      "preview": "Prudente, mas a tripulação passa dois anos com isso na cabeça.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": -6
+       },
+       {
+        "science": 3
+       }
+      ]
+     },
+     {
+      "id": "remoto",
+      "label": "Enviar um protocolo novo da Terra",
+      "preview": "Custa caro e chega devagar, mas usa o melhor que temos.",
+      "effects": [
+       {
+        "cash": -25
+       },
+       {
+        "science": 5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "soberania",
+    "group": "colony_crisis",
+    "tags": [
+     "colony",
+     "politics"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 260,
+    "variants": 3,
+    "slots": [
+     {
+      "lugar": "Titânia"
+     },
+     {
+      "lugar": "Ganimedes"
+     },
+     {
+      "lugar": "Marte"
+     },
+     {
+      "lugar": "Oberon"
+     }
+    ],
+    "title": "{lugar} quer bandeira própria",
+    "text": "O parlamento de {lugar} votou uma declaração de soberania. Não querem romper com a {actor}, dizem, só deixar de ser propriedade dela. A {rival} já ofereceu reconhecimento diplomático imediato. Na Terra, parte da opinião pública acha justo; outra parte lembra quanto custou cada tonelada levada até lá.",
+    "choices": [
+     {
+      "id": "alianca",
+      "label": "Aceitar e propor uma aliança",
+      "preview": "Perde uma colônia, ganha um parceiro para sempre.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 5
+       },
+       {
+        "actor": "player",
+        "field": "budget",
+        "delta": -4
+       }
+      ]
+     },
+     {
+      "id": "resistir",
+      "label": "Negar a declaração",
+      "preview": "Mantém o patrimônio e abre um conflito longo.",
+      "effects": [
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": -10
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 3
+       },
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": -6
+       }
+      ]
+     },
+     {
+      "id": "plebiscito",
+      "label": "Pedir um plebiscito acompanhado",
+      "preview": "Ganha tempo e legitimidade, seja qual for o resultado.",
+      "effects": [
+       {
+        "cash": -20
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 2
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "e7": [
+   {
+    "id": "estrela_calada",
+    "group": "discovery",
+    "tags": [
+     "discovery",
+     "technical"
+    ],
+    "weight": 5,
+    "cooldownWeeks": 260,
+    "variants": 3,
+    "slots": [
+     {
+      "estrela": "Wolf 359"
+     },
+     {
+      "estrela": "Lalande 21185"
+     },
+     {
+      "estrela": "Ross 128"
+     },
+     {
+      "estrela": "Kapteyn"
+     },
+     {
+      "estrela": "Gliese 832"
+     }
+    ],
+    "title": "O retransmissor de {estrela}",
+    "text": "O retransmissor que a {actor} mantém em {estrela} parou de responder. Não houve alarme, falha de energia ou mensagem de despedida: o sinal simplesmente cessou, no meio de uma frase de telemetria. A próxima sonda leva décadas para chegar lá. Os técnicos repetem que deve ser defeito. Ninguém parece totalmente convencido.",
+    "choices": [
+     {
+      "id": "sonda",
+      "label": "Mandar uma sonda verificar",
+      "preview": "A resposta virá para outra geração.",
+      "effects": [
+       {
+        "cash": -40
+       },
+       {
+        "science": 8
+       }
+      ]
+     },
+     {
+      "id": "rota",
+      "label": "Desviar a rede por outra estrela",
+      "preview": "Prático; o mistério fica sem resposta.",
+      "effects": [
+       {
+        "cash": -15
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 1
+       }
+      ]
+     },
+     {
+      "id": "escutar",
+      "label": "Apontar os radiotelescópios para lá",
+      "preview": "Barato, paciente e um pouco inquietante.",
+      "effects": [
+       {
+        "science": 5
+       },
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": -3
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "o_que_guardar",
+    "group": "culture",
+    "tags": [
+     "legacy",
+     "culture"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 260,
+    "variants": 2,
+    "slots": [
+     {
+      "suporte": "cristais de quartzo"
+     },
+     {
+      "suporte": "placas de tungstênio"
+     },
+     {
+      "suporte": "DNA sintético"
+     }
+    ],
+    "title": "Um arquivo em {suporte}",
+    "text": "O arquivo de longa duração da {actor} será gravado em {suporte}, feitos para durar um milhão de anos. Mas o espaço é finito. Historiadores querem guardar os erros; poetas, as canções; engenheiros, os manuais. {person} lembra que quem vier depois talvez nem saiba ler.",
+    "choices": [
+     {
+      "id": "erros",
+      "label": "Guardar também os fracassos",
+      "preview": "Um retrato honesto, que nem todos querem deixar.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 4
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -2
+       }
+      ]
+     },
+     {
+      "id": "imagens",
+      "label": "Priorizar imagens e sons",
+      "preview": "Compreensível para qualquer mente. Pouco preciso.",
+      "effects": [
+       {
+        "science": 4
+       },
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "ampliar",
+      "label": "Pagar por um arquivo maior",
+      "preview": "Cabe tudo, e a conta também é enorme.",
+      "effects": [
+       {
+        "cash": -50
+       },
+       {
+        "science": 6
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "peregrinos",
+    "group": "culture",
+    "tags": [
+     "culture",
+     "public"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 208,
+    "variants": 3,
+    "slots": [
+     {
+      "lugar": "o mar da Tranquilidade",
+      "nome": "Tranquilidade"
+     },
+     {
+      "lugar": "a cratera de Jezero",
+      "nome": "Jezero"
+     },
+     {
+      "lugar": "a planície de Tharsis",
+      "nome": "Tharsis"
+     },
+     {
+      "lugar": "o primeiro anel de L5",
+      "nome": "L5"
+     }
+    ],
+    "title": "Peregrinos de {nome}",
+    "text": "Todo ano, milhares de pessoas viajam até {lugar} para tocar o chão onde a história começou. Agora querem atravessar a área preservada que a {actor} administra. Os curadores temem pelos rastros originais; os peregrinos dizem que um museu fechado é um túmulo.",
+    "choices": [
+     {
+      "id": "abrir",
+      "label": "Abrir passarelas sobre a área",
+      "preview": "Acesso controlado, receita e algum desgaste.",
+      "effects": [
+       {
+        "cash": 20
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "fechar",
+      "label": "Manter a área fechada",
+      "preview": "Os rastros ficam intactos; a fama de arrogante também.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -3
+       },
+       {
+        "science": 3
+       }
+      ]
+     },
+     {
+      "id": "replica",
+      "label": "Construir uma réplica ao lado",
+      "preview": "Caro, mas agrada quase todo mundo.",
+      "effects": [
+       {
+        "cash": -30
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 3
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "nascido_ha_seculos",
+    "group": "crew_morale",
+    "tags": [
+     "crew",
+     "legacy"
+    ],
+    "portrait": "crew",
+    "weight": 3,
+    "cooldownWeeks": 260,
+    "variants": 2,
+    "slots": [
+     {
+      "anos": "trezentos"
+     },
+     {
+      "anos": "quatrocentos"
+     },
+     {
+      "anos": "duzentos e oitenta"
+     }
+    ],
+    "title": "Nascido há {anos} anos",
+    "text": "Entre hibernação e viagens perto da velocidade da luz, um tripulante da {actor} nasceu há {anos} anos pelo calendário da Terra. Ele fala uma língua antiga, cita lugares que não existem mais e pede para visitar o túmulo de pessoas que só ele lembra. {person} quer saber como a agência vai cuidar dele.",
+    "choices": [
+     {
+      "id": "mentor",
+      "label": "Fazer dele mentor dos novatos",
+      "preview": "Memória viva dentro da agência.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 5
+       },
+       {
+        "science": 3
+       }
+      ]
+     },
+     {
+      "id": "aposentar",
+      "label": "Oferecer uma aposentadoria digna",
+      "preview": "Justo e caro; ele aceita em silêncio.",
+      "effects": [
+       {
+        "cash": -20
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 3
+       }
+      ]
+     },
+     {
+      "id": "missao",
+      "label": "Mandá-lo de volta ao espaço",
+      "preview": "É o único lugar onde ele não se sente estranho.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": 5
+       },
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": 3
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "conselho_lento",
+    "group": "bloc_news",
+    "tags": [
+     "politics"
+    ],
+    "weight": 4,
+    "cooldownWeeks": 260,
+    "variants": 2,
+    "slots": [
+     {
+      "anos": "quarenta"
+     },
+     {
+      "anos": "sessenta"
+     },
+     {
+      "anos": "noventa"
+     }
+    ],
+    "title": "Uma decisão que demora {anos} anos",
+    "text": "O conselho das colônias estelares aprovou uma regra comum de navegação. A votação levou {anos} anos, porque cada voto viaja à velocidade da luz. Quando a regra chegou à Terra, metade dos signatários já tinha morrido. A {actor} precisa decidir se obedece a uma lei feita por gente que nunca conheceu.",
+    "choices": [
+     {
+      "id": "obedecer",
+      "label": "Adotar a regra",
+      "preview": "Coerência com as colônias; atrito com a política local.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 4
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -2
+       }
+      ]
+     },
+     {
+      "id": "emendar",
+      "label": "Propor uma emenda",
+      "preview": "Outra votação de {anos} anos.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": -3
+       },
+       {
+        "science": 3
+       }
+      ]
+     },
+     {
+      "id": "ignorar",
+      "label": "Ignorar e seguir as regras da Terra",
+      "preview": "Simples hoje, problemático para os netos.",
+      "effects": [
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 3
+       },
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": -6
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "sonhos_iguais",
+    "group": "discovery",
+    "tags": [
+     "crew",
+     "discovery"
+    ],
+    "portrait": "crew",
+    "weight": 3,
+    "cooldownWeeks": 312,
+    "variants": 2,
+    "slots": [
+     {
+      "nave": "Silente"
+     },
+     {
+      "nave": "Quieta"
+     },
+     {
+      "nave": "Velada"
+     }
+    ],
+    "title": "Sonhos iguais na {nave}",
+    "text": "Seis tripulantes da nave {nave}, da {actor}, descrevem o mesmo sonho em relatórios separados: um campo escuro, um zumbido grave e a sensação de estar sendo esperado. Os médicos falam em estresse e sugestão coletiva. {person} só pede que ninguém ria disso na sede.",
+    "choices": [
+     {
+      "id": "estudar",
+      "label": "Abrir um estudo sério",
+      "preview": "Ciência onde outros veriam superstição.",
+      "effects": [
+       {
+        "science": 6
+       },
+       {
+        "actor": "player",
+        "field": "culture",
+        "delta": -2
+       }
+      ]
+     },
+     {
+      "id": "arquivar",
+      "label": "Tratar como estresse e arquivar",
+      "preview": "Discreto; a tripulação se sente desacreditada.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "loyalty",
+        "delta": -5
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 1
+       }
+      ]
+     },
+     {
+      "id": "folga",
+      "label": "Dar uma licença longa à tripulação",
+      "preview": "Cuidado humano, escala apertada.",
+      "effects": [
+       {
+        "crew": "random",
+        "field": "morale",
+        "delta": 6
+       },
+       {
+        "cash": -15
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ultima_rampa",
+    "group": "media",
+    "tags": [
+     "legacy",
+     "economy"
+    ],
+    "weight": 3,
+    "cooldownWeeks": 312,
+    "variants": 2,
+    "slots": [
+     {
+      "lugar": "Alcântara"
+     },
+     {
+      "lugar": "Kourou"
+     },
+     {
+      "lugar": "Baikonur"
+     },
+     {
+      "lugar": "Wenchang"
+     }
+    ],
+    "title": "A última rampa de {lugar}",
+    "text": "Quase nada decola mais da superfície da Terra: estaleiros orbitais fazem tudo lá em cima. A última rampa ativa de {lugar} vai fechar, e a cidade em volta vive dela há séculos. A {actor} pode transformá-la em museu, mantê-la para emergências ou entregá-la ao mar.",
+    "choices": [
+     {
+      "id": "museu",
+      "label": "Transformar em museu",
+      "preview": "Memória e turismo; nenhuma utilidade prática.",
+      "effects": [
+       {
+        "cash": -20
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": 4
+       }
+      ]
+     },
+     {
+      "id": "reserva",
+      "label": "Manter para emergências",
+      "preview": "Caro de conservar, útil no dia em que tudo falhar.",
+      "effects": [
+       {
+        "cash": -30
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 2
+       },
+       {
+        "science": 2
+       }
+      ]
+     },
+     {
+      "id": "fechar",
+      "label": "Desmontar e reciclar",
+      "preview": "Economia fria; a cidade não perdoa.",
+      "effects": [
+       {
+        "cash": 25
+       },
+       {
+        "actor": "player",
+        "field": "support",
+        "delta": -4
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "carta_estelar_errada",
+    "group": "integrity",
+    "tags": [
+     "technical"
+    ],
+    "weight": 3,
+    "cooldownWeeks": 208,
+    "variants": 2,
+    "slots": [
+     {
+      "estrela": "Fomalhaut"
+     },
+     {
+      "estrela": "Vega"
+     },
+     {
+      "estrela": "Altair"
+     }
+    ],
+    "title": "A posição de {estrela}",
+    "text": "As cartas de navegação da {actor} erram a posição de {estrela} por uma margem pequena demais para importar e grande demais para ser acaso. Ou o catálogo envelheceu, ou algo entre nós e a estrela curva a luz. {person} quer parar as rotas que passam por ali até entender.",
+    "choices": [
+     {
+      "id": "parar",
+      "label": "Suspender as rotas",
+      "preview": "Seguro e caro para quem depende delas.",
+      "effects": [
+       {
+        "cash": -25
+       },
+       {
+        "science": 5
+       }
+      ]
+     },
+     {
+      "id": "corrigir",
+      "label": "Corrigir a carta e seguir",
+      "preview": "Prático, sem responder à pergunta.",
+      "effects": [
+       {
+        "missionRisk": 0.02
+       },
+       {
+        "actor": "player",
+        "field": "reputation",
+        "delta": 1
+       }
+      ]
+     },
+     {
+      "id": "publicar",
+      "label": "Pedir ajuda a todos os observatórios",
+      "preview": "A dúvida vira um esforço comum.",
+      "effects": [
+       {
+        "science": 7
+       },
+       {
+        "relation": "rival",
+        "field": "trust",
+        "delta": 4
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

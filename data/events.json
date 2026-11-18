@@ -7720,7 +7720,7 @@
     }
   ],
   "groups": {
-    "_doc": "Janela compartilhada (semanas): depois de um evento do grupo, os outros do mesmo grupo esperam esse tempo (padrão 16).",
+    "_doc": "Janela compartilhada (semanas): depois de um evento do grupo, os outros do mesmo grupo esperam esse tempo (padrão 16). Um só lugar para todas as eras: os pacotes de era não redefinem grupos (o resultado não pode depender de quais pacotes estão carregados).",
     "rival_first": 39,
     "rival_failure": 20,
     "crew_morale": 20,
@@ -7729,6 +7729,12 @@
     "integrity": 16,
     "rival_contact": 16,
     "bloc_news": 20,
-    "geo_news": 20
+    "geo_news": 20,
+    "discovery": 26,
+    "investors": 26,
+    "succession": 30,
+    "eco": 52,
+    "colony_crisis": 30,
+    "culture": 26
   }
 }

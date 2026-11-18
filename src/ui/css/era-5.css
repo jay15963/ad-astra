@@ -1,0 +1,53 @@
+/* Era 5 — Expansão do Sistema (2051–2199): palette "ambar".
+   Fronteira, improviso, mineração: poeira de ferrugem, âmbar de lanterna de mina, aço riscado.
+   Token block only (DESIGN.md: era skins change accent, texture and surface tone; the system stays the same).
+   Hooked by src/ui/app.js syncEra() → body[data-era="e5"]. */
+body[data-era="e5"] {
+  /* surfaces, back to front: dark iron with a warm rust cast */
+  --s0: #0a0807;
+  --s1: #100c0a;
+  --s2: #16110e;
+  --s3: #1c1612;
+  --s4: #241c17;
+  --line: #231b16;
+  --line-strong: #33281f;
+
+  --text: #efe8df;
+  --text-2: #a89c8e;
+  --text-3: #6e6357;
+
+  --green: #8fcf6a;
+  --red: #f07a5a;
+  --yellow: #f0a830;
+  --amber: #e0892a;
+  --info: #8fb3c4;
+  --violet: #b99ad8;
+
+  --green-bg: #8fcf6a16;
+  --red-bg: #f07a5a18;
+  --yellow-bg: #f0a83018;
+  --info-bg: #8fb3c416;
+  --green-line: #8fcf6a40;
+  --red-line: #f07a5a44;
+  --yellow-line: #f0a83044;
+  --info-line: #8fb3c440;
+
+  /* the lantern: action colour of the frontier */
+  --act: #f0a830;
+  --act-ink: #1a1208;
+  --accent: #f0a830;
+  --accent-ink: #1a1208;
+  --light: #f2e9dc;
+  --light-ink: #120d09;
+
+  /* texture: faint dust grain and a horizon of Martian dusk behind the screens */
+  --grid: #f0a83008;
+  background-image:
+    radial-gradient(120% 60% at 50% 115%, #5c241633 0%, transparent 60%),
+    repeating-linear-gradient(115deg, #ffffff03 0 2px, transparent 2px 7px);
+  background-attachment: fixed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-era="e5"] { background-attachment: scroll; }
+}

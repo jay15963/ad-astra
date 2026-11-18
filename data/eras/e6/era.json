@@ -1,35 +1,27 @@
 {
-  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e6 em data/packs.json).",
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e6). \"newsTone\" = tom das manchetes da era (contemplativo, escalas de séculos): mesmas chaves e marcadores de data/calendar.json \"news\" (calendar) e de core/lifecycle.json \"texts\" (lifecycle); o módulo de notícias pode preferi-los enquanto a era atual for e6. Listas = variantes escolhidas por hash, sem afetar resultados.",
   "id": "e6",
   "name": "Interplanetária e Interestelar",
   "from": 2200,
   "to": 2599,
-  "truthLayers": [
-    "especulacao"
-  ],
+  "truthLayers": ["especulacao"],
   "closingMilestone": "Primeiro pouso em outro sol",
   "palette": "anil",
+  "paletteDoc": "Anil de céu sem atmosfera, luz de estrela fria, verde de folha dos habitats e o vermelho baixo de Proxima (src/ui/css/era-6.css).",
   "chapters": [
-    {
-      "from": {
-        "year": 2200,
-        "month": 0
-      },
-      "title": "As naves geracionais"
-    },
-    {
-      "from": {
-        "year": 2380,
-        "month": 0
-      },
-      "title": "A primeira estrela"
-    },
-    {
-      "from": {
-        "year": 2500,
-        "month": 0
-      },
-      "title": "Cartas de muito longe"
-    }
-  ]
+    {"from":{"year":2200,"month":0},"title":"As naves geracionais"},
+    {"from":{"year":2380,"month":0},"title":"A primeira estrela"},
+    {"from":{"year":2500,"month":0},"title":"Cartas de muito longe"}
+  ],
+  "chapterBlurbs": {
+    "2200-0": "Habitats vivos giram em L5, espelhos começam a aquecer Marte e lasers no lado oculto da Lua empurram as primeiras velas. Em Ceres, constrói-se uma nave para dez gerações.",
+    "2380-0": "A Aurora acorda perto de Proxima e pousa na faixa do crepúsculo: gente sob outro sol. Ceres se declara livre.",
+    "2500-0": "As notícias chegam com anos de atraso: τ Ceti e tem oceanos, Marte tem céu aberto e a Arca Saudade chega a Barnard."
+  },
+  "newsTone": {
+    "voice": "Contemplativo: frases longas e calmas, datas de envio e de chegada, nomes de quem não verá o fim. Pouca exclamação; luto e esperança na mesma manchete.",
+    "calendar": {"launched":["{owner} lança {name}: a resposta chega em {date}","{name} parte. Quem a lançou talvez não esteja aqui para a chegada","Mais uma vela no escuro: {owner} envia {name}","{name} deixa o Sistema Solar devagar, como quem sai de casa"],"launchedBody":"Partida nominal no {vehicle}. Chegada prevista para {date}, e a notícia da chegada demora ainda mais para voltar.","success":["{name} chegou. A notícia viajou anos para chegar até nós","Sinal recebido: {name} cumpriu a missão","{name}: sucesso, com a calma de quem esperou décadas","Do outro lado da noite, {name} responde"],"partial":["{name} chega ferida, mas fala","{name}: parte do sinal se perdeu no caminho","Silêncio parcial: {name} cumpre só parte do que prometeu"],"failed":["{name} se cala para sempre","Fim do sinal: {name} se perde entre as estrelas","A {owner} chora {name}: décadas de espera terminam no silêncio","{name} não responde mais"],"lostCrew":["Luto entre as estrelas: a tripulação de {name} não sobreviveu","{name}: as luzes da nave se apagaram, e com elas a tripulação"],"lostCrewBody":"A {owner} confirma a perda. Os nomes vão para o Memorial, e a mensagem de despedida leva anos para chegar a quem ficou.","first":["Pela primeira vez na história: {owner} conquista {milestone}","{milestone}: um feito que nossos tataravós sonharam, e a {owner} realizou"],"firstEra":"Primeira vez neste século: {owner} conquista {milestone}","delayed":["{name} fica para {date}: o que são alguns meses perto de séculos","Nova data para {name}: {date}","Os estaleiros pedem mais tempo: {name} só em {date}"]},
+    "lifecycle": {"birth":["Nasce {name}, com os olhos nas estrelas","{name} surge para pensar em séculos, e não em mandatos"],"rename":["{old} agora é {name}","{old} muda de nome: o século pede {name}"],"merge":["{from} e {into} viram uma só","{from} se junta a {into} para durar mais"],"dissolve":["{name} encerra as atividades depois de gerações","Fim de uma longa história: {name} fecha as portas"],"successor":["{old} renasce como {name}","Um nome para o novo século: {old} vira {name}"]},
+    "ticker": ["O laser de Hermes passou a noite apontado para Proxima","Habitats de L5 registram o primeiro inverno artificial do século","Mais um cometa desviado rumo a Marte, para engrossar o ar","A mensagem anual para a Arca Saudade ficou pronta: duas horas de vídeo e uma receita de pão","Interferômetro capta nuvens em τ Ceti e","Crianças de Ceres aprendem a desenhar constelações vistas de Proxima"]
+  }
 }

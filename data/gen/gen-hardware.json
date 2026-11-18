@@ -1,0 +1,881 @@
+{
+ "_doc": "Gerador de foguetes e naves das eras especulativas (src/gen/hardware.js, C8). Capacidade em toneladas (leo) e razões para os outros destinos (sempre leo ≥ gto ≥ tli ≥ mars ≥ outer). Custos em US$ milhões do jogo por voo, antes da escala de verba da era. Famílias e tipos vêm de data/core/vocab.json (partFamilies, vehicleClasses, spacecraftKinds); só tipos com suporte no esquema (sem status reserved). Nomes nunca se repetem dentro de um registro.",
+ "version": 1,
+ "vehicles": {
+  "e5": {
+   "classes": [
+    {
+     "class": "medium",
+     "w": 3,
+     "leo": [
+      20,
+      60
+     ],
+     "costM": [
+      12,
+      40
+     ],
+     "cadence": [
+      12,
+      40
+     ]
+    },
+    {
+     "class": "heavy",
+     "w": 4,
+     "leo": [
+      80,
+      200
+     ],
+     "costM": [
+      35,
+      110
+     ],
+     "cadence": [
+      8,
+      24
+     ]
+    },
+    {
+     "class": "superheavy",
+     "w": 2,
+     "leo": [
+      220,
+      600
+     ],
+     "costM": [
+      90,
+      320
+     ],
+     "cadence": [
+      4,
+      14
+     ]
+    }
+   ],
+   "ratios": {
+    "gto": [
+     0.38,
+     0.45
+    ],
+    "tli": [
+     0.3,
+     0.36
+    ],
+    "mars": [
+     0.24,
+     0.3
+    ],
+    "outer": [
+     0.08,
+     0.14
+    ]
+   },
+   "reliability": [
+    0.985,
+    0.997
+   ],
+   "reusableChance": 0.85,
+   "crewRatedChance": 0.45,
+   "standDownWeeks": [
+    2,
+    6
+   ],
+   "families": [
+    "generico",
+    "starship",
+    "nuclear",
+    "fusao"
+   ],
+   "names": [
+    "Carcará",
+    "Tropeiro",
+    "Jangada",
+    "Sabiá",
+    "Albatroz",
+    "Andorinha",
+    "Gavião",
+    "Harpia",
+    "Tuiuiú",
+    "Seriema",
+    "Jaburu",
+    "Condor",
+    "Tesourão",
+    "Falcão-Peregrino",
+    "Biguá",
+    "Quero-Quero",
+    "Bem-te-vi",
+    "Araponga",
+    "Socó",
+    "Fragata",
+    "Petrel",
+    "Atobá",
+    "Martim-Pescador",
+    "Garça"
+   ],
+   "series": [
+    "",
+    "",
+    " Pesado",
+    " II",
+    " III",
+    " Longo",
+    " M"
+   ]
+  },
+  "e6": {
+   "classes": [
+    {
+     "class": "heavy",
+     "w": 3,
+     "leo": [
+      150,
+      400
+     ],
+     "costM": [
+      20,
+      70
+     ],
+     "cadence": [
+      12,
+      40
+     ]
+    },
+    {
+     "class": "superheavy",
+     "w": 4,
+     "leo": [
+      450,
+      1500
+     ],
+     "costM": [
+      50,
+      200
+     ],
+     "cadence": [
+      6,
+      24
+     ]
+    }
+   ],
+   "ratios": {
+    "gto": [
+     0.42,
+     0.5
+    ],
+    "tli": [
+     0.36,
+     0.44
+    ],
+    "mars": [
+     0.32,
+     0.4
+    ],
+    "outer": [
+     0.18,
+     0.28
+    ]
+   },
+   "reliability": [
+    0.992,
+    0.999
+   ],
+   "reusableChance": 0.95,
+   "crewRatedChance": 0.7,
+   "standDownWeeks": [
+    2,
+    4
+   ],
+   "families": [
+    "generico",
+    "fusao",
+    "fusao_pulsada"
+   ],
+   "names": [
+    "Amazonas",
+    "Tejo",
+    "Níger",
+    "Mekong",
+    "Volga",
+    "Paraná",
+    "Orinoco",
+    "Zambeze",
+    "Yukon",
+    "Danúbio",
+    "Ganges",
+    "Nilo Azul",
+    "Tocantins",
+    "Xingu",
+    "Araguaia",
+    "Indo",
+    "Yang-Tsé",
+    "Reno",
+    "Ródano",
+    "Congo",
+    "Limpopo",
+    "Murray",
+    "Mackenzie",
+    "São Francisco"
+   ],
+   "series": [
+    "",
+    "",
+    " Pesado",
+    " II",
+    " Longo"
+   ]
+  },
+  "e7": {
+   "classes": [
+    {
+     "class": "superheavy",
+     "w": 1,
+     "leo": [
+      1200,
+      5000
+     ],
+     "costM": [
+      40,
+      160
+     ],
+     "cadence": [
+      10,
+      40
+     ]
+    }
+   ],
+   "ratios": {
+    "gto": [
+     0.5,
+     0.58
+    ],
+    "tli": [
+     0.46,
+     0.54
+    ],
+    "mars": [
+     0.42,
+     0.5
+    ],
+    "outer": [
+     0.34,
+     0.42
+    ]
+   },
+   "reliability": [
+    0.996,
+    0.9995
+   ],
+   "reusableChance": 1,
+   "crewRatedChance": 0.85,
+   "standDownWeeks": [
+    1,
+    3
+   ],
+   "families": [
+    "fusao_pulsada",
+    "antimateria",
+    "estatorreator_interestelar"
+   ],
+   "names": [
+    "Ariadne",
+    "Teseu",
+    "Orfeu",
+    "Eurídice",
+    "Penélope",
+    "Ulisses",
+    "Cassandra",
+    "Electra",
+    "Selene",
+    "Perséfone",
+    "Anquises",
+    "Dédalo",
+    "Hiperíon",
+    "Mnemósine",
+    "Tétis",
+    "Febe",
+    "Astreia",
+    "Nix",
+    "Érebo",
+    "Hemera",
+    "Éter",
+    "Calíope"
+   ],
+   "series": [
+    "",
+    "",
+    " II",
+    " III"
+   ]
+  }
+ },
+ "spacecraft": {
+  "e5": {
+   "kinds": [
+    {
+     "kind": "capsule", "tPerPerson": 2.5,
+     "w": 3,
+     "crew": [
+      4,
+      8
+     ],
+     "massT": [
+      12,
+      30
+     ],
+     "costM": [
+      60,
+      260
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars"
+     ]
+    },
+    {
+     "kind": "cargo",
+     "w": 2,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      10,
+      40
+     ],
+     "costM": [
+      20,
+      90
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars"
+     ]
+    },
+    {
+     "kind": "lander", "tPerPerson": 4,
+     "w": 2,
+     "crew": [
+      2,
+      6
+     ],
+     "massT": [
+      15,
+      40
+     ],
+     "costM": [
+      120,
+      420
+     ],
+     "reach": [
+      "tli",
+      "mars"
+     ],
+     "surface": true
+    },
+    {
+     "kind": "probe",
+     "w": 2,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      1,
+      8
+     ],
+     "costM": [
+      80,
+      600
+     ],
+     "reach": [
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "tug",
+     "w": 1,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      8,
+      30
+     ],
+     "costM": [
+      60,
+      200
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "habitat", "tPerPerson": 3,
+     "w": 1,
+     "crew": [
+      8,
+      24
+     ],
+     "massT": [
+      30,
+      60
+     ],
+     "costM": [
+      300,
+      1200
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars"
+     ]
+    }
+   ],
+   "reliability": [
+    0.95,
+    0.985
+   ],
+   "names": {
+    "capsule": [
+     "Esperança",
+     "Coragem",
+     "Ventura",
+     "Promessa",
+     "Mutirão",
+     "Teimosia",
+     "Labuta",
+     "Valentia",
+     "Ousadia",
+     "Constância"
+    ],
+    "cargo": [
+     "Tropa",
+     "Carroça",
+     "Balsa",
+     "Estiva",
+     "Canoa",
+     "Saveiro",
+     "Chata",
+     "Barcaça"
+    ],
+    "lander": [
+     "Pé-de-Vento",
+     "Pousada",
+     "Rancho",
+     "Tapera",
+     "Varanda",
+     "Sítio",
+     "Paragem"
+    ],
+    "probe": [
+     "Batedora",
+     "Rastreadora",
+     "Vigia",
+     "Sentinela",
+     "Olheira",
+     "Mateira",
+     "Andarilha"
+    ],
+    "tug": [
+     "Reboque",
+     "Rebocador",
+     "Guincho",
+     "Cabrestante",
+     "Mula"
+    ],
+    "habitat": [
+     "Vila",
+     "Aldeia",
+     "Arraial",
+     "Povoado",
+     "Vilarejo",
+     "Colmeia"
+    ]
+   }
+  },
+  "e6": {
+   "kinds": [
+    {
+     "kind": "capsule", "tPerPerson": 2,
+     "w": 2,
+     "crew": [
+      6,
+      12
+     ],
+     "massT": [
+      20,
+      50
+     ],
+     "costM": [
+      40,
+      160
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "cargo",
+     "w": 2,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      30,
+      120
+     ],
+     "costM": [
+      20,
+      80
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "lander", "tPerPerson": 3,
+     "w": 1,
+     "crew": [
+      4,
+      12
+     ],
+     "massT": [
+      30,
+      80
+     ],
+     "costM": [
+      80,
+      300
+     ],
+     "reach": [
+      "tli",
+      "mars",
+      "outer"
+     ],
+     "surface": true
+    },
+    {
+     "kind": "probe",
+     "w": 2,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      0.5,
+      6
+     ],
+     "costM": [
+      60,
+      500
+     ],
+     "reach": [
+      "outer"
+     ]
+    },
+    {
+     "kind": "tug",
+     "w": 1,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      20,
+      80
+     ],
+     "costM": [
+      40,
+      160
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "habitat", "tPerPerson": 1.5,
+     "w": 2,
+     "crew": [
+      20,
+      200
+     ],
+     "massT": [
+      60,
+      300
+     ],
+     "costM": [
+      400,
+      2000
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    }
+   ],
+   "reliability": [
+    0.97,
+    0.993
+   ],
+   "names": {
+    "capsule": [
+     "Paciente",
+     "Peregrina",
+     "Romeira",
+     "Longeva",
+     "Serena",
+     "Firme",
+     "Tenaz",
+     "Mansa"
+    ],
+    "cargo": [
+     "Caravela",
+     "Nau",
+     "Galeão",
+     "Escuna",
+     "Bergantim",
+     "Caíque"
+    ],
+    "lander": [
+     "Raiz",
+     "Semente",
+     "Muda",
+     "Enxerto",
+     "Broto",
+     "Estaca"
+    ],
+    "probe": [
+     "Mensageira",
+     "Carta",
+     "Bilhete",
+     "Recado",
+     "Telegrama",
+     "Postal"
+    ],
+    "tug": [
+     "Correnteza",
+     "Corrente",
+     "Maré-Alta",
+     "Vazante"
+    ],
+    "habitat": [
+     "Herdade",
+     "Morada",
+     "Lar",
+     "Solar",
+     "Casarão",
+     "Quinta"
+    ]
+   }
+  },
+  "e7": {
+   "kinds": [
+    {
+     "kind": "capsule", "tPerPerson": 1.5,
+     "w": 1,
+     "crew": [
+      8,
+      20
+     ],
+     "massT": [
+      30,
+      80
+     ],
+     "costM": [
+      30,
+      120
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "cargo",
+     "w": 2,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      80,
+      400
+     ],
+     "costM": [
+      15,
+      60
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "probe",
+     "w": 3,
+     "crew": [
+      0,
+      0
+     ],
+     "massT": [
+      0.1,
+      4
+     ],
+     "costM": [
+      40,
+      400
+     ],
+     "reach": [
+      "outer"
+     ]
+    },
+    {
+     "kind": "habitat", "tPerPerson": 0.6,
+     "w": 2,
+     "crew": [
+      100,
+      2000
+     ],
+     "massT": [
+      200,
+      900
+     ],
+     "costM": [
+      600,
+      3000
+     ],
+     "reach": [
+      "leo",
+      "tli",
+      "mars",
+      "outer"
+     ]
+    },
+    {
+     "kind": "lander", "tPerPerson": 2.5,
+     "w": 1,
+     "crew": [
+      6,
+      20
+     ],
+     "massT": [
+      40,
+      120
+     ],
+     "costM": [
+      60,
+      240
+     ],
+     "reach": [
+      "mars",
+      "outer"
+     ],
+     "surface": true
+    }
+   ],
+   "reliability": [
+    0.98,
+    0.996
+   ],
+   "names": {
+    "capsule": [
+     "Quieta",
+     "Silente",
+     "Velada",
+     "Discreta",
+     "Calada"
+    ],
+    "cargo": [
+     "Arca",
+     "Celeiro",
+     "Tulha",
+     "Paiol",
+     "Silo"
+    ],
+    "probe": [
+     "Pergunta",
+     "Sussurro",
+     "Prece",
+     "Chamado",
+     "Aceno",
+     "Indício",
+     "Rumor"
+    ],
+    "habitat": [
+     "Cidade Errante",
+     "Mundo-Navio",
+     "Arquipélago",
+     "Catedral",
+     "Biblioteca"
+    ],
+    "lander": [
+     "Chegada",
+     "Limiar",
+     "Soleira",
+     "Umbral"
+    ]
+   }
+  }
+ },
+ "kindLabel": {
+  "capsule": "Cápsula",
+  "cargo": "Cargueiro",
+  "lander": "Módulo de pouso",
+  "probe": "Sonda",
+  "tug": "Rebocador",
+  "habitat": "Habitat",
+  "rover": "Jipe",
+  "station_module": "Módulo de estação",
+  "satellite": "Satélite"
+ },
+ "classLabel": {
+  "medium": "médio",
+  "heavy": "pesado",
+  "superheavy": "superpesado",
+  "small": "pequeno",
+  "sounding": "de sondagem"
+ },
+ "familyNote": {
+  "generico": "propulsão química de alto desempenho",
+  "starship": "arquitetura de aço inteiramente reutilizável",
+  "nuclear": "estágio superior nuclear térmico",
+  "fusao": "estágio de fusão de baixo empuxo",
+  "fusao_pulsada": "propulsão de fusão pulsada",
+  "antimateria": "catalisador de antimatéria",
+  "estatorreator_interestelar": "estatorreator que colhe hidrogênio do caminho"
+ },
+ "extraNames": {
+  "satellite": [
+   "Guardiã",
+   "Memorial",
+   "Testemunha",
+   "Relicário",
+   "Cofre",
+   "Âncora de Pedra"
+  ]
+ }
+}

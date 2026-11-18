@@ -1,0 +1,304 @@
+{
+ "_doc": "Destinos interestelares gerados a partir de data/core/stars.json (src/gen/destinations.js, C8). Os ids seguem exatamente as famílias congeladas em data/core/vocab.json (destinationFamilies): <estrela>_system, <planeta>_orbit, <planeta>_surface, region_<região>. Velocidades em fração da luz por era (sonda / tripulada): o tempo de viagem sai da distância real em anos-luz. Δv mostrado é o de cruzeiro (acelerar e frear), só informativo. Os marcos são do vocabulário.",
+ "version": 1,
+ "families": [
+  {
+   "id": "star_system",
+   "pattern": "{star}_system",
+   "from": "stars",
+   "kind": "interstellar",
+   "era": "e6",
+   "label": "Sistema de {name}"
+  },
+  {
+   "id": "exoplanet_orbit",
+   "pattern": "{planet}_orbit",
+   "from": "exoplanets",
+   "kind": "orbit",
+   "era": "e6",
+   "label": "Órbita de {name}"
+  },
+  {
+   "id": "exoplanet_surface",
+   "pattern": "{planet}_surface",
+   "from": "exoplanets",
+   "kind": "surface",
+   "era": "e6",
+   "label": "Superfície de {name}"
+  },
+  {
+   "id": "galactic_region",
+   "pattern": "region_{region}",
+   "from": "regions",
+   "kind": "interstellar",
+   "era": "e7",
+   "label": "{name}"
+  }
+ ],
+ "speedC": {
+  "e6": {
+   "probe": 0.1,
+   "crewed": 0.04
+  },
+  "e7": {
+   "probe": 0.5,
+   "crewed": 0.15
+  }
+ },
+ "boostWeeks": {
+  "probe": 26,
+  "crewed": 104
+ },
+ "firsts": {
+  "star_system": {
+   "robotic": "first_interstellar_probe_arrival",
+   "crewed": "first_crewed_interstellar_arrival"
+  },
+  "exoplanet_orbit": {
+   "robotic": "first_exoplanet_closeup",
+   "crewed": "first_crewed_interstellar_arrival"
+  },
+  "exoplanet_surface": {
+   "robotic": "first_exoplanet_closeup",
+   "crewed": "exoplanet_crewed_landing"
+  },
+  "galactic_region": {
+   "robotic": "first_probe_beyond_local_bubble"
+  },
+  "galactic_region:sgr_a": {
+   "robotic": "first_galactic_core_image"
+  }
+ },
+ "arrival": {
+  "star_system": [
+   {
+    "id": "decel",
+    "label": "Frenagem na heliosfera de {star}",
+    "pFail": 0.06,
+    "radio": [
+     "Vela de frenagem aberta.",
+     "Velocidade caindo dentro do previsto."
+    ]
+   },
+   {
+    "id": "insertion",
+    "label": "Entrada no sistema",
+    "pFail": 0.04,
+    "radio": [
+     "Primeiras imagens de {star} chegando, {years} anos depois."
+    ]
+   }
+  ],
+  "exoplanet_orbit": [
+   {
+    "id": "decel",
+    "label": "Frenagem em {star}",
+    "pFail": 0.06,
+    "radio": [
+     "Frenagem concluída."
+    ]
+   },
+   {
+    "id": "capture",
+    "label": "Captura na órbita de {name}",
+    "pFail": 0.05,
+    "radio": [
+     "Em órbita de {name}. O mundo inteiro espera a próxima imagem."
+    ]
+   }
+  ],
+  "exoplanet_surface": [
+   {
+    "id": "decel",
+    "label": "Frenagem em {star}",
+    "pFail": 0.06,
+    "radio": [
+     "Frenagem concluída."
+    ]
+   },
+   {
+    "id": "entry",
+    "label": "Entrada na atmosfera de {name}",
+    "pFail": 0.06,
+    "radio": [
+     "Escudo térmico brilhando sob uma luz que não é a do Sol."
+    ]
+   },
+   {
+    "id": "touchdown",
+    "label": "Pouso em {name}",
+    "pFail": 0.05,
+    "radio": [
+     "Contato com o solo de {name}."
+    ]
+   }
+  ],
+  "galactic_region": [
+   {
+    "id": "approach",
+    "label": "Aproximação de {name}",
+    "pFail": 0.08,
+    "radio": [
+     "A rede de retransmissão confirma o sinal da sonda."
+    ]
+   }
+  ]
+ },
+ "failureWeights": {
+  "propulsion": 0.3,
+  "structure": 0.3,
+  "software": 0.2,
+  "human": 0,
+  "environment": 0.2
+ },
+ "description": {
+  "star_system": "{name}, a {ly} anos-luz. Uma sonda leva cerca de {years} anos para chegar; cada mensagem, {ly} anos para voltar.",
+  "exoplanet_orbit": "{name}, em volta de {star}, a {ly} anos-luz.{hz} Ver de perto um mundo de outro sol muda a forma como olhamos o nosso.",
+  "exoplanet_surface": "Pousar em {name}, a {ly} anos-luz.{hz} Quem desce ali não volta para contar: fica para começar outra história.",
+  "galactic_region": "{name}, a cerca de {ly} anos-luz. Destino de sondas de antimatéria que só a rede de retransmissão consegue ouvir."
+ },
+ "hzText": " Fica na zona habitável da estrela.",
+ "standIns": [
+  {
+   "id": "mars_polar_cap",
+   "name": "Calota polar de Marte",
+   "kind": "surface",
+   "capacityKey": "mars",
+   "emLabel": "na calota polar de Marte",
+   "toLabel": "à calota polar de Marte",
+   "short": "Polo de Marte",
+   "era": "e5"
+  },
+  {
+   "id": "ceres_surface",
+   "name": "Superfície de Ceres",
+   "kind": "surface",
+   "capacityKey": "outer",
+   "emLabel": "em Ceres",
+   "toLabel": "a Ceres",
+   "short": "Ceres",
+   "era": "e5"
+  },
+  {
+   "id": "belt_mining_site",
+   "name": "Lavra no cinturão",
+   "kind": "rendezvous",
+   "capacityKey": "outer",
+   "emLabel": "no cinturão",
+   "toLabel": "ao cinturão",
+   "short": "Cinturão",
+   "era": "e5"
+  },
+  {
+   "id": "europa_ocean",
+   "name": "Oceano de Europa",
+   "kind": "surface",
+   "capacityKey": "outer",
+   "emLabel": "no oceano de Europa",
+   "toLabel": "ao oceano de Europa",
+   "short": "Europa",
+   "era": "e5"
+  },
+  {
+   "id": "venus_aerostat",
+   "name": "Aeróstato de Vênus",
+   "kind": "atmosphere",
+   "capacityKey": "mars",
+   "emLabel": "nas nuvens de Vênus",
+   "toLabel": "às nuvens de Vênus",
+   "short": "Vênus",
+   "era": "e5"
+  },
+  {
+   "id": "callisto_surface",
+   "name": "Superfície de Calisto",
+   "kind": "surface",
+   "capacityKey": "outer",
+   "emLabel": "em Calisto",
+   "toLabel": "a Calisto",
+   "short": "Calisto",
+   "era": "e5"
+  },
+  {
+   "id": "titan_orbit",
+   "name": "Órbita de Titã",
+   "kind": "orbit",
+   "capacityKey": "outer",
+   "emLabel": "na órbita de Titã",
+   "toLabel": "à órbita de Titã",
+   "short": "Titã",
+   "era": "e5"
+  },
+  {
+   "id": "solar_gravity_lens",
+   "name": "Lente gravitacional do Sol",
+   "kind": "orbit",
+   "capacityKey": "outer",
+   "emLabel": "no foco da lente solar",
+   "toLabel": "ao foco da lente solar",
+   "short": "Lente solar",
+   "era": "e5"
+  },
+  {
+   "id": "interstellar_medium",
+   "name": "Meio interestelar",
+   "kind": "flyby",
+   "capacityKey": "outer",
+   "emLabel": "no meio interestelar",
+   "toLabel": "ao meio interestelar",
+   "short": "Meio interestelar",
+   "era": "e5"
+  },
+  {
+   "id": "lunar_lava_tube",
+   "name": "Tubo de lava lunar",
+   "kind": "surface",
+   "capacityKey": "tli",
+   "emLabel": "num tubo de lava da Lua",
+   "toLabel": "a um tubo de lava da Lua",
+   "short": "Tubo de lava",
+   "era": "e5"
+  },
+  {
+   "id": "triton_surface",
+   "name": "Superfície de Tritão",
+   "kind": "surface",
+   "capacityKey": "outer",
+   "emLabel": "em Tritão",
+   "toLabel": "a Tritão",
+   "short": "Tritão",
+   "era": "e5"
+  },
+  {
+   "id": "earth_moon_l5",
+   "name": "Ponto L5 Terra-Lua",
+   "kind": "orbit",
+   "capacityKey": "tli",
+   "emLabel": "em L5",
+   "toLabel": "a L5",
+   "short": "L5",
+   "era": "e5"
+  },
+  {
+   "id": "oort_cloud",
+   "name": "Nuvem de Oort",
+   "kind": "flyby",
+   "capacityKey": "outer",
+   "emLabel": "na Nuvem de Oort",
+   "toLabel": "à Nuvem de Oort",
+   "short": "Oort",
+   "era": "e6"
+  },
+  {
+   "id": "sedna_flyby",
+   "name": "Sobrevoo de Sedna",
+   "kind": "flyby",
+   "capacityKey": "outer",
+   "emLabel": "em Sedna",
+   "toLabel": "a Sedna",
+   "short": "Sedna",
+   "era": "e6"
+  }
+ ],
+ "_docStandIns": "standIns: linhas mínimas de destinos do vocabulário que as eras 5–6 ainda não escreveram; só para a prévia e os testes dos geradores. Uma linha autoral com o mesmo id sempre vence."
+}

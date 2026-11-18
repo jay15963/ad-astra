@@ -1,0 +1,34 @@
+{
+  "id": "grande_silencio",
+  "kind": "scenario",
+  "name": "O Grande Silêncio",
+  "subtitle": "2950 a 3000",
+  "blurb": "Cinquenta anos antes do fim do milênio, a borda do Silêncio avança à metade da velocidade da luz. Cem mundos esperam. O que a sua agência vai dizer quando ele chegar?",
+  "start": { "year": 2950, "month": 0 },
+  "end": { "year": 3000, "month": 0 },
+  "turnWeeks": 13,
+  "eras": ["e7"],
+  "snapshot": "e7",
+  "playable": { "rule": "list", "actors": ["arquivo_estelar", "diretorio_solar", "concordia_trappist", "casa_vega", "nasa", "cnsa"] },
+  "history": "faithful",
+  "lifecycle": "on",
+  "ending": { "type": "final", "event": "ending/final" },
+  "unlocks": { "builder": { "fromYear": 2950 }, "investors": { "fromYear": 2950 }, "colonies": { "fromYear": 2950 } },
+  "unlockNote": "Liberado depois de terminar a campanha uma vez (core/vocab.json scenarios.grande_silencio).",
+  "historicalFirsts": {
+    "first_interstellar_probe_arrival": { "holder": "Século XXVI", "year": 2599, "mission": "Era Interplanetária e Interestelar" },
+    "first_crewed_interstellar_arrival": { "holder": "Século XXVI", "year": 2599, "mission": "Era Interplanetária e Interestelar" },
+    "exoplanet_crewed_landing": { "holder": "Século XXVI", "year": 2599, "mission": "Era Interplanetária e Interestelar" },
+    "stellar_archive": { "holder": "Fundação do Arquivo Estelar", "year": 2750, "mission": "Memória de Fomalhaut" },
+    "first_galactic_core_image": { "holder": "Fundação do Arquivo Estelar", "year": 2706, "mission": "Olho da Lente" },
+    "interstellar_network": { "holder": "Diretório Solar", "year": 2753, "mission": "Rede das Dez Estrelas" },
+    "hundred_worlds": { "holder": "República Livre de Trappist", "year": 2907, "mission": "Carta dos Cem Mundos" }
+  },
+  "victory": {
+    "description": "Em janeiro de 3000 a borda do Silêncio chega ao Sol: Contato, Silêncio ou Herança. O Coletivo Kepler calou-se em 2904 antes de confirmar a origem do Silêncio, e a Paciência se calou a caminho das Híades: dois feitos seguem em aberto.",
+    "goals": [
+      { "id": "first_colony_beyond_100ly", "label": "Primeira colônia a mais de 100 anos-luz" },
+      { "id": "silence_source_located", "label": "A origem do Silêncio localizada" }
+    ]
+  }
+}

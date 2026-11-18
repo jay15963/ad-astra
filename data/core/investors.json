@@ -178,6 +178,7 @@
       "names": ["Consórcio do Cinturão", "Liga das Estações", "Consórcio Heliopausa", "Fundação Arca Estelar"], "profile": "consorcio",
       "pct": [10, 30], "premium": 1.05, "termYears": 10,
       "emblem": { "shape": "star", "division": "none", "glyph": "orbit", "fields": ["#24324f", "#3b244f", "#244f43"], "glyphColor": "#cfe3ff" }
-    }
+    },
+    {"id":"banco_orbital","kind":"fund","eras":["e5","e6","e7"],"weight":2,"fromYear":2070,"names":["Banco de Compensação L5","Caixa Interplanetária","Banco Orbital de Tharsis","Banco Orbital de Ceres","Fundo Perpétuo de L5"],"profile":"retorno","pct":[5,25],"premium":1.15,"termYears":6,"emblem":{"shape":"wordmark","division":"band","glyph":"orbit","fields":["#1b2a3a","#2a1b3a"],"glyphColor":"#e3b341"}}
   ]
 }

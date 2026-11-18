@@ -1,0 +1,6 @@
+{
+  "note": "Linhagens que nascem na era 4 (projeção). Até 2050 os atores são os reais (GDD).",
+  "lineages": [
+    {"id":"ilrsco","kind":"agency","tier":"minor","color":"#8A3B2E","truthLayer":"projecao","born":{"year":2031,"month":3},"nation":[{"from":{"year":2031,"month":3},"id":"china"}],"identities":[{"from":{"year":2031,"month":3},"name":"Organização de Cooperação da ILRS","short":"ILRSCO","flag":"🌕","country":"Internacional (sede na China)","description":"Organização multilateral que reúne os parceiros da Estação Internacional de Pesquisa Lunar.","style":"Multilateral, metódica"}],"start":{"support":55,"reputation":45,"culture":0},"budgetSeries":[[2031,250],[2040,600],[2050,900]],"eraProfiles":{"e4":{"ai":{"goals":["lunar_base","lunar_resource_demo"],"cooperation":0.75,"aggression":0.25,"riskTolerance":0.4}}}}
+  ]
+}

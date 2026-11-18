@@ -221,7 +221,15 @@ function renderAll() {
     ui.shell = null;
     closeDrawer({ restoreFocus: false });
     closeLaunch();
-    renderGameOver(appRoot, store, { onNewGame: showTitle, onKeepLooking: () => { ui.lookingAfterEnd = true; renderAll(); } });
+    const opts = { onNewGame: showTitle, onKeepLooking: () => { ui.lookingAfterEnd = true; renderAll(); } };
+    // jan/3000: the epilogue of the chosen ending (ending.js, Phase C9); anything else, the campaign summary
+    if (st.gameOver.reason === 'ending' && st.eco) {
+      if (st.scenarioId === 'campaign') { try { localStorage.setItem('adastra.campaign.done', '1'); } catch { /* private mode */ } }
+      import('./ending.js').then((m) => { if (store.state === st && !ui.lookingAfterEnd && !m.renderEnding(appRoot, store, opts)) renderGameOver(appRoot, store, opts); })
+        .catch((e) => { console.error(e); renderGameOver(appRoot, store, opts); });
+      return;
+    }
+    renderGameOver(appRoot, store, opts);
     return;
   }
   ensureShell();

@@ -1,0 +1,179 @@
+{
+  "id": "nova_economia",
+  "kind": "scenario",
+  "name": "Nova Economia",
+  "subtitle": "2008 a 2020",
+  "blurb": "Janeiro de 2008: a SpaceX ainda não chegou à órbita, a crise financeira se aproxima e a NASA vai aposentar o ônibus espacial. Quem vai levar carga, depois gente, à órbita?",
+  "start": {
+    "year": 2008,
+    "month": 0
+  },
+  "end": {
+    "year": 2020,
+    "month": 11
+  },
+  "turnWeeks": null,
+  "eras": [
+    "e2",
+    "e3"
+  ],
+  "snapshot": "e3",
+  "playable": {
+    "rule": "list",
+    "actors": [
+      "spacex",
+      "nasa",
+      "cnsa",
+      "isro",
+      "esa",
+      "jaxa",
+      "roscosmos"
+    ],
+    "found": false
+  },
+  "history": "faithful",
+  "lifecycle": "on",
+  "ending": {
+    "type": "end"
+  },
+  "unlocks": {
+    "builder": {
+      "fromYear": 2008
+    },
+    "investors": {
+      "fromYear": 2008
+    }
+  },
+  "historicalFirstsNote": "Feitos realizados antes de 2008 (o passado é fiel). Quem os repete nesta era leva o \"primeiro do século\", que vale menos.",
+  "historicalFirsts": {
+    "first_satellite": {
+      "holder": "URSS",
+      "year": 1957,
+      "mission": "Sputnik 1"
+    },
+    "first_crewed_orbit": {
+      "holder": "URSS",
+      "year": 1961,
+      "mission": "Vostok 1"
+    },
+    "first_eva": {
+      "holder": "URSS",
+      "year": 1965,
+      "mission": "Voskhod 2"
+    },
+    "first_docking": {
+      "holder": "EUA",
+      "year": 1966,
+      "mission": "Gemini 8"
+    },
+    "crewed_lunar_landing": {
+      "holder": "EUA",
+      "year": 1969,
+      "mission": "Apollo 11"
+    },
+    "lunar_surface_robotic": {
+      "holder": "URSS",
+      "year": 1966,
+      "mission": "Luna 9"
+    },
+    "robotic_lunar_sample_return": {
+      "holder": "URSS",
+      "year": 1970,
+      "mission": "Luna 16"
+    },
+    "first_space_station": {
+      "holder": "URSS",
+      "year": 1971,
+      "mission": "Salyut 1"
+    },
+    "national_station": {
+      "holder": "URSS",
+      "year": 1971,
+      "mission": "Salyut 1"
+    },
+    "mars_landing_robotic": {
+      "holder": "URSS",
+      "year": 1971,
+      "mission": "Mars 3"
+    },
+    "mars_rover": {
+      "holder": "EUA",
+      "year": 1997,
+      "mission": "Mars Pathfinder"
+    },
+    "first_reusable_spaceplane": {
+      "holder": "EUA",
+      "year": 1981,
+      "mission": "STS-1"
+    },
+    "first_modular_station": {
+      "holder": "URSS",
+      "year": 1986,
+      "mission": "Mir"
+    },
+    "international_station": {
+      "holder": "EUA, Rússia e parceiros",
+      "year": 1998,
+      "mission": "Zarya e Unity"
+    },
+    "first_private_orbital_launch": {
+      "holder": "Orbital Sciences",
+      "year": 1990,
+      "mission": "Pegasus"
+    },
+    "jupiter_arrival": {
+      "holder": "EUA",
+      "year": 1995,
+      "mission": "Galileo"
+    },
+    "saturn_orbit": {
+      "holder": "EUA",
+      "year": 2004,
+      "mission": "Cassini"
+    },
+    "titan_arrival": {
+      "holder": "Europa e EUA",
+      "year": 2005,
+      "mission": "Huygens"
+    },
+    "enceladus_plume": {
+      "holder": "EUA",
+      "year": 2005,
+      "mission": "Cassini"
+    },
+    "asteroid_rendezvous": {
+      "holder": "EUA",
+      "year": 2000,
+      "mission": "NEAR Shoemaker"
+    },
+    "asteroid_landing": {
+      "holder": "EUA",
+      "year": 2001,
+      "mission": "NEAR Shoemaker"
+    },
+    "comet_impact": {
+      "holder": "EUA",
+      "year": 2005,
+      "mission": "Deep Impact"
+    },
+    "comet_sample_return": {
+      "holder": "EUA",
+      "year": 2006,
+      "mission": "Stardust"
+    },
+    "first_space_tourist": {
+      "holder": "Rússia",
+      "year": 2001,
+      "mission": "Soyuz TM-32 (Dennis Tito)"
+    },
+    "first_private_suborbital_crew": {
+      "holder": "Scaled Composites",
+      "year": 2004,
+      "mission": "SpaceShipOne"
+    }
+  },
+  "victory": {
+    "description": "Ao fim de 2020, a agência ou empresa com mais prestígio na Tabela da Era vence. Bônus por levar carga e gente à órbita com naves próprias.",
+    "goals": []
+  }
+}

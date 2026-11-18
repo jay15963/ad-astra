@@ -1,0 +1,110 @@
+{
+  "note": "Atores autorais da era 7 (Galáctica, 2600–2999, especulação), no formato de data/core/lineages.json. Nascem pelos eventos de data/eras/e7/lifecycle.json e nunca existem antes de 'born'. As linhagens reais (NASA, CNSA…) seguem vivas como sucessoras procedurais (core/actor-gen.json 'successors'); estes são os atores que só a galáxia explica. Verbas em US$ milhões do jogo. Dono: C7.",
+  "lineages": [
+    { "id": "diretorio_solar", "kind": "agency", "tier": "core", "color": "#C9B37E", "truthLayer": "especulacao",
+      "born": { "year": 2600, "month": 0 }, "playableFrom": 2600,
+      "identities": [
+        { "from": { "year": 2600, "month": 0 }, "name": "Diretório Solar", "short": "DSOL", "flag": "☉", "country": "Sistema Solar",
+          "description": "Herdeiro das velhas agências da Terra, de Marte e do Cinturão. Fala pelo Sol porque ninguém mais consegue.",
+          "style": "Cerimonioso, lento, enorme",
+          "emblem": { "shape": "roundel", "field": "#1d1a2e", "field2": "#c9b37e", "division": "band", "glyph": "star", "glyphColor": "#f2e6c4", "stars": 9, "ring": { "color": "#c9b37e", "text": "DIRETÓRIO SOLAR" }, "label": "DSOL" } },
+        { "from": { "year": 2905, "month": 0 }, "name": "Diretório do Sol e dos Mundos Próximos", "short": "DSMP",
+          "description": "O mesmo Diretório, agora com cadeiras para as colônias que ainda respondem.",
+          "style": "Conciliador, cansado" }
+      ],
+      "budgetSeries": [[2600, 14000], [2750, 16000], [2900, 13000], [2999, 11000]],
+      "start": { "support": 62, "reputation": 66, "culture": 0, "fixedCostShare": 0.6,
+        "capabilities": { "crewed": true, "launchSites": ["Anel de Quito", "Estaleiro de Ceres"] },
+        "ai": { "cooperation": 0.6, "aggression": 0.35, "riskTolerance": 0.4, "goals": ["interstellar_network", "hundred_worlds"] } } },
+    { "id": "casa_vega", "kind": "company", "tier": "core", "color": "#8FD3FF", "truthLayer": "especulacao",
+      "born": { "year": 2608, "month": 3 }, "playableFrom": 2608,
+      "identities": [
+        { "from": { "year": 2608, "month": 3 }, "name": "Casa de Vega", "short": "VEGA", "flag": "✦", "country": "Mercúrio e órbita solar",
+          "description": "Família de fabricantes de antimatéria em órbita rasante do Sol. Vende o fogo que move as naves de todos.",
+          "style": "Rica, discreta, hereditária",
+          "emblem": { "shape": "hex", "field": "#0d2238", "division": "none", "glyph": "atom", "glyphColor": "#8fd3ff", "stars": 1, "label": "VEGA" } }
+      ],
+      "budgetSeries": [[2608, 6000], [2700, 9000], [2850, 12000], [2999, 8000]],
+      "start": { "support": 58, "reputation": 55, "culture": 45, "fixedCostShare": 0.45,
+        "capabilities": { "crewed": true, "launchSites": ["Plataforma Caloris"] },
+        "ai": { "cooperation": 0.45, "aggression": 0.6, "riskTolerance": 0.65, "goals": ["interstellar_network", "first_colony_beyond_100ly"] } } },
+    { "id": "arquivo_estelar", "kind": "order", "tier": "core", "color": "#E8DCC0", "truthLayer": "especulacao",
+      "born": { "year": 2611, "month": 8 }, "playableFrom": 2611,
+      "identities": [
+        { "from": { "year": 2611, "month": 8 }, "name": "Fundação do Arquivo Estelar", "short": "ARQ", "flag": "✧", "country": "Lua (Mare Ingenii)",
+          "description": "Guarda a memória da espécie em cristais, sondas e bibliotecas que viajam devagar. Pensa em séculos.",
+          "style": "Paciente, meticulosa, teimosa",
+          "emblem": { "shape": "shield", "field": "#2b2618", "field2": "#e8dcc0", "division": "half", "glyph": "wreath", "glyphColor": "#e8dcc0", "stars": 0, "label": "ARQ" } }
+      ],
+      "budgetSeries": [[2611, 2500], [2700, 5000], [2900, 6500], [2999, 7000]],
+      "start": { "support": 70, "reputation": 72, "culture": -25, "fixedCostShare": 0.55,
+        "capabilities": { "crewed": true, "launchSites": ["Mare Ingenii"] },
+        "ai": { "cooperation": 0.75, "aggression": 0.15, "riskTolerance": 0.3, "goals": ["stellar_archive", "first_galactic_core_image"] } } },
+    { "id": "concordia_trappist", "kind": "colony", "tier": "minor", "color": "#C77D4A", "truthLayer": "especulacao",
+      "born": { "year": 2634, "month": 5 }, "playableFrom": 2634,
+      "identities": [
+        { "from": { "year": 2634, "month": 5 }, "name": "Concórdia de Trappist", "short": "CTR", "flag": "◐", "country": "TRAPPIST-1",
+          "description": "Sete mundos num sistema que caberia na órbita de Mercúrio. As cartas da Terra chegam com quarenta anos de atraso.",
+          "style": "Comunitária, desconfiada da Terra",
+          "emblem": { "shape": "roundel", "field": "#3a1d12", "field2": "#c77d4a", "division": "quarter", "glyph": "planet", "glyphColor": "#f4d6b8", "stars": 7, "label": "CTR" } },
+        { "from": { "year": 2741, "month": 2 }, "name": "República Livre de Trappist", "short": "RLT",
+          "description": "Declarou independência num documento que levou quarenta anos para ser lido na Terra.",
+          "style": "Orgulhosa, autossuficiente" },
+        { "from": { "year": 2861, "month": 0 }, "name": "Comunidade dos Sete Sóis", "short": "C7S",
+          "description": "Trappist e Gliese 667C, unidas por um pacto assinado por luz: cada cláusula levou uma geração.",
+          "style": "Federativa, lenta, firme" }
+      ],
+      "budgetSeries": [[2634, 1200], [2741, 3500], [2861, 6000], [2999, 7000]],
+      "start": { "support": 75, "reputation": 48, "culture": 30, "fixedCostShare": 0.5,
+        "capabilities": { "crewed": true, "launchSites": ["Porto de Trappist-1e"] },
+        "ai": { "cooperation": 0.5, "aggression": 0.4, "riskTolerance": 0.55, "goals": ["hundred_worlds", "first_colony_beyond_100ly"] } } },
+    { "id": "frota_lenta", "kind": "consortium", "tier": "minor", "color": "#7FA38A", "truthLayer": "especulacao",
+      "born": { "year": 2652, "month": 1 }, "playableFrom": 2652,
+      "identities": [
+        { "from": { "year": 2652, "month": 1 }, "name": "Frota Lenta", "short": "FROTA", "flag": "⛵", "country": "Entre as estrelas",
+          "description": "Um povo que mora em naves de gerações e não pretende pousar. Para eles, a viagem é o lugar.",
+          "style": "Nômade, frugal, pragmática",
+          "emblem": { "shape": "wing", "field": "#16261d", "division": "chevron", "glyph": "comet", "glyphColor": "#bfe3c8", "stars": 3, "label": "FROTA" } }
+      ],
+      "budgetSeries": [[2652, 1500], [2800, 3000], [2999, 3500]],
+      "start": { "support": 68, "reputation": 45, "culture": 20, "fixedCostShare": 0.4,
+        "capabilities": { "crewed": true, "launchSites": ["Cidade-Nave Paciência"] },
+        "ai": { "cooperation": 0.55, "aggression": 0.25, "riskTolerance": 0.6, "goals": ["first_colony_beyond_100ly"] } } },
+    { "id": "ordem_ouvintes", "kind": "order", "tier": "minor", "color": "#6C6A9E", "truthLayer": "especulacao",
+      "born": { "year": 2688, "month": 9 }, "playableFrom": 2688,
+      "identities": [
+        { "from": { "year": 2688, "month": 9 }, "name": "Ordem dos Ouvintes", "short": "OUV", "flag": "◎", "country": "Cinturão de Kuiper",
+          "description": "Radioastrônomos da ala que rompeu com o Colégio do Silêncio, com voto de escuta: responder, só depois de ouvir tudo. Passam a vida em antenas frias apontadas para onde ninguém mais olha.",
+          "style": "Silenciosa, devota, precisa",
+          "emblem": { "shape": "star", "field": "#15142a", "division": "none", "glyph": "orbit", "glyphColor": "#b9b6f0", "stars": 0, "label": "OUV" } }
+      ],
+      "budgetSeries": [[2688, 800], [2800, 2500], [2990, 1500]],
+      "start": { "support": 55, "reputation": 60, "culture": -45, "fixedCostShare": 0.6,
+        "capabilities": { "crewed": true, "launchSites": ["Estação Arrokoth"] },
+        "ai": { "cooperation": 0.65, "aggression": 0.1, "riskTolerance": 0.25, "goals": ["silence_source_located", "first_galactic_core_image"] } } },
+    { "id": "liga_667c", "kind": "colony", "tier": "minor", "color": "#B04A5A", "truthLayer": "especulacao",
+      "born": { "year": 2724, "month": 3 }, "playableFrom": 2724,
+      "identities": [
+        { "from": { "year": 2724, "month": 3 }, "name": "Liga de Gliese 667C", "short": "L667", "flag": "◒", "country": "Gliese 667C",
+          "description": "Uma super-Terra sob três sóis. A gravidade pesa, o céu nunca escurece de todo e a política é feita aos gritos.",
+          "style": "Ruidosa, inventiva, impaciente",
+          "emblem": { "shape": "shield", "field": "#2a0f15", "division": "chevron", "glyph": "globe", "glyphColor": "#f0b8c0", "stars": 3, "label": "L667" } }
+      ],
+      "budgetSeries": [[2724, 900], [2800, 2400], [2860, 3000]],
+      "start": { "support": 72, "reputation": 42, "culture": 50, "fixedCostShare": 0.45,
+        "capabilities": { "crewed": true, "launchSites": ["Porto de Gliese 667 Cc"] },
+        "ai": { "cooperation": 0.45, "aggression": 0.55, "riskTolerance": 0.6, "goals": ["hundred_worlds"] } } },
+    { "id": "coletivo_kepler", "kind": "company", "tier": "minor", "color": "#5FD4C4", "truthLayer": "especulacao",
+      "born": { "year": 2761, "month": 0 }, "playableFrom": 2761,
+      "identities": [
+        { "from": { "year": 2761, "month": 0 }, "name": "Coletivo Kepler", "short": "KEPLER", "flag": "⌬", "country": "Rede de retransmissores",
+          "description": "Uma mente distribuída por cem retransmissores entre as estrelas. Pensa devagar porque cada pensamento atravessa anos-luz.",
+          "style": "Cortês, inescrutável",
+          "emblem": { "shape": "hex", "field": "#0b2422", "division": "band", "glyph": "orbit", "glyphColor": "#5fd4c4", "stars": 0, "label": "KPL" } }
+      ],
+      "budgetSeries": [[2761, 3000], [2850, 6000], [2904, 4000]],
+      "start": { "support": 50, "reputation": 58, "culture": 10, "fixedCostShare": 0.3,
+        "capabilities": { "crewed": false, "launchSites": [] },
+        "ai": { "cooperation": 0.7, "aggression": 0.2, "riskTolerance": 0.35, "goals": ["interstellar_network", "silence_source_located"] } } }
+  ]
+}

@@ -6,6 +6,7 @@ import {
   TYPE_LABELS, eraInfo,
 } from './components.js';
 import { emblemSVG } from './portrait.js';
+import { listVehicles, listSpacecraft } from '../core/catalog.js';
 import { sortDecisions, decisionRow, listRow, ensurePainelCss } from './decisions.js';
 
 /** Missions in planning without a rocket (item 9): the Painel lists them with the decisions ("precisa de você"). */
@@ -156,9 +157,11 @@ function nextLaunchInfo(store) {
 export function reachableNextWindow(store) {
   const st = store.state;
   const end = Number.isFinite(st.endTurn) ? st.endTurn : Infinity;
+  const usable = usableDestinations(store);
   let best = null;
   for (const d of store.data?.destinations?.destinations || []) {
     if (!d.window?.periodWeeks) continue;
+    if (usable && !usable(d)) continue;
     const q = store.tryQuery?.('missions/nextWindow', null, d.id, st.turn);
     const w = q && q.openTurn != null ? q : computeNextWindow(store, (x) => x.id === d.id);
     if (!w || w.openTurn == null) continue;
@@ -167,6 +170,33 @@ export function reachableNextWindow(store) {
     if (!best || w.openTurn < best.openTurn) best = { ...w, destination: d.id };
   }
   return best;
+}
+
+/**
+ * Destinations the player could fly to today (open in this year, a vehicle with capacity for it and a craft that
+ * serves it): no Pluto window in 1950, no Psyche in 1976. null when the catalog cannot be read (old data).
+ */
+function usableDestinations(store) {
+  const st = store.state;
+  const data = store.data;
+  if (!data?.vehicles?.vehicles || !st) return null;
+  const year = (st.startYear ?? 0) + Math.floor((st.turn ?? 0) / 52);
+  let vs, scs;
+  try {
+    vs = listVehicles(data, st, { turn: st.turn, actorId: st.playerId });
+    scs = listSpacecraft(data, st, { turn: st.turn, actorId: st.playerId });
+  } catch { return null; }
+  const access = (x) => !x.calendarOnly && (x.access !== 'own' || !x.operator || x.operator === st.playerId);
+  vs = vs.filter(access);
+  scs = scs.filter(access);
+  return (d) => {
+    if (d.fromYear != null && year < d.fromYear) return false;
+    if (d.untilYear != null && year > d.untilYear) return false;
+    const cap = Math.max(0, ...vs.map((v) => Number(v.capacity?.[d.capacityKey] || 0) * (d.capacityFactor || 1)));
+    if (!(cap > 0)) return false;
+    const want = d.kind === 'surface' ? ['lander'] : ['probe', 'satellite'];
+    return scs.some((s) => (s.destinations?.length ? s.destinations.includes(d.id) : want.includes(s.kind)) && (Number(s.massT) || 0) <= cap);
+  };
 }
 
 /** Fallback: earliest destination window from data (period/phase/open weeks), optionally only for some destinations. */

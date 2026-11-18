@@ -1,0 +1,6 @@
+{
+  "note": "Ciclo de vida da era 4 (meses base 0). De 2026 a 2030 nada muda; depois, só projeções.",
+  "events": [
+    {"id":"ilrsco_born","date":{"year":2031,"month":3},"op":"birth","actor":"ilrsco","truthLayer":"projecao"}
+  ]
+}

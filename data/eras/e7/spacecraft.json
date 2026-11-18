@@ -1,0 +1,92 @@
+{
+  "_comment": "Naves da era 7 (Galáctica, 2600–2999, especulação). Mesmo formato de data/spacecraft.json. Os tipos 'interstellar_ship'/'generation_ship' do vocabulário ainda são reservados: as naves entre estrelas usam 'habitat' (tripuladas) e 'probe' (robóticas). 'crew' conta a tripulação de comando; os colonos dormem no porão. Dono: C7.",
+  "monthBase": 1,
+  "spacecraft": [
+    {
+      "id": "capsula_aurora", "name": "Cápsula Aurora", "operator": "diretorio_solar", "provider": "Diretório Solar", "kind": "capsule", "crew": 6,
+      "massT": 45, "costM": 120, "availableFrom": { "year": 2601, "month": 4 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.99,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["leo", "lunar_surface", "mars_surface"],
+      "compatibleVehicles": ["lanca_aurora", "cargueiro_vega", "lanterna_ouvintes", "ultimo_feixe"], "access": "open",
+      "notes": "Seis lugares, casco de diamante crescido e um sistema de escape que nunca precisou ser usado. Táxi entre os mundos do Sol."
+    },
+    {
+      "id": "cargueiro_sombra", "name": "Cargueiro Sombra", "operator": "casa_vega", "provider": "Casa de Vega", "kind": "cargo", "crew": 0,
+      "massT": 400, "costM": 650, "availableFrom": { "year": 2610, "month": 8 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.98,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["mars_surface", "eridani_82_c_surface", "gliese_667c_c_surface", "trappist_1e_surface", "trappist_1f_orbit"],
+      "compatibleVehicles": ["lanca_aurora", "cargueiro_vega", "arco_bussard", "ultimo_feixe"], "access": "open",
+      "notes": "Um casco escuro que viaja sozinho por décadas levando sementes, peças e livros. Chega quando os netos de quem pediu já estão no comando."
+    },
+    {
+      "id": "arca_concordia", "name": "Arca Concórdia", "operator": "diretorio_solar", "provider": "Estaleiro de Ceres", "kind": "habitat", "crew": 12,
+      "massT": 580, "costM": 2600, "availableFrom": { "year": 2612, "month": 5 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.97,
+      "history": { "flights": 0, "failures": 0 },
+      "destinations": ["eridani_82_c_surface", "gliese_581_system", "gliese_667c_system", "gliese_667c_c_surface", "trappist_1_system", "trappist_1e_surface", "trappist_1f_orbit"],
+      "compatibleVehicles": ["cargueiro_vega", "arco_bussard", "ultimo_feixe"], "access": "open",
+      "notes": "Doze acordados e quatro mil dormindo. A arca leva sementes de trezentas espécies e uma biblioteca que ninguém a bordo terá tempo de ler."
+    },
+    {
+      "id": "semente_arquivo", "name": "Sonda-Semente", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "probe", "crew": 0,
+      "massT": 14, "costM": 700, "availableFrom": { "year": 2615, "month": 3 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.97,
+      "history": { "flights": 0, "failures": 0 },
+      "destinations": ["altair_system", "gliese_581_system", "vega_system", "fomalhaut_system", "trappist_1_system", "region_hyades"],
+      "compatibleVehicles": ["seta_arquivo", "lanca_aurora", "lanterna_ouvintes"], "access": "open",
+      "notes": "Uma sonda do tamanho de um piano que fabrica as próprias antenas ao chegar. Leva uma cópia comprimida do Arquivo inteiro."
+    },
+    {
+      "id": "pousador_brisa", "name": "Pousador Brisa", "operator": "diretorio_solar", "provider": "Diretório Solar", "kind": "lander", "crew": 0,
+      "massT": 60, "costM": 450, "availableFrom": { "year": 2620, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.97,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["eridani_82_c_surface", "gliese_667c_c_surface", "trappist_1e_surface"],
+      "compatibleVehicles": ["lanca_aurora", "cargueiro_vega", "seta_arquivo"], "access": "open",
+      "notes": "Pousador robótico que prepara o terreno: acha água, ergue o primeiro abrigo e acende o farol para quem vem depois."
+    },
+    {
+      "id": "capsula_memoria", "name": "Cápsula de Memória", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "probe", "crew": 0,
+      "massT": 8, "costM": 300, "availableFrom": { "year": 2640, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.98,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["altair_system", "gliese_581_system", "vega_system", "fomalhaut_system"],
+      "compatibleVehicles": ["seta_arquivo", "lanca_aurora"], "access": "open",
+      "notes": "Cristal, chumbo e um bilhete na primeira página: \"para quem chegar depois de nós\". O Arquivo semeia memórias como quem semeia árvores."
+    },
+    {
+      "id": "rebocador_vega", "name": "Rebocador de Coleta", "operator": "casa_vega", "provider": "Casa de Vega", "kind": "tug", "crew": 0,
+      "massT": 300, "costM": 800, "availableFrom": { "year": 2640, "month": 6 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.97,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["vega_system", "fomalhaut_system", "altair_system"],
+      "compatibleVehicles": ["cargueiro_vega", "lanca_aurora"], "access": "open",
+      "notes": "Vai às estrelas brancas montar coletores de antimatéria no vento estelar. Volta, quando volta, um século depois."
+    },
+    {
+      "id": "vigia_kuiper", "name": "Vigia de Kuiper", "operator": "ordem_ouvintes", "provider": "Ordem dos Ouvintes", "kind": "station_module", "crew": 3,
+      "massT": 260, "costM": 900, "availableFrom": { "year": 2692, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.98,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["kuiper", "altair_system", "fomalhaut_system"],
+      "compatibleVehicles": ["lanterna_ouvintes", "lanca_aurora", "cargueiro_vega"], "access": "open",
+      "notes": "Uma estação de escuta para três monges e uma antena de quilômetros. O frio de Kuiper deixa o céu mais nítido, e mais solitário."
+    },
+    {
+      "id": "olho_da_lente", "name": "Olho da Lente", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "satellite", "crew": 0,
+      "massT": 90, "costM": 1400, "availableFrom": { "year": 2700, "month": 6 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.97,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["region_sgr_a"],
+      "compatibleVehicles": ["seta_arquivo", "lanca_aurora", "lanterna_ouvintes"], "access": "open",
+      "notes": "Um telescópio que viaja até a linha focal do Sol e usa a estrela inteira como lente. Vê o centro da galáxia como se estivesse ali."
+    },
+    {
+      "id": "cidade_paciencia", "name": "Cidade-Nave Paciência", "operator": "frota_lenta", "provider": "Frota Lenta", "kind": "habitat", "crew": 12,
+      "massT": 1400, "costM": 5200, "availableFrom": { "year": 2722, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.96,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["region_hyades", "trappist_1_system", "gliese_667c_system"],
+      "compatibleVehicles": ["arco_bussard"], "access": "open",
+      "notes": "Uma cidade em forma de cilindro com rio, escola e cemitério. Quem nasce aqui aprende que o chão gira e que o destino é a parte menos importante."
+    },
+    {
+      "id": "nave_espelho", "name": "Nave Espelho", "operator": "diretorio_solar", "provider": "Estaleiros do Anel de Quito", "kind": "habitat", "crew": 8,
+      "massT": 700, "costM": 4200, "availableFrom": { "year": 2813, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.97,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["region_hyades", "trappist_1e_surface", "gliese_667c_c_surface", "vega_system"],
+      "compatibleVehicles": ["ultimo_feixe"], "access": "open",
+      "notes": "Casco espelhado contra o feixe de antimatéria e oito tripulantes que envelhecem metade do que os parentes em casa."
+    },
+    {
+      "id": "farol_coro", "name": "Farol do Coro", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "satellite", "crew": 0,
+      "massT": 200, "costM": 1500, "availableFrom": { "year": 2960, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.98,
+      "history": { "flights": 0, "failures": 0 }, "destinations": ["kuiper", "region_sgr_a"],
+      "compatibleVehicles": ["seta_arquivo", "lanca_aurora", "lanterna_ouvintes", "ultimo_feixe"], "access": "open",
+      "notes": "O maior transmissor já feito, pensado para uma única pergunta: se alguém responder ao Silêncio, que seja com a nossa voz."
+    }
+  ]
+}

@@ -57,11 +57,16 @@ export function yearsOf(sc) {
   return a && b ? `${a} a ${b}` : sc?.subtitle || '';
 }
 
+/** True once the player has reached an ending of the campaign (unlocks 'locked' scenarios such as O Grande Silêncio). */
+export function campaignDone() {
+  try { return globalThis.localStorage?.getItem('adastra.campaign.done') === '1'; } catch { return false; }
+}
+
 /** Split the scenario list into the campaign and the short scenarios (Corrida Lunar first among those). */
 export function titleModes(list) {
   const all = Array.isArray(list) ? list.filter(Boolean) : [];
   const campaign = all.find((x) => x.kind === 'campaign' || x.id === 'campaign') || null;
-  const scenarios = all.filter((x) => x !== campaign && !x.locked)
+  const scenarios = all.filter((x) => x !== campaign && (!x.locked || campaignDone()))
     .sort((a, b) => (a.id === 'lunar_race' ? -1 : b.id === 'lunar_race' ? 1 : 0) || (a.start?.year ?? a.startYear ?? 0) - (b.start?.year ?? b.startYear ?? 0));
   return { campaign, scenarios };
 }

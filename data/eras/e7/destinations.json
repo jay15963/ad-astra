@@ -1,0 +1,145 @@
+{
+  "_comment": "Destinos da era 7 (Galáctica, 2600–2999, especulação). Mesmo formato de data/destinations.json. Ids das famílias interestelares do vocabulário (core/vocab.json destinationFamilies, a partir de core/stars.json). Trânsitos em semanas de calendário da Terra, com cruzeiro entre 0,2 e 0,3 c (fusão catalisada por antimatéria) e cerca de 0,5 c para as Híades (estatorreator, três séculos de viagem). Sem janela: entre as estrelas, a porta está sempre aberta e sempre longe. Dono: C7.",
+  "monthBase": 1,
+  "routeNodes": [
+    { "id": "cruzeiro_relativistico", "name": "Cruzeiro relativístico" },
+    { "id": "linha_focal_solar", "name": "Linha focal do Sol (650 UA)" }
+  ],
+  "destinations": [
+    { "id": "altair_system", "name": "Sistema de Altair", "emLabel": "em Altair", "toLabel": "a Altair", "short": "Altair",
+      "body": "altair", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.6,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "altair_system", "dv": 60000 }],
+      "transitWeeks": 3640, "window": null, "missionTypes": ["probe", "crewed", "station"], "risk": 0.12, "prestige": 70, "scienceMult": 4,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem contra o vento de Altair", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
+          "radio": ["Setenta anos de viagem e a frenagem começa no horário.", "A estrela gira tão depressa que é achatada como uma lentilha."] }
+      ],
+      "description": "Uma estrela branca que gira em menos de nove horas, a 16,7 anos-luz. Sem planetas conhecidos: por isso mesmo, um ótimo posto de escuta." },
+    { "id": "eridani_82_c_surface", "name": "Superfície de 82 Eridani c", "emLabel": "em 82 Eridani c", "toLabel": "a 82 Eridani c", "short": "82 Eri c",
+      "body": "eridani_82_c", "kind": "surface", "capacityKey": "outer", "capacityFactor": 0.5,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "eridani_82_c_surface", "dv": 60012 }],
+      "transitWeeks": 4264, "window": null, "missionTypes": ["lander", "crewed", "cargo"], "risk": 0.14, "prestige": 75, "scienceMult": 4.2,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem e captura", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
+          "radio": ["Captura em órbita de 82 Eridani c.", "O sol aqui é amarelo como o nosso, só mais velho."] },
+        { "id": "touchdown", "label": "Pouso numa super-Terra quente", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.3, "structure": 0.3, "software": 0.2, "human": 0.05, "environment": 0.15 },
+          "radio": ["Gravidade de 1,6 g no pouso.", "Rochas vitrificadas até o horizonte."] }
+      ],
+      "description": "Uma super-Terra quente ao redor de uma estrela parecida com o Sol, a 19,7 anos-luz. Pesada demais para quem nasceu na Lua." },
+    { "id": "gliese_581_system", "name": "Sistema de Gliese 581", "emLabel": "em Gliese 581", "toLabel": "a Gliese 581", "short": "GJ 581",
+      "body": "gliese_581", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.6,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "gliese_581_system", "dv": 60000 }],
+      "transitWeeks": 4420, "window": null, "missionTypes": ["probe", "crewed", "cargo", "station"], "risk": 0.12, "prestige": 70, "scienceMult": 4,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem no sistema", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
+          "radio": ["Gliese 581 à frente, vermelha e calma.", "Três planetas no radar, nenhum como nos livros antigos."] }
+      ],
+      "description": "Uma anã vermelha a 20,5 anos-luz que já teve mais planetas nos catálogos do que no céu. Hoje é cruzamento de rotas." },
+    { "id": "gliese_667c_system", "name": "Sistema de Gliese 667C", "emLabel": "em Gliese 667C", "toLabel": "a Gliese 667C", "short": "GJ 667C",
+      "body": "gliese_667c", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.6,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "gliese_667c_system", "dv": 60000 }],
+      "transitWeeks": 5096, "window": null, "missionTypes": ["probe", "crewed", "cargo", "station"], "risk": 0.12, "prestige": 72, "scienceMult": 4,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem entre três sóis", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.45, "structure": 0.2, "software": 0.25, "human": 0, "environment": 0.1 },
+          "radio": ["Duas estrelas laranja no céu, e a nossa vermelha mais perto.", "Navegação recalculando para o sistema triplo."] }
+      ],
+      "description": "Uma anã vermelha com duas companheiras laranja, a 23,6 anos-luz. O céu da colônia nunca escurece de todo." },
+    { "id": "gliese_667c_c_surface", "name": "Superfície de Gliese 667 Cc", "emLabel": "em Gliese 667 Cc", "toLabel": "a Gliese 667 Cc", "short": "667 Cc",
+      "body": "gliese_667c_c", "kind": "surface", "capacityKey": "outer", "capacityFactor": 0.5,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "gliese_667c_c_surface", "dv": 60012 }],
+      "transitWeeks": 5148, "window": null, "missionTypes": ["lander", "crewed", "cargo"], "risk": 0.15, "prestige": 78, "scienceMult": 4.4,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem e captura", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
+          "radio": ["Órbita de Cc estável.", "A Liga mandou um farol para guiar a descida."] },
+        { "id": "touchdown", "label": "Pouso sob três sóis", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.3, "structure": 0.3, "software": 0.2, "human": 0.05, "environment": 0.15 },
+          "radio": ["Contato com o solo. Pesamos o dobro aqui.", "O musgo vermelho cobre tudo até as montanhas."] }
+      ],
+      "firsts": { "crewed": "exoplanet_crewed_landing" },
+      "description": "Uma super-Terra na zona habitável, travada de frente para a sua estrela. Colônia desde o fim do século XXVII." },
+    { "id": "vega_system", "name": "Sistema de Vega", "emLabel": "em Vega", "toLabel": "a Vega", "short": "Vega",
+      "body": "vega", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.6,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "vega_system", "dv": 60000 }],
+      "transitWeeks": 5408, "window": null, "missionTypes": ["probe", "crewed", "station"], "risk": 0.13, "prestige": 74, "scienceMult": 4.2,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem no disco de poeira", "pFail": 0.06, "anomalyBand": 0.1,
+          "failureWeights": { "propulsion": 0.4, "structure": 0.35, "software": 0.15, "human": 0, "environment": 0.1 },
+          "radio": ["Poeira do disco batendo no escudo de proa.", "Vega brilha quarenta vezes mais que o Sol. Os filtros aguentam."] }
+      ],
+      "description": "A estrela que deu nome à Casa de Vega, a 25 anos-luz: branca, jovem, cercada por um disco de poeira largo e liso demais." },
+    { "id": "fomalhaut_system", "name": "Sistema de Fomalhaut", "emLabel": "em Fomalhaut", "toLabel": "a Fomalhaut", "short": "Fomalhaut",
+      "body": "fomalhaut", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.6,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "fomalhaut_system", "dv": 60000 }],
+      "transitWeeks": 5460, "window": null, "missionTypes": ["probe", "station"], "risk": 0.13, "prestige": 72, "scienceMult": 4.2,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem diante do anel", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.45, "structure": 0.3, "software": 0.15, "human": 0, "environment": 0.1 },
+          "radio": ["O anel de gelo de Fomalhaut ocupa o céu inteiro da proa.", "Nenhum planeta onde os mapas antigos diziam haver um."] }
+      ],
+      "description": "Uma estrela branca a 25 anos-luz com um anel de gelo e poeira tão nítido que parece desenhado. Ninguém mora aqui; muitos escutam." },
+    { "id": "trappist_1_system", "name": "Sistema TRAPPIST-1", "emLabel": "em TRAPPIST-1", "toLabel": "a TRAPPIST-1", "short": "Trappist",
+      "body": "trappist_1", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.6,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 75000 }, { "from": "cruzeiro_relativistico", "to": "trappist_1_system", "dv": 75000 }],
+      "transitWeeks": 8580, "window": null, "missionTypes": ["probe", "crewed", "cargo", "station"], "risk": 0.13, "prestige": 76, "scienceMult": 4.4,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem na anã ultrafria", "pFail": 0.05, "anomalyBand": 0.09,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
+          "radio": ["Cento e sessenta anos depois, a anã vermelha cresce na proa.", "Sete mundos alinhados como contas de um colar."] }
+      ],
+      "description": "Sete planetas rochosos ao redor de uma anã ultrafria, a 40,7 anos-luz. Uma carta daqui leva quarenta anos para chegar em casa." },
+    { "id": "trappist_1e_surface", "name": "Superfície de TRAPPIST-1 e", "emLabel": "em TRAPPIST-1 e", "toLabel": "a TRAPPIST-1 e", "short": "Trappist-1e",
+      "body": "trappist_1e", "kind": "surface", "capacityKey": "outer", "capacityFactor": 0.5,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 75000 }, { "from": "cruzeiro_relativistico", "to": "trappist_1e_surface", "dv": 75008 }],
+      "transitWeeks": 8632, "window": null, "missionTypes": ["lander", "crewed", "cargo"], "risk": 0.14, "prestige": 80, "scienceMult": 4.5,
+      "arrivalMilestones": [
+        { "id": "braking", "label": "Frenagem e captura", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
+          "radio": ["Captura em órbita de 1e.", "A Concórdia acendeu o farol do porto."] },
+        { "id": "touchdown", "label": "Pouso na faixa do crepúsculo", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.3, "structure": 0.3, "software": 0.2, "human": 0.05, "environment": 0.15 },
+          "radio": ["Pouso na faixa onde o dia nunca termina nem começa.", "Os vizinhos pequenos atravessam o céu a olho nu."] }
+      ],
+      "description": "O mundo mais parecido com a Terra do sistema: travado, com um lado sempre de dia e uma faixa de crepúsculo onde mora a colônia." },
+    { "id": "trappist_1f_orbit", "name": "Órbita de TRAPPIST-1 f", "emLabel": "na órbita de TRAPPIST-1 f", "toLabel": "à órbita de TRAPPIST-1 f", "short": "Trappist-1f",
+      "body": "trappist_1f", "kind": "orbit", "capacityKey": "outer", "capacityFactor": 0.55,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 75000 }, { "from": "cruzeiro_relativistico", "to": "trappist_1f_orbit", "dv": 75004 }],
+      "transitWeeks": 8600, "window": null, "missionTypes": ["probe", "station", "cargo", "crewed"], "risk": 0.12, "prestige": 70, "scienceMult": 4,
+      "arrivalMilestones": [
+        { "id": "capture", "label": "Captura em órbita de 1f", "pFail": 0.04, "anomalyBand": 0.08,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
+          "radio": ["Órbita de 1f estável. Oceano de gelo abaixo.", "Estaleiro orbital à vista."] }
+      ],
+      "description": "Um mundo de gelo e água sob a crosta, onde a Concórdia quer erguer o próprio estaleiro orbital, longe das encomendas do Sol." },
+    { "id": "region_hyades", "name": "Aglomerado das Híades", "emLabel": "nas Híades", "toLabel": "às Híades", "short": "Híades",
+      "body": "hyades", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.4,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 180000 }, { "from": "cruzeiro_relativistico", "to": "region_hyades", "dv": 180000 }],
+      "transitWeeks": 15960, "window": null, "missionTypes": ["probe", "crewed", "cargo"], "risk": 0.2, "prestige": 95, "scienceMult": 6,
+      "arrivalMilestones": [
+        { "id": "ramscoop_off", "label": "Desligar o funil do estatorreator", "pFail": 0.06, "anomalyBand": 0.1,
+          "failureWeights": { "propulsion": 0.5, "structure": 0.25, "software": 0.15, "human": 0.05, "environment": 0.05 },
+          "radio": ["Funil magnético recolhido. Velocidade caindo de 0,5 c.", "O aglomerado inteiro na proa: centenas de sóis da mesma idade."] },
+        { "id": "first_light", "label": "Primeira luz nas Híades", "pFail": 0.03, "anomalyBand": 0.07,
+          "failureWeights": { "propulsion": 0.1, "structure": 0.2, "software": 0.3, "human": 0.2, "environment": 0.2 },
+          "radio": ["Chegamos. Ninguém nos espera, e ninguém nos responde.", "Daqui, o céu inteiro está quieto. Não sabemos se esta voz sai."] }
+      ],
+      "firsts": { "robotic": "first_probe_beyond_local_bubble", "crewed": "first_colony_beyond_100ly" },
+      "description": "Um aglomerado de centenas de estrelas irmãs a 153 anos-luz, na borda da Bolha Local, na direção de onde vem o Silêncio. Mesmo o estatorreator, à metade da velocidade da luz, leva três séculos: quem parte depois de 2700 só chega depois de 3000, e a borda chega antes." },
+    { "id": "region_sgr_a", "name": "Sagitário A* (pela lente do Sol)", "emLabel": "na linha focal apontada para o centro galáctico", "toLabel": "à linha focal do centro galáctico", "short": "Centro galáctico",
+      "body": "sgr_a", "kind": "interstellar", "capacityKey": "outer", "capacityFactor": 0.8,
+      "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "linha_focal_solar", "dv": 900 }],
+      "transitWeeks": 156, "window": null, "missionTypes": ["satellite", "probe", "station"], "risk": 0.08, "prestige": 80, "scienceMult": 5,
+      "arrivalMilestones": [
+        { "id": "alignment", "label": "Alinhamento com a linha focal", "pFail": 0.03, "anomalyBand": 0.07,
+          "failureWeights": { "propulsion": 0.3, "structure": 0.1, "software": 0.5, "human": 0, "environment": 0.1 },
+          "radio": ["Seiscentas e cinquenta unidades astronômicas. O Sol vira uma lente.", "O anel de Einstein do centro da galáxia aparece no espelho."] }
+      ],
+      "firsts": { "robotic": "first_galactic_core_image" },
+      "description": "Não se vai ao centro da galáxia: aponta-se para ele. Um telescópio a 650 UA usa a gravidade do Sol como lente e vê Sagitário A*, a 26 mil anos-luz." }
+  ]
+}

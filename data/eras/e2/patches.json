@@ -1,0 +1,169 @@
+{
+ "_comment": "Remendos do pacote e2 (aplicados só com a era carregada): âncoras dos destinos novos no mapa e metas da IA na era 2 (lineages.eraProfiles.e2.ai.goals, lidas por simtime.aiGoals). As metas evitam os marcos que o calendário real entrega na data certa, para que as missões livres da IA não antecipem a história.",
+ "bodies": [
+  {
+   "$op": "patch",
+   "id": "earth",
+   "destinations": [
+    {
+     "id": "mir",
+     "anchor": "ring",
+     "r": 11.4,
+     "angle": 80,
+     "label": "Mir"
+    },
+    {
+     "id": "meo",
+     "anchor": "ring",
+     "r": 16,
+     "angle": 260,
+     "label": "Órbita média"
+    },
+    {
+     "id": "sun_earth_l1",
+     "anchor": "ring",
+     "r": 24,
+     "angle": 0,
+     "label": "L1"
+    }
+   ]
+  },
+  {
+   "$op": "patch",
+   "id": "sun",
+   "destinations": [
+    {
+     "id": "solar_polar",
+     "anchor": "ring",
+     "r": 120,
+     "angle": 90,
+     "tilt": 0.9,
+     "label": "Polos do Sol"
+    }
+   ]
+  },
+  {
+   "$op": "patch",
+   "id": "asteroid_belt",
+   "destinations": [
+    {
+     "id": "asteroid_flyby",
+     "anchor": "ring",
+     "r": 0,
+     "angle": 40,
+     "label": "Asteroide"
+    }
+   ]
+  },
+  {
+   "$op": "patch",
+   "id": "jupiter",
+   "destinations": [
+    {
+     "id": "jupiter_atmosphere",
+     "anchor": "surface",
+     "angle": 330,
+     "label": "Nuvens de Júpiter"
+    }
+   ]
+  },
+  {
+   "$op": "patch",
+   "id": "saturn",
+   "destinations": [
+    {
+     "id": "saturn_flyby",
+     "anchor": "ring",
+     "r": 60,
+     "angle": 300,
+     "label": "Sobrevoo de Saturno"
+    }
+   ]
+  },
+  {
+   "$op": "patch",
+   "id": "uranus",
+   "destinations": [
+    {
+     "id": "uranus_flyby",
+     "anchor": "ring",
+     "r": 24,
+     "angle": 20,
+     "label": "Sobrevoo de Urano"
+    }
+   ]
+  }
+ ],
+ "lineages": [
+  {
+   "$op": "patch",
+   "id": "nasa",
+   "eraProfiles": {
+    "e2": {
+     "ai": { "goals": [ "mars_orbit", "venus_orbit", "mars_landing_robotic" ]
+     }
+    }
+   }
+  },
+  {
+   "$op": "patch",
+   "id": "roscosmos",
+   "eraProfiles": {
+    "e2": {
+     "ai": { "goals": [ "national_station", "venus_orbit", "mars_orbit" ]
+     }
+    }
+   }
+  },
+  {
+   "$op": "patch",
+   "id": "esa",
+   "eraProfiles": {
+    "e2": {
+     "ai": { "goals": [ "crewed_orbit_national:esa", "venus_orbit" ]
+     }
+    }
+   }
+  },
+  {
+   "$op": "patch",
+   "id": "cnsa",
+   "eraProfiles": {
+    "e2": {
+     "ai": { "goals": [ "crewed_orbit_national:cnsa", "lunar_orbit_robotic" ]
+     }
+    }
+   }
+  },
+  {
+   "$op": "patch",
+   "id": "isro",
+   "eraProfiles": {
+    "e2": {
+     "ai": { "goals": [ "crewed_orbit_national:isro", "lunar_orbit_robotic" ]
+     }
+    }
+   }
+  },
+  {
+   "$op": "patch",
+   "id": "jaxa",
+   "eraProfiles": {
+    "e2": {
+     "ai": { "goals": [ "lunar_orbit_robotic", "mars_orbit" ]
+     }
+    }
+   }
+  },
+  {
+   "$op": "patch",
+   "id": "isas",
+   "eraProfiles": {
+    "e2": {
+     "ai": { "goals": [ "lunar_orbit_robotic", "venus_flyby" ]
+     }
+    }
+   }
+  }
+ ]
+}

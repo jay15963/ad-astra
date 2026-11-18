@@ -1,0 +1,45 @@
+/* Era 4 — A Década Lunar (2026–2050): palette "prata".
+   Poeira lunar, regolito cinza-prata, a Terra azul baixa no horizonte. E4 é o visual de referência do jogo
+   (styles.css: body, body[data-era="4"], body[data-era="e4"]), então este bloco NÃO troca a ação âmbar nem os
+   textos: só o tom das superfícies (um cinza um pouco mais frio), as linhas prateadas e uma textura discreta.
+   Token block only (DESIGN.md: era skins change accent, texture and surface tone; the system stays the same).
+   Hooked by src/ui/app.js syncEra() → body[data-era="e4"]. */
+body[data-era="e4"] {
+  /* surfaces, back to front: the base greys with a faint cold, lunar cast */
+  --s0: #070709;
+  --s1: #0c0c10;
+  --s2: #121217;
+  --s3: #17171d;
+  --s4: #1e1e26;
+  --line: #1c1c23;
+  --line-strong: #2b2b35;
+
+  /* silver: the era's secondary accent (chips, info, map rings); amber stays the action colour */
+  --silver: #c3c8d2;
+  --silver-bg: #c3c8d212;
+  --silver-line: #c3c8d23a;
+  --info: #8aa9c8;
+  --info-bg: #8aa9c816;
+  --info-line: #8aa9c840;
+
+  /* texture: regolith grain and Earthlight low on the horizon */
+  --grid: #c3c8d206;
+  background-image:
+    radial-gradient(110% 55% at 50% 118%, #2a4a7a2e 0%, transparent 62%),
+    radial-gradient(circle at 18% 12%, #ffffff05 0 1px, transparent 1.5px),
+    radial-gradient(circle at 72% 64%, #ffffff04 0 1px, transparent 1.5px);
+  background-size: auto, 23px 23px, 31px 31px;
+  background-attachment: fixed;
+}
+
+/* era scene (src/ui/era-scene.js): the transition into and out of the Lunar Decade gets a regolith floor */
+body[data-era="e4"] .era-cena {
+  background-image:
+    linear-gradient(180deg, transparent 62%, #c3c8d20d 100%),
+    repeating-linear-gradient(170deg, #ffffff03 0 1px, transparent 1px 6px);
+}
+body[data-era="e4"] .era-pontos span.atual { background: var(--silver); }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-era="e4"] { background-attachment: scroll; }
+}

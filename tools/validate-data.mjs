@@ -49,12 +49,32 @@ export function loadRepoInput(root = ROOT) {
     else if (!r.error) parseErrors.push({ level: 'error', pack: 'scenarios', path: file, message: 'arquivo de cenário não existe' });
   }
   const scenarioIndex = readJson('scenarios/index').json ?? null;
+  // shared vocabulary (C0): core/vocab.json + core/stars.json + per-era requests; tool-only files (not in packs.json)
+  const tool = (rel, pack) => {
+    const r = readJson(rel);
+    if (r.error) parseErrors.push({ level: 'error', pack, path: `${rel}.json`, message: r.error });
+    return r.json;
+  };
+  const vocab = tool('core/vocab', 'core');
+  const stars = tool('core/stars', 'core');
+  const vocabRequests = {};
+  for (const p of manifest.packs || []) {
+    if (!p.era || p.always) continue;
+    const j = tool(`${p.dir || ''}vocab-requests`, p.id);
+    if (j !== undefined) vocabRequests[p.era] = j;
+  }
+  const extraCore = {};
+  for (const name of ['eco', 'colonies']) {
+    const listed = (manifest.packs || []).some((p) => p.id === 'core' && (p.files || []).includes(name));
+    const j = listed ? undefined : tool(`core/${name}`, 'core');
+    if (j !== undefined) extraCore[name] = j;
+  }
   const schemas = {};
   const sdir = path.join(dataDir, 'core', 'schemas');
   if (fs.existsSync(sdir)) {
     for (const f of fs.readdirSync(sdir)) if (f.endsWith('.schema.json')) schemas[f] = JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'));
   }
-  return { input: { manifest: m.json, packs, sizes, scenarios, scenarioIndex, schemas }, parseErrors };
+  return { input: { manifest: m.json, packs, sizes, scenarios, scenarioIndex, schemas, vocab, stars, vocabRequests, extraCore }, parseErrors };
 }
 
 /** Load + check. Returns {issues, density, stats}. */
@@ -84,6 +104,8 @@ function main(argv) {
         console.log(rows.join('\n'));
       }
       console.log(`\n${r.stats.entities ?? 0} entidades em ${r.stats.packs ?? 0} pacotes; dados de partida ≈ ${((r.stats.bootBytes ?? 0) / 1024).toFixed(0)} KB.`);
+      const vc = r.stats.vocab?.counts;
+      if (vc) console.log(`Vocabulário (core/vocab.json): ${vc.destinations} destinos, ${vc.milestones} marcos, ${vc.ecoFragments} fragmentos do Eco; ${r.stats.vocab.provisional} id(s) provisório(s) pedidos pelas eras.`);
     }
     console.log(errors.length ? `\n${errors.length} erro(s).` : '\nDados válidos.');
   }

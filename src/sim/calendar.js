@@ -463,7 +463,7 @@ export function prerequisiteStatus(state, data, calendarId) {
 /** 'done' | 'pending' | 'failed' | 'cancelled' | 'missing' for any calendar item, rival or player-owned. */
 function itemProgress(state, data, id) {
   const inst = calendarInstance(state, id);
-  if (!inst) return 'missing';
+  if (!inst) return PAST_PROGRESS[String(state.calendarPast?.[id] ?? '')[0]] || 'missing';
   if (DONE.includes(inst.status)) return 'done';
   if (inst.status === 'cancelled') return 'cancelled';
   if (inst.status === 'failed') return 'failed';
@@ -523,21 +523,52 @@ function newInstance(state, data, item) {
   };
 }
 
+/**
+ * Campaign instantiation horizon (docs/EXPANSION.md §4.2 determinism, §10): items and vehicle stats enter the state
+ * only when their date is within CAMPAIGN_HORIZON weeks, so the result never depends on which era packs are loaded
+ * (the browser preloads the next era at 85% of the current one, ≥ 3.6 years before it starts). Fixed scenarios load
+ * all their eras up front and keep instantiating everything at once (the Corrida Lunar golden world).
+ */
+const CAMPAIGN_HORIZON = 3 * WEEKS_PER_YEAR;
+const PLAN_TURNS = new WeakMap();
+function horizonTurn(state, data) {
+  return data?.scenario?.kind === 'campaign' ? (state.turn ?? 0) + CAMPAIGN_HORIZON : Infinity;
+}
+/** Earliest turn an entity matters for the horizon: launch (or real launch of an in-transit probe), availability. */
+function planTurnOf(state, data, x, kind) {
+  let m = PLAN_TURNS.get(x);
+  const sy = startYearOf(state, data);
+  if (m && m.sy === sy) return m.t;
+  let t;
+  if (kind === 'item') {
+    const p = turnOfDate(x.planned, sy, data) ?? -Infinity;
+    t = !x.inTransit ? p : Math.min(p, turnOfDate(x.launched, sy, data) ?? p - Math.max(1, destinationById(data, x.destination)?.transitWeeks || 1));
+  } else {
+    t = turnOfDate(x.availableFrom, sy, data) ?? (x.fromYear != null ? (x.fromYear - sy) * WEEKS_PER_YEAR : -Infinity);
+  }
+  PLAN_TURNS.set(x, { sy, t });
+  return t;
+}
+
 function ensureSlices(state, data) {
   if (!state.vehicleStats || typeof state.vehicleStats !== 'object') state.vehicleStats = {};
+  const horizon = horizonTurn(state, data);
   for (const v of vehiclesOf(data)) {
-    if (!state.vehicleStats[v.id]) {
+    if (!state.vehicleStats[v.id] && planTurnOf(state, data, v, 'vehicle') <= horizon) {
       state.vehicleStats[v.id] = { ...emptyStats(), flights: v.history?.flights || 0, failures: v.history?.failures || 0, standDownWeeks: v.standDownWeeks ?? 12 };
     }
   }
   certSlice(state); // old saves (v0.2/v0.3): no crew certification yet
   if (!Array.isArray(state.calendar)) state.calendar = [];
   const have = new Set(state.calendar.map((c) => c.id));
+  for (const id of Object.keys(state.calendarPast || {})) have.add(id); // compacted history is never re-instantiated
   for (const item of itemsOf(data)) {
-    if (have.has(item.id)) continue;
+    if (have.has(item.id) || planTurnOf(state, data, item, 'item') > horizon) continue;
     const inst = newInstance(state, data, item);
     // an old save meets a probe that was added later and already arrived: it is history, not news
     if (inst.inTransit && inst.arrivalTurn < (state.turn ?? 0)) settleAsHistory(state, data, inst, item);
+    // a scenario that starts mid-history (§2.1): items dated before the start are history, never launches or mandates
+    else if (!inst.inTransit && inst.plannedTurn < 0 && data?.scenario?.id !== 'lunar_race') settleBeforeStart(state, data, inst, item);
     state.calendar.push(inst);
   }
 }
@@ -555,6 +586,24 @@ function settleAsHistory(state, data, inst, item) {
   for (const mid of milestonesFor(state, data, item)) {
     if (state.firsts[mid]) continue;
     state.firsts[mid] = isHistoricFirst(state, mid) ? { actorId: item.owner, turn, era: true } : { actorId: item.owner, turn };
+  }
+}
+
+/** An item dated before the scenario start: its real outcome at its real date, firsts kept if unclaimed, no news. */
+function settleBeforeStart(state, data, inst, item) {
+  const h = item.historicalOutcome;
+  const level = h === 'failure' ? 'failure' : h === 'partial' ? 'partial' : 'total';
+  inst.status = level === 'failure' ? 'failed' : level === 'partial' ? 'partial' : 'success';
+  inst.outcome = { level, failureType: null, phase: 'arrival' };
+  inst.launchTurn = inst.plannedTurn;
+  inst.currentTurn = inst.plannedTurn;
+  inst.resolvedTurn = inst.plannedTurn;
+  inst.history.push({ turn: inst.plannedTurn, level, phase: 'ascent', attempt: 0, vehicleOk: level !== 'failure', craftJudged: true, retro: true });
+  if (level === 'failure') return;
+  state.firsts = state.firsts || {};
+  for (const mid of milestonesFor(state, data, item)) {
+    if (state.firsts[mid]) continue;
+    state.firsts[mid] = isHistoricFirst(state, mid) ? { actorId: item.owner, turn: inst.plannedTurn, era: true } : { actorId: item.owner, turn: inst.plannedTurn };
   }
 }
 
@@ -609,6 +658,9 @@ export function tick(state, data, ctx) {
 //   flights: {actorId: {destId: n}}, react, raced: {calendarId: turn}, fund: {actorId: US$ mi}, score: {actorId: points} }.
 
 const OPS_PERIOD = 4;
+// with quarter, half-year and year steps (eras 5–7) the AI weighs its discretionary missions once a quarter: the
+// same decisions on the scale the player sees them, at a third of the cost (the 1,050-year campaign budget, §10)
+const opsPeriod = (state) => ((state?.clock?.stepWeeks ?? 1) >= 13 ? 13 : OPS_PERIOD);
 const OPS_REACT_WEEKS = 26;   // how long the player's latest first steers the rivals' choices
 const OPS_TUNING = {
   reserveShare: 0.05,      // cash an AI never touches (share of its yearly budget)
@@ -788,8 +840,10 @@ function opsOptionsRaw(state, data, actorId, { react = null, tun = opsTuning(dat
   const own = (state.calendar || []).map((c) => ({ c, item: calendarItem(data, c.id) })).filter((x) => x.item?.owner === actorId);
   const pendingHere = new Set(ops.pending.filter((p) => p.actorId === actorId).map((p) => p.destination));
   const out = [];
+  const yearNow = startYearOf(state, data) + Math.floor(turn / WEEKS_PER_YEAR);
   for (const dest of destinationsOf(data)) {
     if (dest.body === 'earth') continue; // Earth orbit is routine: no prestige worth a program of its own
+    if (dest.fromYear != null && dest.fromYear > yearNow) continue; // era-pack destination not open yet (§4.2)
     if (pendingHere.has(dest.id)) continue;
     if ((tries[dest.id] || 0) >= tun.maxOpsPerDest + (goalDests.has(dest.id) ? 1 : 0)) continue; // no endless repeats of one site
     const cfg = opsConfig(state, data, actorId, dest.id, vehicles, spacecraft);
@@ -945,7 +999,7 @@ function rivalOps(state, data, ctx) {
   }
   if (tun.enabled === false) return;
   opsRace(state, data, ctx, tun);
-  if (!crossed(state, ctx, OPS_PERIOD, 2) || state.turn < (tun.startTurn ?? 8)) return;
+  if (!crossed(state, ctx, opsPeriod(state), 2) || state.turn < (tun.startTurn ?? 8)) return;
   const react = ops.react && ops.react.untilTurn > state.turn ? ops.react : null;
   // one read-only memo for the whole pass: the actors' choices below move cash and the pending list, never the
   // flight history, vehicle stats or research that the reliabilities and tech bonuses are computed from
@@ -964,7 +1018,7 @@ function rivalOpsPass(state, data, ctx, ops, tun, react) {
     const load = (state.calendar || []).filter((c) => (c.status === 'planned' || c.status === 'launched') && c.currentTurn - state.turn <= 104
       && calendarItem(data, c.id)?.owner === id).length;
     const rate = (tun.fundK * Math.sqrt(a.budget) * clamp(pressure, tun.fundPressureMin, tun.fundPressureMax)) / (1 + tun.fundLoadK * load);
-    ops.fund[id] = Math.min(tun.fundCapYears * tun.fundK * Math.sqrt(a.budget), (ops.fund[id] ?? tun.fundStartYears * rate) + (rate * OPS_PERIOD) / WEEKS_PER_YEAR);
+    ops.fund[id] = Math.min(tun.fundCapYears * tun.fundK * Math.sqrt(a.budget), (ops.fund[id] ?? tun.fundStartYears * rate) + (rate * opsPeriod(state)) / WEEKS_PER_YEAR);
     // a comfortable leader runs fewer missions at once (less money for extras); a trailing one gets an extra team
     const base = Math.min(tun.concurrentMax, tun.concurrentBase + Math.floor(a.budget / 1000 / tun.concurrentPerBi));
     const slots = pressure < 1 ? Math.max(1, Math.round(base * pressure)) : base + Math.max(0, Math.floor((pressure - tun.catchUpSlotAt) / 0.4) + 1);
@@ -974,7 +1028,9 @@ function rivalOpsPass(state, data, ctx, ops, tun, react) {
     if (spare <= 0 && !saving) continue;
     const rng = ctx.rng(`ops:${id}`);
     const ambition = clamp(0.2 + 0.5 * (a.ai?.aggression ?? 0.5) + 0.3 * (a.ai?.riskTolerance ?? 0.5), 0, 1);
-    if (!saving && !rng.chance(clamp((tun.commitBase + tun.commitAmbition * ambition) * pressure, 0.03, 0.95))) continue;
+    const pCommit = clamp((tun.commitBase + tun.commitAmbition * ambition) * pressure, 0.03, 0.95);
+    const passes = opsPeriod(state) / OPS_PERIOD; // a quarterly pass keeps the monthly commit rate
+    if (!saving && !rng.chance(passes === 1 ? pCommit : 1 - Math.pow(1 - pCommit, passes))) continue;
     const all = opsOptions(state, data, id, { react, tun });
     let pick = null;
     if (saving) {
@@ -1942,7 +1998,43 @@ export const queries = {
  * Yearly compaction: the rival-ops ledgers (fund, tries, savings, flights per destination) of actors that left
  * the game (a 1950–3000 campaign sees hundreds come and go). Nothing changes while every actor is alive.
  */
-export function compact(state) {
+/**
+ * Compacted calendar history (§10: instances resolved more than 3 years ago leave state.calendar): id -> status letter
+ * (s success, p partial, f failed, c cancelled) + launch turn, e.g. "s403". The outcome also lives in vehicleStats,
+ * firsts and annals.
+ */
+const PAST_PROGRESS = { s: 'done', p: 'done', f: 'failed', c: 'cancelled' };
+const PAST_CODE = { success: 's', partial: 'p', failed: 'f', cancelled: 'c' };
+const PAST_NAME = { s: 'success', p: 'partial', f: 'failed', c: 'cancelled' };
+const PAST_AFTER = 3 * WEEKS_PER_YEAR;
+
+/** A calendar instance, or the stub of a compacted one ({id, status, launchTurn, compacted: true}); null if unknown. */
+export function instanceOrPast(state, id) {
+  const inst = calendarInstance(state, id);
+  if (inst) return inst;
+  const p = state?.calendarPast?.[id];
+  if (p == null) return null;
+  const t = Number(String(p).slice(1));
+  return { id, status: PAST_NAME[String(p)[0]] || 'success', launchTurn: String(p).length > 1 && Number.isFinite(t) ? t : null, compacted: true };
+}
+
+export function compact(state, data) {
+  // the Corrida Lunar keeps every instance (5 years; golden fixture)
+  if (Array.isArray(state.calendar) && data?.scenario && data.scenario.id !== 'lunar_race') {
+    const keep = [];
+    for (const inst of state.calendar) {
+      const code = PAST_CODE[inst.status];
+      const at = inst.resolvedTurn ?? inst.currentTurn ?? state.turn;
+      if (code && state.turn - at > PAST_AFTER) (state.calendarPast ||= {})[inst.id] = `${code}${inst.launchTurn ?? ''}`;
+      else keep.push(inst);
+    }
+    state.calendar = keep;
+    // vehicles that have not flown for 20 years keep only their record (§10): {flights, failures}
+    for (const [id, st] of Object.entries(state.vehicleStats || {})) {
+      if (!st || st.lastFlightTurn == null || state.turn - st.lastFlightTurn <= 20 * WEEKS_PER_YEAR || Object.keys(st).length <= 2) continue;
+      state.vehicleStats[id] = { flights: st.flights || 0, failures: st.failures || 0 };
+    }
+  }
   const ops = state.rivalOps;
   if (!ops || typeof ops !== 'object' || !state.actors) return;
   const live = (id) => !!state.actors[id] || (ops.pending || []).some((p) => p.actorId === id);

@@ -1,0 +1,17 @@
+{
+  "_doc": "Eventos do ciclo de vida da era 6 (meses base 0, como core/lifecycle.json). Tudo especulação autoral, com datas fixas para a história ser a mesma em toda partida. Dono: C6.",
+  "events": [
+    {"id":"heliopausa_born","date":{"year":2203,"month":2},"op":"birth","actor":"heliopausa","headline":"Nasce o Consórcio da Heliopausa: lasers para empurrar velas até as estrelas","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"conselho_marte_born","date":{"year":2209,"month":8},"op":"birth","actor":"conselho_marte","headline":"Marte ganha um Conselho de Terraformação com prazo de três séculos","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"habitats_vivos_born","date":{"year":2212,"month":4},"op":"birth","actor":"habitats_vivos","headline":"Os habitats giratórios se unem na Federação dos Habitats Vivos","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"longa_viagem_born","date":{"year":2231,"month":7},"op":"birth","actor":"longa_viagem","headline":"Em Belém, nasce a Fundação da Longa Viagem: a meta é uma nave de gerações","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"ventos_solares_born","date":{"year":2244,"month":0},"op":"birth","actor":"ventos_solares","headline":"Companhia dos Ventos Solares começa a vender tempo de feixe em Mercúrio","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"proxima_born","date":{"year":2309,"month":3},"op":"birth","actor":"proxima","headline":"Expedição Aurora abre inscrições: quatrocentos lugares para dormir até Proxima","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"aurora_colonia","date":{"year":2402,"month":1},"op":"rename","actor":"proxima","to":1,"headline":"A Expedição Aurora agora é a Colônia Aurora, em Proxima b","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"ventos_into_heliopausa","date":{"year":2421,"month":3},"op":"merge","from":["ventos_solares"],"into":"heliopausa","inherit":{"crew":"transfer","cash":0.6,"prestige":"sum"},"headline":"Ventos Solares se funde à Heliopausa, que passa a se chamar Rede Heliopausa","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"republica_ceres_born","date":{"year":2447,"month":9},"op":"birth","actor":"republica_ceres","headline":"Ceres declara independência: nasce a República Livre de Ceres","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"conselho_marte_fim","date":{"year":2552,"month":1},"op":"dissolve","actor":"conselho_marte","headline":"Missão cumprida: o Conselho de Terraformação de Marte se dissolve","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"colonia_barnard_born","date":{"year":2567,"month":9},"op":"birth","actor":"colonia_barnard","headline":"Primeira mensagem de Barnard: a Comunidade da Arca Saudade se apresenta à Terra","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"},
+    {"id":"longa_viagem_arquivo","date":{"year":2568,"month":0},"op":"rename","actor":"longa_viagem","to":1,"headline":"A Fundação da Longa Viagem vira o Arquivo da Longa Viagem","truthLayer":"especulacao","source":"Especulação autoral do Ad Astra (GDD, era 6)"}
+  ]
+}

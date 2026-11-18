@@ -1,0 +1,12 @@
+{
+  "_doc": "Investidores da era 5 (EXPANSION.md §5.2): arquétipos do vocabulário (core/vocab.json investorArchetypes) e modelos de mandato com destinos da era (fromYear 2051). Mescla com core/investors.json (lista por id, perfis por mescla profunda).",
+  "investors": [
+    {"id":"cooperativa_cinturao","kind":"consortium","eras":["e5","e6"],"weight":3,"fromYear":2085,"names":["Cooperativa dos Garimpeiros de Vesta","Assembleia das Rochas","Cooperativa Níquel e Gelo"],"profile":"mineracao","pct":[5,20],"premium":1,"termYears":8,"emblem":{"shape":"hex","division":"quarter","glyph":"comet","fields":["#2f3238","#3a3026"],"glyphColor":"#f0d890"}}
+  ],
+  "profiles": {
+    "mineracao": {"templates":[{"id":"min_belt","title":"Carga de metal do cinturão","type":"cargo","destinations":["belt_mining_site"],"years":4,"reward":0.18,"fromYear":2080},{"id":"min_ceres_ice","title":"Gelo de Ceres para os tanques","type":"cargo","destinations":["ceres_surface"],"years":4,"reward":0.18,"fromYear":2090},{"id":"min_deimos","title":"Depósito de combustível em Deimos","type":"cargo","destinations":["deimos"],"years":3,"reward":0.14,"fromYear":2058}]},
+    "colonia": {"templates":[{"id":"col_lava_tube","title":"Módulo para o tubo de lava","type":"station","destinations":["lunar_lava_tube"],"years":3,"reward":0.14,"fromYear":2052},{"id":"col_ceres_crew","title":"Rotação de colonos em Ceres","type":"crewed","destinations":["ceres_surface"],"years":4,"reward":0.22,"fromYear":2095},{"id":"col_venus","title":"Suprimentos para a cidade-balão","type":"cargo","destinations":["venus_aerostat"],"years":3,"reward":0.16,"fromYear":2140}]},
+    "consorcio": {"templates":[{"id":"cons_l5","title":"Doca do consórcio em L5","type":"station","destinations":["earth_moon_l5","earth_moon_l4"],"years":3,"reward":0.16,"fromYear":2095},{"id":"cons_jovian","title":"Pouso nas luas de Júpiter","type":"lander","destinations":["europa_surface","ganymede_surface","callisto_surface"],"years":5,"reward":0.22,"fromYear":2070},{"id":"cons_titan","title":"Sonda aos mares de Titã","type":"probe","destinations":["titan_lakes","titan_orbit"],"years":6,"reward":0.22,"fromYear":2075}]},
+    "turismo": {"templates":[{"id":"tur_ring","title":"Hóspedes para o habitat rotativo","type":"crewed","destinations":["earth_orbital_habitat"],"years":2,"reward":0.12,"fromYear":2084}]}
+  }
+}

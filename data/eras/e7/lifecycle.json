@@ -1,0 +1,32 @@
+{
+  "note": "Ciclo de vida autoral da era 7 (2600–2999, especulação), no formato de data/core/lifecycle.json (meses base 0). Só mexe nas linhagens de data/eras/e7/lineages.json: as linhagens reais seguem com os sucessores procedurais. 'headline' é a manchete do dia, no tom da era. Dono: C7.",
+  "events": [
+    { "id": "diretorio_solar_born", "date": { "year": 2600, "month": 0 }, "op": "birth", "actor": "diretorio_solar", "truthLayer": "especulacao",
+      "headline": "Ano 2600: as agências do Sol assinam a Carta do Diretório e passam a falar com uma voz só" },
+    { "id": "casa_vega_born", "date": { "year": 2608, "month": 3 }, "op": "birth", "actor": "casa_vega", "truthLayer": "especulacao",
+      "headline": "A família Vega acende sua primeira fábrica de antimatéria a seis milhões de quilômetros do Sol" },
+    { "id": "arquivo_estelar_born", "date": { "year": 2611, "month": 8 }, "op": "birth", "actor": "arquivo_estelar", "truthLayer": "especulacao",
+      "headline": "Nasce a Fundação do Arquivo Estelar: \"lembrar é a única viagem que não acaba\"" },
+    { "id": "concordia_trappist_born", "date": { "year": 2634, "month": 5 }, "op": "birth", "actor": "concordia_trappist", "truthLayer": "especulacao",
+      "headline": "Chega a carta de fundação da Concórdia de Trappist, escrita quarenta anos atrás pelos netos das primeiras arcas" },
+    { "id": "frota_lenta_born", "date": { "year": 2652, "month": 1 }, "op": "birth", "actor": "frota_lenta", "truthLayer": "especulacao",
+      "headline": "Três naves de gerações se recusam a pousar e fundam a Frota Lenta" },
+    { "id": "ordem_ouvintes_born", "date": { "year": 2688, "month": 9 }, "op": "birth", "actor": "ordem_ouvintes", "truthLayer": "especulacao",
+      "headline": "Em Kuiper, os Ouvintes que romperam com o Colégio fazem voto de escuta: antes de responder, ouvir tudo" },
+    { "id": "liga_667c_born", "date": { "year": 2724, "month": 3 }, "op": "birth", "actor": "liga_667c", "truthLayer": "especulacao",
+      "headline": "Sob três sóis, os colonos de Gliese 667 Cc proclamam a Liga e pedem cadeira no Diretório" },
+    { "id": "trappist_independencia", "date": { "year": 2741, "month": 2 }, "op": "rename", "actor": "concordia_trappist", "to": 1, "truthLayer": "especulacao",
+      "headline": "Chega à Terra, com quarenta anos de atraso: Trappist é uma república livre" },
+    { "id": "coletivo_kepler_born", "date": { "year": 2761, "month": 0 }, "op": "birth", "actor": "coletivo_kepler", "truthLayer": "especulacao",
+      "headline": "Os retransmissores da rede interestelar começam a responder por conta própria: é o Coletivo Kepler" },
+    { "id": "pacto_sete_sois", "date": { "year": 2861, "month": 0 }, "op": "merge", "from": ["liga_667c"], "into": "concordia_trappist", "truthLayer": "especulacao",
+      "inherit": { "crew": "transfer", "cash": 0.8, "prestige": "sum" },
+      "headline": "Pacto dos Sete Sóis: Gliese 667C e Trappist viram uma comunidade só, assinada por luz" },
+    { "id": "coletivo_kepler_cala", "date": { "year": 2904, "month": 5 }, "op": "dissolve", "actor": "coletivo_kepler", "truthLayer": "especulacao",
+      "headline": "O Coletivo Kepler para de responder. O último pacote diz apenas: \"vamos ouvir\"" },
+    { "id": "diretorio_mundos_proximos", "date": { "year": 2905, "month": 0 }, "op": "rename", "actor": "diretorio_solar", "to": 1, "truthLayer": "especulacao",
+      "headline": "O Diretório Solar abre cadeiras para as colônias e muda de nome pela primeira vez em três séculos" },
+    { "id": "ouvintes_encerram", "date": { "year": 2993, "month": 6 }, "op": "dissolve", "actor": "ordem_ouvintes", "truthLayer": "especulacao",
+      "headline": "A Ordem dos Ouvintes desliga as antenas: \"não há mais nada para ouvir, só para esperar\"" }
+  ]
+}

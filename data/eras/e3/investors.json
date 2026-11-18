@@ -1,0 +1,10 @@
+{
+"_doc": "Arquétipos de investidor que estreiam na era 3 (vocab investorArchetypes) e os mandatos do perfil \"mecenas\". Mesma forma de data/core/investors.json; mescla por id. untilYear 2050: a era 3 sai da memória depois da era 4.",
+"profiles": {
+"mecenas": {"label":"Mecenas: prestígio acima do lucro","templates":[{"id":"mec_private_probe","title":"Sonda privada à Lua","type":"probe","destinations":["lunar_orbit","lunar_surface"],"years":3,"reward":0.12,"fromYear":2007},{"id":"mec_telescope","title":"Telescópio com o nome do patrono","type":"satellite","destinations":["leo","sso","sun_earth_l2"],"years":3,"reward":0.1},{"id":"mec_crewed","title":"Voo tripulado privado","type":"crewed","destinations":["leo","iss"],"years":3,"reward":0.16,"fromYear":2020},{"id":"mec_mars","title":"Sonda a Marte com o logotipo do patrono","type":"probe","destinations":["mars_orbit","mars_surface"],"years":4,"reward":0.18,"fromYear":2010}]}
+},
+"investors": [
+{"id":"mecenas_bilionario","kind":"fund","eras":["e3","e4"],"untilYear":2050,"weight":2,"names":["Fundação Perihélio","Family Office Altamira","Instituto Horizonte Profundo","Fundo Pálido Ponto Azul"],"profile":"mecenas","pct":[5,25],"premium":1.25,"termYears":8,"emblem":{"shape":"star","division":"none","glyph":"comet","fields":["#1b1f2b","#2b1b26","#1b2b26"],"glyphColor":"#e3b341"}},
+{"id":"fundo_soberano","kind":"fund","eras":["e3","e4"],"untilYear":2050,"weight":1,"names":["Fundo Soberano do Golfo","Autoridade de Investimento Nacional","Fundo Estratégico de Tecnologia"],"profile":"retorno","pct":[10,30],"premium":1.05,"termYears":10,"emblem":{"shape":"shield","division":"band","glyph":"globe","fields":["#14363a","#3a2a14","#1f2a44"],"glyphColor":"#f4f1e8"}}
+]
+}

@@ -1,0 +1,62 @@
+{
+  "_comment": "Equipe da era 7 (2600–2999). Mescla profunda com data/crew.json: 'actorCulture' e os nomes da cultura 'estelar' valem só para os atores nascidos nesta era (de propósito, 'estelar' NÃO entra em 'cultures': a contratação estrangeira de outras eras não pode depender deste pacote). 'roster' = equipe inicial dos atores jogáveis do cenário O Grande Silêncio (2950). Sobrenomes antigos de propósito: os legados voltam gerações depois. Dono: C7.",
+  "actorCulture": {
+    "diretorio_solar": "estelar", "casa_vega": "estelar", "arquivo_estelar": "estelar", "concordia_trappist": "estelar",
+    "frota_lenta": "estelar", "ordem_ouvintes": "estelar", "liga_667c": "estelar", "coletivo_kepler": "estelar"
+  },
+  "firstNames": {
+    "estelar": ["Tálio", "Orin", "Caetano", "Ilan", "Rhaul", "Sereno", "Davi-Lune", "Teo", "Ícaro", "Bento", "Kenji", "Amaro", "Yuri", "Noam", "Ravi", "Joaquim", "Elian", "Zuri", "Hélio", "Tupã"]
+  },
+  "femaleNames": {
+    "estelar": ["Aurora", "Lira", "Céu", "Maíra", "Selene", "Nayra", "Ísis", "Tainá", "Vega", "Mira", "Inês", "Anaí", "Sol", "Yara", "Ondina", "Lume", "Iara", "Clara-Nuvem", "Hana", "Júlia"]
+  },
+  "lastNames": {
+    "estelar": ["Calloway-Ceres", "Whitfield", "Halvorsen de Titã", "Boyd", "Marchand", "do Crepúsculo", "Ferraro", "Okonkwo", "Takahashi", "Almeida-Vesta", "Brenner", "Sato", "de Tharsis", "Ivanova", "Lin", "Paciência", "Ramanathan", "da Faixa", "Quispe", "Andrade"]
+  },
+  "roster": {
+    "arquivo_estelar": [
+      { "id": "arq_almeida", "name": "Inês Almeida-Vesta", "gender": "f", "role": "flight_director", "skill": 80, "experience": 55, "missions": 9, "successes": 9, "age": 71,
+        "traits": ["veterano", "cabeca_fria"], "loyalty": 88, "ambition": 25, "morale": 64,
+        "bio": "Dirigiu o voo do Olho da Lente II. Descende de uma engenheira da Corrida Lunar e guarda o diário dela na gaveta do console." },
+      { "id": "arq_calloway", "name": "Orin Calloway-Ceres", "gender": "m", "role": "engineer", "skill": 76, "experience": 40, "age": 58,
+        "traits": ["perfeccionista", "metodico"], "loyalty": 80, "ambition": 35, "morale": 60,
+        "bio": "Mestre em cristais de memória. Diz que um bit perdido é uma pessoa esquecida, e trabalha como se fosse verdade." },
+      { "id": "arq_lira", "name": "Lira do Crepúsculo", "gender": "f", "role": "astronaut", "skill": 70, "experience": 30, "missions": 2, "successes": 2, "age": 39,
+        "traits": ["intuicao", "resistente"], "loyalty": 70, "ambition": 55, "morale": 66,
+        "bio": "Nasceu em Trappist e cruzou os quarenta anos-luz até o Sol no sono longo: tem trinta e nove anos vividos e uma irmã gêmea que, lá, já passou dos cento e sessenta." },
+      { "id": "arq_ravi", "name": "Ravi Ramanathan", "gender": "m", "role": "engineer", "skill": 68, "experience": 20, "age": 44,
+        "traits": ["inventivo", "avesso_midia"], "loyalty": 65, "ambition": 50, "morale": 58,
+        "bio": "Passou três anos num retiro do Colégio do Silêncio e voltou falando pouco. As antenas que ele calibra ouvem mais longe." }
+    ],
+    "diretorio_solar": [
+      { "id": "dsol_okonkwo", "name": "Teo Okonkwo", "gender": "m", "role": "flight_director", "skill": 78, "experience": 50, "missions": 14, "successes": 13, "age": 63,
+        "traits": ["lider_nato", "veterano"], "loyalty": 75, "ambition": 45, "morale": 62,
+        "bio": "Comandou o lançamento do último Feixe Derradeiro. Fala com as colônias como quem escreve para netos." },
+      { "id": "dsol_selene", "name": "Selene Takahashi", "gender": "f", "role": "astronaut", "skill": 74, "experience": 35, "missions": 4, "successes": 4, "age": 47,
+        "traits": ["piloto_testes", "cabeca_fria"], "loyalty": 72, "ambition": 60, "morale": 65,
+        "bio": "Pilotou a Cápsula Aurora até a Lua quarenta vezes. Quer ser a última a voar antes de 3000, e a primeira depois." },
+      { "id": "dsol_brenner", "name": "Caetano Brenner", "gender": "m", "role": "engineer", "skill": 72, "experience": 30, "age": 52,
+        "traits": ["workaholic", "calculista"], "loyalty": 68, "ambition": 55, "morale": 55,
+        "bio": "Herdou do bisavô a mania de conferir cada válvula. Mantém sozinho metade dos nós da rede desde que o Coletivo Kepler se calou." }
+    ],
+    "concordia_trappist": [
+      { "id": "c7s_maira", "name": "Maíra da Faixa", "gender": "f", "role": "flight_director", "skill": 77, "experience": 45, "missions": 7, "successes": 7, "age": 60,
+        "traits": ["carismatico", "teimoso"], "loyalty": 85, "ambition": 40, "morale": 63,
+        "bio": "Bisneta de uma menina que escreveu para a Terra e esperou oitenta anos pela resposta. Dirige a escola de voo da Comunidade." },
+      { "id": "c7s_rhaul", "name": "Rhaul Quispe", "gender": "m", "role": "astronaut", "skill": 69, "experience": 25, "missions": 2, "successes": 2, "age": 36,
+        "traits": ["impulsivo", "resistente"], "loyalty": 60, "ambition": 70, "morale": 70,
+        "bio": "Nunca viu chuva nem noite de verdade. Quer ser o primeiro da Comunidade a ver as Híades de perto, nem que seja do lado de dentro do Silêncio." },
+      { "id": "c7s_anai", "name": "Anaí Ferraro", "gender": "f", "role": "engineer", "skill": 71, "experience": 30, "age": 49,
+        "traits": ["inventivo", "cientista_campo"], "loyalty": 74, "ambition": 45, "morale": 61,
+        "bio": "Cultiva liquens para os mundos frios de Trappist e conserta motores com peças feitas no estaleiro de 1f." }
+    ],
+    "casa_vega": [
+      { "id": "vega_mira", "name": "Mira Vega", "gender": "f", "role": "flight_director", "skill": 75, "experience": 40, "missions": 10, "successes": 10, "age": 34,
+        "traits": ["ambicioso", "calculista"], "loyalty": 90, "ambition": 85, "morale": 66,
+        "bio": "A herdeira mais nova da Casa. Diz que o fogo não sabe que o milênio acaba e quer vender cada grama antes de janeiro." },
+      { "id": "vega_helio", "name": "Hélio Sato", "gender": "m", "role": "engineer", "skill": 79, "experience": 50, "age": 66,
+        "traits": ["perfeccionista", "veterano"], "loyalty": 70, "ambition": 30, "morale": 58,
+        "bio": "Quarenta anos em Caloris, a seis milhões de quilômetros do Sol. Tem as mãos queimadas e nenhuma pressa." }
+    ]
+  }
+}

@@ -1,35 +1,21 @@
 {
-  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e5 em data/packs.json).",
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e5). news = tom das manchetes da era (modelos para quem montar as notícias; mesmos marcadores de data/calendar.json \"news\").",
   "id": "e5",
   "name": "Expansão do Sistema",
   "from": 2051,
   "to": 2199,
-  "truthLayers": [
-    "especulacao"
-  ],
+  "truthLayers": ["especulacao"],
   "closingMilestone": "Primeira colônia autônoma",
   "palette": "ambar",
   "chapters": [
-    {
-      "from": {
-        "year": 2051,
-        "month": 0
-      },
-      "title": "Marte deixa de ser visita"
-    },
-    {
-      "from": {
-        "year": 2100,
-        "month": 0
-      },
-      "title": "Cinturão e luas"
-    },
-    {
-      "from": {
-        "year": 2150,
-        "month": 0
-      },
-      "title": "Colônias que votam"
-    }
-  ]
+    {"from":{"year":2051,"month":0},"title":"Marte deixa de ser visita"},
+    {"from":{"year":2088,"month":0},"title":"A febre do cinturão"},
+    {"from":{"year":2125,"month":0},"title":"Luas de gelo, motores de estrela"},
+    {"from":{"year":2165,"month":0},"title":"Colônias que votam"}
+  ],
+  "news": {
+    "voice": "Fronteira e improviso: boletins de rádio, avisos de comboio, assembleias de colônia e preço do minério. Frases curtas, gíria de garimpo, orgulho de quem vive longe.",
+    "calendar": {"launched":"Comboio no ar: {owner} lança {name}","launchedBody":"Chegada prevista para {date}, se a janela e o reator colaborarem.","success":"{name}: chegou inteiro","partial":"{name} chega, mas com avarias","failed":"{name} se perde no caminho","lostCrew":"Luto na fronteira: tripulação perdida em {name}","first":"Marco da fronteira! {owner} conquista: {milestone}","firstEra":"Primeira vez neste século: {owner} conquista {milestone}","delayed":"{name} perde o comboio e espera a próxima janela","debut":"Estreia do {vehicle} na rota","bgFailure":"{vehicle} perde carga no caminho do cinturão","opsAnnounce":"{owner} contrata missão própria {to}"},
+    "tickers": ["Preço do níquel do cinturão","Janela de Marte abre em","Fila do elevador lunar","Tempestade solar: abrigos em alerta","Assembleia de Ceres vota"]
+  }
 }

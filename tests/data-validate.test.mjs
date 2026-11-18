@@ -57,7 +57,7 @@ test('entity dated before its era is an error (results would depend on loaded pa
 test('truth layer × year and source rules', () => {
   const inp = base();
   inp.packs.e1.calendar.missions[0].truthLayer = 'especulacao';
-  delete inp.packs.e1.calendar.missions[1].source;
+  delete inp.packs.e1.calendar.missions.find((m) => m.id === 'vostok1').source;
   const e = errs(inp);
   assert.ok(has(e, /sputnik1\.truthLayer especulacao não combina com 1957/));
   assert.ok(has(e, /vostok1\.source camada fato precisa de "source"/));

@@ -26,7 +26,7 @@ async function loadBot() {
   try {
     const b = await import('./bot-b.mjs');
     const mem = {};
-    if (typeof b.phaseBStep === 'function') return (state, data) => b.phaseBStep(state, data, engine, { schedule: true }, mem);
+    if (typeof b.phaseBStep === 'function') return (state, data) => b.phaseBStep(state, data, engine, { schedule: true, keepControl: true }, mem);
   } catch { /* bot-b.mjs not available */ }
   try {
     const m = await import('./golden.mjs');

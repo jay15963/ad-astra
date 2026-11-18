@@ -7,12 +7,17 @@
 //   scenarios: { [scenarioId]: json },          // raw scenario files
 //   scenarioIndex,                              // data/scenarios/index.json
 //   schemas: { 'vehicle.schema.json': {...}, … }
+//   vocab?, stars?,                             // data/core/vocab.json (C0) and data/core/stars.json
+//   vocabRequests?: { [eraId]: json },          // data/eras/eN/vocab-requests.json
+//   extraCore?: { eco?, colonies? }             // core files outside the manifest that use vocabulary ids
 // }
+// Without input.vocab the vocabulary checks (tools/validate/vocab.js) are skipped.
 // checkData(input, opts) -> { issues: [{level:'error'|'warn', pack, path, message}], density: {[year]: n}, stats }
 // Paths look like "eras/e1/calendar.json#vostok1.planned". Messages are pt-BR.
 
 import { validate } from './schema.js';
 import { assemble, LIST_KEYS } from '../../src/core/packs.js';
+import { checkVocab, starIds } from './vocab.js';
 
 /** Year of the data's "present": items up to it may be 'fato' (the data is up to date as of nov/2026). */
 export const DATA_PRESENT_YEAR = 2026;
@@ -71,6 +76,7 @@ export function placeholdersIn(values) {
 export function checkData(input, { onlyPack = null, legacyWarnings = false } = {}) {
   const issues = [];
   const { manifest, packs = {}, sizes = {}, scenarios = {}, scenarioIndex = null, schemas = {} } = input;
+  const { vocab = null, stars = null, vocabRequests = {}, extraCore = {} } = input;
   const packDefs = manifest?.packs || [];
   const byId = Object.fromEntries(packDefs.map((p) => [p.id, p]));
   const add = (level, pack, path, message) => {
@@ -154,7 +160,7 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
   // ---------------------------------------------------------------- merged view (every pack: what the campaign sees)
   const raw = {};
   for (const p of packDefs) raw[p.id] = { files: packs[p.id] || {}, hash: '' };
-  const merged = assemble(manifest, raw, packDefs.map((p) => p.id), { scenario: scenarios.lunar_race || scenarios.campaign || {} });
+  const merged = assemble(manifest, raw, packDefs.map((p) => p.id), { scenario: scenarios.campaign || scenarios.lunar_race || {}, scenarioId: scenarios.campaign ? 'campaign' : 'lunar_race' });
   for (const w of merged.packWarnings) err('manifest', 'merge', w);
   const list = (file) => merged[file]?.[LIST_KEYS[file]] || [];
   const ids = (file) => new Set(list(file).map((x) => x.id));
@@ -238,7 +244,10 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
     if (pos.some((x, i) => i > 0 && x > pos[i - 1])) warn(pk, `${pathOf('vehicles', v.id)}.capacity`, 'capacidade não decresce leo ≥ gto ≥ tli ≥ mars ≥ outer');
   }
   for (const t of list('tech')) for (const r of t.requires || []) ref(TECH.has(r), 'tech', t.id, 'requires', r, 'tecnologia');
-  for (const d of list('destinations')) ref(BODIES.has(d.body), 'destinations', d.id, 'body', d.body, 'corpo');
+  // interstellar destinations may sit on a star, exoplanet or galactic region of core/stars.json (vocab families)
+  const sid = starIds(stars);
+  const starBody = (b) => sid.stars.has(b) || sid.exoplanets.has(b) || sid.regions.has(b);
+  for (const d of list('destinations')) ref(BODIES.has(d.body) || starBody(d.body), 'destinations', d.id, 'body', d.body, 'corpo');
 
   // ---------------------------------------------------------------- lifecycle (core files)
   const corePack = packDefs.find((p) => p.id === 'core') || { id: 'core', dir: 'core/' };
@@ -369,12 +378,22 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
         for (const [k, v] of Object.entries(o)) {
           if (typeof v === 'string' && TEXT_FIELDS.has(k)) {
             if (FORBIDDEN_TEXT.test(v)) err(p.id, `${path}.${k}`, `texto com marcador proibido: "${v.match(FORBIDDEN_TEXT)[0]}"`);
-            if (!p.legacy) for (const m of v.matchAll(/\{(\w+)\}/g)) if (!legacyPh.has(m[1])) err(p.id, `${path}.${k}`, `marcador {${m[1]}} desconhecido`);
+            // generator templates (data/gen) carry their own slot markers, filled by src/gen before the sim sees them
+            if (!p.legacy && !String(p.dir || '').startsWith('gen/')) for (const m of v.matchAll(/\{(\w+)\}/g)) if (!legacyPh.has(m[1])) err(p.id, `${path}.${k}`, `marcador {${m[1]}} desconhecido`);
           } else if (v && typeof v === 'object') walk(v, `${path}.${k}`);
         }
       };
       walk(json, packPath(p, file));
     }
+  }
+
+  // ---------------------------------------------------------------- shared vocabulary (core/vocab.json, §14 C0)
+  let vocabStats = null;
+  if (vocab) {
+    vocabStats = checkVocab({ vocab, stars, requests: vocabRequests, extraCore, manifest, packDefs, packs, scenarios,
+      scenarioIndex, listKeys: LIST_KEYS, packPath, add, runSchema });
+  } else if (Object.keys(vocabRequests).length) {
+    warn('core', 'core/vocab.json', 'há pedidos de vocabulário, mas core/vocab.json não existe');
   }
 
   // ---------------------------------------------------------------- budgets (§4.5)
@@ -405,6 +424,7 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
     entities: Object.keys(origin).length,
     bootBytes: always + biggest,
     packBytes: Object.fromEntries(packDefs.map((p) => [p.id, packBytes(p.id)])),
+    vocab: vocabStats,
   };
   return { issues, density, stats };
 }

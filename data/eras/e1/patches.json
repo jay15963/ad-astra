@@ -1,0 +1,127 @@
+{
+ "_comment": "Remendos do pacote e1 (EXPANSION.md §3.3, dono C1): as linhas reais de 1950–1975 do ciclo de vida (core/lifecycle.json) e as linhagens nascidas até 1975 (core/lineages.json) ganham uma fonte conferível (URL). Só o campo source muda: datas e operações foram conferidas e estão certas, e nada aqui altera a simulação.",
+ "lifecycle": [
+  {
+   "$op": "patch",
+   "id": "abma_born",
+   "source": "https://en.wikipedia.org/wiki/Army_Ballistic_Missile_Agency"
+  },
+  {
+   "$op": "patch",
+   "id": "quinta_born",
+   "source": "https://english.spacechina.com/n17138/n382513/index.html"
+  },
+  {
+   "$op": "patch",
+   "id": "naca_to_nasa",
+   "source": "https://en.wikipedia.org/wiki/NASA"
+  },
+  {
+   "$op": "patch",
+   "id": "abma_into_nasa",
+   "source": "https://en.wikipedia.org/wiki/Marshall_Space_Flight_Center"
+  },
+  {
+   "$op": "patch",
+   "id": "cnes_born",
+   "source": "https://en.wikipedia.org/wiki/CNES"
+  },
+  {
+   "$op": "patch",
+   "id": "incospar_born",
+   "source": "https://en.wikipedia.org/wiki/Indian_National_Committee_for_Space_Research"
+  },
+  {
+   "$op": "patch",
+   "id": "eldo_born",
+   "source": "https://en.wikipedia.org/wiki/European_Launcher_Development_Organisation"
+  },
+  {
+   "$op": "patch",
+   "id": "esro_born",
+   "source": "https://en.wikipedia.org/wiki/European_Space_Research_Organisation"
+  },
+  {
+   "$op": "patch",
+   "id": "isas_born",
+   "source": "https://en.wikipedia.org/wiki/Institute_of_Space_and_Astronautical_Science"
+  },
+  {
+   "$op": "patch",
+   "id": "dfvlr_born",
+   "source": "https://en.wikipedia.org/wiki/German_Aerospace_Center"
+  },
+  {
+   "$op": "patch",
+   "id": "incospar_to_isro",
+   "source": "https://en.wikipedia.org/wiki/Indian_Space_Research_Organisation"
+  },
+  {
+   "$op": "patch",
+   "id": "nasda_born",
+   "source": "https://en.wikipedia.org/wiki/National_Space_Development_Agency_of_Japan"
+  },
+  {
+   "$op": "patch",
+   "id": "esa_formed",
+   "source": "https://en.wikipedia.org/wiki/European_Space_Agency"
+  }
+ ],
+ "lineages": [
+  {
+   "$op": "patch",
+   "id": "nasa",
+   "source": "https://en.wikipedia.org/wiki/National_Advisory_Committee_for_Aeronautics"
+  },
+  {
+   "$op": "patch",
+   "id": "roscosmos",
+   "source": "https://en.wikipedia.org/wiki/OKB-1"
+  },
+  {
+   "$op": "patch",
+   "id": "abma",
+   "source": "https://en.wikipedia.org/wiki/Army_Ballistic_Missile_Agency"
+  },
+  {
+   "$op": "patch",
+   "id": "cnsa",
+   "source": "https://english.spacechina.com/n17138/n382513/index.html"
+  },
+  {
+   "$op": "patch",
+   "id": "cnes",
+   "source": "https://en.wikipedia.org/wiki/CNES"
+  },
+  {
+   "$op": "patch",
+   "id": "isro",
+   "source": "https://en.wikipedia.org/wiki/Indian_Space_Research_Organisation"
+  },
+  {
+   "$op": "patch",
+   "id": "eldo",
+   "source": "https://en.wikipedia.org/wiki/European_Launcher_Development_Organisation"
+  },
+  {
+   "$op": "patch",
+   "id": "esa",
+   "source": "https://en.wikipedia.org/wiki/European_Space_Research_Organisation"
+  },
+  {
+   "$op": "patch",
+   "id": "isas",
+   "source": "https://en.wikipedia.org/wiki/Institute_of_Space_and_Astronautical_Science"
+  },
+  {
+   "$op": "patch",
+   "id": "dlr",
+   "source": "https://en.wikipedia.org/wiki/German_Aerospace_Center"
+  },
+  {
+   "$op": "patch",
+   "id": "jaxa",
+   "source": "https://en.wikipedia.org/wiki/National_Space_Development_Agency_of_Japan"
+  }
+ ]
+}

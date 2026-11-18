@@ -1,5 +1,5 @@
 {
-  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e2 em data/packs.json).",
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e2 em data/packs.json). 'tone' resume a voz da era para quem escreve; 'news' são variantes das manchetes do calendário com o tom da era (mesmas chaves e marcadores de data/calendar.json news): calendar.js deve preferir data.eraPacks[era].news[chave] e cair em data.calendar.news.",
   "id": "e2",
   "name": "Estações e Sondas",
   "from": 1976,
@@ -9,6 +9,7 @@
   ],
   "closingMilestone": "Primeiros módulos da ISS",
   "palette": "cobre",
+  "tone": "Industrial, cinzento, burocrático: relatórios, comissões, orçamentos cortados e gente trabalhando de madrugada. Os heróis agora são equipes, não indivíduos; as vitórias são técnicas e as tragédias, investigadas. Frases curtas, verbos concretos, nenhum ufanismo.",
   "chapters": [
     {
       "from": {
@@ -38,5 +39,20 @@
       },
       "title": "Uma estação para todos"
     }
-  ]
+  ],
+  "news": {
+    "delayed": ["Cronograma revisado: {name} fica para {date}", "Relatório de prontidão adia {name} para {date}", "{name} atrasa outra vez: nova data, {date}", "Comissão técnica empurra {name} para {date}"],
+    "launched": ["{owner} lança {name}", "{name} decola no horário da janela", "Contagem sem pausas: {name} a caminho", "{owner} põe {name} em órbita na primeira tentativa"],
+    "success": ["{name}: missão cumprida", "{name} entrega o que prometeu", "Relatório final: {name} sem anomalias graves", "Controle confirma: {name} deu certo"],
+    "partial": ["{name} cumpre parte da missão", "{name}: resultados abaixo do previsto", "Falha parcial em {name}; engenheiros avaliam"],
+    "failed": ["{name} perdida", "Falha em {name}: comissão de investigação instalada", "{owner} perde {name}", "Telemetria interrompida: {name} fracassa"],
+    "lostCrew": "Tragédia: tripulação perdida em {name}",
+    "lostCrewBody": "{owner} suspende os voos tripulados e instala uma comissão de investigação independente.",
+    "first": "Feito inédito: {owner} conquista {milestone}",
+    "firstEra": "Primeira vez nesta era: {owner} conquista {milestone}",
+    "bgFailure": ["Falha do {vehicle} destrói satélite comercial", "{vehicle} perde carga e seguradoras reagem", "Satélite de cliente perdido no {vehicle}", "Revés do {vehicle}: frota em solo para inspeção"],
+    "bgTestFailure": ["{vehicle} falha em voo de qualificação", "Teste do {vehicle} termina antes da hora", "Protótipo do {vehicle} perdido; programa revisado"],
+    "debut": "Estreia do {vehicle}: o novo foguete entra no catálogo",
+    "grounded": "Frota do {vehicle} em solo: {name} espera o relatório de investigação"
+  }
 }

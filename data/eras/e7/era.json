@@ -1,5 +1,5 @@
 {
-  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e7 em data/packs.json).",
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e7 em data/packs.json). 'newsTone' = tom das manchetes da era, na mesma forma das outras eras: 'calendar' usa as chaves e marcadores de data/calendar.json 'news' ({owner}, {name}, {date}, {vehicle}, {milestone}), 'lifecycle' os de core/lifecycle.json 'texts' ({name}, {old}, {from}, {into}) e 'ticker' são frases soltas do letreiro. 'eco' = ganchos desta era para o Eco (C9: src/sim/eco.js): fragmentos de core/vocab.json e as flags que os eventos de events.json gravam. Dono: C7.",
   "id": "e7",
   "name": "Galáctica",
   "from": 2600,
@@ -19,6 +19,13 @@
     },
     {
       "from": {
+        "year": 2720,
+        "month": 0
+      },
+      "title": "Cartas com cem anos de atraso"
+    },
+    {
+      "from": {
         "year": 2800,
         "month": 0
       },
@@ -31,5 +38,139 @@
       },
       "title": "O Grande Silêncio"
     }
-  ]
+  ],
+  "newsTone": {
+    "voice": "Místico e quieto: boletins curtos, quase litúrgicos, com data de envio e de chegada e distâncias em anos-luz. Pouca exclamação. As colônias falam com décadas de atraso; o céu, cada vez menos. Na década final, cada manchete soa como despedida.",
+    "calendar": {
+      "launched": [
+        "{owner} acende {name}; a chegada fica para outro século",
+        "Partiu {name}. Quem acenou no cais não verá o pouso",
+        "{name} deixa o Sol com uma biblioteca a bordo",
+        "Mais uma luz rumo ao escuro: {owner} envia {name}"
+      ],
+      "launchedBody": "Partida nominal no {vehicle}. Chegada prevista para {date}; a confirmação ainda levará anos para atravessar a rede.",
+      "success": [
+        "{name} chegou. A notícia levou anos para atravessar a rede",
+        "Recebido hoje, enviado há muito: {name} cumpriu o que prometeu",
+        "{name} está onde deveria estar",
+        "O Arquivo registra: {name} deu certo"
+      ],
+      "partial": [
+        "{name} chega, mas parte dela ficou pelo caminho",
+        "{name} cumpre só parte do que prometeu",
+        "Meio sucesso para {name}, a muitos anos-luz daqui"
+      ],
+      "failed": [
+        "Silêncio de {name}: a {owner} perde o contato entre as estrelas",
+        "{name} não responde. A {owner} mantém a antena apontada",
+        "Última telemetria de {name} chega incompleta",
+        "{name} se perde no escuro"
+      ],
+      "lostCrew": "Luto entre as estrelas: a tripulação de {name} não responde mais",
+      "lostCrewBody": "A {owner} suspende os voos tripulados e inscreve os nomes no Memorial. A notícia levará anos para chegar às colônias.",
+      "first": [
+        "Para os anais do milênio: {owner} conquista {milestone}",
+        "{milestone}. O feito é da {owner}, e o Arquivo já o registrou"
+      ],
+      "firstEra": "Primeira vez neste milênio: {owner} conquista {milestone}",
+      "delayed": [
+        "{name} fica para {date}: o tempo, aqui, é a parte barata",
+        "Novo atraso: {name} só em {date}",
+        "{name} espera mais um pouco: agora {date}"
+      ],
+      "cancelled": "Cancelamento: {name} não vai mais partir",
+      "cancelledBody": "A {owner} reviu as prioridades. Há quem diga que, com o Silêncio chegando, não vale mais partir."
+    },
+    "lifecycle": {
+      "birth": [
+        "Nasce {name}, para pensar em séculos",
+        "Recebida a carta de fundação de {name}",
+        "{name} surge entre as estrelas"
+      ],
+      "rename": [
+        "{old} agora é {name}",
+        "Uma geração depois, {old} vira {name}"
+      ],
+      "merge": [
+        "{from} e {into} viram uma só, assinada por luz",
+        "{from} se junta a {into}"
+      ],
+      "dissolve": [
+        "{name} se cala",
+        "{name} desliga as antenas",
+        "Fim da linha para {name}: o último pacote chegou"
+      ],
+      "successor": [
+        "{old} renasce como {name}",
+        "Mil anos depois, {old} se chama {name}"
+      ]
+    },
+    "ticker": [
+      "Mais um pulsar se cala na direção de Touro",
+      "O ruído de fundo cai outra vez, dizem os Ouvintes",
+      "O Colégio do Silêncio não comenta",
+      "Uma carta de Trappist chega com quarenta anos de atraso",
+      "Cem mundos, nenhuma resposta de fora",
+      "A rede das dez estrelas retransmite uma canção de ninar de Gliese 667C",
+      "O Arquivo grava mais um cristal: três séculos de diários de bordo",
+      "Na faixa do crepúsculo de Trappist-1e, a colheita de liquens foi boa",
+      "A Frota Lenta pede para ninguém mandar notícias tristes neste ano",
+      "Falta um trimestre para janeiro de 3000"
+    ]
+  },
+  "eco": {
+    "fragments": [
+      {
+        "ecoFragment": "eco_e7_mapa_do_silencio",
+        "flags": [
+          "e7_cartografia",
+          "e7_mapa_kepler",
+          "e7_borda_calculada"
+        ],
+        "milestone": "silence_source_located",
+        "note": "O mapa do Silêncio: pulsares calados desenham uma esfera que cresce à metade da velocidade da luz desde um ponto a uns 250 anos-luz, além das Híades, em Touro, e chega ao Sol em jan/3000."
+      },
+      {
+        "ecoFragment": "eco_e7_silencio_cresce",
+        "fromYear": 2990,
+        "flags": [
+          "e7_rumo_escuta",
+          "e7_rumo_heranca"
+        ],
+        "note": "Década final (passos de 13 semanas): o ruído de fundo cai a cada trimestre; 82 Eridani se cala; as últimas cartas chegam."
+      },
+      {
+        "ecoFragment": "eco_e7_ultima_voz",
+        "fromYear": 2990,
+        "flags": [
+          "e7_ultima_voz_arquivada",
+          "e7_respondeu_vigia",
+          "e7_hiades_transmitiu"
+        ],
+        "note": "A última voz: a transmissão da Vigia Avançada (posto da Ordem a dez anos-luz, rumo a Touro) no instante em que a borda a alcança, recebida em 2990–2993. A Cidade-Nave Paciência já se calara (e7_paciencia_cala, 2932+: partiu a 0,5 c em 2724, a borda a alcançou por volta de 2862 a uns 70 anos-luz)."
+      }
+    ],
+    "lean": {
+      "contato": [
+        "e7_tende_contato",
+        "e7_gritar",
+        "e7_bilhete_pergunta",
+        "e7_hiades_transmitiu",
+        "e7_respondeu_vigia"
+      ],
+      "silencio": [
+        "e7_tende_silencio",
+        "e7_nao_gritar",
+        "e7_hiades_calou",
+        "e7_rumo_escuta"
+      ],
+      "heranca": [
+        "e7_tende_heranca",
+        "e7_rumo_heranca",
+        "e7_ultima_voz_arquivada",
+        "e7_mapa_arquivado",
+        "e7_arquivo_integral"
+      ]
+    }
+  }
 }

@@ -1,0 +1,59 @@
+/* Ad Astra: skin of Era 3, "A Era Comercial" (2000–2025), palette "aco" (data/eras/e3/era.json).
+   Brushed steel, clean-room white and the cool blue of investor decks. Only the era hooks change:
+   accent, surface tone and a faint texture (docs/EXPANSION.md §12, docs/DESIGN.md system unchanged).
+   Applies when app.js sets body[data-era="e3"]. "Mine" highlights keep the amber --yellow. */
+
+body[data-era="e3"] {
+  /* surfaces: graphite with a cold steel cast */
+  --s0: #06080b;
+  --s1: #0b0e12;
+  --s2: #11151a;
+  --s3: #161b21;
+  --s4: #1d232b;
+  --line: #1a2027;
+  --line-strong: #29313b;
+
+  --text: #eaeef2;
+  --text-2: #98a2ad;
+  --text-3: #5f6a76;
+
+  /* accent: steel blue of the commercial era (primary actions, chapter chips, era scene) */
+  --steel: #8fb8d6;
+  --steel-bg: #8fb8d616;
+  --steel-line: #8fb8d640;
+  --act: var(--steel);
+  --act-ink: #0d1218;
+  --accent: var(--steel);
+  --accent-ink: var(--act-ink);
+  --accent2: #c9d6e0;
+  --info: #7fb0d0;
+  --info-bg: #7fb0d016;
+  --info-line: #7fb0d040;
+
+  /* faint brushed-metal grain: horizontal hairlines, almost invisible on OLED */
+  background-color: var(--s0);
+  background-image:
+    repeating-linear-gradient(0deg, #ffffff03 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #0c1117 0%, var(--s0) 38%);
+  background-attachment: fixed;
+}
+
+/* cards get a thin top highlight, like a machined edge */
+body[data-era="e3"] .card {
+  box-shadow: inset 0 1px 0 #ffffff08;
+}
+
+/* era/chapter chip in the header and era scene accents */
+body[data-era="e3"] .data-chip {
+  border-color: var(--steel-line);
+  color: var(--accent2);
+}
+
+/* phones in lite mode and reduced-motion users: no texture, no fixed background */
+html[data-perf="lite"] body[data-era="e3"] {
+  background-image: none;
+  background-attachment: scroll;
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-era="e3"] { background-attachment: scroll; }
+}

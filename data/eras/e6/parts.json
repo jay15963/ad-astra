@@ -1,0 +1,9 @@
+{
+  "_doc": "Peças do Hangar que surgem na era 6 (mesmo formato de data/core/parts.json; meses base 1). Os propulsores de nave (vela, escudo, habitat) esperam o construtor de naves (§6); por ora só motores e aviônica.",
+  "monthBase": 1,
+  "parts": [
+    {"id":"fusao_pulsada_ii","kind":"engine","name":"Fusão pulsada de 2ª geração","prop":"fusion","thrustKN":900,"ispSL":0,"ispVac":18000,"massT":55,"costM":420,"reliability":0.985,"availableFrom":{"year":2300,"month":1},"access":"generic","family":"fusao_pulsada","bellD":7,"bellLen":6,"upperOnly":true,"truthLayer":"especulacao","source":"https://en.wikipedia.org/wiki/Project_Daedalus","note":"Pastilhas de deutério e hélio-3 detonadas por feixes de elétrons, como no estudo Daedalus, com uma câmara magnética que não derrete."},
+    {"id":"fusao_pulsada_iii","kind":"engine","name":"Fusão pulsada de 3ª geração","prop":"fusion","thrustKN":1400,"ispSL":0,"ispVac":26000,"massT":60,"costM":380,"reliability":0.99,"availableFrom":{"year":2430,"month":1},"access":"generic","family":"fusao_pulsada","bellD":7,"bellLen":6,"upperOnly":true,"truthLayer":"especulacao","source":"https://en.wikipedia.org/wiki/Project_Daedalus","note":"Ignição a cada décimo de segundo durante anos. O mesmo motor que leva as naves de segunda leva a Proxima."},
+    {"id":"av_2400","kind":"avionics","name":"Aviônica de luz (computação fotônica)","massT":0.08,"costM":2,"reliability":0.9997,"availableFrom":{"year":2400,"month":1},"access":"generic","truthLayer":"especulacao"}
+  ]
+}

@@ -1,0 +1,81 @@
+/* Era 7 — Galáctica (2600–2999): "violeta". Místico, estranho, silencioso.
+   Pele da era (EXPANSION.md §12, DESIGN.md: body[data-era] troca só tokens: acento, textura, tom de superfície).
+   Superfícies de um índigo quase preto, texto frio, acento lilás pálido em vez do amarelo da era 4; o vermelho e o
+   verde ficam um pouco mais apagados (as notícias boas e ruins chegam com décadas de atraso). Contraste do texto
+   principal sobre --s0 ≈ 15:1, do --text-2 ≈ 7:1, do --act sobre --act-ink ≈ 9:1. Dono: C7. */
+
+body[data-era="e7"] {
+  /* surfaces, back to front */
+  --s0: #07060d;
+  --s1: #0c0a16;
+  --s2: #120f20;
+  --s3: #181429;
+  --s4: #201b35;
+  --line: #1d1830;
+  --line-strong: #2d2647;
+
+  --text: #ebe8f5;
+  --text-2: #a6a0c0;
+  --text-3: #6c6688;
+
+  --green: #7fd6b0;
+  --red: #e98aa0;
+  --yellow: #d9c38a;
+  --amber: #c9a86a;
+  --info: #9fb4e8;
+  --violet: #c4b5fd;
+
+  --green-bg: #7fd6b014;
+  --red-bg: #e98aa014;
+  --yellow-bg: #d9c38a14;
+  --info-bg: #9fb4e814;
+  --green-line: #7fd6b03a;
+  --red-line: #e98aa03a;
+  --yellow-line: #d9c38a3a;
+  --info-line: #9fb4e83a;
+
+  --act: #c4b5fd;
+  --act-ink: #120d24;
+  --light: #ece9f7;
+  --light-ink: #0b0914;
+  --shadow: 0 18px 48px #000000c4;
+  --shadow-sheet: 0 -24px 70px #000000a8;
+
+  /* legacy aliases follow the new tokens */
+  --bg: var(--s0);
+  --bg2: var(--s1);
+  --panel: var(--s1);
+  --panel2: var(--s3);
+  --ink: var(--text);
+  --ink2: var(--text-2);
+  --muted: var(--text-3);
+  --dust: var(--text-3);
+  --accent: var(--act);
+  --accent-ink: var(--act-ink);
+  --accent2: var(--violet);
+  --blue: var(--info);
+  --good: var(--green);
+  --bad: var(--red);
+  --warn: var(--yellow);
+  --ok: var(--green);
+  --danger: var(--red);
+  --fg: var(--text);
+
+  /* texture: a faint, static star dust (no animation: the era is still) */
+  background-image:
+    radial-gradient(1px 1px at 18% 22%, #ffffff14 50%, transparent 51%),
+    radial-gradient(1px 1px at 72% 64%, #c4b5fd12 50%, transparent 51%),
+    radial-gradient(1px 1px at 41% 83%, #ffffff0d 50%, transparent 51%),
+    radial-gradient(120% 80% at 50% -10%, #1a1433 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+/* colorblind on top of the era: keep blue/orange, only the hues of this palette */
+body[data-era="e7"].colorblind {
+  --green: #8fb8f0;
+  --red: #f0a868;
+  --green-bg: #8fb8f014;
+  --red-bg: #f0a86814;
+  --green-line: #8fb8f03a;
+  --red-line: #f0a8683a;
+}

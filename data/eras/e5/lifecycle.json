@@ -1,0 +1,22 @@
+{
+  "_doc": "Ciclo de vida da era 5 (EXPANSION.md §3.2; meses base 0). Sucessores especulativos: consórcios planetários, corporações-estado e governos de colônia. Mescla com core/lifecycle.json por id.",
+  "events": [
+    {"id":"shackleton_born","date":{"year":2051,"month":0},"op":"birth","truthLayer":"especulacao","actor":"shackleton","headline":"Operadoras da base lunar fundam o Consórcio Lunar Shackleton"},
+    {"id":"tharsis_born","date":{"year":2058,"month":3},"op":"birth","truthLayer":"especulacao","actor":"tharsis","headline":"Empreiteiras de Marte criam o Consórcio Planetário de Tharsis"},
+    {"id":"helion_born","date":{"year":2069,"month":8},"op":"birth","truthLayer":"especulacao","actor":"helion","headline":"Nasce a Hélion, estatal do hélio-3 e da fusão"},
+    {"id":"cinturao_born","date":{"year":2087,"month":9},"op":"birth","truthLayer":"especulacao","actor":"cinturao","headline":"Garimpeiros do cinturão fundam a sua cooperativa"},
+    {"id":"lagrange_born","date":{"year":2093,"month":3},"op":"birth","truthLayer":"especulacao","actor":"lagrange","headline":"Estaleiros Lagrange abrem a primeira doca no ponto L5"},
+    {"id":"shackleton_selenita","date":{"year":2097,"month":6},"op":"rename","truthLayer":"especulacao","actor":"shackleton","to":1},
+    {"id":"joviana_born","date":{"year":2119,"month":1},"op":"birth","truthLayer":"especulacao","actor":"joviana","headline":"Europa, Japão e Índia fundam a Liga Joviana"},
+    {"id":"tharsis_corp","date":{"year":2126,"month":0},"op":"rename","truthLayer":"especulacao","actor":"tharsis","to":1},
+    {"id":"ishtar_born","date":{"year":2138,"month":2},"op":"birth","truthLayer":"especulacao","actor":"ishtar","headline":"Primeira cidade-balão de Vênus ganha governo próprio: Ishtar"},
+    {"id":"helion_interplanetaria","date":{"year":2141,"month":3},"op":"rename","truthLayer":"especulacao","actor":"helion","to":1},
+    {"id":"ceres_comuna_born","date":{"year":2146,"month":6},"op":"birth","truthLayer":"especulacao","actor":"ceres_comuna","headline":"Moradores de Occator proclamam a Comuna de Ceres"},
+    {"id":"cinturao_liga","date":{"year":2150,"month":0},"op":"rename","truthLayer":"especulacao","actor":"cinturao","to":1},
+    {"id":"lagrange_into_helion","date":{"year":2156,"month":4},"op":"merge","truthLayer":"especulacao","from":["lagrange"],"into":"helion","inherit":{"crew":"transfer","cash":0.6,"prestige":"sum"}},
+    {"id":"marte_livre_born","date":{"year":2171,"month":8},"op":"birth","truthLayer":"especulacao","actor":"marte_livre","headline":"Nascidos em Marte formam o Conselho Livre de Marte"},
+    {"id":"ishtar_dissolve","date":{"year":2179,"month":9},"op":"dissolve","truthLayer":"especulacao","actor":"ishtar","headline":"Ishtar é evacuada: a cidade-balão de Vênus fecha as portas"},
+    {"id":"tharsis_into_marte","date":{"year":2184,"month":1},"op":"merge","truthLayer":"especulacao","from":["tharsis"],"into":"marte_livre","inherit":{"crew":"transfer","cash":0.8,"prestige":"sum","vehicles":["graneleiro_tharsis","graneleiro_ii"]}},
+    {"id":"marte_republica","date":{"year":2188,"month":3},"op":"rename","truthLayer":"especulacao","actor":"marte_livre","to":1}
+  ]
+}

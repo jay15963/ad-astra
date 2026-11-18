@@ -1,0 +1,26 @@
+{
+  "_doc": "Peças do Hangar da era 7 (Galáctica, 2600–2999, especulação). Mesmo formato de data/core/parts.json (lista 'parts', mescla por id). Propelente 'fusion' (deutério e hélio-3) como reação principal; a antimatéria entra em miligramas, como catalisador ou como núcleo de feixe. Custos em US$ milhões do jogo.",
+  "monthBase": 1,
+  "parts": [
+    { "id": "fusao_densa_2600", "kind": "engine", "name": "Fusão térmica de ar denso", "prop": "fusion", "thrustKN": 26000, "ispSL": 1800, "ispVac": 2600,
+      "massT": 38, "costM": 60, "reliability": 0.998, "availableFrom": { "year": 2600, "month": 1 }, "access": "generic", "family": "fusao",
+      "bellD": 4, "bellLen": 5, "truthLayer": "especulacao",
+      "note": "Um reator de fusão aquece o propelente e o ar que entra pela tomada: decola de um planeta sem queimar o céu." },
+    { "id": "antimat_catalisada", "kind": "engine", "name": "Fusão catalisada por antimatéria", "prop": "fusion", "thrustKN": 9000, "ispSL": 0, "ispVac": 40000,
+      "massT": 70, "costM": 400, "reliability": 0.995, "availableFrom": { "year": 2600, "month": 1 }, "access": "generic", "family": "antimateria",
+      "bellD": 7, "bellLen": 9, "upperOnly": true, "truthLayer": "especulacao",
+      "note": "Microgramas de antiprótons acendem pastilhas de fusão: empuxo de nave de guerra, eficiência de vela." },
+    { "id": "antimat_feixe", "kind": "engine", "name": "Núcleo de feixe de antimatéria", "prop": "fusion", "thrustKN": 4000, "ispSL": 0, "ispVac": 90000,
+      "massT": 55, "costM": 900, "reliability": 0.99, "availableFrom": { "year": 2810, "month": 1 }, "access": "generic", "family": "antimateria",
+      "bellD": 9, "bellLen": 12, "upperOnly": true, "truthLayer": "especulacao",
+      "note": "Píons guiados por um bocal magnético: a nave mais rápida que a humanidade já fez, e a mais cara de abastecer." },
+    { "id": "bussard_coletor", "kind": "engine", "name": "Estatorreator de Bussard", "prop": "fusion", "thrustKN": 1500, "ispSL": 0, "ispVac": 70000,
+      "massT": 90, "costM": 700, "reliability": 0.985, "availableFrom": { "year": 2720, "month": 1 }, "access": "generic", "family": "estatorreator_interestelar",
+      "bellD": 12, "bellLen": 8, "upperOnly": true, "truthLayer": "especulacao",
+      "note": "Um funil magnético de mil quilômetros recolhe o hidrogênio entre as estrelas. Só funciona depressa; para começar, precisa de ajuda." },
+    { "id": "fr_20m", "kind": "fairing", "name": "Coifa de 20 m", "d": 20, "len": 45, "massT": 16, "costM": 18, "reliability": 0.999,
+      "availableFrom": { "year": 2600, "month": 1 }, "access": "generic", "truthLayer": "especulacao" },
+    { "id": "av_2600", "kind": "avionics", "name": "Aviônica de mente distribuída", "massT": 0.05, "costM": 3, "reliability": 0.9998,
+      "availableFrom": { "year": 2600, "month": 1 }, "access": "generic", "truthLayer": "especulacao" }
+  ]
+}

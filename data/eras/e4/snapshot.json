@@ -1,0 +1,725 @@
+{
+  "note": "Valores de jan/2026 das linhagens vivas no começo da Década Lunar (EXPANSION.md §2.1). Os oito atores principais repetem data/actors.json (o mesmo mundo da Corrida Lunar); relações, blocos (Acordos Artemis e ILRS) e tratados também. Linhagens fora da lista usam lineages.json. Usado pelos cenários com \"snapshot\": \"e4\".",
+  "era": "e4",
+  "date": {
+    "year": 2026,
+    "month": 0
+  },
+  "actors": {
+    "nasa": {
+      "budget": 9000,
+      "support": 62,
+      "reputation": 72,
+      "culture": 25,
+      "prestige": 0,
+      "fixedCostShare": 0.55,
+      "capabilities": {
+        "crewed": true,
+        "launchSites": [
+          "Cabo Canaveral",
+          "Kennedy",
+          "Vandenberg",
+          "Wallops"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.65,
+        "aggression": 0.45,
+        "riskTolerance": 0.5,
+        "goals": [
+          "crewed_lunar_flyby",
+          "crewed_lunar_landing",
+          "lunar_south_pole_crewed",
+          "lunar_base",
+          "mars_sample_return",
+          "europa_arrival",
+          "psyche_arrival",
+          "titan_arrival",
+          "trojan_flyby",
+          "apophis_rendezvous",
+          "venus_entry_probe",
+          "first_fission_surface_power",
+          "crewed_mars_orbit"
+        ]
+      }
+    },
+    "spacex": {
+      "budget": 5000,
+      "support": 70,
+      "reputation": 64,
+      "culture": 80,
+      "prestige": 0,
+      "fixedCostShare": 0.35,
+      "capabilities": {
+        "crewed": true,
+        "launchSites": [
+          "Starbase",
+          "Cabo Canaveral",
+          "Kennedy",
+          "Vandenberg"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.45,
+        "aggression": 0.75,
+        "riskTolerance": 0.85,
+        "goals": [
+          "crewed_lunar_landing",
+          "lunar_south_pole_landing",
+          "mars_landing_robotic",
+          "commercial_station",
+          "crewed_mars_landing"
+        ],
+        "scienceInterest": 0.35
+      }
+    },
+    "blueorigin": {
+      "budget": 2500,
+      "support": 60,
+      "reputation": 52,
+      "culture": 35,
+      "prestige": 0,
+      "fixedCostShare": 0.45,
+      "capabilities": {
+        "crewed": false,
+        "launchSites": [
+          "Cabo Canaveral",
+          "Vandenberg"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.55,
+        "aggression": 0.6,
+        "riskTolerance": 0.65,
+        "goals": [
+          "lunar_south_pole_landing",
+          "crewed_lunar_landing",
+          "commercial_station",
+          "lunar_resource_demo"
+        ],
+        "scienceInterest": 0.3
+      }
+    },
+    "cnsa": {
+      "budget": 6000,
+      "support": 80,
+      "reputation": 60,
+      "culture": 10,
+      "prestige": 0,
+      "fixedCostShare": 0.45,
+      "capabilities": {
+        "crewed": true,
+        "launchSites": [
+          "Wenchang",
+          "Jiuquan",
+          "Xichang",
+          "Taiyuan"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.45,
+        "aggression": 0.55,
+        "riskTolerance": 0.45,
+        "goals": [
+          "crewed_lunar_landing",
+          "lunar_south_pole_landing",
+          "lunar_resource_demo",
+          "lunar_base",
+          "mars_sample_return",
+          "asteroid_sample_return",
+          "asteroid_rendezvous",
+          "mars_landing_robotic",
+          "jupiter_arrival",
+          "first_space_solar_power"
+        ]
+      }
+    },
+    "isro": {
+      "budget": 1600,
+      "support": 74,
+      "reputation": 62,
+      "culture": 15,
+      "prestige": 0,
+      "fixedCostShare": 0.4,
+      "capabilities": {
+        "crewed": false,
+        "launchSites": [
+          "Sriharikota"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.7,
+        "aggression": 0.35,
+        "riskTolerance": 0.45,
+        "goals": [
+          "crewed_orbit_national:isro",
+          "national_station",
+          "lunar_sample_return",
+          "lunar_south_pole_landing",
+          "venus_orbit",
+          "venus_flyby",
+          "mars_landing_robotic"
+        ]
+      }
+    },
+    "esa": {
+      "budget": 3500,
+      "support": 58,
+      "reputation": 70,
+      "culture": -35,
+      "prestige": 0,
+      "fixedCostShare": 0.5,
+      "capabilities": {
+        "crewed": false,
+        "launchSites": [
+          "Kourou"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.85,
+        "aggression": 0.2,
+        "riskTolerance": 0.3,
+        "goals": [
+          "mars_landing_robotic",
+          "lunar_resource_demo",
+          "jupiter_arrival",
+          "lunar_sample_return",
+          "mercury_orbit",
+          "planetary_defense_survey",
+          "apophis_rendezvous",
+          "ganymede_orbit",
+          "venus_orbit",
+          "lunar_station"
+        ]
+      }
+    },
+    "roscosmos": {
+      "budget": 2200,
+      "support": 55,
+      "reputation": 45,
+      "culture": 5,
+      "prestige": 0,
+      "fixedCostShare": 0.5,
+      "capabilities": {
+        "crewed": true,
+        "launchSites": [
+          "Baikonur",
+          "Vostochny",
+          "Plesetsk"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.4,
+        "aggression": 0.6,
+        "riskTolerance": 0.55,
+        "goals": [
+          "national_station",
+          "lunar_south_pole_landing",
+          "lunar_base",
+          "venus_entry_probe",
+          "phobos_landing"
+        ]
+      }
+    },
+    "jaxa": {
+      "budget": 1500,
+      "support": 60,
+      "reputation": 74,
+      "culture": -45,
+      "prestige": 0,
+      "fixedCostShare": 0.45,
+      "capabilities": {
+        "crewed": false,
+        "launchSites": [
+          "Tanegashima",
+          "Uchinoura"
+        ]
+      },
+      "ai": {
+        "cooperation": 0.8,
+        "aggression": 0.2,
+        "riskTolerance": 0.3,
+        "goals": [
+          "lunar_south_pole_landing",
+          "lunar_resource_demo",
+          "lunar_sample_return",
+          "phobos_landing",
+          "asteroid_sample_return",
+          "asteroid_rendezvous"
+        ]
+      }
+    }
+  },
+  "relations": [
+    {
+      "a": "nasa",
+      "b": "spacex",
+      "trust": 55,
+      "dependence": 70,
+      "rivalry": 15
+    },
+    {
+      "a": "nasa",
+      "b": "blueorigin",
+      "trust": 45,
+      "dependence": 40,
+      "rivalry": 10
+    },
+    {
+      "a": "nasa",
+      "b": "esa",
+      "trust": 60,
+      "dependence": 45,
+      "rivalry": 10
+    },
+    {
+      "a": "nasa",
+      "b": "jaxa",
+      "trust": 65,
+      "dependence": 35,
+      "rivalry": 5
+    },
+    {
+      "a": "nasa",
+      "b": "isro",
+      "trust": 40,
+      "dependence": 20,
+      "rivalry": 15
+    },
+    {
+      "a": "nasa",
+      "b": "cnsa",
+      "trust": -55,
+      "dependence": 0,
+      "rivalry": 85
+    },
+    {
+      "a": "nasa",
+      "b": "roscosmos",
+      "trust": -10,
+      "dependence": 25,
+      "rivalry": 45
+    },
+    {
+      "a": "spacex",
+      "b": "blueorigin",
+      "trust": 10,
+      "dependence": 0,
+      "rivalry": 70
+    },
+    {
+      "a": "spacex",
+      "b": "esa",
+      "trust": 25,
+      "dependence": 30,
+      "rivalry": 25
+    },
+    {
+      "a": "spacex",
+      "b": "jaxa",
+      "trust": 25,
+      "dependence": 10,
+      "rivalry": 10
+    },
+    {
+      "a": "spacex",
+      "b": "isro",
+      "trust": 15,
+      "dependence": 5,
+      "rivalry": 20
+    },
+    {
+      "a": "spacex",
+      "b": "cnsa",
+      "trust": -40,
+      "dependence": 0,
+      "rivalry": 55
+    },
+    {
+      "a": "spacex",
+      "b": "roscosmos",
+      "trust": -35,
+      "dependence": 0,
+      "rivalry": 45
+    },
+    {
+      "a": "blueorigin",
+      "b": "esa",
+      "trust": 15,
+      "dependence": 0,
+      "rivalry": 10
+    },
+    {
+      "a": "blueorigin",
+      "b": "jaxa",
+      "trust": 15,
+      "dependence": 0,
+      "rivalry": 5
+    },
+    {
+      "a": "blueorigin",
+      "b": "isro",
+      "trust": 5,
+      "dependence": 0,
+      "rivalry": 5
+    },
+    {
+      "a": "blueorigin",
+      "b": "cnsa",
+      "trust": -35,
+      "dependence": 0,
+      "rivalry": 40
+    },
+    {
+      "a": "blueorigin",
+      "b": "roscosmos",
+      "trust": -25,
+      "dependence": 0,
+      "rivalry": 20
+    },
+    {
+      "a": "cnsa",
+      "b": "roscosmos",
+      "trust": 45,
+      "dependence": 35,
+      "rivalry": 15
+    },
+    {
+      "a": "cnsa",
+      "b": "esa",
+      "trust": 5,
+      "dependence": 5,
+      "rivalry": 25
+    },
+    {
+      "a": "cnsa",
+      "b": "jaxa",
+      "trust": -25,
+      "dependence": 0,
+      "rivalry": 40
+    },
+    {
+      "a": "cnsa",
+      "b": "isro",
+      "trust": -40,
+      "dependence": 0,
+      "rivalry": 65
+    },
+    {
+      "a": "esa",
+      "b": "jaxa",
+      "trust": 40,
+      "dependence": 15,
+      "rivalry": 5
+    },
+    {
+      "a": "esa",
+      "b": "isro",
+      "trust": 30,
+      "dependence": 5,
+      "rivalry": 10
+    },
+    {
+      "a": "esa",
+      "b": "roscosmos",
+      "trust": -45,
+      "dependence": 5,
+      "rivalry": 30
+    },
+    {
+      "a": "jaxa",
+      "b": "isro",
+      "trust": 40,
+      "dependence": 15,
+      "rivalry": 10
+    },
+    {
+      "a": "jaxa",
+      "b": "roscosmos",
+      "trust": -25,
+      "dependence": 0,
+      "rivalry": 15
+    },
+    {
+      "a": "isro",
+      "b": "roscosmos",
+      "trust": 25,
+      "dependence": 15,
+      "rivalry": 5
+    }
+  ],
+  "blocs": [
+    {
+      "id": "artemis_accords",
+      "name": "Acordos Artemis",
+      "short": "Artemis",
+      "leader": "nasa",
+      "icon": "🌗",
+      "members": [
+        "nasa",
+        "esa",
+        "jaxa",
+        "isro",
+        "spacex",
+        "blueorigin"
+      ],
+      "associates": [
+        "spacex",
+        "blueorigin"
+      ],
+      "treatyId": "artemis_accords",
+      "description": "Princípios para explorar a Lua com transparência, interoperabilidade e uso de recursos. Liderado pelos EUA; empresas americanas entram como associadas."
+    },
+    {
+      "id": "ilrs",
+      "name": "ILRS (Estação Internacional de Pesquisa Lunar)",
+      "short": "ILRS",
+      "leader": "cnsa",
+      "icon": "🌕",
+      "members": [
+        "cnsa",
+        "roscosmos"
+      ],
+      "associates": [],
+      "treatyId": "ilrs_agreement",
+      "description": "Base lunar robótica e depois tripulada no polo sul, liderada pela China com a Rússia."
+    }
+  ],
+  "treaties": [
+    {
+      "id": "outer_space_treaty",
+      "type": "peaceful_use",
+      "name": "Tratado do Espaço Exterior",
+      "parties": [
+        "nasa",
+        "cnsa",
+        "isro",
+        "esa",
+        "roscosmos",
+        "jaxa"
+      ],
+      "signedTurn": -3068,
+      "status": "active",
+      "terms": {
+        "multilateral": true,
+        "permanent": true,
+        "untilTurn": null,
+        "note": "Base do direito espacial desde 1967: uso pacífico e nenhuma soberania sobre corpos celestes."
+      }
+    },
+    {
+      "id": "artemis_accords",
+      "type": "lunar_resources",
+      "name": "Acordos Artemis",
+      "parties": [
+        "nasa",
+        "esa",
+        "jaxa",
+        "isro"
+      ],
+      "signedTurn": -271,
+      "status": "active",
+      "terms": {
+        "multilateral": true,
+        "blocId": "artemis_accords",
+        "untilTurn": null,
+        "note": "Zonas de segurança e uso de recursos lunares."
+      }
+    },
+    {
+      "id": "ilrs_agreement",
+      "type": "mission_partnership",
+      "name": "Acordo ILRS China-Rússia",
+      "parties": [
+        "cnsa",
+        "roscosmos"
+      ],
+      "signedTurn": -250,
+      "status": "active",
+      "terms": {
+        "multilateral": true,
+        "blocId": "ilrs",
+        "program": "lunar_base",
+        "untilTurn": null
+      }
+    },
+    {
+      "id": "hls_starship",
+      "type": "mission_partnership",
+      "name": "Contrato HLS Starship",
+      "parties": [
+        "nasa",
+        "spacex"
+      ],
+      "signedTurn": -248,
+      "status": "active",
+      "terms": {
+        "program": "lunar_crewed",
+        "lead": "nasa",
+        "untilTurn": 259
+      }
+    },
+    {
+      "id": "hls_blue_moon",
+      "type": "mission_partnership",
+      "name": "Contrato HLS Blue Moon",
+      "parties": [
+        "nasa",
+        "blueorigin"
+      ],
+      "signedTurn": -140,
+      "status": "active",
+      "terms": {
+        "program": "lunar_crewed",
+        "lead": "nasa",
+        "untilTurn": 259
+      }
+    },
+    {
+      "id": "artemis_iii_docking",
+      "type": "mission_partnership",
+      "name": "Artemis III: teste de acoplagem Starship e Blue Moon",
+      "parties": [
+        "spacex",
+        "blueorigin"
+      ],
+      "signedTurn": -20,
+      "status": "active",
+      "terms": {
+        "program": "docking_test",
+        "lead": "spacex",
+        "untilTurn": 104,
+        "protectedUntil": 80,
+        "note": "Rivais no pouso, parceiras no teste em órbita exigido pela NASA."
+      }
+    },
+    {
+      "id": "iss_integrated_crew",
+      "type": "crew_exchange",
+      "name": "Assentos integrados da ISS",
+      "parties": [
+        "nasa",
+        "roscosmos"
+      ],
+      "signedTurn": -180,
+      "status": "active",
+      "terms": {
+        "seats": 1,
+        "untilTurn": 103,
+        "protectedUntil": 103,
+        "note": "Astronautas em Soyuz e cosmonautas em Crew Dragon."
+      }
+    },
+    {
+      "id": "orion_esm",
+      "type": "cost_sharing",
+      "name": "Módulo de Serviço Europeu da Orion",
+      "parties": [
+        "nasa",
+        "esa"
+      ],
+      "signedTurn": -620,
+      "status": "active",
+      "terms": {
+        "share": 0.15,
+        "untilTurn": 259,
+        "note": "A ESA fornece o módulo de serviço em troca de assentos."
+      }
+    },
+    {
+      "id": "artemis_esa_seats",
+      "type": "crew_exchange",
+      "name": "Astronautas europeus na Artemis",
+      "parties": [
+        "nasa",
+        "esa"
+      ],
+      "signedTurn": -320,
+      "status": "active",
+      "terms": {
+        "seats": 1,
+        "untilTurn": 259
+      }
+    },
+    {
+      "id": "artemis_jaxa_rover",
+      "type": "crew_exchange",
+      "name": "Rover pressurizado por assentos lunares",
+      "parties": [
+        "nasa",
+        "jaxa"
+      ],
+      "signedTurn": -90,
+      "status": "active",
+      "terms": {
+        "seats": 2,
+        "untilTurn": 259,
+        "note": "O Japão constrói o rover pressurizado; dois japoneses pisam na Lua."
+      }
+    },
+    {
+      "id": "nisar",
+      "type": "mission_partnership",
+      "name": "NISAR",
+      "parties": [
+        "nasa",
+        "isro"
+      ],
+      "signedTurn": -600,
+      "status": "active",
+      "terms": {
+        "program": "earth_obs",
+        "untilTurn": 155
+      }
+    },
+    {
+      "id": "lupex",
+      "type": "mission_partnership",
+      "name": "LUPEX (Chandrayaan-5)",
+      "parties": [
+        "jaxa",
+        "isro"
+      ],
+      "signedTurn": -100,
+      "status": "active",
+      "terms": {
+        "program": "lunar_science",
+        "untilTurn": 259
+      }
+    },
+    {
+      "id": "smile",
+      "type": "mission_partnership",
+      "name": "SMILE (ESA e China)",
+      "parties": [
+        "esa",
+        "cnsa"
+      ],
+      "signedTurn": -520,
+      "status": "active",
+      "terms": {
+        "program": "space_weather",
+        "untilTurn": 120,
+        "note": "Raro elo científico entre a Europa e a China."
+      }
+    },
+    {
+      "id": "exomars_russia",
+      "type": "mission_partnership",
+      "name": "ExoMars com a Rússia",
+      "parties": [
+        "esa",
+        "roscosmos"
+      ],
+      "signedTurn": -680,
+      "status": "broken",
+      "brokenBy": "esa",
+      "brokenTurn": -198,
+      "terms": {
+        "program": "mars_robotic",
+        "untilTurn": null,
+        "note": "Suspensa em 2022 após a invasão da Ucrânia."
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "note": "Valores iniciais de jan/2051 (EXPANSION.md §2.1 \"snapshot\"): cenário Fronteira Marciana e qualquer partida que comece na era 5. Verbas em US$ milhões do jogo (valores constantes de 2026). Relações sobrescrevem os pares listados; blocos e tratados substituem os de 2026. signedTurn é relativo a jan/2051. Dono: era 5 (C5).",
+  "era": "e5",
+  "date": {"year":2051,"month":0},
+  "actors": {
+    "nasa": {"budget":15000,"cash":3800,"support":58,"reputation":74,"culture":20,"prestige":0,"fixedCostShare":0.55,"capabilities":{"crewed":true,"launchSites":["Kennedy","Vandenberg","Shackleton"]},"ai":{"cooperation":0.6,"aggression":0.45,"riskTolerance":0.5}},
+    "cnsa": {"budget":16000,"cash":4200,"support":74,"reputation":68,"culture":5,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":["Wenchang","Jiuquan"]},"ai":{"cooperation":0.35,"aggression":0.55,"riskTolerance":0.5}},
+    "esa": {"budget":9000,"cash":2200,"support":60,"reputation":70,"culture":-10,"prestige":0,"fixedCostShare":0.6,"capabilities":{"crewed":true,"launchSites":["Kourou"]},"ai":{"cooperation":0.8,"aggression":0.2,"riskTolerance":0.35}},
+    "isro": {"budget":5200,"cash":1300,"support":70,"reputation":62,"culture":10,"prestige":0,"fixedCostShare":0.5,"capabilities":{"crewed":true,"launchSites":["Sriharikota","Kulasekarapattinam"]},"ai":{"cooperation":0.6,"aggression":0.35,"riskTolerance":0.45}},
+    "jaxa": {"budget":3600,"cash":900,"support":58,"reputation":66,"culture":-15,"prestige":0,"fixedCostShare":0.6,"capabilities":{"crewed":true,"launchSites":["Tanegashima"]},"ai":{"cooperation":0.75,"aggression":0.2,"riskTolerance":0.3}},
+    "roscosmos": {"budget":2800,"cash":500,"support":52,"reputation":45,"culture":15,"prestige":0,"fixedCostShare":0.65,"capabilities":{"crewed":true,"launchSites":["Baikonur","Vostochny"]},"ai":{"cooperation":0.35,"aggression":0.5,"riskTolerance":0.55}},
+    "spacex": {"budget":14000,"cash":3500,"support":66,"reputation":64,"culture":75,"prestige":0,"fixedCostShare":0.35,"capabilities":{"crewed":true,"launchSites":["Starbase","Kennedy"]},"ai":{"cooperation":0.5,"aggression":0.6,"riskTolerance":0.75}},
+    "blueorigin": {"budget":7000,"cash":1800,"support":60,"reputation":58,"culture":40,"prestige":0,"fixedCostShare":0.4,"capabilities":{"crewed":true,"launchSites":["Cabo Canaveral","Van Horn"]},"ai":{"cooperation":0.55,"aggression":0.4,"riskTolerance":0.5}},
+    "shackleton": {"budget":2600,"cash":700,"support":62,"reputation":55,"culture":30,"prestige":0,"fixedCostShare":0.45,"capabilities":{"crewed":true,"launchSites":["Shackleton"]},"ai":{"cooperation":0.6,"aggression":0.35,"riskTolerance":0.55}}
+  },
+  "relations": [
+    {"a":"nasa","b":"esa","trust":55,"dependence":40,"rivalry":15},
+    {"a":"nasa","b":"jaxa","trust":60,"dependence":35,"rivalry":10},
+    {"a":"nasa","b":"isro","trust":40,"dependence":20,"rivalry":20},
+    {"a":"nasa","b":"cnsa","trust":-25,"dependence":0,"rivalry":70},
+    {"a":"nasa","b":"spacex","trust":45,"dependence":60,"rivalry":30},
+    {"a":"nasa","b":"blueorigin","trust":45,"dependence":40,"rivalry":15},
+    {"a":"nasa","b":"shackleton","trust":50,"dependence":45,"rivalry":20},
+    {"a":"cnsa","b":"roscosmos","trust":35,"dependence":45,"rivalry":20},
+    {"a":"cnsa","b":"isro","trust":-5,"dependence":5,"rivalry":45},
+    {"a":"cnsa","b":"shackleton","trust":0,"dependence":10,"rivalry":40},
+    {"a":"esa","b":"jaxa","trust":55,"dependence":25,"rivalry":10},
+    {"a":"esa","b":"isro","trust":45,"dependence":20,"rivalry":10},
+    {"a":"esa","b":"shackleton","trust":40,"dependence":30,"rivalry":15},
+    {"a":"spacex","b":"blueorigin","trust":5,"dependence":5,"rivalry":65},
+    {"a":"spacex","b":"shackleton","trust":30,"dependence":40,"rivalry":25}
+  ],
+  "blocs": [
+    {"id":"artemis_accords","name":"Aliança Artemis","short":"Artemis","leader":"nasa","icon":"🌗","members":["nasa","esa","jaxa","isro","spacex","blueorigin","shackleton"],"associates":["spacex","blueorigin","shackleton"],"treatyId":"artemis_accords","description":"Os Acordos Artemis viraram aliança: base lunar compartilhada, regras de recursos e rotas para Marte."},
+    {"id":"ilrs","name":"ILRS (Estação Internacional de Pesquisa Lunar)","short":"ILRS","leader":"cnsa","icon":"🌕","members":["cnsa","roscosmos"],"associates":[],"treatyId":"ilrs_agreement","description":"A base lunar sino-russa cresceu e mira Marte: o bloco rival da Aliança Artemis."}
+  ],
+  "treaties": [
+    {"id":"outer_space_treaty","type":"peaceful_use","name":"Tratado do Espaço Exterior","parties":["nasa","cnsa","isro","esa","roscosmos","jaxa"],"signedTurn":-4368,"status":"active","terms":{"multilateral":true,"permanent":true,"untilTurn":null,"note":"Uso pacífico e nenhuma soberania sobre corpos celestes, ainda de pé depois de oitenta anos de reinterpretações."}},
+    {"id":"artemis_accords","type":"lunar_resources","name":"Acordos Artemis","parties":["nasa","esa","jaxa","isro"],"signedTurn":-1573,"status":"active","terms":{"multilateral":true,"blocId":"artemis_accords","untilTurn":null,"note":"Zonas de segurança e uso de recursos; desde 2049 valem também para Marte."}},
+    {"id":"ares_partnership","type":"mission_partnership","name":"Parceria Ares (Marte)","parties":["nasa","esa","jaxa"],"signedTurn":-191,"status":"active","terms":{"multilateral":true,"untilTurn":1040,"note":"Divisão de custos e de assentos nos primeiros voos tripulados a Marte."}},
+    {"id":"ilrs_agreement","type":"mission_partnership","name":"Acordo da ILRS","parties":["cnsa","roscosmos"],"signedTurn":-1551,"status":"active","terms":{"multilateral":true,"blocId":"ilrs","untilTurn":null,"note":"Base lunar conjunta e cooperação para Marte."}}
+  ]
+}

@@ -134,7 +134,7 @@ test('1950→2031: every real event on its exact month, actors alive exactly whe
     },
   });
   // every event applied, on its own month
-  for (const e of lifecycle.eventsOf(data)) {
+  for (const e of lifecycle.eventsOf(data).filter((x) => x.date.year < 2031)) { // the run stops at jan/2031
     const t = s.lifecycle.applied[e.id];
     assert.ok(Number.isFinite(t), `evento ${e.id} não aplicado`);
     const d = turnToDate(t, 1950);
@@ -319,6 +319,7 @@ test('data: lineages, events and nations are consistent', () => {
       const l = lin.find((x) => x.id === e.actor);
       assert.deepEqual(l.identities[e.to].from, e.date, `${e.id}: identidade ${e.to} começa em outra data`);
     }
-    assert.ok(e.source, `${e.id} sem fonte`);
+    // real history (fato, plano_oficial) needs a source; projections and speculative eras (Phase C) do not
+    if (!['projecao', 'especulacao'].includes(e.truthLayer)) assert.ok(e.source, `${e.id} sem fonte`);
   }
 });

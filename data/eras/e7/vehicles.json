@@ -1,0 +1,60 @@
+{
+  "_comment": "Lançadores da era 7 (Galáctica, 2600–2999, especulação). Mesmo formato de data/vehicles.json. Primeiro estágio de fusão térmica (decola de qualquer mundo rochoso) e estágios superiores de antimatéria; 'design' decompõe cada um em peças do Hangar (core/parts.json + eras/e7/parts.json) e reproduz a capacidade com calib 1. Acima de 2600 o estágio superior sobra para tudo: a capacidade é a mesma até os planetas externos, e a viagem entre as estrelas é feita pela nave. Dono: C7.",
+  "monthBase": 1,
+  "vehicles": [
+    {
+      "id": "lanca_aurora", "name": "Lança-Aurora", "operator": "diretorio_solar", "provider": "Estaleiros do Anel de Quito", "country": "Sistema Solar",
+      "class": "superheavy", "availableFrom": { "year": 2601, "month": 3 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "costM": 360, "cadencePerYear": 24, "backgroundPerYear": 6,
+      "history": { "flights": 0, "failures": 0, "firstFlight": 2601 }, "estimatedReliability": 0.985,
+      "reusable": true, "crewRated": true, "access": "open", "embargo": [], "standDownWeeks": 8,
+      "capacity": { "leo": 1004, "gto": 1004, "tli": 1004, "mars": 1004, "outer": 1004 },
+      "design": { "calib": 1, "stages": [{ "engineId": "fusao_densa_2600", "engines": 4, "tank": "d20_0", "size": 6, "reuse": true }, { "engineId": "antimat_catalisada", "engines": 1, "tank": "d20_0", "size": 3, "reuse": true }], "boosters": null, "fairingId": "fr_20m", "avionicsId": "av_2600", "paint": "white" },
+      "notes": "O cavalo de carga do Diretório: dois estágios que voltam, mil toneladas em órbita e um rastro de luz azul que se vê do Equador inteiro."
+    },
+    {
+      "id": "cargueiro_vega", "name": "Cargueiro Vega", "operator": "casa_vega", "provider": "Casa de Vega", "country": "Mercúrio",
+      "class": "superheavy", "availableFrom": { "year": 2610, "month": 6 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "costM": 860, "cadencePerYear": 10, "backgroundPerYear": 3,
+      "history": { "flights": 0, "failures": 0, "firstFlight": 2610 }, "estimatedReliability": 0.98,
+      "reusable": true, "crewRated": true, "access": "open", "embargo": [], "standDownWeeks": 10,
+      "capacity": { "leo": 2938, "gto": 2938, "tli": 2938, "mars": 2938, "outer": 2938 },
+      "design": { "calib": 1, "stages": [{ "engineId": "fusao_densa_2600", "engines": 6, "tank": "d20_0", "size": 8, "reuse": true }, { "engineId": "antimat_catalisada", "engines": 1, "tank": "d20_0", "size": 3 }], "boosters": null, "fairingId": "fr_20m", "avionicsId": "av_2600", "paint": "steel" },
+      "notes": "Feito para subir cascos de arca inteiros. A Casa cobra caro e entrega no prazo; ninguém pergunta de onde vem tanta antimatéria."
+    },
+    {
+      "id": "seta_arquivo", "name": "Seta do Arquivo", "operator": "arquivo_estelar", "provider": "Oficinas de Mare Ingenii", "country": "Lua",
+      "class": "heavy", "availableFrom": { "year": 2615, "month": 2 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "costM": 520, "cadencePerYear": 6, "backgroundPerYear": 2,
+      "history": { "flights": 0, "failures": 0, "firstFlight": 2615 }, "estimatedReliability": 0.99,
+      "reusable": false, "crewRated": false, "access": "own", "embargo": [], "standDownWeeks": 12,
+      "capacity": { "leo": 481, "gto": 481, "tli": 481, "mars": 481, "outer": 481 },
+      "design": { "calib": 1, "stages": [{ "engineId": "fusao_densa_2600", "engines": 1, "tank": "d12_0", "size": 6, "reuse": true }, { "engineId": "antimat_catalisada", "engines": 1, "tank": "d12_0", "size": 2 }], "boosters": null, "fairingId": "fr_12m", "avionicsId": "av_2600", "paint": "black" },
+      "notes": "Lançador lento e caprichado para sondas-semente e cápsulas de memória. O Arquivo prefere perder um ano a perder um cristal."
+    },
+    {
+      "id": "lanterna_ouvintes", "name": "Lanterna", "operator": "ordem_ouvintes", "provider": "Ordem dos Ouvintes", "country": "Cinturão de Kuiper",
+      "class": "superheavy", "availableFrom": { "year": 2690, "month": 10 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "costM": 600, "cadencePerYear": 4, "backgroundPerYear": 1,
+      "history": { "flights": 0, "failures": 0, "firstFlight": 2690 }, "estimatedReliability": 0.985,
+      "reusable": true, "crewRated": true, "access": "open", "embargo": [], "standDownWeeks": 16,
+      "capacity": { "leo": 1085, "gto": 1085, "tli": 1085, "mars": 1085, "outer": 1085 },
+      "design": { "calib": 1, "stages": [{ "engineId": "fusao_densa_2600", "engines": 2, "tank": "d15_0", "size": 6, "reuse": true }, { "engineId": "antimat_catalisada", "engines": 1, "tank": "d15_0", "size": 2 }], "boosters": null, "fairingId": "fr_12m", "avionicsId": "av_2600", "paint": "black" },
+      "notes": "Os Ouvintes pintam os foguetes de preto para não refletir nada. Levam antenas, não bandeiras."
+    },
+    {
+      "id": "arco_bussard", "name": "Arco de Bussard", "operator": "frota_lenta", "provider": "Estaleiros de Ceres", "country": "Entre as estrelas",
+      "class": "superheavy", "availableFrom": { "year": 2721, "month": 4 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "costM": 1900, "cadencePerYear": 3, "backgroundPerYear": 1,
+      "history": { "flights": 0, "failures": 0, "firstFlight": 2721 }, "estimatedReliability": 0.975,
+      "reusable": true, "crewRated": true, "access": "open", "embargo": [], "standDownWeeks": 20,
+      "capacity": { "leo": 3680, "gto": 3680, "tli": 3680, "mars": 3680, "outer": 3680 },
+      "design": { "calib": 1, "stages": [{ "engineId": "fusao_densa_2600", "engines": 8, "tank": "d20_0", "size": 10, "reuse": true }, { "engineId": "antimat_catalisada", "engines": 1, "tank": "d20_0", "size": 3 }, { "engineId": "bussard_coletor", "engines": 1, "tank": "d20_0", "size": 2 }], "boosters": null, "fairingId": "fr_20m", "avionicsId": "av_2600", "paint": "steel" },
+      "notes": "Três estágios, e o último abre um funil magnético maior que a Lua. Só presta para ir longe, e vai longe como nada antes dele."
+    },
+    {
+      "id": "ultimo_feixe", "name": "Feixe Derradeiro", "operator": "diretorio_solar", "provider": "Estaleiros do Anel de Quito", "country": "Sistema Solar",
+      "class": "superheavy", "availableFrom": { "year": 2812, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "costM": 1700, "cadencePerYear": 4, "backgroundPerYear": 1,
+      "history": { "flights": 0, "failures": 0, "firstFlight": 2812 }, "estimatedReliability": 0.98,
+      "reusable": true, "crewRated": true, "access": "open", "embargo": [], "standDownWeeks": 16,
+      "capacity": { "leo": 5269, "gto": 5269, "tli": 5269, "mars": 5269, "outer": 5269 },
+      "design": { "calib": 1, "stages": [{ "engineId": "fusao_densa_2600", "engines": 9, "tank": "d20_0", "size": 12, "reuse": true }, { "engineId": "antimat_feixe", "engines": 1, "tank": "d20_0", "size": 3 }], "boosters": null, "fairingId": "fr_20m", "avionicsId": "av_2600", "paint": "white" },
+      "notes": "O último grande foguete do Diretório: núcleo de feixe de antimatéria, pensado para as naves que precisam chegar antes do ano 3000."
+    }
+  ]
+}

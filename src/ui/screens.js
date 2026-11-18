@@ -170,7 +170,7 @@ registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', grou
 registerScreen({ id: 'lancamentos', title: 'Calendário de lançamentos', short: 'Calendário', icon: 'calendario', group: 'operacoes', order: 30, load: () => import('./lancamentos.js'), badge: (st) => mandatesDueSoon(st).length });
 registerScreen({ id: 'veiculo', title: 'Falta o veículo', icon: 'alerta', group: 'operacoes', order: 5, go: 'missoes/lista', available: (st) => missionsNeedingVehicle(st).length > 0, badge: (st) => missionsNeedingVehicle(st).length });
 
-registerScreen({ id: 'colonias', title: 'Colônias', icon: 'alvo', group: 'universo', order: 10, soon: 'C', available: (st) => !!st?.colonies, load: () => views().then((m) => m.stub) });
+registerScreen({ id: 'colonias', title: 'Colônias', icon: 'alvo', group: 'universo', order: 10, available: (st, data) => !!st?.colonies || (!!data?.scenario?.unlocks?.colonies && unlocked(st, data, 'colonies')), load: orStub(() => import('./colonies.js')), badge: (st) => decisionsOf(st, /^colonies\//).length || ((st?.colonies?.list || []).some((c) => c && c.ownerId === st.playerId && c.status === 'active' && (c.welfare ?? 100) < 45) ? true : 0) });
 
 registerScreen({ id: 'noticias', title: 'Notícias', icon: 'noticia', group: 'mundo', order: 10, go: 'mundo/noticias' });
 registerScreen({ id: 'diplomacia', title: 'Rivais e diplomacia', icon: 'transferir', group: 'mundo', order: 20, go: 'mundo/atores', badge: (st) => decisionsOf(st, /^(diplomacy|politics)/).length });
@@ -179,7 +179,7 @@ registerScreen({ id: 'tabela', title: 'Tabela da Era', icon: 'ranking', group: '
 registerScreen({ id: 'anais', title: 'Anais', icon: 'livro', group: 'arquivo', order: 10, load: () => import('./anais.js') });
 registerScreen({ id: 'memorial', title: 'Memorial', icon: 'vela', group: 'arquivo', order: 20, go: 'equipe/memorial' });
 registerScreen({ id: 'album', title: 'Álbum', icon: 'estrela', group: 'arquivo', order: 30, go: 'equipe/album' });
-registerScreen({ id: 'eco', title: 'Arquivo do Eco', icon: 'eco', group: 'arquivo', order: 40, soon: 'C', available: (st) => (st?.eco?.pieces || []).length > 0, load: () => views().then((m) => m.stub) });
+registerScreen({ id: 'eco', title: 'Arquivo do Eco', icon: 'eco', group: 'arquivo', order: 40, available: (st) => !!st?.eco, load: orStub(() => import('./eco-archive.js')) });
 
 registerScreen({ id: 'salvar', title: 'Salvar e capítulos', icon: 'salvar', group: 'sistema', order: 10, load: () => views().then((m) => m.salvar) });
 registerScreen({ id: 'ajustes', title: 'Ajustes', icon: 'ajustes', group: 'sistema', order: 20, load: () => views().then((m) => m.ajustes) });

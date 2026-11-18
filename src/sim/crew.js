@@ -648,7 +648,7 @@ function rivalSlice(state, data) {
     for (const def of rcfg(data).flights || []) {
       let n = 0;
       for (let t = 0; t < (state.turn || 0); t++) if (isFlightTurn(state, data, def, t)) n++;
-      flown[def.id] = n;
+      if (n) flown[def.id] = n; // zero counts stay implicit: the slice never depends on which era packs are loaded
     }
     state.rivalCrew = { flown, standDown: {}, losses: [], aborts: 0, flights: 0 };
   }

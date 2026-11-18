@@ -15,6 +15,10 @@
 // - Never mutates the raw JSON it is given (copy on write), so packs can be re-assembled in any order of loading and
 //   the result only depends on the manifest order and the set of active packs.
 
+import { genEvents } from '../gen/events.js';
+
+const GEN_EVENTS_SEED = 3000;
+
 /** Legacy manifest (no data/packs.json): exactly today's files. */
 export const LEGACY_FILES = ['actors', 'vehicles', 'spacecraft', 'destinations', 'calendar', 'politics', 'geopolitics',
   'tech', 'events', 'crew', 'bodies'];
@@ -145,6 +149,8 @@ export function normalizeScenario(raw, id) {
     s.ending = { type: 'end' };
     s.playable = { rule: 'list', actors: (s.playableActors || []).slice() };
     s.unlocks = s.unlocks || {};
+    // the Corrida Lunar keeps today's world (golden fixture): of the era packs only era.json (meta) is merged
+    if (s.id === 'lunar_race') s.eraContent = 'meta';
   } else {
     s.kind = s.kind || 'scenario';
     s.start = { month: 0, ...(s.start || { year: s.startYear }) };
@@ -224,6 +230,7 @@ export function assemble(manifest, raw, active, { scenario, scenarioId, scenario
   const eraMeta = {};
   const snapshots = {};
   const packsLoaded = {};
+  const metaOnly = normalizeScenario(scenario, scenarioId)?.eraContent === 'meta';
   for (const pack of manifest.packs || []) {
     if (!on.has(pack.id) || !raw[pack.id]) continue;
     const { files, hash } = raw[pack.id];
@@ -233,6 +240,7 @@ export function assemble(manifest, raw, active, { scenario, scenarioId, scenario
     for (const name of pack.files || []) {
       const json = files[name];
       if (json === undefined || json === null) continue;
+      if (metaOnly && !pack.always && name !== 'era') continue;
       if (isEraDir && name === 'era') { eraMeta[pack.era] = json; continue; }
       if (isEraDir && name === 'snapshot') { snapshots[pack.era] = json; continue; }
       if (name === 'patches') { Object.assign(data, applyPatches(data, json, warn)); continue; }
@@ -240,6 +248,14 @@ export function assemble(manifest, raw, active, { scenario, scenarioId, scenario
       const value = isEraDir ? stampFile(name, json, pack.era, eraFrom) : json;
       data[key] = key in data ? mergeValue(data[key], value, warn, name) : value;
     }
+  }
+  // procedural narrative events of the speculative eras (C8, data/gen/gen-events.json): generated per loaded era
+  // pack with a fixed seed, so they are content like any other (the same in every game and every load order)
+  if (data.genEvents?.templates) {
+    const have = new Set((data.events?.events || []).map((e) => e.id));
+    const extra = Object.keys(eraMeta).filter((e) => data.genEvents.templates[e])
+      .flatMap((eraId) => genEvents(data.genEvents, { eraId, seed: GEN_EVENTS_SEED })).filter((e) => !have.has(e.id));
+    if (extra.length) data.events = { ...(data.events || {}), events: [...(data.events?.events || []), ...extra] };
   }
   data.eraPacks = eraMeta;
   data.snapshots = snapshots;

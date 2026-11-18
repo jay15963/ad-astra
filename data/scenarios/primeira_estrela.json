@@ -1,0 +1,104 @@
+{
+ "id": "primeira_estrela",
+ "kind": "scenario",
+ "name": "Primeira Estrela",
+ "subtitle": "2380 a 2420",
+ "start": {
+  "year": 2380,
+  "month": 0
+ },
+ "end": {
+  "year": 2420,
+  "month": 11
+ },
+ "turnWeeks": 13,
+ "eras": [
+  "e6"
+ ],
+ "snapshot": "e6",
+ "playable": {
+  "rule": "list",
+  "actors": [
+   "proxima",
+   "heliopausa",
+   "habitats_vivos",
+   "longa_viagem"
+  ],
+  "found": false
+ },
+ "history": "faithful",
+ "lifecycle": "on",
+ "ending": {
+  "type": "end"
+ },
+ "unlocks": {
+  "builder": {
+   "fromYear": 2380
+  },
+  "investors": {
+   "fromYear": 2380
+  },
+  "colonies": {
+   "fromYear": 2380
+  }
+ },
+ "historicalFirsts": {
+  "first_beamed_sail": {
+   "holder": "Consórcio da Heliopausa",
+   "year": 2214,
+   "mission": "Vela de teste Selene"
+  },
+  "mars_terraforming_begun": {
+   "holder": "Conselho de Terraformação de Marte",
+   "year": 2217,
+   "mission": "Espelhos de Ares"
+  },
+  "first_dyson_swarm_segment": {
+   "holder": "Consórcio da Heliopausa",
+   "year": 2241,
+   "mission": "Enxame de Mercúrio"
+  },
+  "first_interstellar_probe_arrival": {
+   "holder": "Consórcio da Heliopausa",
+   "year": 2258,
+   "mission": "Flotilha Colibri"
+  },
+  "first_exoplanet_closeup": {
+   "holder": "Consórcio da Heliopausa",
+   "year": 2258,
+   "mission": "Flotilha Colibri"
+  },
+  "first_generation_ship_launch": {
+   "holder": "Fundação da Longa Viagem",
+   "year": 2262,
+   "mission": "Arca Saudade"
+  },
+  "first_crewed_interstellar_launch": {
+   "holder": "Fundação da Longa Viagem",
+   "year": 2262,
+   "mission": "Arca Saudade"
+  },
+  "first_interstellar_round_trip_message": {
+   "holder": "Consórcio da Heliopausa",
+   "year": 2344,
+   "mission": "Coro de Lagrange"
+  }
+ },
+ "victory": {
+  "description": "A Aurora está a caminho há sessenta anos. Quem pousa primeiro sob outro sol, quem mantém a conversa com as estrelas e quem prepara a próxima partida? A Tabela da Era decide em dez/2420.",
+  "goals": [
+   {
+    "id": "first_crewed_interstellar_arrival",
+    "label": "Primeira tripulação em outro sistema estelar"
+   },
+   {
+    "id": "exoplanet_crewed_landing",
+    "label": "Primeiro pouso em outro sol"
+   },
+   {
+    "id": "second_star_colony",
+    "label": "Colônias em duas estrelas"
+   }
+  ]
+ }
+}

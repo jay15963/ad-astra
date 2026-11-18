@@ -4,6 +4,7 @@
 // missing from the engine/data falls back to plain text, so the scene can never trap the player.
 import { h, raw, button, chip, toast, reduceMotion, attempt, eraInfo, ERA_NAMES, FIRST_LABELS } from './components.js';
 import { emblemSVG } from './portrait.js';
+import { query as engineQuery } from '../core/engine.js';
 
 const SWIPE_PX = 60;
 
@@ -53,13 +54,15 @@ export function eraSceneModel(state, data, decision = null) {
   const unlocks = Object.entries(data?.scenario?.unlocks || {}).filter(([, u]) => to?.from != null && Number(u?.fromYear) === Number(to.from))
     .map(([k]) => ({ builder: 'Construtor de foguetes', investors: 'Investidores', colonies: 'Colônias' }[k] || k));
   const eraTitle = (e) => (e ? `Era ${e.n ?? ''}${e.name ? `: ${e.name}` : ''}`.trim() : '');
+  // the Eco piece of the era that ends (Phase C9, src/sim/eco.js)
+  const eco = attempt(() => (state?.eco ? engineQuery(state, data, 'eco/eraFragment', from.id) : null), null);
   return {
     fromId: from.id, toId: to?.id || null,
     cards: [
       { eyebrow: 'Fim de uma era', title: `Fim da ${eraTitle(from)}`, lines: [pos ? `Você termina a era em ${pos}º lugar na Tabela da Era, entre ${ranked.length} agências.` : 'A Tabela da Era está fechada.', ranked[0] ? `Líder da era: ${ranked[0].name}.` : null].filter(Boolean) },
       { eyebrow: 'O que você fez', title: firsts.length ? 'Seus feitos' : 'Seu legado', lines: [...(firsts.length ? firsts.map((f) => `Primeiro: ${f}`) : ['Nenhum feito inédito nesta era.']), `${launches} lançamento${launches === 1 ? '' : 's'} com resultado.`, best ? `Melhor carta do álbum: ${best.title || best.name || 'sem título'}.` : null].filter(Boolean) },
       { eyebrow: 'Quem ficou', title: 'O mundo que continua', lines: [`${ranked.length} agência${ranked.length === 1 ? '' : 's'} seguem em atividade.`, memorial.length ? `No Memorial: ${memorial.join(', ')}.` : 'Ninguém da agência entrou para o Memorial nesta era.'], faces: ranked.slice(0, 8).map((r) => r.id) },
-      { eyebrow: 'A próxima era', title: to ? eraTitle(to) : 'Uma nova era', lines: [step ? `Agora cada toque = ${STEP_WORDS[step] || `+${step} semanas`}.` : 'O ritmo do tempo muda com a era.', unlocks.length ? `Novo: ${unlocks.join(', ')}.` : null].filter(Boolean) },
+      { eyebrow: 'A próxima era', title: to ? eraTitle(to) : 'Uma nova era', lines: [step ? `Agora cada toque = ${STEP_WORDS[step] || `+${step} semanas`}.` : 'O ritmo do tempo muda com a era.', unlocks.length ? `Novo: ${unlocks.join(', ')}.` : null, eco ? `Eco: ${eco.title}. ${eco.line}`.trim() : null].filter(Boolean) },
     ],
     cta: to ? `Começar a Era ${to.n ?? ''}`.trim() : 'Continuar',
   };

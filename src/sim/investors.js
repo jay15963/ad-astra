@@ -70,8 +70,8 @@ const tuningCache = new WeakMap();
 export function tuning(data) {
   const src = data?.investors?.tuning;
   if (!src || !data) return DEFAULT_TUNING;
-  let t = tuningCache.get(data);
-  if (!t) { t = deepMerge(DEFAULT_TUNING, src); tuningCache.set(data, t); }
+  let t = tuningCache.get(src);
+  if (!t) { t = deepMerge(DEFAULT_TUNING, src); tuningCache.set(src, t); }
   return t;
 }
 const archetypes = (data) => (Array.isArray(data?.investors?.investors) ? data.investors.investors : []);

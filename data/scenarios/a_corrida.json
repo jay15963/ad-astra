@@ -1,0 +1,52 @@
+{
+  "_doc": "Cenário curto da era 1 (EXPANSION.md §2.1, dono C1): A Corrida, de jan/1957 a dez/1969, do Sputnik à Apollo 11/12. Passo fixo de 2 semanas (a faixa b2 da campanha); 13 anos = 338 turnos. Os valores de partida vêm de data/eras/e1/snapshot.json (sem blocos nem tratados) e da budgetSeries das linhagens em 1957; o passado anterior a 1957 não tem feitos (historicalFirsts vazio).",
+  "id": "a_corrida",
+  "kind": "scenario",
+  "name": "A Corrida",
+  "subtitle": "1957 a 1969",
+  "start": {
+    "year": 1957,
+    "month": 0
+  },
+  "end": {
+    "year": 1969,
+    "month": 11
+  },
+  "turnWeeks": 2,
+  "eras": [
+    "e1"
+  ],
+  "snapshot": "e1",
+  "playable": {
+    "rule": "alive",
+    "actors": [
+      "nasa",
+      "roscosmos",
+      "abma",
+      "cnsa"
+    ],
+    "found": true
+  },
+  "history": "faithful",
+  "lifecycle": "on",
+  "ending": {
+    "type": "end"
+  },
+  "unlocks": {
+    "builder": {
+      "fromYear": 1957
+    },
+    "investors": {
+      "fromYear": 1957
+    }
+  },
+  "historicalFirsts": {},
+  "victory": {
+    "description": "De 1957 a 1969: quem chega primeiro à órbita, ao espaço com gente e à Lua? A Tabela da Era guarda o placar.",
+    "goals": [
+      "first_satellite",
+      "first_crewed_orbit",
+      "crewed_lunar_landing"
+    ]
+  }
+}

@@ -776,6 +776,42 @@ delivers actors/lifecycle rows with sources, vehicles/craft with `design`, desti
 layer with `canon`, tech tier, ≥ 120 events with year triggers, news tone, investors, starting crew, snapshot, one
 short scenario; validator clean.
 
+#### C0 vocabulary (delivered)
+Owns: `data/core/vocab.json`, `data/core/schemas/vocab.schema.json`, `data/core/schemas/vocab-requests.schema.json`,
+`tools/validate/vocab.js` (+ its wiring in `tools/validate/rules.js` and `tools/validate-data.mjs`),
+`tests/vocab.test.mjs`; created the empty `data/eras/eN/vocab-requests.json` (ownership passes to Cn with the folder).
+- **What is frozen** (keys of `vocab.json`): `destinations` (Earth orbits and stations, Lagrange points, Moon sites,
+  Sun/heliosphere, every planet, moons, asteroids, comets; `body`/`kind`/`era`/`label` per id) +
+  `destinationFamilies` (interstellar ids derived from `data/core/stars.json`: `<star>_system`, `<exoplanet>_orbit`,
+  `<exoplanet>_surface`, `region_<region>`; such destinations may use the star/exoplanet/region id as `body` without a
+  `bodies.json` row), `bodies`, `milestones` (the "os primeiros" of all 7 eras with `era`, `kind` place|capability|
+  colony|science, `scope: actor` for per-agency firsts), `missionTypes`, `spacecraftKinds`, `vehicleClasses`,
+  `destinationKinds`, `eventKinds`, `eventGroups`, `eventTags`, `techBranches`, `techTiers` (`t1`…`t7`, one per era, with
+  per-branch themes from the GDD; a node may carry `techTier` and must match its era), `partKinds`, `partFamilies`,
+  `rocketTemplates`, `colonyStages` (`survey` 1 … `sovereign` 6 with outcomes `independent|allied`), `holderKinds`,
+  `investorProfiles`, `investorArchetypes` (kind, profile, allowed eras), `ecoFragments` (≥ 1 per era, exactly one
+  `main` per era, `order` within the era), `endings`, `scenarios` (ids of the per-era scenarios of §2.1).
+- **Stability**: every id the data used at freeze time keeps its name and definition (`titan` keeps body `saturn`).
+  New milestone ids: places are `<place>_<feat>` (`mars_flyby`), capabilities are `first_<feat>` (`first_eva`).
+  `gen_` is reserved for runtime generators (C8) and refused in authored data. `status: "reserved"` = frozen id whose
+  code/schema support does not exist yet (`colony`/`mining`/`interstellar` mission types, `eco`/`colony` event kinds,
+  ship part kinds, interstellar craft kinds, `suborbital` destination kind): using it warns; the schema enum may still
+  refuse it until the owning builder adds support.
+- **Validator** (errors, pt-BR, `file#id.field` paths): ids of defined destinations/bodies/investor archetypes must be
+  in the vocabulary and match its frozen `body`/`kind`/`kind+eras`; typed fields anywhere in any pack, scenario or
+  `core/eco.json`/`core/colonies.json` (`milestone(s)`, `goals` (`id` or `id:actor`), `destination(s)`,
+  `landerRequired`, `missionType(s)`, `ecoPiece(s)`/`ecoFragment(s)`, `colonyStage` (id or 1..6), `techTier`,
+  `investorArchetype`, `ending`) must be known; also checked: calendar `type`, spacecraft `kind`, vehicle `class`,
+  event `kind/group/tags`, `events.groups`/`events.milestones`/`milestoneLabels` keys, tech `branch` and `era` = pack era,
+  part `kind/family`, `templates`, investor `profiles`/`anchors`, ending choices, scenario ids and `historicalFirsts`.
+  `vocab.json` is a tool file (not in `packs.json`, not loaded by the game); in-memory validator input without `vocab`
+  skips these checks.
+- **Requests** `data/eras/eN/vocab-requests.json` = `{era, requests: [{id, category, entry, reason, status}]}`
+  (`category` = a key above, `entry` = same shape as that category's entries, `status` pending|accepted|rejected).
+  A `pending` request makes the id usable at once (warning "id provisório"); errors: requesting an id that is
+  already frozen, two eras requesting the same id with different entries, `accepted` without the id in `vocab.json`.
+  The integrator (or a C0 pass) moves pending ids into `vocab.json`, then deletes the request.
+
 ### Phase D — balance, review, publish
 D1 balance per era with `tools/campaign.mjs` (20 seeds × playable actors: runway, mandates vs free slots per stake,
 births per century, firsts pacing, stops per turn in target); D2 UX review of every registry screen at 390×844 and

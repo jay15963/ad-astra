@@ -145,9 +145,11 @@ export function openDecision(store, id, { onResolved } = {}) {
   const k = String(d.kind || '');
   if (k === 'era/transition' || k === 'ending/final') {
     let closeScene = null;
-    import('./era-scene.js').then((m) => {
-      closeScene = k === 'era/transition' ? m.openEraScene(store, d) : m.openEndingCard(store, d);
-    }).catch((e) => { console.error(e); toast('A cena da nova era não pôde ser aberta.', 'bad'); });
+    // the year-3000 card lives in ending.js (Phase C9); era-scene.js keeps the Phase A stand-in as a fallback
+    const scene = k === 'era/transition'
+      ? import('./era-scene.js').then((m) => m.openEraScene(store, d))
+      : import('./ending.js').then((m) => m.openEndingCard(store, d)).catch(() => import('./era-scene.js').then((m) => m.openEndingCard(store, d)));
+    scene.then((c) => { closeScene = c; }).catch((e) => { console.error(e); toast('A cena da nova era não pôde ser aberta.', 'bad'); });
     return () => { try { closeScene?.(); } catch { /* */ } };
   }
   let selected = null;

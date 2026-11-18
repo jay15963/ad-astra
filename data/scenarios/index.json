@@ -1,9 +1,23 @@
 {
-  "_doc": "Lista de cenários da tela de título (src/core/data.js listScenarios). O arquivo de cada um está em data/packs.json 'scenarios'.",
+  "_doc": "Lista de cenários da tela de título (src/core/data.js listScenarios). O arquivo de cada um está em data/packs.json 'scenarios'. 'locked' = escondido até o jogador terminar a campanha uma vez (localStorage adastra.campaign.done).",
   "scenarios": [
     { "id": "campaign", "kind": "campaign", "name": "Campanha", "subtitle": "1950 a 3000", "start": { "year": 1950, "month": 0 }, "end": { "year": 3000, "month": 0 }, "order": 1,
       "blurb": "De 1950 até o ano 3000: a corrida, as estações, a era comercial, a Lua, o Sistema Solar e as estrelas." },
+    { "id": "a_corrida", "kind": "scenario", "name": "A Corrida", "subtitle": "1957 a 1969", "start": { "year": 1957, "month": 0 }, "end": { "year": 1969, "month": 11 }, "order": 2,
+      "blurb": "Outubro de 1957 está a meses de distância. Satélite, cão, homem, caminhada, Lua: quem chega primeiro?" },
+    { "id": "estacoes", "kind": "scenario", "name": "Estações", "subtitle": "1981 a 1998", "start": { "year": 1981, "month": 0 }, "end": { "year": 1998, "month": 11 }, "order": 3,
+      "blurb": "O ônibus espacial vai estrear, a Salyut 6 está no céu e a Mir vem aí. Quem consegue morar em órbita e mandar sondas ao Sistema Solar inteiro?" },
+    { "id": "nova_economia", "kind": "scenario", "name": "Nova Economia", "subtitle": "2008 a 2020", "start": { "year": 2008, "month": 0 }, "end": { "year": 2020, "month": 11 }, "order": 4,
+      "blurb": "Janeiro de 2008: a SpaceX ainda não chegou à órbita, a crise financeira se aproxima e a NASA vai aposentar o ônibus espacial. Quem vai levar carga, depois gente, à órbita?" },
     { "id": "lunar_race", "kind": "scenario", "name": "Corrida Lunar", "subtitle": "2026 a 2030", "start": { "year": 2026, "month": 0 }, "end": { "year": 2030, "month": 11 }, "order": 5,
-      "blurb": "Cinco anos, uma pergunta: quem volta primeiro à Lua?" }
+      "blurb": "Cinco anos, uma pergunta: quem volta primeiro à Lua?" },
+    { "id": "decada_lunar", "kind": "scenario", "name": "A Década Lunar", "subtitle": "2026 a 2040", "start": { "year": 2026, "month": 0 }, "end": { "year": 2040, "month": 11 }, "order": 6,
+      "blurb": "A ISS vai cair, Artemis e a ILRS disputam o polo sul da Lua. Quem constrói a primeira base que fica?" },
+    { "id": "fronteira_marciana", "kind": "scenario", "name": "Fronteira Marciana", "subtitle": "2051 a 2100", "start": { "year": 2051, "month": 0 }, "end": { "year": 2100, "month": 11 }, "order": 7,
+      "blurb": "A Lua já tem endereço fixo. Agora é Marte: postos avançados, linhas de suprimento e a primeira colônia que não depende da Terra." },
+    { "id": "primeira_estrela", "kind": "scenario", "name": "Primeira Estrela", "subtitle": "2380 a 2420", "start": { "year": 2380, "month": 0 }, "end": { "year": 2420, "month": 11 }, "order": 8,
+      "blurb": "As naves-semente partiram há décadas. Quem vai pousar primeiro sob outro sol, e quem vai ouvir o que vem de lá?" },
+    { "id": "grande_silencio", "kind": "scenario", "name": "O Grande Silêncio", "subtitle": "2950 a 3000", "start": { "year": 2950, "month": 0 }, "end": { "year": 3000, "month": 0 }, "order": 9, "locked": true,
+      "blurb": "Cinquenta anos antes do fim do milênio, a borda do Silêncio avança à metade da velocidade da luz. Cem mundos esperam. O que a sua agência vai dizer quando ele chegar?" }
   ]
 }

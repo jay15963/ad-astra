@@ -1,0 +1,23 @@
+{
+  "_doc": "Investidores da era 7 (2600–2999), no formato de data/core/investors.json: arquétipos novos só desta era (core/vocab.json investorArchetypes 'rede_estelar' e 'fundacao_arquivo') e o perfil de mandato 'arquivo'. 'colonia' e 'consorcio' já vêm do núcleo e valem também em e7. Valores: 'reward' é fração da verba anual do jogador. Dono: C7.",
+  "investors": [
+    { "id": "rede_estelar", "kind": "consortium", "eras": ["e7"], "weight": 3,
+      "names": ["Rede das Dez Estrelas", "Consórcio dos Retransmissores", "Liga dos Mundos Ligados", "Conselho da Rede de Trappist"],
+      "profile": "consorcio", "pct": [10, 30], "premium": 1.05, "termYears": 25,
+      "emblem": { "shape": "star", "division": "band", "glyph": "orbit", "fields": ["#16243f", "#2b1f45", "#1b3a3a"], "glyphColor": "#cfe3ff", "ring": true } },
+    { "id": "fundacao_arquivo", "kind": "fund", "eras": ["e7"], "weight": 2,
+      "names": ["Fundação do Arquivo Estelar", "Fundo da Memória Longa", "Mecenas do Arquivo"],
+      "profile": "arquivo", "pct": [5, 20], "premium": 0.9, "termYears": 50,
+      "emblem": { "shape": "shield", "division": "half", "glyph": "wreath", "fields": ["#2b2618", "#1f1b12"], "glyphColor": "#e8dcc0" } }
+  ],
+  "profiles": {
+    "arquivo": {
+      "label": "Guardar a memória para quem vier depois",
+      "templates": [
+        { "id": "arq_capsula", "title": "Semear uma cápsula de memória", "type": "probe", "destinations": ["altair_system", "fomalhaut_system", "vega_system", "gliese_581_system"], "years": 5, "reward": 0.1, "fromYear": 2640 },
+        { "id": "arq_lente", "title": "Manter um olho na linha focal do Sol", "type": "satellite", "destinations": ["region_sgr_a"], "years": 4, "reward": 0.12, "fromYear": 2700 },
+        { "id": "arq_kuiper", "title": "Uma vigília de escuta em Kuiper", "type": "station", "destinations": ["kuiper"], "years": 6, "reward": 0.12, "fromYear": 2692 }
+      ]
+    }
+  }
+}

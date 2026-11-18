@@ -1,0 +1,58 @@
+/* Era 6 — Interplanetária e Interestelar (2200–2599): palette "anil".
+   Habitats vivos, escalas enormes, contemplativo: anil profundo de céu sem atmosfera, luz de estrela fria,
+   um verde de folha (os habitats) e o vermelho baixo de Proxima no horizonte.
+   Token block only (DESIGN.md: era skins change accent, texture and surface tone; the system stays the same).
+   Hooked by src/ui/app.js syncEra() → body[data-era="e6"]. */
+body[data-era="e6"] {
+  /* surfaces, back to front: night indigo, slightly cold */
+  --s0: #06070d;
+  --s1: #0a0c15;
+  --s2: #10131e;
+  --s3: #151927;
+  --s4: #1c2132;
+  --line: #181c2a;
+  --line-strong: #272d42;
+
+  --text: #e8ebf5;
+  --text-2: #9ca2b8;
+  --text-3: #5f6580;
+
+  --green: #7fd6a4;      /* leaf of the living habitats */
+  --red: #f28a7a;        /* Proxima at the terminator */
+  --yellow: #e8c46a;     /* old gold: kept for warnings and champions */
+  --amber: #d9a24a;
+  --info: #8fb4ff;
+  --violet: #b4a2f2;
+
+  --green-bg: #7fd6a416;
+  --red-bg: #f28a7a18;
+  --yellow-bg: #e8c46a16;
+  --info-bg: #8fb4ff18;
+  --green-line: #7fd6a440;
+  --red-line: #f28a7a44;
+  --yellow-line: #e8c46a40;
+  --info-line: #8fb4ff44;
+
+  /* starlight: the action colour of the era (laser sails, long signals) */
+  --act: #9fbcff;
+  --act-ink: #0b1022;
+  --accent: #9fbcff;
+  --accent-ink: #0b1022;
+  --light: #e6ebfa;
+  --light-ink: #0a0d18;
+
+  /* texture: a few cold points of light and the red glow of another sun low on the horizon */
+  --grid: #9fbcff08;
+  background-image:
+    radial-gradient(1px 1px at 18% 22%, #ffffff22 50%, transparent 51%),
+    radial-gradient(1px 1px at 72% 12%, #cfdcff1f 50%, transparent 51%),
+    radial-gradient(1px 1px at 43% 64%, #ffffff18 50%, transparent 51%),
+    radial-gradient(1px 1px at 86% 48%, #ffd9c41a 50%, transparent 51%),
+    radial-gradient(130% 55% at 50% 118%, #4a1f2a30 0%, transparent 62%),
+    radial-gradient(90% 60% at 50% -20%, #1a2a5a2a 0%, transparent 70%);
+  background-attachment: fixed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-era="e6"] { background-attachment: scroll; }
+}

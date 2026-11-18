@@ -230,6 +230,11 @@ export function createStore(data, { storage, loadScenario = null, reader = null 
       const rd = reader || (dataApi.browserReader ? dataApi.browserReader() : null);
       const next = await dataApi.ensurePacks(store.data, rd, [eraId]);
       if (next && typeof next === 'object') store.data = next;
+      // per-era offline cache (sw.js precacheEras): this era and the next one
+      try {
+        const n = Number(String(eraId).slice(1));
+        globalThis.navigator?.serviceWorker?.controller?.postMessage({ type: 'precache-eras', eras: [eraId, ...(n ? [`e${n + 1}`] : [])] });
+      } catch { /* no service worker (Node, private mode) */ }
       return true;
     },
 

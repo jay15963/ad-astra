@@ -6,7 +6,7 @@
 // dynamic imports, found by following the import statements — the game data and the icons), so the app
 // opens offline from the second visit on, including screens never opened online (Mapa, Dia de Lançamento).
 // Keep SW_VERSION equal to APP_VERSION in src/ui/settings.js (tests/sw.test.mjs checks it).
-const SW_VERSION = '0.7.0';
+const SW_VERSION = '0.8.0';
 const CACHE = `adastra-${SW_VERSION}`;
 
 // entry points of the crawl; everything they import or link is added (same origin only)
@@ -18,9 +18,9 @@ const SHELL = [
 ];
 // = DATA_FILES in src/core/data.js + the lazily loaded world map + the pack manifest and scenario list
 // (tests/sw-pwa.test.mjs checks it), plus two files the UI fetches outside the manifest: world-eras (épocas do
-// mapa-múndi, worldmap.js) and core/stars (setor e galáxia, starmap.js). Every file listed in data/packs.json (core,
-// era packs, scenarios) is added by
-// the crawl when the manifest is fetched (packFiles), so new era packs need no edit here.
+// mapa-múndi, worldmap.js) and core/stars (setor e galáxia, starmap.js). The crawl adds, from data/packs.json
+// (packFiles), the always-loaded packs, each era's era.json and the scenarios; the rest of an era pack is cached per
+// era when the page asks ('precache-eras'), so new era packs need no edit here.
 const DATA = ['scenario', 'actors', 'vehicles', 'spacecraft', 'destinations', 'calendar', 'politics', 'geopolitics',
   'tech', 'events', 'crew', 'bodies', 'world', 'packs', 'scenarios/index',
   'world-eras', 'core/stars'];
@@ -42,6 +42,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data === 'version') event.source?.postMessage({ type: 'sw-version', version: SW_VERSION });
+  if (event.data?.type === 'precache-eras' && Array.isArray(event.data.eras)) event.waitUntil?.(precacheEras(event.data.eras.map(String)).catch(() => {}));
 });
 
 self.addEventListener('fetch', (event) => {
@@ -105,15 +106,39 @@ function referencesOf(text, base, type) {
   return out;
 }
 
-/** data/packs.json -> every pack file and scenario file it lists (absolute URLs, same folder as the manifest). */
-function packFiles(text, base) {
+/**
+ * data/packs.json -> pack files to precache (absolute URLs, same folder as the manifest). Per-era lazy precache
+ * (EXPANSION.md §10, Phase D4): the install takes the packs that are always loaded, every era's era.json (title,
+ * palettes) and the scenarios; the content of an era pack (and of a pack bound to eras, like colonies) only when
+ * `eras` lists it — the page asks for the current and the next era with a 'precache-eras' message (src/ui/store.js).
+ */
+function packFiles(text, base, eras = null) {
   const out = [];
   try {
     const m = JSON.parse(text);
-    for (const p of m.packs || []) for (const f of p.files || []) out.push(new URL(`${p.dir || ''}${f}.json`, base).href);
-    for (const f of Object.values(m.scenarios || {})) out.push(new URL(f, base).href);
+    const want = new Set(eras || []);
+    for (const p of m.packs || []) {
+      const bound = p.era ? [p.era] : Array.isArray(p.eras) ? p.eras : [];
+      const all = p.always || bound.some((e) => want.has(e));
+      for (const f of p.files || []) if (all || (eras === null && p.era && f === 'era')) out.push(new URL(`${p.dir || ''}${f}.json`, base).href);
+    }
+    if (eras === null) for (const f of Object.values(m.scenarios || {})) out.push(new URL(f, base).href);
   } catch { /* bad manifest: the loader reports it */ }
   return out;
+}
+
+/** Cache the content of some era packs (message from the page; failures are ignored: network-first fills gaps). */
+async function precacheEras(eras) {
+  const scope = self.registration?.scope || new URL('./', self.location.href).href;
+  const manifestUrl = new URL('./data/packs.json', scope).href;
+  const cache = await caches.open(CACHE);
+  let text = '';
+  try { const r = await fetch(manifestUrl, { cache: 'no-cache' }); text = r.ok ? await r.text() : ''; } catch { /* offline */ }
+  if (!text) { const hit = await cache.match(manifestUrl); text = hit ? await hit.text() : ''; }
+  for (const href of packFiles(text, manifestUrl, eras)) {
+    if (await cache.match(href)) continue;
+    try { const res = await fetch(href, { cache: 'no-cache' }); if (res.ok && res.type === 'basic') await cache.put(href, res); } catch { /* offline */ }
+  }
 }
 
 const typeOf = (href) => (/\.m?js(\?|$)/.test(href) ? 'js' : /\.css(\?|$)/.test(href) ? 'css' : /(\/|\.html)(\?|$)/.test(href) ? 'html' : '');

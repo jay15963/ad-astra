@@ -1,0 +1,54 @@
+{
+  "$id": "vocab-requests.schema.json",
+  "description": "Pedidos de vocabulário de uma era (eras/eN/vocab-requests.json, EXPANSION.md §14 C0).",
+  "type": "object",
+  "required": [
+    "era",
+    "requests"
+  ],
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "era": {
+      "$ref": "common.schema.json#/$defs/eraId"
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "category": {
+            "type": "string"
+          },
+          "entry": {
+            "type": "object"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 400
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

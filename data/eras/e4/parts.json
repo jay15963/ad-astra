@@ -1,0 +1,186 @@
+{
+  "_doc": "Peças da era 4 (mescla com data/core/parts.json). Por ora só as decomposições dos lançadores novos do pacote e4 (comprar e editar no Hangar); \"calib\" calibrado com src/sim/designs.js para reproduzir a capacidade em LEO.",
+  "monthBase": 1,
+  "vehicleDesigns": {
+    "long_march_9": {
+      "calib": 1.15,
+      "year": 2035,
+      "stages": [
+        {
+          "engineId": "raptor_next",
+          "engines": 28,
+          "tank": "d10_1",
+          "size": 7,
+          "reuse": true
+        },
+        {
+          "engineId": "gen_m3u",
+          "engines": 6,
+          "tank": "d10_1",
+          "size": 4
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_9m",
+      "avionicsId": "av_2000",
+      "paint": "white"
+    },
+    "nglv": {
+      "calib": 1.15,
+      "stages": [
+        {
+          "engineId": "gen_m3",
+          "engines": 7,
+          "tank": "d5_0",
+          "size": 24,
+          "reuse": true
+        },
+        {
+          "engineId": "gen_m3u",
+          "engines": 2,
+          "tank": "d5_0",
+          "size": 3
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_5m",
+      "avionicsId": "av_2000",
+      "paint": "white"
+    },
+    "kslv3": {
+      "calib": 1.15,
+      "stages": [
+        {
+          "engineId": "gen_k3",
+          "engines": 6,
+          "tank": "d3_7",
+          "size": 7
+        },
+        {
+          "engineId": "gen_k3u",
+          "engines": 1,
+          "tank": "d3_7",
+          "size": 8
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_4m",
+      "avionicsId": "av_2000",
+      "paint": "white"
+    },
+    "amur_lng": {
+      "calib": 1.15,
+      "stages": [
+        {
+          "engineId": "gen_m3",
+          "engines": 5,
+          "tank": "d4_1",
+          "size": 18,
+          "reuse": true
+        },
+        {
+          "engineId": "gen_m3u",
+          "engines": 1,
+          "tank": "d4_1",
+          "size": 2
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_5m",
+      "avionicsId": "av_2000",
+      "paint": "white"
+    },
+    "starship_v4": {
+      "calib": 1.49,
+      "year": 2034,
+      "stages": [
+        {
+          "engineId": "raptor_next",
+          "engines": 28,
+          "tank": "d9_0",
+          "size": 24,
+          "reuse": true
+        },
+        {
+          "engineId": "rvac2",
+          "engines": 6,
+          "engineId2": "raptor2",
+          "engines2": 3,
+          "tank": "d9_0",
+          "size": 8,
+          "reuse": true
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_9m",
+      "avionicsId": "av_2000",
+      "paint": "steel"
+    },
+    "new_glenn_9x4": {
+      "calib": 1.15,
+      "stages": [
+        {
+          "engineId": "be4",
+          "engines": 13,
+          "tank": "d8_4",
+          "size": 5,
+          "reuse": true
+        },
+        {
+          "engineId": "be3u",
+          "engines": 4,
+          "tank": "d8_4",
+          "size": 8
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_9m",
+      "avionicsId": "av_2000",
+      "paint": "white"
+    },
+    "terran_r": {
+      "calib": 1.15,
+      "stages": [
+        {
+          "engineId": "gen_m3",
+          "engines": 9,
+          "tank": "d5_4",
+          "size": 14,
+          "reuse": true
+        },
+        {
+          "engineId": "gen_m3u",
+          "engines": 1,
+          "tank": "d5_4",
+          "size": 2
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_5m",
+      "avionicsId": "av_2000",
+      "paint": "white"
+    },
+    "ariane_next": {
+      "calib": 1.15,
+      "stages": [
+        {
+          "engineId": "gen_m3",
+          "engines": 11,
+          "tank": "d5_4",
+          "size": 6,
+          "reuse": true
+        },
+        {
+          "engineId": "gen_m3u",
+          "engines": 1,
+          "tank": "d5_4",
+          "size": 2
+        }
+      ],
+      "boosters": null,
+      "fairingId": "fr_5m",
+      "avionicsId": "av_2035",
+      "paint": "white"
+    }
+  }
+}

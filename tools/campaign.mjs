@@ -3,6 +3,7 @@
 //   --fast   the bot only resolves cards and plays launches (no own missions): measures the engine and the world
 //   --found  the bot founds its own agency at turn 0 (agency/found, Phase B) instead of directing --actor
 //   --min-pct  stake the bot keeps in investor rounds (Phase B; default 50 = autonomy)
+//   --keep-control  never sell below --min-pct, even when cash is tight (long runs that must reach an ending)
 // The bot is tools/bot-b.mjs (Phase B moves: investor rounds, mandates, Hangar designs and test flights) over the
 // shared golden bot; without investors.js/designs.js it plays exactly like the golden bot.
 //   --from   start at an era's first year (or a given year) with a scenario built from data (no simulated past)
@@ -58,7 +59,7 @@ function hasNaN(state) {
  * Play one campaign. Returns {state, eras: [{eraId, turns, ms, saveKB, core, minor, stops, births, merges, gone}],
  * ending, totalMs, errors}.
  */
-export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null, found = false, minPct = 50 } = {}) {
+export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null, found = false, minPct = 50, keepControl = false } = {}) {
   const errors = [];
   let state = engine.newGame(data, { seed, playerId });
   let founded = null;
@@ -108,7 +109,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
       openEra();
     }
     try {
-      phaseBStep(state, data, engine, { schedule: !fast, minPct }, botMem);
+      phaseBStep(state, data, engine, { schedule: !fast, minPct, keepControl }, botMem);
     } catch (e) {
       errors.push(`bot t${state.turn}: ${e.message}`);
       break;
@@ -158,11 +159,12 @@ if (isMain) {
   const playerId = opt('--actor') || 'nasa';
   const found = flag('--found');
   const minPct = Number(opt('--min-pct') ?? 50);
+  const keepControl = flag('--keep-control');
   let failures = 0;
   for (let s = 1; s <= nSeeds; s++) {
     const seed = s * 7919;
     const res = runCampaign(data, {
-      seed, playerId, fast, toEra, found, minPct,
+      seed, playerId, fast, toEra, found, minPct, keepControl,
       onEra: quiet ? null : (e, st) => console.log(
         `  ${e.eraId} até ${e.endYear}: ${e.turns} turnos, ${(e.ms / Math.max(1, e.turns)).toFixed(1)} ms/turno, save ${e.saveKB} KB, ` +
         `atores ${e.core} núcleo/${e.minor} menores, nasc ${e.births} ev ${e.events} fim ${e.gone}, paradas/turno ${(e.stops / Math.max(1, e.turns)).toFixed(2)}` +

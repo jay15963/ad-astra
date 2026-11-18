@@ -1,0 +1,11 @@
+{
+  "_doc": "Investidores que entram nas rodadas da era 6 (arquétipos do vocabulário; formato de data/core/investors.json). profiles.geracional = mandatos das sociedades de naves de gerações.",
+  "profiles": {
+    "geracional": {"label":"Preparar a próxima partida","templates":[{"id":"ger_sail","title":"Flotilha de reconhecimento para a próxima Arca","type":"probe","destinations":["proxima_centauri_system","alpha_centauri_system","tau_ceti_system","epsilon_eridani_system"],"years":4,"reward":0.12,"fromYear":2215},{"id":"ger_habitat","title":"Habitat de ensaio para uma vida de gerações","type":"station","destinations":["ceres","cislunar"],"years":3,"reward":0.14,"fromYear":2219},{"id":"ger_orbit","title":"Sonda com freio no destino da Arca","type":"probe","destinations":["proxima_b_orbit","tau_ceti_e_orbit"],"years":4,"reward":0.18,"fromYear":2290}]},
+    "colonia": {"templates":[{"id":"col_titan_e6","title":"Semente de habitat para Titã","type":"station","destinations":["titan","ceres"],"years":4,"reward":0.18,"fromYear":2240},{"id":"col_mars_mirror","title":"Mais um espelho para o céu de Marte","type":"station","destinations":["mars_orbit"],"years":3,"reward":0.15,"fromYear":2216}]}
+  },
+  "investors": [
+    {"id":"arca_geracional","kind":"consortium","eras":["e6","e7"],"weight":3,"names":["Sociedade da Arca Ybytu","Irmandade da Nave Lonjura","Cooperativa Geracional Kalunga"],"profile":"geracional","pct":[8,25],"premium":1.02,"termYears":30,"emblem":{"shape":"roundel","division":"band","glyph":"star","fields":["#1f2a4f","#2f1f4f"],"glyphColor":"#f2c14e","ring":true}},
+    {"id":"liga_habitats","kind":"colony","eras":["e6","e7"],"weight":3,"names":["Liga dos Habitats de L5","Assembleia dos Cilindros","Conselho dos Jardins Giratórios"],"profile":"colonia","pct":[10,30],"premium":1,"termYears":15,"emblem":{"shape":"hex","division":"none","glyph":"planet","fields":["#1f4f3a","#24414f"],"glyphColor":"#d8f3dc"}}
+  ]
+}

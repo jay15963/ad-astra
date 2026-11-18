@@ -1,0 +1,1601 @@
+{
+  "_doc": "O mistério do Eco e o final de jan/3000 (docs/EXPANSION.md §9; GDD 'O mistério de fundo'). Dono: C9 (src/sim/eco.js, src/ui/ending.js). Ficção: as peças são especulação narrativa ancorada em marcos reais; quando um texto cita um fato real, a peça traz 'sources'. Campos com marcadores {x} ficam em chaves 'tpl'/'body'/'paras' (preenchidas por eco.js). Uma peça abre quando a era dela chegou, o ano passou de minYear e algum marco de 'milestones' já foi alcançado por qualquer agência (ou o ano chegou a fallbackYear). A peça principal de cada era nunca falta: se a era terminar sem ela, ela entra nos arquivos sem carta.",
+  "version": 1,
+  "config": {
+    "cardWeeks": 26,
+    "leanCap": 60,
+    "colegioRel": [
+      -100,
+      100
+    ],
+    "familyCap": 40,
+    "playerDouble": 2
+  },
+  "pieces": [
+    {
+      "id": "eco_e1_anomalia_radio",
+      "era": "e1",
+      "order": 1,
+      "main": true,
+      "title": "Anomalia no radiotelescópio",
+      "trigger": {
+        "milestones": [
+          "lunar_far_side_image",
+          "lunar_flyby_robotic",
+          "first_heliocentric_orbit"
+        ],
+        "minYear": 1959,
+        "fallbackYear": 1964
+      },
+      "line": "Um pulso na frequência do hidrogênio, gravado na noite em que uma sonda passou atrás da Lua.",
+      "news": {
+        "headline": "Radioastrônomos registram pulso que ninguém sabe explicar",
+        "body": "A estação de rastreamento gravou sete batidas regulares em 1420 MHz, a linha do hidrogênio. Os técnicos falam em interferência. Um deles anotou na margem da fita: eco."
+      },
+      "card": {
+        "body": "Madrugada na estação de rastreamento. A fita de uma sonda lunar mostra sete pulsos regulares que não vieram da sonda, nem da Terra, nem de nenhum avião. Repetem-se a cada 41 minutos e somem ao amanhecer. O chefe da estação liga para você antes de ligar para qualquer jornal.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "publicar",
+            "label": "Publicar no boletim científico",
+            "preview": "A ciência precisa ver isso. Reputação sobe; o mundo começa a perguntar.",
+            "lean": {
+              "contato": 2
+            },
+            "effects": {
+              "reputation": 1
+            }
+          },
+          {
+            "id": "classificar",
+            "label": "Classificar como interferência",
+            "preview": "Melhor não alimentar boatos em plena Guerra Fria.",
+            "lean": {
+              "silencio": 2
+            },
+            "effects": {
+              "support": 1
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Guardar as fitas, com tudo anotado",
+            "preview": "Ninguém sabe o que é. Alguém, um dia, vai saber.",
+            "lean": {
+              "heranca": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e1_fita_luna",
+      "era": "e1",
+      "order": 2,
+      "after": "eco_e1_anomalia_radio",
+      "title": "Ruído na fita de uma sonda lunar",
+      "trigger": {
+        "milestones": [
+          "lunar_surface_robotic",
+          "lunar_orbit_robotic",
+          "robotic_lunar_sample_return",
+          "crewed_lunar_landing"
+        ],
+        "minYear": 1964,
+        "fallbackYear": 1972
+      },
+      "line": "Os mesmos sete pulsos, agora chegando doze segundos antes do sinal da sonda.",
+      "news": {
+        "headline": "Engenheiros voltam a ouvir o pulso misterioso nas fitas da Lua",
+        "body": "O ruído é o mesmo de anos atrás. A diferença assusta quem entende: ele chega antes do sinal que deveria ecoar."
+      },
+      "card": {
+        "body": "Um engenheiro jovem, de óculos grossos e cigarro apagado, traz duas fitas lado a lado. O pulso voltou, idêntico. Só que desta vez ele chega doze segundos antes da transmissão da sonda. Como se algo respondesse antes da pergunta.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "investigar",
+            "label": "Montar uma equipe para ouvir mais",
+            "preview": "Três pessoas, uma sala sem janela e um orçamento pequeno.",
+            "lean": {
+              "contato": 2
+            },
+            "effects": {
+              "cash": -3
+            }
+          },
+          {
+            "id": "calar",
+            "label": "Pedir sigilo à equipe",
+            "preview": "Doze segundos não cabem em nenhuma manchete.",
+            "lean": {
+              "silencio": 2
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Copiar as fitas e espalhar as cópias",
+            "preview": "Uma em cada estação. Fitas se perdem; cópias, menos.",
+            "lean": {
+              "heranca": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e2_telemetria_fantasma",
+      "era": "e2",
+      "order": 1,
+      "main": true,
+      "title": "Telemetria fantasma no espaço profundo",
+      "trigger": {
+        "milestones": [
+          "jupiter_flyby",
+          "saturn_flyby",
+          "uranus_flyby",
+          "neptune_flyby"
+        ],
+        "minYear": 1978,
+        "fallbackYear": 1990
+      },
+      "line": "Um quadro de telemetria a mais, que nenhuma sonda transmitiu, com os mesmos sete pulsos dentro.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Wow!_signal"
+      ],
+      "news": {
+        "headline": "Sonda de espaço profundo envia um quadro de dados que não existe",
+        "body": "O relatório técnico chama de erro de contagem. Três páginas depois, uma nota de rodapé lembra o sinal 'Wow!', registrado pelo radiotelescópio Big Ear em agosto de 1977 e nunca repetido."
+      },
+      "card": {
+        "body": "Memorando interno, carimbo de confidencial. Entre dois quadros normais de telemetria da sonda chegou um terceiro, bem formatado, com o nosso próprio cabeçalho. Dentro dele, sete pulsos. Os mesmos das fitas antigas. A sonda não tem memória para isso. A equipe pede uma decisão por escrito.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "publicar",
+            "label": "Levar o caso a um congresso",
+            "preview": "Pesquisadores de fora vão olhar. Alguns vão rir.",
+            "lean": {
+              "contato": 2
+            },
+            "effects": {
+              "reputation": 1
+            }
+          },
+          {
+            "id": "classificar",
+            "label": "Arquivar como falha de hardware",
+            "preview": "Burocracia também é uma forma de silêncio.",
+            "lean": {
+              "silencio": 2
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Abrir um dossiê permanente",
+            "preview": "Número de processo, pasta cinza, armário de aço. Para sempre.",
+            "lean": {
+              "heranca": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e2_desvio_sonda",
+      "era": "e2",
+      "order": 2,
+      "after": "eco_e2_telemetria_fantasma",
+      "title": "O desvio que ninguém explica",
+      "trigger": {
+        "milestones": [
+          "first_gravity_assist",
+          "neptune_flyby",
+          "first_exoplanet_discovery"
+        ],
+        "minYear": 1984,
+        "fallbackYear": 1996
+      },
+      "line": "O resíduo do desvio das sondas aponta, por acaso ou não, para a mesma região do céu.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Pioneer_anomaly"
+      ],
+      "news": {
+        "headline": "Sondas desaceleram um nada a mais do que a física prevê",
+        "body": "As Pioneer 10 e 11 seguem perdendo velocidade um pouco além do previsto. Os navegadores desconfiam do calor das próprias sondas, mas a conta ainda não fecha. Os analistas da agência guardam o que sobra."
+      },
+      "card": {
+        "body": "Os navegadores confirmam: as sondas desaceleram um fio de cabelo a mais do que deviam. A física vai acabar explicando quase tudo com calor. Quase. O resíduo que sobra, quando projetado no céu, aponta para a mesma região de onde vieram os pulsos.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "mapear",
+            "label": "Mapear a região do céu",
+            "preview": "Um radiotelescópio emprestado, duas noites por mês.",
+            "lean": {
+              "contato": 2
+            }
+          },
+          {
+            "id": "esquecer",
+            "label": "Aceitar a explicação térmica",
+            "preview": "A resposta simples costuma ser a certa.",
+            "lean": {
+              "silencio": 2
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Anexar ao dossiê do Eco",
+            "preview": "A pasta engorda. Ninguém lê. Ainda.",
+            "lean": {
+              "heranca": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e3_padrao_arquivo",
+      "era": "e3",
+      "order": 1,
+      "main": true,
+      "title": "O padrão nos dados arquivados",
+      "trigger": {
+        "milestones": [
+          "heliopause_crossing",
+          "first_l2_observatory",
+          "first_megaconstellation"
+        ],
+        "minYear": 2005,
+        "fallbackYear": 2016
+      },
+      "line": "Os pulsos das primeiras fitas, o quadro fantasma e as leituras de agora caem nas datas dos nossos primeiros feitos. O Eco marca o nosso tempo.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Voyager_1"
+      ],
+      "news": {
+        "headline": "Algoritmo encontra padrão em meio século de dados de rádio",
+        "body": "Uma equipe de análise cruzou arquivos digitalizados de várias décadas. Os pulsos que pareciam ruído aparecem sempre perto das datas em que a humanidade fez algo pela primeira vez no espaço."
+      },
+      "card": {
+        "body": "A planilha tem meio século de colunas. Uma analista de dados pôs lado a lado as primeiras fitas do Eco, o quadro fantasma da sonda de espaço profundo e as leituras de agora. Os pulsos não são aleatórios: cada um cai dias depois de um primeiro feito humano no espaço. O Eco não fala com a gente. Ele marca o nosso tempo.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "publicar",
+            "label": "Publicar os dados abertos",
+            "preview": "Código aberto, repositório público, revisão pelos pares.",
+            "lean": {
+              "contato": 2
+            },
+            "effects": {
+              "reputation": 2
+            }
+          },
+          {
+            "id": "classificar",
+            "label": "Restringir o acesso aos dados",
+            "preview": "Investidores não gostam de mistérios sem modelo de negócio.",
+            "lean": {
+              "silencio": 2
+            },
+            "effects": {
+              "support": 1
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Preservar o acervo bruto em três continentes",
+            "preview": "Servidores morrem. Fitas, discos e papel, em três lugares.",
+            "lean": {
+              "heranca": 2
+            },
+            "effects": {
+              "cash": -4
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e3_rede_amadora",
+      "era": "e3",
+      "order": 2,
+      "after": "eco_e3_padrao_arquivo",
+      "title": "A rede de radioamadores",
+      "trigger": {
+        "milestones": [
+          "first_private_crewed_orbit",
+          "first_commercial_crew",
+          "first_booster_catch"
+        ],
+        "minYear": 2020,
+        "fallbackYear": 2024
+      },
+      "line": "Voluntários com antenas no quintal confirmam o padrão e o publicam num fórum.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/SETI@home"
+      ],
+      "news": {
+        "headline": "Rede de radioamadores diz ter captado o 'Eco' por conta própria",
+        "body": "O fórum tem nostalgia dos computadores domésticos que procuraram sinais pelo projeto SETI@home, de 1999 a 2020. Agora são antenas de quintal, e o vídeo da gravação já passou de um milhão de visualizações."
+      },
+      "card": {
+        "body": "Um fórum de radioamadores publicou uma gravação: sete pulsos, captados com antenas montadas em telhados de quatro países. O vídeo viralizou. Repórteres ligam pedindo um comentário oficial da agência.",
+        "defaultChoice": "espelhar",
+        "choices": [
+          {
+            "id": "apoiar",
+            "label": "Confirmar e convidar a rede",
+            "preview": "Ciência cidadã com o selo da agência.",
+            "lean": {
+              "contato": 2
+            },
+            "effects": {
+              "support": 2
+            }
+          },
+          {
+            "id": "desmentir",
+            "label": "Desmentir com educação",
+            "preview": "Interferência de satélite. Caso encerrado, por enquanto.",
+            "lean": {
+              "silencio": 2
+            }
+          },
+          {
+            "id": "espelhar",
+            "label": "Guardar cópias de tudo o que publicarem",
+            "preview": "A internet esquece rápido. A agência, não.",
+            "lean": {
+              "heranca": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e4_receptor_lado_oculto",
+      "era": "e4",
+      "order": 1,
+      "main": true,
+      "title": "O receptor do lado oculto da Lua",
+      "trigger": {
+        "milestones": [
+          "far_side_observatory",
+          "lunar_far_side_landing",
+          "lunar_station"
+        ],
+        "minYear": 2030,
+        "fallbackYear": 2042
+      },
+      "line": "Protegido do barulho da Terra, o lado oculto da Lua ouve o Eco pela primeira vez com clareza: não é um pulso, é uma estrutura.",
+      "news": {
+        "headline": "Do lado oculto da Lua, o Eco aparece nítido pela primeira vez",
+        "body": "Sem o ruído de rádio da Terra, a antena lunar separou os sete pulsos em camadas. Os dois blocos disputam quem guarda os dados."
+      },
+      "card": {
+        "body": "Poeira lunar nos conectores, quatro horas de atraso nos relatórios e uma frase que ninguém quer escrever: o Eco tem estrutura. Atrás da Lua, longe do rádio da Terra, os sete pulsos se abrem em camadas, como páginas. Os dois blocos já querem os dados. O seu também.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "compartilhar",
+            "label": "Dividir os dados com os dois blocos",
+            "preview": "Ciência acima da disputa. O seu bloco não vai gostar.",
+            "lean": {
+              "contato": 3
+            },
+            "effects": {
+              "reputation": 2,
+              "support": -2
+            }
+          },
+          {
+            "id": "segredo",
+            "label": "Tratar como segredo estratégico",
+            "preview": "Quem entender primeiro, decide primeiro.",
+            "lean": {
+              "silencio": 3
+            },
+            "effects": {
+              "support": 2
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Gravar tudo em cofres na própria Lua",
+            "preview": "Fora do alcance de qualquer governo da Terra.",
+            "lean": {
+              "heranca": 3
+            },
+            "effects": {
+              "cash": -6
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e4_resposta_atrasada",
+      "era": "e4",
+      "order": 2,
+      "after": "eco_e4_receptor_lado_oculto",
+      "title": "Uma resposta atrasada",
+      "trigger": {
+        "milestones": [
+          "lunar_base",
+          "crewed_mars_orbit",
+          "crewed_mars_landing"
+        ],
+        "minYear": 2036,
+        "fallbackYear": 2048
+      },
+      "line": "Numa das camadas, um desenho de bits parecido com a mensagem de Arecibo de 1974. Ou é eco de verdade, ou algo perto devolve o que dissemos.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Arecibo_message"
+      ],
+      "news": {
+        "headline": "Camada do Eco lembra a mensagem de Arecibo, de 1974",
+        "body": "Em 16 de novembro de 1974 o radiotelescópio de Arecibo transmitiu uma imagem de 1679 bits rumo ao aglomerado M13, a cerca de 25 mil anos-luz. Nenhuma resposta poderia voltar tão cedo. Mesmo assim, o desenho está lá."
+      },
+      "card": {
+        "body": "Uma das camadas, posta em grade, vira um desenho de bits. Parece a mensagem que Arecibo mandou ao aglomerado M13 em 1974: números, uma hélice, uma figura humana. Só que torta, incompleta, como uma foto de foto. M13 fica a 25 mil anos-luz. Ninguém poderia ter respondido. A não ser que o Eco esteja perto, devolvendo o que dissemos.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "responder",
+            "label": "Transmitir uma mensagem de volta",
+            "preview": "Pequena, cuidadosa, assinada pela agência.",
+            "lean": {
+              "contato": 3
+            },
+            "effects": {
+              "reputation": 1
+            }
+          },
+          {
+            "id": "calar",
+            "label": "Proibir qualquer transmissão",
+            "preview": "Se algo nos imita, melhor não ensinar mais.",
+            "lean": {
+              "silencio": 3
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Registrar e esperar outra camada",
+            "preview": "Paciência é uma ferramenta científica.",
+            "lean": {
+              "heranca": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e5_colegio_silencio",
+      "era": "e5",
+      "order": 1,
+      "main": true,
+      "colegio": "born",
+      "title": "Nasce o Colégio Silêncio",
+      "trigger": {
+        "milestones": [
+          "mars_base",
+          "first_colony",
+          "ceres_base",
+          "first_asteroid_mining"
+        ],
+        "minYear": 2060,
+        "fallbackYear": 2090
+      },
+      "line": "Cientistas, mineiros e antigos oficiais fundam em Ceres uma ordem que estuda o Eco e prega o silêncio: o Colégio.",
+      "news": {
+        "headline": "Em Ceres, nasce uma ordem dedicada ao Eco: o Colégio Silêncio",
+        "body": "Eles não dão entrevistas. Publicam um único texto: quem responde se revela. Na fronteira, onde o rádio é a única companhia, muita gente concorda."
+      },
+      "card": {
+        "body": "Num túnel de mineração desativado em Ceres, gente da fronteira se reúne para ouvir o Eco sem transmitir nada. Têm antenas melhores que as nossas e uma regra só: não responder. Chamam a si mesmos de Colégio Silêncio. Quem fala pelo grupo, {person}, pediu para conversar com você.",
+        "defaultChoice": "arquivos",
+        "choices": [
+          {
+            "id": "aliar",
+            "label": "Receber o Colégio como aliado",
+            "preview": "Eles sabem mais do que dizem. Talvez digam a você.",
+            "lean": {
+              "silencio": 2
+            },
+            "colegio": 25
+          },
+          {
+            "id": "vigiar",
+            "label": "Vigiar o Colégio de perto",
+            "preview": "Uma ordem secreta na fronteira é um risco.",
+            "lean": {
+              "contato": 2
+            },
+            "colegio": -15
+          },
+          {
+            "id": "arquivos",
+            "label": "Trocar acesso aos arquivos",
+            "preview": "O dossiê do Eco em troca do que eles ouviram.",
+            "lean": {
+              "heranca": 2
+            },
+            "colegio": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e5_lente_solar",
+      "era": "e5",
+      "order": 2,
+      "after": "eco_e5_colegio_silencio",
+      "title": "O que a lente do Sol viu",
+      "trigger": {
+        "milestones": [
+          "solar_gravity_lens_telescope",
+          "first_interstellar_probe_launch"
+        ],
+        "minYear": 2100,
+        "fallbackYear": 2180
+      },
+      "line": "A lente gravitacional do Sol mostra que o Eco não vem de uma estrela: vem de muitas, e algumas já se calaram.",
+      "news": {
+        "headline": "Telescópio da lente solar mostra estrelas que pararam de falar",
+        "body": "A 550 unidades astronômicas, o telescópio usa o Sol como lente. Ele encontrou as fontes do Eco: dezenas de estrelas. Várias se apagaram no rádio nos últimos séculos."
+      },
+      "card": {
+        "body": "Lá fora, a 550 vezes a distância da Terra ao Sol, o telescópio da lente solar enfim aponta para o Eco. Não há uma fonte: há dezenas, espalhadas por milhares de anos-luz. E o mais estranho: comparadas com registros antigos, várias pararam de emitir. Uma a uma, em sequência. Como luzes de um corredor que alguém vai apagando.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "seguir",
+            "label": "Seguir a sequência até a origem",
+            "preview": "Se é um corredor, alguém está andando nele.",
+            "lean": {
+              "contato": 2
+            }
+          },
+          {
+            "id": "avisar_colegio",
+            "label": "Entregar os dados ao Colégio",
+            "preview": "Eles vão dizer que avisaram.",
+            "lean": {
+              "silencio": 2
+            },
+            "colegio": 15
+          },
+          {
+            "id": "arquivar",
+            "label": "Catalogar cada estrela que se calou",
+            "preview": "Um obituário estelar, com data e posição.",
+            "lean": {
+              "heranca": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e6_alem_heliopausa",
+      "era": "e6",
+      "order": 1,
+      "main": true,
+      "title": "Um sinal de além da heliopausa",
+      "trigger": {
+        "milestones": [
+          "first_interstellar_probe_arrival",
+          "crewed_oort_cloud",
+          "first_beamed_sail"
+        ],
+        "minYear": 2220,
+        "fallbackYear": 2400
+      },
+      "line": "Vista de outra estrela, a Terra está no caminho do Eco, e não no destino dele.",
+      "news": {
+        "headline": "Sonda em outra estrela ouve o Eco mais alto do que em casa",
+        "body": "Pela primeira vez o Eco é medido de fora do Sistema Solar. A geometria é clara: ele não vem até nós. Ele passa por nós."
+      },
+      "card": {
+        "body": "A sonda levou décadas para chegar e anos para responder. A mensagem é curta: daqui, o Eco é mais forte. Os cálculos de triangulação ocupam uma parede inteira do habitat. A conclusão cabe numa linha. O Eco não foi mandado para nós. Nós só estamos no caminho dele.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "acenar",
+            "label": "Pôr um farol na rota do Eco",
+            "preview": "Se estamos no caminho, que nos vejam passar.",
+            "lean": {
+              "contato": 3
+            },
+            "colegio": -10
+          },
+          {
+            "id": "desviar",
+            "label": "Apagar os rádios na direção do Eco",
+            "preview": "Deixar o caminho livre, sem chamar atenção.",
+            "lean": {
+              "silencio": 3
+            },
+            "colegio": 10
+          },
+          {
+            "id": "arquivar",
+            "label": "Estudar o caminho por um século",
+            "preview": "Habitats vivem séculos. Perguntas também.",
+            "lean": {
+              "heranca": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e6_estrela_muda",
+      "era": "e6",
+      "order": 2,
+      "after": "eco_e6_alem_heliopausa",
+      "title": "A estrela muda",
+      "trigger": {
+        "milestones": [
+          "first_exoplanet_closeup",
+          "first_crewed_interstellar_arrival",
+          "exoplanet_crewed_landing"
+        ],
+        "minYear": 2300,
+        "fallbackYear": 2560
+      },
+      "line": "Num planeta de outra estrela, antenas enormes e frias, viradas para o Eco. Alguém ouviu antes de nós e se calou.",
+      "news": {
+        "headline": "Ruínas de antenas encontradas em planeta de outra estrela",
+        "body": "As estruturas têm milhões de anos e apontam todas para a mesma região do céu. Não há sinal de quem as construiu. Há sinal de para onde olhavam."
+      },
+      "card": {
+        "body": "As imagens chegam em lotes, com anos de atraso. Num planeta seco, numa planície de vidro, há antenas do tamanho de montanhas, todas viradas para o mesmo ponto do céu. Estão frias há milhões de anos. Quem as fez ouviu o Eco antes de nós. E, em algum momento, parou de ouvir. Ou parou de existir.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "decifrar",
+            "label": "Tentar ler o que eles transmitiram",
+            "preview": "Talvez tenham respondido. Talvez esteja escrito ali.",
+            "lean": {
+              "contato": 3
+            }
+          },
+          {
+            "id": "selar",
+            "label": "Declarar o planeta zona proibida",
+            "preview": "Há lugares que é melhor deixar em paz.",
+            "lean": {
+              "silencio": 3
+            },
+            "colegio": 10
+          },
+          {
+            "id": "arquivar",
+            "label": "Fazer um molde de tudo, sem tocar em nada",
+            "preview": "Eles não deixaram herança. Nós vamos deixar.",
+            "lean": {
+              "heranca": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e7_mapa_do_silencio",
+      "era": "e7",
+      "order": 1,
+      "title": "O mapa do Silêncio",
+      "trigger": {
+        "milestones": [
+          "first_probe_beyond_local_bubble",
+          "interstellar_network",
+          "first_galactic_core_image",
+          "silence_source_located"
+        ],
+        "minYear": 2650,
+        "fallbackYear": 2850
+      },
+      "line": "O Silêncio é uma frente que atravessa a galáxia. Onde ela passa, os sinais param. Ela vem na nossa direção.",
+      "news": {
+        "headline": "O mapa está pronto: o Silêncio avança pela galáxia",
+        "body": "Séculos de medidas viram uma imagem só. Uma frente escura onde nenhum sinal sobrevive. Ela avança quase tão rápido quanto a luz, e a borda está a poucas centenas de anos-luz."
+      },
+      "card": {
+        "body": "O mapa ocupa a cúpula inteira do observatório. Pontos de luz são vozes: estrelas, pulsares, vazamentos de rádio de civilizações que nunca conheceremos. Uma mancha escura cobre um terço do disco da galáxia, e cresce. Onde ela passou, não há mais vozes. Não há fogo, nem destruição visível. Só silêncio. Pelos cálculos, a frente viaja quase à velocidade da luz, e por isso só a vemos quando já está perto. A borda está a caminho.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "ir",
+            "label": "Mandar uma sonda até a borda",
+            "preview": "Ver de perto o que nenhum mapa mostra.",
+            "lean": {
+              "contato": 3
+            }
+          },
+          {
+            "id": "esconder",
+            "label": "Reduzir as emissões de todos os mundos",
+            "preview": "Talvez ela siga o barulho.",
+            "lean": {
+              "silencio": 3
+            },
+            "colegio": 15
+          },
+          {
+            "id": "arquivar",
+            "label": "Enterrar cópias do mapa em cem mundos",
+            "preview": "Se a borda chegar, que sobre o mapa.",
+            "lean": {
+              "heranca": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e7_silencio_cresce",
+      "era": "e7",
+      "order": 2,
+      "main": true,
+      "title": "O Silêncio se intensifica",
+      "trigger": {
+        "milestones": [],
+        "minYear": 2990,
+        "fallbackYear": 2990
+      },
+      "line": "Na década final, o fundo de rádio do céu inteiro baixa um pouco a cada ano. O Eco fica mais forte, como quem se aproxima.",
+      "news": {
+        "headline": "O céu está ficando mais quieto, e o Eco, mais forte",
+        "body": "Os receptores de todos os mundos medem a mesma coisa: o ruído de fundo cai, ano após ano. No meio do silêncio crescente, os sete pulsos ficam nítidos como nunca."
+      },
+      "card": {
+        "body": "Os gráficos de todos os mundos contam a mesma história. O ruído de fundo do céu cai, ano a ano, como uma maré baixando. No meio dele, o Eco fica mais forte. Os sete pulsos das primeiras fitas agora se ouvem com um rádio de bolso. As pessoas saem à noite para escutar. Faltam dez anos para o ano 3000.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "preparar_resposta",
+            "label": "Preparar a resposta da humanidade",
+            "preview": "Mil anos de história num só sinal.",
+            "lean": {
+              "contato": 4
+            }
+          },
+          {
+            "id": "preparar_silencio",
+            "label": "Preparar os mundos para calar",
+            "preview": "Desligar transmissores, um por um.",
+            "lean": {
+              "silencio": 4
+            },
+            "colegio": 10
+          },
+          {
+            "id": "arquivar",
+            "label": "Preparar o legado",
+            "preview": "Arquivos, sementes, mapas, nomes. Tudo pronto.",
+            "lean": {
+              "heranca": 4
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "eco_e7_ultima_voz",
+      "era": "e7",
+      "order": 3,
+      "after": "eco_e7_silencio_cresce",
+      "title": "A última voz",
+      "trigger": {
+        "milestones": [],
+        "minYear": 2998,
+        "fallbackYear": 2999
+      },
+      "line": "A sequência do Eco se completa: cada primeiro feito humano no espaço, em ordem, e um espaço vazio marcado para janeiro de 3000.",
+      "news": {
+        "headline": "Decifrada a última camada do Eco: há um espaço vazio em janeiro de 3000",
+        "body": "A última camada lista, em ordem, as datas de todos os primeiros feitos humanos no espaço. No fim, uma posição em branco. A data dela é janeiro de 3000."
+      },
+      "card": {
+        "body": "A última camada se abre. É uma lista. Cada item é um primeiro feito humano no espaço, em ordem, começando antes mesmo da primeira fita: o primeiro satélite, a primeira pessoa em órbita, a primeira pegada na Lua, a primeira criança nascida fora da Terra. A lista termina com um espaço vazio. A data marcada para ele é janeiro de 3000. O espaço é nosso, e espera o que vamos fazer.",
+        "defaultChoice": "arquivar",
+        "choices": [
+          {
+            "id": "escrever",
+            "label": "Escrever algo nesse espaço",
+            "preview": "A primeira palavra que não é um feito, mas uma resposta.",
+            "lean": {
+              "contato": 3
+            }
+          },
+          {
+            "id": "deixar_vazio",
+            "label": "Deixar o espaço em branco",
+            "preview": "Há escolhas que se fazem não fazendo.",
+            "lean": {
+              "silencio": 3
+            }
+          },
+          {
+            "id": "arquivar",
+            "label": "Guardar a lista inteira, com o espaço",
+            "preview": "Para que alguém, um dia, entenda o que escolhemos.",
+            "lean": {
+              "heranca": 3
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "colegio": {
+    "name": "Colégio Silêncio",
+    "founders": [
+      "Irene Valdés",
+      "Tomás Ilunga",
+      "Mirela Saar",
+      "Hamid Okonjo",
+      "Lúcia Tavares",
+      "Ana Kristensen"
+    ],
+    "beats": [
+      {
+        "id": "colegio_censo",
+        "from": 2070,
+        "to": 2140,
+        "chance": 0.08,
+        "title": "O Colégio pede os arquivos",
+        "news": {
+          "headline": "Colégio Silêncio pede acesso aos arquivos brutos do Eco",
+          "body": "O pedido chegou por carta, em papel, de Ceres. Eles querem as fitas originais, as primeiras em que o Eco apareceu."
+        },
+        "card": {
+          "body": "O Colégio quer as fitas originais do primeiro Eco, não as cópias digitais. Dizem que há algo nelas que só o material físico guarda. Prometem devolver tudo, intacto, com o que descobrirem.",
+          "defaultChoice": "negar",
+          "choices": [
+            {
+              "id": "abrir",
+              "label": "Emprestar as fitas",
+              "preview": "Confiança se constrói emprestando o que importa.",
+              "lean": {
+                "heranca": 1
+              },
+              "colegio": 15
+            },
+            {
+              "id": "negar",
+              "label": "Mandar só cópias",
+              "preview": "O original fica em casa.",
+              "lean": {
+                "contato": 1
+              },
+              "colegio": -10
+            }
+          ]
+        }
+      },
+      {
+        "id": "colegio_zona_quieta",
+        "from": 2090,
+        "to": 2180,
+        "chance": 0.07,
+        "title": "Uma zona de silêncio no Cinturão",
+        "news": {
+          "headline": "Colégio propõe zona sem transmissões ao redor de Ceres",
+          "body": "A proposta proíbe rádio potente num raio de milhões de quilômetros. Mineiros protestam; astrônomos aplaudem."
+        },
+        "card": {
+          "body": "O Colégio quer uma zona de silêncio de rádio ao redor de Ceres, para ouvir o Eco sem interferência. As mineradoras dizem que vão perder dinheiro. O seu voto no conselho do Cinturão desempata.",
+          "defaultChoice": "abster",
+          "choices": [
+            {
+              "id": "apoiar",
+              "label": "Votar a favor da zona",
+              "preview": "Ciência e silêncio, lado a lado.",
+              "lean": {
+                "silencio": 2
+              },
+              "colegio": 12,
+              "effects": {
+                "reputation": 1
+              }
+            },
+            {
+              "id": "opor",
+              "label": "Votar contra",
+              "preview": "A fronteira precisa de rádio para viver.",
+              "lean": {
+                "contato": 2
+              },
+              "colegio": -12,
+              "effects": {
+                "support": 1
+              }
+            },
+            {
+              "id": "abster",
+              "label": "Abster-se",
+              "preview": "Que os outros decidam desta vez.",
+              "lean": {}
+            }
+          ]
+        }
+      },
+      {
+        "id": "colegio_recruta",
+        "from": 2150,
+        "to": 2260,
+        "chance": 0.06,
+        "title": "O Colégio recruta",
+        "news": {
+          "headline": "Engenheiros deixam agências para se juntar ao Colégio",
+          "body": "Ninguém explica a decisão em público. Os que saem dizem apenas que querem ouvir."
+        },
+        "card": {
+          "body": "{person}, do seu time de engenharia, pediu demissão. Vai para Ceres, para o Colégio. Na carta de despedida, escreveu: passei a vida fazendo barulho no espaço; quero passar o resto ouvindo.",
+          "defaultChoice": "deixar",
+          "choices": [
+            {
+              "id": "deixar",
+              "label": "Desejar boa viagem",
+              "preview": "Uma ponte entre a agência e o Colégio.",
+              "lean": {
+                "heranca": 1
+              },
+              "colegio": 10
+            },
+            {
+              "id": "segurar",
+              "label": "Oferecer o dobro para ficar",
+              "preview": "Caro, e talvez inútil.",
+              "lean": {
+                "contato": 1
+              },
+              "colegio": -5,
+              "effects": {
+                "cash": -5
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "colegio_manifesto",
+        "from": 2230,
+        "to": 2400,
+        "chance": 0.05,
+        "title": "O Manifesto do Silêncio",
+        "news": {
+          "headline": "Colégio publica o Manifesto do Silêncio: 'quem responde se revela'",
+          "body": "O texto tem uma página. Circula em todos os habitats, copiado à mão em alguns. Muita gente que nunca ouviu o Eco passa a ter opinião sobre ele."
+        },
+        "lean": {
+          "silencio": 1
+        }
+      },
+      {
+        "id": "colegio_sonda_muda",
+        "from": 2300,
+        "to": 2500,
+        "chance": 0.05,
+        "title": "Desliguem a sonda",
+        "news": {
+          "headline": "Colégio pede que sondas interestelares viajem com rádio desligado",
+          "body": "Segundo o Colégio, cada transmissão a caminho de outra estrela é um grito no corredor."
+        },
+        "card": {
+          "body": "Uma delegação do Colégio, de túnicas cinzentas e fones de ouvido que nunca tiram, pede que a sua próxima sonda interestelar viaje calada: sem farol, sem transmissão, só gravando. Os seus cientistas acham absurdo. Os seus contadores acham barato.",
+          "defaultChoice": "janela",
+          "choices": [
+            {
+              "id": "atender",
+              "label": "Mandar a sonda calada",
+              "preview": "Ela vai ver tudo e contar só quando voltar.",
+              "lean": {
+                "silencio": 2
+              },
+              "colegio": 15
+            },
+            {
+              "id": "recusar",
+              "label": "Manter o farol ligado",
+              "preview": "Uma sonda que não fala é uma sonda perdida.",
+              "lean": {
+                "contato": 2
+              },
+              "colegio": -15
+            },
+            {
+              "id": "janela",
+              "label": "Transmitir só em janelas curtas",
+              "preview": "Meio silêncio, meio voz.",
+              "lean": {
+                "heranca": 1
+              },
+              "colegio": 5
+            }
+          ]
+        }
+      },
+      {
+        "id": "colegio_cisma",
+        "from": 2450,
+        "to": 2650,
+        "chance": 0.05,
+        "title": "O cisma dos Ouvintes",
+        "news": {
+          "headline": "Cisma no Colégio: os 'Ouvintes' querem responder ao Eco",
+          "body": "Pela primeira vez desde a fundação, em Ceres, o Colégio se divide em público. A facção dos Ouvintes acha que calar também é uma resposta, e a pior delas."
+        },
+        "card": {
+          "body": "O Colégio rachou. De um lado, a ortodoxia: nunca responder. Do outro, os Ouvintes: séculos ouvindo bastam, é hora de falar. As duas facções pedem o apoio da sua agência, e as duas têm metade dos arquivos.",
+          "defaultChoice": "abrigar",
+          "choices": [
+            {
+              "id": "ouvintes",
+              "label": "Apoiar os Ouvintes",
+              "preview": "O Colégio inteiro vai lembrar disso.",
+              "lean": {
+                "contato": 3
+              },
+              "colegio": -20
+            },
+            {
+              "id": "ortodoxia",
+              "label": "Apoiar a ortodoxia",
+              "preview": "Séculos de silêncio merecem respeito.",
+              "lean": {
+                "silencio": 3
+              },
+              "colegio": 20
+            },
+            {
+              "id": "abrigar",
+              "label": "Guardar os arquivos das duas facções",
+              "preview": "Que nenhuma metade se perca.",
+              "lean": {
+                "heranca": 3
+              },
+              "colegio": 5
+            }
+          ]
+        }
+      },
+      {
+        "id": "colegio_sai_da_sombra",
+        "from": 2600,
+        "to": 2700,
+        "chance": 0.1,
+        "actor": true,
+        "title": "O Colégio sai da sombra",
+        "news": {
+          "headline": "O Colégio Silêncio passa a agir como potência própria",
+          "body": "Com estações, sondas e acordos em vários sistemas, a velha ordem de Ceres agora negocia de igual para igual com governos e agências."
+        }
+      },
+      {
+        "id": "colegio_conselho",
+        "from": 2700,
+        "to": 2900,
+        "chance": 0.04,
+        "minRel": 30,
+        "title": "Um assento no Conselho Interno",
+        "news": {
+          "headline": "Colégio convida a direção de uma agência para o seu Conselho Interno",
+          "body": "É a primeira vez que alguém de fora recebe o convite."
+        },
+        "card": {
+          "body": "O Colégio oferece a você um assento no Conselho Interno, onde se guardam as leituras do Eco que nunca foram publicadas. Em troca, a agência promete não transmitir nada na direção do Eco sem consultá-los.",
+          "defaultChoice": "aceitar",
+          "choices": [
+            {
+              "id": "aceitar",
+              "label": "Aceitar o assento",
+              "preview": "Saber tudo, em troca de não dizer nada.",
+              "lean": {
+                "silencio": 3
+              },
+              "colegio": 15
+            },
+            {
+              "id": "recusar",
+              "label": "Recusar com respeito",
+              "preview": "A agência fala por si.",
+              "lean": {
+                "contato": 2
+              },
+              "colegio": -10
+            }
+          ]
+        }
+      },
+      {
+        "id": "colegio_denuncia",
+        "from": 2700,
+        "to": 2900,
+        "chance": 0.04,
+        "maxRel": -30,
+        "title": "O Colégio denuncia a agência",
+        "news": {
+          "headline": "Colégio acusa agência de pôr todos os mundos em risco",
+          "body": "A acusação é longa e cita décadas de transmissões. Em vários habitats, o apoio à agência cai."
+        },
+        "lean": {
+          "silencio": 1
+        },
+        "effects": {
+          "support": -3
+        }
+      },
+      {
+        "id": "colegio_ultimo_pedido",
+        "from": 2992,
+        "to": 2998,
+        "chance": 0.3,
+        "title": "O último pedido do Colégio",
+        "news": {
+          "headline": "Colégio Silêncio faz um último pedido: 'não respondam'",
+          "body": "O texto foi lido em todos os mundos ao mesmo tempo. Dura onze segundos. Depois dele, o Colégio desliga os próprios transmissores."
+        },
+        "card": {
+          "body": "A voz é de uma velha senhora, a atual decana do Colégio. A mensagem é curta: em janeiro de 3000 o espaço em branco vai chegar, e quem escrever nele vai ser lido. Nós pedimos, uma última vez, que ninguém escreva. Depois disso o Colégio desliga os próprios transmissores, para sempre.",
+          "defaultChoice": "ouvir",
+          "choices": [
+            {
+              "id": "prometer",
+              "label": "Prometer considerar o pedido",
+              "preview": "Uma promessa, não um juramento.",
+              "lean": {
+                "silencio": 2
+              },
+              "colegio": 10
+            },
+            {
+              "id": "ouvir",
+              "label": "Agradecer e não prometer nada",
+              "preview": "A decisão é da agência, e de mais ninguém.",
+              "lean": {
+                "heranca": 1
+              }
+            },
+            {
+              "id": "rejeitar",
+              "label": "Responder que a humanidade vai falar",
+              "preview": "Mil anos de feitos não terminam calados.",
+              "lean": {
+                "contato": 2
+              },
+              "colegio": -15
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "drift": [
+    {
+      "milestone": "extraterrestrial_life",
+      "lean": {
+        "contato": 2
+      },
+      "headline": "Vida fora da Terra muda o que se pensa do Eco"
+    },
+    {
+      "milestone": "first_interstellar_round_trip_message",
+      "lean": {
+        "contato": 2
+      }
+    },
+    {
+      "milestone": "interstellar_network",
+      "lean": {
+        "contato": 2
+      }
+    },
+    {
+      "milestone": "silence_source_located",
+      "lean": {
+        "contato": 1,
+        "silencio": 1
+      }
+    },
+    {
+      "milestone": "autonomous_colony",
+      "lean": {
+        "silencio": 1
+      }
+    },
+    {
+      "milestone": "first_independent_colony",
+      "lean": {
+        "silencio": 1
+      }
+    },
+    {
+      "milestone": "first_off_earth_birth",
+      "lean": {
+        "heranca": 1
+      }
+    },
+    {
+      "milestone": "first_generation_ship_launch",
+      "lean": {
+        "heranca": 2
+      }
+    },
+    {
+      "milestone": "hundred_worlds",
+      "lean": {
+        "heranca": 2
+      }
+    },
+    {
+      "milestone": "stellar_archive",
+      "lean": {
+        "heranca": 3
+      }
+    }
+  ],
+  "silence": {
+    "fromYear": 2990,
+    "lines": [
+      "O ruído de fundo do céu cai 3% em um ano; nenhum modelo explica",
+      "Pulsares distantes somem dos catálogos, um por mês",
+      "Crianças de Titã dormem com rádios ligados para ouvir o Eco",
+      "Radioastrônomos pedem silêncio de rádio em todos os mundos por uma noite",
+      "A borda do Silêncio passa a menos de dez anos-luz; as estrelas vizinhas são as próximas",
+      "Habitats religiosos e laicos fazem vigílias para escutar o céu",
+      "Os sete pulsos já se ouvem sem antena, num rádio de bolso",
+      "As estrelas vizinhas continuam brilhando; só param de falar",
+      "Faltam dois anos: todos os mundos discutem o espaço vazio",
+      "Último ano antes de 3000: o céu nunca esteve tão quieto"
+    ]
+  },
+  "final": {
+    "title": "O Grande Silêncio",
+    "body": "Janeiro de 3000. Mil e cinquenta anos depois de 1950, o céu inteiro se cala, e no meio do silêncio só resta o Eco, com o seu espaço em branco. Todos os mundos esperam a palavra da agência.",
+    "leanLines": {
+      "contato": "Há séculos a agência se inclina a responder.",
+      "silencio": "Há séculos a agência se inclina a calar.",
+      "heranca": "Há séculos a agência se inclina a guardar e preparar.",
+      "none": "A agência nunca se decidiu de verdade. Agora vai ter de decidir."
+    }
+  },
+  "endings": {
+    "contato": {
+      "label": "Contato",
+      "preview": "Responder ao Silêncio com tudo o que temos.",
+      "requirements": [
+        {
+          "id": "fonte",
+          "type": "milestone",
+          "milestone": "silence_source_located",
+          "label": "Saber de onde vem o Silêncio"
+        },
+        {
+          "id": "pecas",
+          "type": "pieces",
+          "n": 10,
+          "label": "Ter reunido 10 peças do Eco"
+        },
+        {
+          "id": "rede",
+          "type": "milestone",
+          "milestone": "interstellar_network",
+          "label": "Uma rede de antenas entre as estrelas"
+        }
+      ],
+      "previews": {
+        "pleno": "Sabemos para onde falar, o que dizer e temos antenas para isso.",
+        "incerto": "Vamos falar sem saber tudo. Talvez baste.",
+        "fragil": "Uma voz pequena, mal apontada, no maior silêncio da história."
+      },
+      "paras": {
+        "pleno": "Às zero hora de janeiro de 3000, cada antena de cada mundo aponta para o mesmo ponto do céu. A rede entre as estrelas, construída ao longo de séculos, transmite a resposta: a história da espécie, mil e cinquenta anos de voos desde 1950, os mapas, as canções, os nomes do Memorial, e no espaço em branco do Eco uma única palavra, em todas as línguas humanas: aqui. Durante um ano nada volta. Então, numa madrugada de 3001, a frente do Silêncio para de avançar. Pela primeira vez em milhões de anos, alguém do outro lado escuta.",
+        "incerto": "Às zero hora de janeiro de 3000, as antenas que a agência conseguiu reunir apontam para onde o Eco parece vir. A resposta é imperfeita: faltam peças, faltam antenas, faltam certezas. Mesmo assim ela sai, com a história da espécie e os nomes do Memorial, e no espaço em branco a palavra aqui. Por um ano, nada. Depois, um único pulso, o oitavo, que nunca existiu antes. Não sabemos o que ele diz. Sabemos que alguém ouviu.",
+        "fragil": "Às zero hora de janeiro de 3000, uma única antena da agência transmite, quase sozinha, na direção errada ou quase certa. A resposta é curta: os nomes do Memorial e a palavra aqui, repetida até a energia acabar. Ninguém sabe se chegou. O Silêncio continua avançando, e as estrelas vizinhas apagam a voz uma a uma. Mas, pela primeira vez em mil anos, a humanidade não esperou ser chamada. Ela falou primeiro."
+      },
+      "coherent": "Foi o fim que a agência vinha escolhendo, peça por peça, desde a primeira fita do Eco.",
+      "turn": "Depois de séculos inclinada a outro caminho, a agência surpreendeu a todos e decidiu falar.",
+      "close": "Em algum lugar, alguém aprende o nome de cada pessoa que morreu para que a humanidade chegasse até ali.",
+      "world": "Em janeiro de 3000, a humanidade respondeu ao Eco",
+      "worldPara": "A agência já não existia quando janeiro de 3000 chegou, mas a inclinação que ela ajudou a criar sobreviveu. Os mundos que restaram juntaram as antenas que tinham e responderam ao Eco: a história da espécie, os nomes do Memorial e, no espaço em branco, a palavra aqui. Ninguém sabe se a resposta chegou a algum lugar. Sabe-se que a humanidade não esperou calada."
+    },
+    "silencio": {
+      "label": "Silêncio",
+      "preview": "Calar e seguir sozinhos.",
+      "requirements": [
+        {
+          "id": "colegio",
+          "type": "colegio",
+          "min": 20,
+          "label": "O Colégio Silêncio ao seu lado"
+        },
+        {
+          "id": "autonomia",
+          "type": "milestone",
+          "milestone": "autonomous_colony",
+          "label": "Mundos capazes de viver sozinhos"
+        },
+        {
+          "id": "independencia",
+          "type": "milestone",
+          "milestone": "first_independent_colony",
+          "label": "Colônias que já decidem o próprio destino"
+        }
+      ],
+      "previews": {
+        "pleno": "Todos os mundos calam juntos, e cada um sabe viver sozinho.",
+        "incerto": "Calar vai custar caro a alguns mundos.",
+        "fragil": "Um silêncio que nem todos vão respeitar."
+      },
+      "paras": {
+        "pleno": "Em janeiro de 3000, um a um, os transmissores de todos os mundos se desligam. O Colégio Silêncio conduz a cerimônia em Ceres, onde tudo começou para eles, e a agência apaga a última luz da rede. O espaço em branco do Eco fica em branco. A frente do Silêncio passa por nós como a sombra de uma nuvem passa por um campo: sem nos ver. Do outro lado, os mundos continuam: colônias que já sabiam viver sozinhas, cidades sob cúpulas, crianças que vão crescer sem saber o que quase aconteceu. O céu volta a ser só nosso, imenso e quieto.",
+        "incerto": "Em janeiro de 3000 a agência desliga os transmissores e pede a todos os mundos que façam o mesmo. A maioria obedece. Alguns hesitam, alguns custam a ficar no escuro, e por semanas o silêncio humano tem falhas. A frente do Silêncio passa por nós, e ninguém sabe se nos viu. Quando ela vai embora, os mundos religam os rádios, um a um, para conversar apenas entre si. Seguimos sozinhos, como sempre estivemos. Agora sabemos disso.",
+        "fragil": "Em janeiro de 3000 a agência desliga os próprios transmissores e pede que todos façam o mesmo. Muitos não fazem. Colônias que ainda dependem do rádio para comer, para pedir socorro, para não enlouquecer, continuam falando. O silêncio humano é feito de buracos. A frente do Silêncio passa, e ninguém sabe o que ela ouviu. Quando a última vigília termina, só uma coisa é certa: a agência fez o que achou certo, mesmo sem ser seguida."
+      },
+      "coherent": "Foi o silêncio que a agência vinha guardando, segredo por segredo, desde a primeira fita do Eco.",
+      "turn": "Depois de séculos inclinada a outro caminho, a agência surpreendeu a todos e escolheu calar.",
+      "close": "As naves continuam partindo, agora sem esperar resposta. Ninguém precisa saber que, um dia, alguém poderia ter ouvido.",
+      "world": "Em janeiro de 3000, a humanidade escolheu o silêncio",
+      "worldPara": "A agência já não existia quando janeiro de 3000 chegou, mas o silêncio que ela ajudou a defender venceu. Um a um, os mundos desligaram os transmissores, e o espaço em branco do Eco ficou em branco. A frente do Silêncio passou sem que ninguém soubesse se ela nos viu. Do outro lado, os mundos religaram os rádios apenas para falar entre si."
+    },
+    "heranca": {
+      "label": "Herança",
+      "preview": "Deixar tudo preparado para quem vier depois.",
+      "requirements": [
+        {
+          "id": "arquivo",
+          "type": "milestone",
+          "milestone": "stellar_archive",
+          "label": "Um arquivo que dure um milhão de anos"
+        },
+        {
+          "id": "familias",
+          "type": "families",
+          "n": 2,
+          "label": "Famílias com gerações na agência"
+        },
+        {
+          "id": "mundos",
+          "type": "milestone",
+          "milestone": "hundred_worlds",
+          "label": "Cem mundos com gente"
+        }
+      ],
+      "previews": {
+        "pleno": "Arquivos, mapas e mundos prontos para quem vier depois.",
+        "incerto": "Uma herança incompleta, mas de pé.",
+        "fragil": "Pouco a deixar, deixado com cuidado."
+      },
+      "paras": {
+        "pleno": "Em janeiro de 3000 a agência não responde nem esquece. No espaço em branco do Eco ela escreve um endereço: o do arquivo estelar, cópias de tudo o que a humanidade aprendeu desde 1950, guardadas em cem mundos e em sondas que esperam em órbitas estáveis por um milhão de anos. Ali estão os mapas, as fórmulas, as primeiras fitas do Eco, os nomes do Memorial e a história das famílias que serviram geração após geração. Quem vier depois, nós ou outros, depois do Silêncio ou através dele, vai encontrar a porta aberta e a luz acesa.",
+        "incerto": "Em janeiro de 3000 a agência não responde nem esquece. Guarda o que pode: arquivos em alguns mundos, sondas em órbitas de longo prazo, os nomes do Memorial gravados em pedra. Não é tudo. Faltam mundos, faltam cópias, falta tempo. Mas no espaço em branco do Eco fica escrito um endereço, e no endereço há uma biblioteca. Quem vier depois vai encontrar uma porta, talvez emperrada. E atrás dela, uma luz.",
+        "fragil": "Em janeiro de 3000 a agência faz o que está ao seu alcance. Um único arquivo, numa órbita estável, com as primeiras fitas do Eco, os mapas e os nomes do Memorial. Não há cem mundos para guardar cópias, nem gerações de famílias para contar a história. Há uma caixa bem-feita, flutuando no escuro, à espera. Talvez ninguém a abra nunca. Mas, se alguém abrir, vai saber que estivemos aqui e que pensamos nele."
+      },
+      "coherent": "Foi a herança que a agência vinha juntando, pasta por pasta, desde a primeira fita do Eco.",
+      "turn": "Depois de séculos inclinada a outro caminho, a agência surpreendeu a todos e escolheu preparar o futuro.",
+      "close": "A porta fica aberta. A luz fica acesa. O resto é com quem vier.",
+      "world": "Em janeiro de 3000, a humanidade deixou sua herança para quem vier depois",
+      "worldPara": "A agência já não existia quando janeiro de 3000 chegou, mas os arquivos que ela ajudou a começar continuaram crescendo. Os mundos que restaram não responderam nem esqueceram: escreveram no espaço em branco do Eco um endereço, e no endereço guardaram tudo o que sabiam. Quem vier depois vai encontrar uma porta, e atrás dela os nomes de quem chegou primeiro."
+    }
+  },
+  "legacy": {
+    "agency": {
+      "tpl": "{agencia} nasceu em {ano} e atravessou {eras}."
+    },
+    "agencyOld": {
+      "tpl": "{agencia} tem raízes em {ano} e atravessou {eras} desde {inicio}."
+    },
+    "renamed": {
+      "tpl": "Ao longo dos séculos, chamou-se {nomes}."
+    },
+    "league": {
+      "tpl": "Terminou {lideres} eras no topo da Tabela da Era."
+    },
+    "firsts": {
+      "tpl": "Foi a primeira em {n} feitos, de {primeiro} ({ano1}) a {ultimo} ({ano2})."
+    },
+    "noFirsts": {
+      "tpl": "Nunca chegou primeiro, mas chegou: {missoes} com resultado."
+    },
+    "memorial": {
+      "tpl": "{n} nomes estão no Memorial. O primeiro foi {primeiro}, em {ano1}; o último, {ultimo}, em {ano2}."
+    },
+    "memorialOne": {
+      "tpl": "Um único nome está no Memorial: {primeiro}, em {ano1}."
+    },
+    "noMemorial": {
+      "tpl": "Em toda a sua história, ninguém da agência morreu a serviço. O Memorial tem só uma placa: obrigado."
+    },
+    "family": {
+      "tpl": "Os {sobrenome} serviram a agência por {geracoes}, de {ano1} a {ano2}: de {primeiro} a {ultimo}."
+    },
+    "familyFallen": {
+      "tpl": "{ultimo} carregou o nome de {primeiro}, que morreu a serviço em {ano1}."
+    },
+    "colonies": {
+      "tpl": "{n} mundos com gente levam a marca da agência: {nomes}."
+    },
+    "eco": {
+      "tpl": "Das {total} peças do Eco, a agência guardou {n}, a primeira em {ano1}."
+    },
+    "colegioFriend": {
+      "tpl": "O Colégio Silêncio foi um aliado discreto por {anos}."
+    },
+    "colegioFoe": {
+      "tpl": "O Colégio Silêncio foi um adversário paciente por {anos}."
+    },
+    "colegioNeutral": {
+      "tpl": "Com o Colégio Silêncio, a agência manteve uma distância respeitosa por {anos}."
+    },
+    "gone": {
+      "tpl": "A agência deixou o caminho em {ano}, mas a história seguiu sem ela."
+    }
+  },
+  "milestoneLabels": {
+    "first_satellite": "Primeiro satélite artificial",
+    "first_animal_in_orbit": "Primeiro animal em órbita",
+    "first_heliocentric_orbit": "Primeiro objeto em órbita do Sol",
+    "lunar_flyby_robotic": "Primeira sonda a passar pela Lua",
+    "lunar_impact": "Primeiro impacto na Lua",
+    "lunar_far_side_image": "Primeira foto do lado oculto da Lua",
+    "first_weather_satellite": "Primeiro satélite meteorológico",
+    "first_navigation_satellite": "Primeiro satélite de navegação",
+    "first_orbital_recovery": "Primeira cápsula recuperada da órbita",
+    "first_animals_returned": "Primeiros animais trazidos vivos da órbita",
+    "first_crewed_orbit": "Primeiro ser humano em órbita",
+    "crewed_orbit_national": "Voo orbital tripulado próprio",
+    "first_communications_satellite": "Primeiro satélite de comunicações ativo",
+    "first_woman_in_space": "Primeira mulher no espaço",
+    "first_geostationary_satellite": "Primeiro satélite geoestacionário",
+    "first_multi_crew": "Primeira tripulação de várias pessoas",
+    "first_eva": "Primeira caminhada espacial",
+    "first_orbital_rendezvous": "Primeiro encontro em órbita",
+    "first_docking": "Primeira acoplagem em órbita",
+    "first_automated_docking": "Primeira acoplagem automática",
+    "first_crew_transfer": "Primeira troca de tripulantes entre naves",
+    "first_orbital_observatory": "Primeiro observatório em órbita",
+    "venus_flyby": "Sobrevoo de Vênus",
+    "venus_entry_probe": "Sonda nas nuvens de Vênus",
+    "venus_landing": "Pouso em Vênus",
+    "venus_orbit": "Órbita de Vênus",
+    "mars_flyby": "Sobrevoo de Marte",
+    "mars_orbit": "Órbita de Marte",
+    "mars_landing_robotic": "Pouso robótico em Marte",
+    "lunar_surface_robotic": "Pouso robótico na Lua",
+    "lunar_orbit_robotic": "Primeira sonda em órbita lunar",
+    "crewed_lunar_flyby": "Sobrevoo lunar tripulado",
+    "crewed_lunar_orbit": "Órbita lunar tripulada",
+    "crewed_lunar_landing": "Pouso tripulado na Lua",
+    "lunar_sample_return": "Amostras lunares trazidas à Terra",
+    "robotic_lunar_sample_return": "Amostras lunares trazidas por robô",
+    "lunar_rover_robotic": "Primeiro jipe robótico na Lua",
+    "crewed_lunar_rover": "Primeiro carro lunar tripulado",
+    "first_space_station": "Primeira estação espacial",
+    "national_station": "Estação nacional",
+    "mercury_flyby": "Sobrevoo de Mercúrio",
+    "jupiter_flyby": "Sobrevoo de Júpiter",
+    "first_gravity_assist": "Primeira manobra de estilingue gravitacional",
+    "first_international_docking": "Primeira acoplagem internacional",
+    "saturn_flyby": "Sobrevoo de Saturno",
+    "first_reusable_spaceplane": "Primeiro avião espacial reutilizável em órbita",
+    "first_untethered_eva": "Primeira caminhada espacial sem cabo",
+    "first_satellite_repair": "Primeiro satélite consertado em órbita",
+    "comet_flyby": "Primeira sonda a atravessar a cauda de um cometa",
+    "uranus_flyby": "Sobrevoo de Urano",
+    "comet_nucleus_flyby": "Primeira foto do núcleo de um cometa",
+    "first_modular_station": "Primeira estação modular",
+    "first_year_in_orbit": "Primeiro ano inteiro em órbita",
+    "neptune_flyby": "Sobrevoo de Netuno",
+    "first_private_orbital_launch": "Primeiro foguete orbital de empresa privada",
+    "asteroid_flyby": "Sobrevoo de asteroide",
+    "solar_polar_orbit": "Órbita sobre os polos do Sol",
+    "first_exoplanet_discovery": "Primeiro planeta descoberto em outra estrela",
+    "jupiter_arrival": "Chegada a Júpiter",
+    "jupiter_atmosphere_probe": "Sonda na atmosfera de Júpiter",
+    "mars_rover": "Primeiro jipe robótico em Marte",
+    "international_station": "Primeiros módulos de uma estação internacional",
+    "asteroid_rendezvous": "Encontro com asteroide",
+    "asteroid_landing": "Pouso em asteroide",
+    "first_space_tourist": "Primeiro turista espacial",
+    "first_private_suborbital_crew": "Primeiro voo tripulado privado ao espaço",
+    "saturn_orbit": "Órbita de Saturno",
+    "titan_arrival": "Chegada a Titã",
+    "enceladus_plume": "Voo pelos gêiseres de Encélado",
+    "comet_impact": "Impacto em cometa",
+    "asteroid_sample_return": "Amostras de asteroide trazidas à Terra",
+    "comet_sample_return": "Poeira de cometa trazida à Terra",
+    "mercury_orbit": "Órbita de Mercúrio",
+    "vesta_orbit": "Órbita de Vesta",
+    "first_commercial_station_cargo": "Primeira nave privada a chegar a uma estação",
+    "heliopause_crossing": "Primeira sonda no espaço interestelar",
+    "comet_orbit": "Órbita de cometa",
+    "comet_landing": "Pouso em cometa",
+    "ceres_orbit": "Órbita de Ceres",
+    "pluto_flyby": "Sobrevoo de Plutão",
+    "first_orbital_booster_landing": "Primeiro estágio orbital pousado de volta",
+    "first_booster_reflight": "Primeiro estágio orbital reutilizado",
+    "solar_corona_flyby": "Primeira nave dentro da coroa solar",
+    "lunar_far_side_landing": "Pouso no lado oculto da Lua",
+    "kuiper_flyby": "Sobrevoo no Cinturão de Kuiper",
+    "first_megaconstellation": "Primeira megaconstelação de satélites",
+    "first_commercial_crew": "Primeira nave tripulada privada em órbita",
+    "mars_helicopter": "Primeiro voo motorizado em outro planeta",
+    "first_private_crewed_orbit": "Primeira tripulação só de civis em órbita",
+    "first_l2_observatory": "Grande observatório em L2",
+    "planetary_defense_impact": "Primeiro desvio de asteroide",
+    "lunar_south_pole_landing": "Pouso no polo sul lunar",
+    "first_commercial_lunar_landing": "Primeiro pouso lunar de empresa privada",
+    "lunar_far_side_sample_return": "Amostras do lado oculto da Lua",
+    "first_commercial_eva": "Primeira caminhada espacial privada",
+    "first_booster_catch": "Primeiro propulsor apanhado pela torre",
+    "trojan_flyby": "Sobrevoo de asteroide troiano",
+    "apophis_rendezvous": "Encontro com Apophis",
+    "planetary_defense_survey": "Inspeção do teste de defesa planetária",
+    "phobos_landing": "Pouso em Fobos",
+    "europa_arrival": "Primeira missão dedicada a Europa",
+    "ganymede_orbit": "Órbita de Ganimedes",
+    "psyche_arrival": "Chegada a um asteroide metálico",
+    "uranus_orbit": "Órbita de Urano",
+    "commercial_station": "Estação comercial em órbita",
+    "lunar_station": "Estação em órbita lunar",
+    "lunar_south_pole_crewed": "Pessoas no polo sul lunar",
+    "lunar_resource_demo": "Uso de recursos lunares",
+    "first_orbital_refueling": "Primeiro reabastecimento de foguete em órbita",
+    "first_fission_surface_power": "Primeiro reator nuclear na superfície da Lua",
+    "first_lunar_night_survival": "Primeira tripulação a atravessar a noite lunar",
+    "far_side_observatory": "Radiotelescópio no lado oculto da Lua",
+    "mars_sample_return": "Amostras de Marte trazidas à Terra",
+    "first_nuclear_thermal_flight": "Primeiro voo com propulsão nuclear térmica",
+    "first_space_solar_power": "Primeira energia solar enviada do espaço",
+    "lunar_base": "Base lunar permanente",
+    "crewed_mars_orbit": "Primeira tripulação em órbita de Marte",
+    "crewed_mars_landing": "Primeira tripulação em Marte",
+    "crewed_asteroid_visit": "Primeira tripulação em um asteroide",
+    "mars_outpost": "Primeiro posto avançado em Marte",
+    "mars_base": "Primeira base permanente em Marte",
+    "first_off_earth_birth": "Primeira criança nascida fora da Terra",
+    "first_asteroid_mining": "Primeiro minério de asteroide vendido",
+    "first_colony": "Primeira colônia (estágio 4)",
+    "first_fusion_flight": "Primeiro voo com propulsão de fusão",
+    "first_orbital_shipyard": "Primeiro estaleiro orbital",
+    "ceres_base": "Primeira base em Ceres",
+    "venus_aerostat_habitat": "Primeiro habitat nas nuvens de Vênus",
+    "first_space_elevator": "Primeiro elevador espacial (lunar)",
+    "crewed_jupiter_system": "Primeira tripulação no sistema de Júpiter",
+    "europa_ocean_reached": "Primeira sonda no oceano de Europa",
+    "extraterrestrial_life": "Primeira vida fora da Terra",
+    "crewed_saturn_system": "Primeira tripulação no sistema de Saturno",
+    "solar_gravity_lens_telescope": "Telescópio no foco da lente do Sol",
+    "first_interstellar_probe_launch": "Primeira sonda lançada rumo a outra estrela",
+    "autonomous_colony": "Primeira colônia autônoma (estágio 5)",
+    "first_beamed_sail": "Primeira vela empurrada por laser",
+    "crewed_oort_cloud": "Primeira tripulação na Nuvem de Oort",
+    "mars_terraforming_begun": "Começa a terraformação de Marte",
+    "first_interstellar_probe_arrival": "Primeira sonda a chegar a outra estrela",
+    "first_exoplanet_closeup": "Primeira imagem de perto de um exoplaneta",
+    "first_interstellar_round_trip_message": "Primeira mensagem de ida e volta com outra estrela",
+    "first_independent_colony": "Primeira colônia independente (estágio 6)",
+    "first_dyson_swarm_segment": "Primeiro segmento de enxame solar",
+    "first_generation_ship_launch": "Partida da primeira nave de gerações",
+    "first_crewed_interstellar_launch": "Primeira tripulação rumo a outra estrela",
+    "first_crewed_interstellar_arrival": "Primeira tripulação em outro sistema estelar",
+    "exoplanet_crewed_landing": "Primeiro pouso em outro sol",
+    "mars_open_air": "Primeiro passeio sem capacete em Marte",
+    "second_star_colony": "Colônias em duas estrelas",
+    "first_probe_beyond_local_bubble": "Primeira sonda além da Bolha Local",
+    "first_colony_beyond_100ly": "Primeira colônia a mais de 100 anos-luz",
+    "interstellar_network": "Rede de comunicação entre dez estrelas",
+    "hundred_worlds": "Cem mundos habitados",
+    "first_galactic_core_image": "Primeira imagem de perto do centro da galáxia",
+    "stellar_archive": "O Arquivo Estelar",
+    "silence_source_located": "A origem do Silêncio localizada"
+  }
+}

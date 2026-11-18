@@ -1,0 +1,36 @@
+{
+"note": "Valores de jan/2008 das linhagens vivas (início do cenário Nova Economia; a campanha usa o snapshot da era 1). Verbas em US$ milhões do jogo (valores constantes de 2026), perto da budgetSeries das linhagens. Relações e tratados de 2008: ISS (IGA de 1998), Tratado do Espaço Exterior, contratos COTS. Não há blocos lunares ainda.",
+"era": "e3",
+"date": {"year":2008,"month":0},
+"actors": {
+"nasa": {"budget":9300,"cash":900,"support":58,"reputation":70,"culture":15,"prestige":0,"capabilities":{"crewed":true,"launchSites":["Cabo Canaveral","Kennedy","Vandenberg","Wallops"]},"ai":{"cooperation":0.65,"aggression":0.35,"riskTolerance":0.35,"goals":["mercury_orbit","vesta_orbit","ceres_orbit","pluto_flyby","mars_helicopter","solar_corona_flyby","planetary_defense_impact","first_l2_observatory"]},"fixedCostShare":0.6},
+"roscosmos": {"budget":1500,"cash":150,"support":50,"reputation":55,"culture":0,"prestige":0,"capabilities":{"crewed":true,"launchSites":["Baikonur","Plesetsk"]},"ai":{"cooperation":0.5,"aggression":0.45,"riskTolerance":0.5,"goals":["lunar_south_pole_landing"]},"fixedCostShare":0.55},
+"cnsa": {"budget":2800,"cash":300,"support":80,"reputation":50,"culture":10,"prestige":0,"capabilities":{"crewed":true,"launchSites":["Jiuquan","Xichang","Taiyuan"]},"ai":{"cooperation":0.35,"aggression":0.55,"riskTolerance":0.45,"goals":["national_station","lunar_far_side_landing","lunar_far_side_sample_return","mars_landing_robotic"]},"fixedCostShare":0.45},
+"isro": {"budget":850,"cash":80,"support":70,"reputation":55,"culture":15,"prestige":0,"capabilities":{"crewed":false,"launchSites":["Sriharikota"]},"ai":{"cooperation":0.7,"aggression":0.3,"riskTolerance":0.45,"goals":["crewed_orbit_national:isro","lunar_south_pole_landing","mars_orbit"]},"fixedCostShare":0.4},
+"esa": {"budget":3200,"cash":350,"support":55,"reputation":65,"culture":-25,"prestige":0,"capabilities":{"crewed":false,"launchSites":["Kourou"]},"ai":{"cooperation":0.85,"aggression":0.2,"riskTolerance":0.3,"goals":["comet_orbit","comet_landing","first_l2_observatory"]},"fixedCostShare":0.5},
+"jaxa": {"budget":1200,"cash":120,"support":55,"reputation":65,"culture":-35,"prestige":0,"capabilities":{"crewed":false,"launchSites":["Tanegashima","Uchinoura"]},"ai":{"cooperation":0.8,"aggression":0.2,"riskTolerance":0.3,"goals":["asteroid_sample_return","asteroid_landing"]},"fixedCostShare":0.45},
+"spacex": {"budget":150,"cash":120,"support":50,"reputation":35,"culture":85,"prestige":0,"capabilities":{"crewed":false,"launchSites":["Kwajalein","Cabo Canaveral"]},"ai":{"cooperation":0.45,"aggression":0.75,"riskTolerance":0.85,"goals":["first_commercial_station_cargo","first_orbital_booster_landing","first_booster_reflight","first_commercial_crew","first_private_crewed_orbit"],"scienceInterest":0.3},"fixedCostShare":0.3},
+"blueorigin": {"budget":240,"cash":120,"support":45,"reputation":40,"culture":20,"prestige":0,"capabilities":{"crewed":false,"launchSites":["Van Horn"]},"ai":{"cooperation":0.5,"aggression":0.4,"riskTolerance":0.4,"goals":["first_private_suborbital_crew"],"scienceInterest":0.2},"fixedCostShare":0.4}
+},
+"relations": [
+{"a":"nasa","b":"roscosmos","trust":45,"dependence":55,"rivalry":20},
+{"a":"nasa","b":"esa","trust":65,"dependence":40,"rivalry":10},
+{"a":"nasa","b":"jaxa","trust":65,"dependence":30,"rivalry":5},
+{"a":"nasa","b":"spacex","trust":35,"dependence":25,"rivalry":5},
+{"a":"nasa","b":"cnsa","trust":-20,"dependence":0,"rivalry":45},
+{"a":"nasa","b":"isro","trust":35,"dependence":5,"rivalry":10},
+{"a":"nasa","b":"blueorigin","trust":25,"dependence":5,"rivalry":5},
+{"a":"esa","b":"roscosmos","trust":45,"dependence":35,"rivalry":10},
+{"a":"esa","b":"jaxa","trust":55,"dependence":10,"rivalry":10},
+{"a":"cnsa","b":"roscosmos","trust":35,"dependence":15,"rivalry":20},
+{"a":"cnsa","b":"isro","trust":-10,"dependence":0,"rivalry":40},
+{"a":"isro","b":"roscosmos","trust":45,"dependence":25,"rivalry":5},
+{"a":"spacex","b":"blueorigin","trust":5,"dependence":0,"rivalry":55}
+],
+"blocs": [],
+"treaties": [
+{"id":"outer_space_treaty","type":"peaceful_use","name":"Tratado do Espaço Exterior","parties":["nasa","cnsa","isro","esa","roscosmos","jaxa"],"signedTurn":-2132,"status":"active","terms":{"multilateral":true,"permanent":true,"untilTurn":null,"note":"Base do direito espacial desde 1967: uso pacífico e nenhuma soberania sobre corpos celestes."}},
+{"id":"iss_iga","type":"crew_exchange","name":"Acordo Intergovernamental da ISS","parties":["nasa","roscosmos","esa","jaxa"],"signedTurn":-520,"status":"active","terms":{"multilateral":true,"untilTurn":null,"note":"Assinado em janeiro de 1998 com o Canadá: cada parceiro é dono dos próprios módulos e troca serviços em vez de dinheiro."}},
+{"id":"cots_demo","type":"mission_partnership","name":"COTS: carga comercial para a ISS","parties":["nasa","spacex"],"signedTurn":-70,"status":"active","terms":{"untilTurn":260,"note":"Agosto de 2006: a NASA paga por marcos cumpridos, e a empresa fica com o foguete e a nave."}}
+]
+}

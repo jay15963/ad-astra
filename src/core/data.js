@@ -43,8 +43,8 @@ async function tryRead(reader, name) {
 }
 
 /** Read one pack's files. Legacy files are mandatory (errors propagate); everything else is optional. */
-async function readPack(reader, pack) {
-  const names = pack.files || [];
+async function readPack(reader, pack, only = null) {
+  const names = (pack.files || []).filter((n) => !only || only.includes(n));
   const entries = await Promise.all(names.map(async (n) => {
     const path = `${pack.dir || ''}${n}`;
     const v = pack.legacy ? await reader(path) : await tryRead(reader, path);
@@ -74,13 +74,27 @@ function resolveEras(eras, scenario, manifest) {
   return startEras(scenario, manifest);
 }
 
+/**
+ * Files of an era pack that stay merged after the game has left that era (catalog continuity, §4.2 determinism):
+ * places, hardware, parts, tech, lineages and the lifecycle rows (plus the pack's patches) are referenced for
+ * centuries (GEO, a Soyuz, an agency born in 2087), while calendar, events, crew and snapshot are dated content.
+ */
+export const CATALOG_FILES = ['lineages', 'lifecycle', 'parts', 'vehicles', 'spacecraft', 'destinations', 'bodies', 'tech', 'investors', 'patches'];
+
+/** Era packs before the latest loaded era that are not loaded in full: merged with their catalog files only. */
+function catalogIds(manifest, eraSet) {
+  const list = eraPacks(manifest);
+  const last = Math.max(-1, ...list.map((p, i) => (eraSet.has(p.era) ? i : -1)));
+  return list.filter((p, i) => i < last && !eraSet.has(p.era)).map((p) => p.id);
+}
+
 function activeIds(manifest, eraSet) {
-  return (manifest.packs || []).filter((p) => p.always || (p.era && eraSet.has(p.era))).map((p) => p.id);
+  return (manifest.packs || []).filter((p) => p.always || (p.era && eraSet.has(p.era)) || (!p.era && Array.isArray(p.eras) && p.eras.some((e) => eraSet.has(e)))).map((p) => p.id);
 }
 
 /** Re-assemble `data` in place (the store keeps its reference) from the cached raw packs. */
 function rebuild(data, st) {
-  const active = activeIds(st.manifest, st.eras);
+  const active = [...activeIds(st.manifest, st.eras), ...catalogIds(st.manifest, st.eras)];
   const fresh = assemble(st.manifest, st.raw, active, {
     scenario: st.scenarioRaw, scenarioId: st.scenarioId, scenarioIndex: st.scenarioIndex,
   });
@@ -91,9 +105,14 @@ function rebuild(data, st) {
 }
 
 async function loadPacks(st, reader, ids) {
-  const todo = (st.manifest.packs || []).filter((p) => ids.includes(p.id) && !st.raw[p.id]);
-  const loaded = await Promise.all(todo.map((p) => readPack(reader, p)));
+  st.partial ||= new Set();
+  const catalog = new Set(catalogIds(st.manifest, st.eras));
+  for (const id of catalog) if (!ids.includes(id)) ids = [...ids, id];
+  // a pack held as catalog only is read again in full when the game needs all of it
+  const todo = (st.manifest.packs || []).filter((p) => ids.includes(p.id) && (!st.raw[p.id] || (st.partial.has(p.id) && !catalog.has(p.id))));
+  const loaded = await Promise.all(todo.map((p) => readPack(reader, p, catalog.has(p.id) ? CATALOG_FILES : null)));
   todo.forEach((p, i) => {
+    if (catalog.has(p.id)) st.partial.add(p.id); else st.partial.delete(p.id);
     st.raw[p.id] = { files: loaded[i].files, hash: loaded[i].hash };
     for (const m of loaded[i].missing) if (!st.missing.includes(`arquivo ausente: ${m}`)) st.missing.push(`arquivo ausente: ${m}`);
   });
@@ -134,10 +153,22 @@ export async function ensurePacks(data, reader, eraIdsWanted, { prune = false } 
   const wanted = (eraIdsWanted || []).filter((e) => known.has(e));
   const next = new Set(prune ? wanted : [...st.eras, ...wanted]);
   const same = next.size === st.eras.size && [...next].every((e) => st.eras.has(e));
-  await loadPacks(st, reader, activeIds(st.manifest, next));
-  if (same) return data;
+  if (same) { await loadPacks(st, reader, activeIds(st.manifest, next)); return data; }
   st.eras = next;
-  if (prune) for (const p of eraPacks(st.manifest)) if (!next.has(p.era)) delete st.raw[p.id];
+  if (prune) {
+    // packs left behind keep only their catalog files (CATALOG_FILES); later eras are dropped
+    const catalog = new Set(catalogIds(st.manifest, next));
+    for (const p of eraPacks(st.manifest)) {
+      if (next.has(p.era) || !st.raw[p.id]) continue;
+      if (!catalog.has(p.id)) { delete st.raw[p.id]; st.partial?.delete(p.id); continue; }
+      if (!st.partial?.has(p.id)) {
+        const files = Object.fromEntries(Object.entries(st.raw[p.id].files).filter(([n]) => CATALOG_FILES.includes(n)));
+        st.raw[p.id] = { files, hash: packHash(files, (p.files || []).filter((n) => CATALOG_FILES.includes(n))) };
+        (st.partial ||= new Set()).add(p.id);
+      }
+    }
+  }
+  await loadPacks(st, reader, activeIds(st.manifest, next));
   return rebuild(data, st);
 }
 
@@ -152,8 +183,8 @@ export async function ensureScenario(data, reader, scenarioId, { eras = 'auto' }
   st.scenarioId = scenarioId;
   const scenario = normalizeScenario(st.scenarioRaw, scenarioId);
   st.eras = new Set(resolveEras(eras, scenario, st.manifest));
+  for (const p of eraPacks(st.manifest)) if (!st.eras.has(p.era)) { delete st.raw[p.id]; st.partial?.delete(p.id); }
   await loadPacks(st, reader, activeIds(st.manifest, st.eras));
-  for (const p of eraPacks(st.manifest)) if (!st.eras.has(p.era)) delete st.raw[p.id];
   return rebuild(data, st);
 }
 

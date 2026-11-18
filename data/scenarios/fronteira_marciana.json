@@ -1,0 +1,111 @@
+{
+  "id": "fronteira_marciana",
+  "kind": "scenario",
+  "name": "Fronteira Marciana",
+  "subtitle": "2051 a 2100",
+  "start": {
+    "year": 2051,
+    "month": 0
+  },
+  "end": {
+    "year": 2100,
+    "month": 11
+  },
+  "turnWeeks": null,
+  "eras": [
+    "e5"
+  ],
+  "snapshot": "e5",
+  "playable": {
+    "rule": "list",
+    "actors": [
+      "nasa",
+      "cnsa",
+      "esa",
+      "isro",
+      "spacex",
+      "shackleton"
+    ],
+    "found": false
+  },
+  "history": "faithful",
+  "lifecycle": "on",
+  "ending": {
+    "type": "end"
+  },
+  "unlocks": {
+    "builder": {
+      "fromYear": 2051
+    },
+    "investors": {
+      "fromYear": 2051
+    },
+    "colonies": {
+      "fromYear": 2051
+    }
+  },
+  "historicalFirstsNote": "Feitos já realizados antes de 2051 (fatos até 2025 e a projeção da Década Lunar): quem repete leva o primeiro do século, que vale menos.",
+  "historicalFirsts": {
+    "crewed_lunar_landing": {
+      "holder": "EUA",
+      "year": 1969,
+      "mission": "Apollo 11"
+    },
+    "mars_landing_robotic": {
+      "holder": "URSS",
+      "year": 1971,
+      "mission": "Mars 3"
+    },
+    "ceres_orbit": {
+      "holder": "EUA",
+      "year": 2015,
+      "mission": "Dawn"
+    },
+    "europa_arrival": {
+      "holder": "EUA",
+      "year": 1996,
+      "mission": "Galileo"
+    },
+    "titan_arrival": {
+      "holder": "Europa e EUA",
+      "year": 2005,
+      "mission": "Huygens"
+    },
+    "lunar_base": {
+      "holder": "Aliança Artemis",
+      "year": 2044,
+      "mission": "Base Shackleton (projeção)"
+    },
+    "crewed_mars_orbit": {
+      "holder": "EUA",
+      "year": 2041,
+      "mission": "Ares Orbital (projeção)"
+    },
+    "crewed_mars_landing": {
+      "holder": "EUA e parceiros",
+      "year": 2047,
+      "mission": "Ares I (projeção)"
+    }
+  },
+  "victory": {
+    "description": "Em 2100, a agência com mais prestígio na fronteira vence a Tabela da Era. Marte, o cinturão e Ceres esperam quem chegar primeiro.",
+    "goals": [
+      {
+        "id": "mars_outpost",
+        "label": "Posto avançado permanente em Marte"
+      },
+      {
+        "id": "mars_base",
+        "label": "Base marciana que produz o próprio ar"
+      },
+      {
+        "id": "first_asteroid_mining",
+        "label": "Primeiro minério de asteroide vendido"
+      },
+      {
+        "id": "ceres_base",
+        "label": "Base em Ceres"
+      }
+    ]
+  }
+}

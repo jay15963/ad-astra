@@ -1,0 +1,5 @@
+{
+  "_doc": "Pedidos de ids novos para data/core/vocab.json (EXPANSION.md §14, C0). Cada pedido: {id, category (chave do vocab.json), entry (mesma forma das entradas da categoria), reason (pt-BR), status: pending|accepted|rejected}. Um pedido pending vale como id provisório (o validador avisa) até o C0/integrador incorporá-lo; depois ele é marcado accepted ou apagado.",
+  "era": "e3",
+  "requests": []
+}

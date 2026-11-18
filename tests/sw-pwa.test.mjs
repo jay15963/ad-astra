@@ -163,17 +163,23 @@ test('settings: install card with native prompt and iOS instructions; context de
   assert.equal(installContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0)' }, mm(false)), 'other');
 });
 
-test('sw.js precaches every file of data/packs.json (era packs, core files, scenarios) through the manifest', () => {
+test('sw.js precache is per era: install takes the always packs, every era.json and the scenarios; era content on request', () => {
   const sw = read('sw.js');
   const src = sw.match(/function packFiles\([\s\S]*?\n}\n/)?.[0];
   assert.ok(src, 'packFiles in sw.js');
   assert.ok(sw.includes('/\\/data\\/packs\\.json(\\?|$)/.test(href)'), 'the crawl expands data/packs.json');
+  assert.match(sw, /precache-eras/, 'the page can ask for an era pack');
   const packFiles = new Function(`${src}; return packFiles;`)();
   const base = 'https://x.test/app/data/packs.json';
-  const urls = packFiles(read('data/packs.json'), base).map((u) => u.replace('https://x.test/app/data/', ''));
+  const strip = (list) => list.map((u) => u.replace('https://x.test/app/data/', ''));
+  const urls = strip(packFiles(read('data/packs.json'), base));
   const manifest = JSON.parse(read('data/packs.json'));
-  for (const p of manifest.packs) for (const f of p.files) assert.ok(urls.includes(`${p.dir}${f}.json`), `${p.dir}${f}.json`);
+  for (const p of manifest.packs.filter((x) => x.always)) for (const f of p.files) assert.ok(urls.includes(`${p.dir}${f}.json`), `${p.dir}${f}.json`);
+  for (const p of manifest.packs.filter((x) => x.era && !x.always)) assert.ok(urls.includes(`${p.dir}era.json`), `${p.dir}era.json`);
   for (const f of Object.values(manifest.scenarios)) assert.ok(urls.includes(f), f);
-  assert.ok(urls.includes('eras/e1/era.json') && urls.includes('scenarios/campaign.json'));
+  assert.ok(!urls.includes('eras/e3/events.json'), 'era content is not in the install');
+  const e3 = strip(packFiles(read('data/packs.json'), base, ['e3']));
+  for (const f of manifest.packs.find((x) => x.id === 'e3').files) assert.ok(e3.includes(`eras/e3/${f}.json`), f);
+  assert.ok(strip(packFiles(read('data/packs.json'), base, ['e6'])).includes('core/colonies.json'), 'packs bound to eras come with them');
   assert.deepEqual(packFiles('não é json', base), []);
 });

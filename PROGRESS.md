@@ -1,6 +1,10 @@
 # PROGRESS — Ad Astra (web)
 
 ## Estado (nov/2026)
+- **Versão 0.8.0 — Fase C: as 7 eras com conteúdo e o final de 3000.** Campanha 1950 → jan/3000 com história real
+  conferida até 2025 (calendário, foguetes, naves, agências e eventos com fonte), plano oficial e projeções até 2050 e
+  especulação até 3000; o mistério do Eco com os finais Contato · Silêncio · Herança; colônias; 7 cenários curtos;
+  Arquivo do Eco. Detalhes em "v0.8.0" abaixo.
 - **Versão 0.7.0 — Fase B: o jogador e suas ferramentas.** Fundar a própria agência (tipo, país, sede no mapa, nome e logo
   editável), emblemas novos para todas as agências, investidores e participação (mandatos no lugar das missões de programa,
   rodadas anuais, autonomia com ≥ 50%, conselho que demite), Hangar (licenciar e editar um foguete existente ou montar do zero,
@@ -178,6 +182,64 @@ Métricas finais:
 - Certificação: SpaceX jogadora tem a Starship certificada pelo calendário ~turno 96–105; New Glenn (Blue Origin) certificada nas
   campanhas de teste da SpaceX; com a NASA jogadora a Starship pode não ser certificada (demo do HLS atrasa/falha).
 
+## v0.8.0 — Fase C: as 7 eras com conteúdo e o final de 3000 (nov/2026)
+
+As 7 eras ganharam conteúdo de verdade (C1–C7), mais vocabulário congelado (C0), geradores (C8), o mistério do Eco com os três
+finais (C9) e as colônias (C10). A integração ligou tudo no manifesto e fechou a campanha de ponta a ponta. Arquitetura em
+`ARCHITECTURE.md` ("Fase C").
+
+**Conteúdo por era** (arquivos de `data/eras/eN/`; "linhagens" = agências reais ou especulativas que nascem na era;
+"programas" = itens do calendário; e1–e3 são `fato` com `source`; e4 `plano_oficial`/`projecao`; e5–e7 `especulacao`):
+
+| Era | Anos | Linhagens que nascem | Atores no snapshot | Foguetes | Naves | Destinos | Programas | Eventos | Tech | Pacote |
+|---|---|---|---|---|---|---|---|---|---|---|
+| e1 A Corrida | 1950–1975 | 9 | 4 | 35 | 59 | 9 | 76 | 137 | 23 | 316 KB |
+| e2 Estações e Sondas | 1976–1999 | 8 | 10 | 30 | 69 | 10 | 92 | 129 | 23 | 331 KB |
+| e3 A Era Comercial | 2000–2025 | 14 | 8 | 21 | 56 | 12 | 134 | 140 | 18 | 349 KB |
+| e4 A Década Lunar | 2026–2050 | 1 (+ legado e4) | 8 | 8 (+25) | 26 (+61) | 4 (+39) | 53 (+59) | 153 (+100) | 14 | 263 KB |
+| e5 Expansão do Sistema | 2051–2199 | 9 | 9 | 15 | 27 | 23 | 45 | 121 (+21 gerados) | 20 | 264 KB |
+| e6 Interplanetária e Interestelar | 2200–2599 | 8 | 11 | 8 | 11 | 10 | 20 | 156 (+20 gerados) | 14 | 246 KB |
+| e7 Galáctica | 2600–2999 | 8 | 36 | 6 | 12 | 12 | 26 | 126 (+18 gerados) | 19 | 251 KB |
+
+(+N em e4 = pacote `legacy-e4` de sempre, que continua carregado.) Além disso: 7 cenários curtos (A Corrida 1957–1969,
+Estações 1981–1998, Nova Economia 2008–2020, Corrida Lunar 2026–2030, A Década Lunar 2026–2040, Fronteira Marciana
+2051–2100, Primeira Estrela 2380–2420, O Grande Silêncio 2950–3000, este liberado depois de terminar a campanha),
+`core/eco.json` (15 peças do Eco, o Colégio Silêncio, os 3 finais), `core/colonies.json` (28 locais, 6 estágios, 40 crises,
+4 grandes projetos), `core/vocab.json` (282 destinos com os interestelares, 174 marcos), peles por era `src/ui/css/era-1..7.css`.
+Validador: 2.802 entidades em 11 pacotes, "Dados válidos", dados de partida ≈ 1.178 KB (teto 1,2 MB).
+
+**Integração (o que mudou no código):**
+- `data/packs.json` lista todos os arquivos de cada era; `colonies` e `gen` viraram pacotes ligados às eras 5–7 (`eras`).
+- Corrida Lunar intocada (só o `era.json` dos pacotes de era; golden v0.5 igual).
+- Catálogo contínuo: ao sair de uma era, o pacote fica com lugares, hardware, peças, tech, linhagens e ciclo de vida.
+- Determinismo lazy = eager restaurado (horizonte de 3 anos do calendário na campanha, caches pela lista de origem,
+  grupos de eventos num lugar só, sorteios só com eventos da época).
+- História antes do início vira história nos cenários do meio (Nova Economia não relança Voyager nem herda mandatos de 1977).
+- Compactação: calendário resolvido → `calendarPast`, `vehicleStats` de foguetes parados, histórico de eventos, rascunhos
+  esquecidos. IA de missões trimestral em passos longos.
+- Política mundial datada (nada de controle de chips em 1957 nem cúpula de Estados nacionais em 2419), "Próxima janela"
+  só com destinos alcançáveis (sem Plutão em 1950 nem Psyche em 1976).
+- Eventos gerados (C8) entram por era; colônias no registro de módulos; tela **Arquivo do Eco** (deixou de ser "em breve").
+- Service worker com precache por era; versão 0.8.0 (`package.json`, `APP_VERSION`, `SW_VERSION`, `BUILD 2026.11.18-3`).
+- Pedidos de vocabulário (17 marcos de e2/e5 e o cenário `decada_lunar`) incorporados.
+
+**Métricas (nov/2026, Node, desktop):**
+- `node --test tests/*.test.mjs`: **679/679**. `node tools/smoke.mjs 2`: 10/10 ok. `node tools/validate-data.mjs`: dados válidos.
+- `tools/full-campaign.mjs` (pacotes sob demanda, bot da Fase B mantendo o controle):
+
+  | Semente / ator | Turnos | Tempo | Maior save numa virada de ano | Fim |
+  |---|---|---|---|---|
+  | 7919 NASA | 13.321 | 159 s | 397 KB (e6) | Contato em jan/3000 |
+  | 15838 Roscosmos | 11.216 | 147 s | 372 KB (e7) | Contato em jan/3000 |
+  | 23757 CNSA | 10.563 | 143 s | 364 KB (e6) | Contato em jan/3000 |
+
+  `--compare-eager` (7919): saves idênticos sob demanda e com tudo carregado; no máximo 3 pacotes de era na memória.
+  (Rodadas em paralelo; o bot agenda muitas missões, então os passos encurtam e os turnos passam de 3.670.)
+- `tools/campaign.mjs 1 --fast` (3.670 turnos): 66–84 s até Contato em jan/3000 (conforme a carga da máquina), saves ≤ 341 KB.
+- Agência fundada: `campaign.mjs --found --fast --from e7` e `--found --keep-control --from e6` chegam ao final (Contato);
+  desde 1950 o governo troca a direção entre 2101 e 2131 (ver Pendências).
+- Capturas 390×844 em `tools/_scratch/ref/faseC-*.png`.
+
 ## v0.7.0 — Fase B: o jogador e suas ferramentas (nov/2026)
 - **Fundar agência** (B1): cartão "Fundar a sua agência" na escolha da Campanha → assistente de 4 passos (tipo · país e sede
   no mapa, com cidades sugeridas e bases de lançamento · nome, sigla e logo · resumo com números e dificuldade). 93 cidades
@@ -288,11 +350,11 @@ Métricas finais:
   todas; investidores e participação (`state.cap`, mandatos, rodadas, conselho; save v3); Hangar (licença ou do zero, voos de
   teste); mapa-múndi por época e mapa espacial até setor/galáxia com névoa; telas Conselho, Identidade, Hangar, Finanças,
   Calendário de lançamentos e Anais.
-- **Fase C — conteúdo das 7 eras e o final de 3000 (próxima).** Vocabulário congelado; por era: atores e eventos de ciclo de vida com fonte,
+- **Fase C — conteúdo das 7 eras e o final de 3000: FEITA (v0.8.0).** Vocabulário congelado; por era: atores e eventos de ciclo de vida com fonte,
   foguetes/naves com `design`, destinos, calendário, tech tier, ≥ 120 eventos, tom das notícias, investidores, tripulação,
   snapshot e um cenário curto; separar `legacy-e4` em `core/` + `eras/e4/`; geradores para e5+; o mistério do Eco e "O Grande
   Silêncio" com os 3 finais; colônias; Anais.
-- **Fase D — equilíbrio, revisão e publicação.** Equilíbrio por era (20 sementes × atores jogáveis), revisão de UX de cada tela
+- **Fase D — equilíbrio, revisão e publicação (próxima).** Ver Pendências da v0.8.0. Equilíbrio por era (20 sementes × atores jogáveis), revisão de UX de cada tela
   em 390×844 e 320 px, auditoria de tamanho/desempenho num celular intermediário, publicação.
 
 ### Roteiro anterior (corte vertical "Corrida Lunar", plano de 10 turnos do GDD)
@@ -304,7 +366,38 @@ Métricas finais:
   aprovado, Supabase (login, saves na nuvem, ligas semanais).
 - Depois do turno 10 o corte vertical "Corrida Lunar" fecha; as outras eras do GDD entram como expansões de conteúdo.
 
-## Pendências (por prioridade, atualizado na v0.7.0)
+## Pendências (por prioridade, atualizado na v0.8.0 — para a Fase D)
+Da Fase C:
+1. **Agência fundada em 1950 não chega a 3000 com o bot**: o governo troca a direção entre 2101 e 2131 (verba de
+   ~US$ 130–160 mi/ano, custos fixos de instalação que crescem em e5, apoio caindo a 0 sem voos). Fundada em 2200 ou
+   2600 chega ao final. Equilibrar custos de e5+ para agências pequenas (ou dar ao bot uma política de voo barato).
+2. **Velocidade**: `campaign.mjs --fast` 66–84 s (meta ≤ 60 s); `full-campaign` 143–159 s com o bot que agenda (10–13 mil
+   turnos: cada lançamento encurta o passo). O custo vem de módulos ainda semanais (`maxDt 1`: calendar, diplomacy,
+   politics, budget, missions, research, crew) num passo de 1 ano = 52 sub-passos. Tornar os mais caros nativos em `dt`.
+3. **Paradas por turno 1,00 em e5–e7** (alvo 0,15–0,35): quase todo passo longo para em algo (cartão, briefing,
+   notícia ≥ 3). Rever no equilíbrio por era (D1).
+4. **Saves**: maior virada de ano 397 KB (teto 400) com o bot que agenda muito. Folga pequena: compactar
+   `research.rivals` (ids das eras passadas → `eraDone`), `world.pairs` neutros e `lifecycle.tombstones`.
+5. **Geopolítica de 2026 em séculos futuros**: as zonas e conflitos de `geopolitics.json` (Taiwan, Ucrânia…) continuam
+   escalando com a tensão em 2400 (os eventos de `politics.json` já têm `minYear/maxYear`). Decidir se zonas viram
+   sucessoras especulativas depois de 2100 ou congelam.
+6. **Textos de corpos no presente de 2026** (`bodies.json`: "A MMX fará sobrevoos de Deimos" aparece em 2151) e
+   "Líder da era: OKB-1" no fim de 1975 (a OKB-1 virou TsKBEM em 1966 e NPO Energia em 1974 — conferir o ciclo de vida).
+7. **Itens `fato` sempre dão certo**: `calendar.js` resolve os itens históricos como sucesso total; Apollo 13, Mars 3,
+   Soyuz 1 e 11, N1 e Vanguard TV-3 são contados por eventos (ver C1). `canon.requires/onBreak` ainda não é lido pelo motor.
+8. **`abma_into_nasa`** herda `["redstone","jupiter_c"]`, que não existem (os ids de e1 são `juno1`/`juno2`); destino
+   `suborbital` ainda reservado (sem Mercury-Redstone/Freedom 7).
+9. Geradores C8: só os eventos (`gen-events`) entram no jogo; programas, hardware e nomes gerados (`src/gen`) ainda não
+   são chamados pelo sim (os atores gerados vêm de `core/actor-gen.json` no ciclo de vida).
+10. `legacy-e4` continua sempre carregado (separar em `core/` + `eras/e4/` e remover o alias é da D4).
+11. Não verificado em celular real: cena de era, cartão final, Arquivo do Eco e Colônias numa campanha longa (só Chrome
+    headless 390×844).
+
+Da Fase B (ainda abertas): itens 2–4 e 6 da lista da v0.7.0 abaixo (recompra do bot, Hangar/Conselho no 1º passo,
+siglas repetidas de agências geradas, celular real). O item 1 (conselho demite o bot) foi contornado nas ferramentas com
+`keepControl` (`full-campaign`, `campaign.mjs --keep-control`); o equilíbrio de mandatos continua para a D1.
+
+### Pendências da v0.7.0 (histórico)
 Da Fase B:
 1. **O conselho demite o bot nas campanhas longas** (7919 em 2941, 15838 em 2397): o bot vende abaixo de 50% quando o caixa
    aperta, as penalidades de mandato perdido passam ações para o governo (15838 terminou com 10%) e muitos mandatos vencem

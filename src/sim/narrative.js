@@ -103,11 +103,13 @@ export function getEvent(data, id) {
 const groupCache = new WeakMap();
 /** Event ids per group (cached per data object). */
 function groupMembers(data, group) {
-  let m = data && groupCache.get(data);
+  // keyed by the event list (a lazy pack load rebuilds data in place, with a new list)
+  const list = eventList(data);
+  let m = groupCache.get(list);
   if (!m) {
     m = {};
-    for (const e of eventList(data)) if (e.group) (m[e.group] ||= []).push(e.id);
-    if (data) groupCache.set(data, m);
+    for (const e of list) if (e.group) (m[e.group] ||= []).push(e.id);
+    groupCache.set(list, m);
   }
   return m[group] || [];
 }
@@ -478,6 +480,9 @@ function pushEventDecision(state, data, event, context, source) {
   const h = ev.history[event.id] || (ev.history[event.id] = { count: 0, lastTurn: null });
   h.count += 1;
   h.lastTurn = state.turn;
+  // once-events keep their entry through compaction (§10); the Corrida Lunar keeps the v0.5 slice shape
+  // (h.once = the last year the event can fire, or 1 when undated: the entry goes once that year has passed)
+  if (event.once && data?.scenario?.id !== 'lunar_race') h.once = Number(event.trigger?.untilYear ?? event.untilYear) || 1;
   const R = (s) => renderText(state, data, s, context);
   const choices = (event.choices || []).map((c) => {
     const ok = evalCondition(state, data, c.requires, context);
@@ -758,6 +763,8 @@ function processSignals(state, data, ctx) {
   for (const event of eventList(data)) {
     const t = event.trigger;
     if (!t?.signal || event.kind === 'operation') continue;
+    // out-of-window events never draw from the rng: the result cannot depend on which era packs are loaded
+    if (!eventInYear(state, data, event)) continue;
     for (const sig of sigs) if (sig.type === t.signal && signalMatches(state, sig, t.signalWhere)) cands.push({ event, sig });
   }
   if (!cands.length) return;
@@ -796,6 +803,39 @@ function fireScheduled(state, data, ctx) {
   ev.scheduled = keep;
 }
 
+/**
+ * Events that can be random rolls this calendar year (window, kind, no signal, not a chain follow-up), in data order:
+ * a cheap prefilter before eligibleContext (same candidates, same order, so the same pick).
+ */
+const RANDOM_POOL = new WeakMap();
+function randomPool(state, data) {
+  const list = eventList(data);
+  const y = yearAt(state);
+  let m = RANDOM_POOL.get(list);
+  if (!m || m.y !== y) {
+    m = { y, events: list.filter((e) => e.kind !== 'operation' && !e.trigger?.signal && !isFollowUp(e) && eventInYear(state, data, e)) };
+    RANDOM_POOL.set(list, m);
+  }
+  return m.events;
+}
+
+/** Yearly compaction (§10): history of events not seen for 10 years is dropped (once-events stay). */
+const HISTORY_KEEP = 10 * 52;
+export function compact(state, data) {
+  const h = state.events?.history;
+  if (!h || !data?.scenario || data.scenario.id === 'lunar_race') return;
+  const year = yearAt(state);
+  for (const [id, x] of Object.entries(h)) {
+    if (x?.once > 1 ? year > x.once : !x?.once && x?.lastTurn != null && state.turn - x.lastTurn > HISTORY_KEEP) delete h[id];
+  }
+  // per-mission risk notes go with the mission (archived missions keep only their stub)
+  const risk = state.events.missionRisk;
+  if (risk && typeof risk === 'object') {
+    const live = new Set((state.missions || []).map((m) => m.id));
+    for (const id of Object.keys(risk)) if (!live.has(id)) delete risk[id];
+  }
+}
+
 function maybeRandomEvent(state, data, ctx) {
   const ev = state.events;
   if (state.turn < 2 || pendingEvents(state).length >= PENDING_CAP) return;
@@ -806,7 +846,7 @@ function maybeRandomEvent(state, data, ctx) {
   const rng = ctx.rng('random-event');
   if (!rng.chance(p)) return;
   const cands = [];
-  for (const event of eventList(data)) {
+  for (const event of randomPool(state, data)) {
     const context = eligibleContext(state, data, event, { mode: 'random', rng: ctx.rng(`ctx:${event.id}`) });
     if (!context) continue;
     const weight = eventWeight(state, event);

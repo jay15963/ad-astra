@@ -23,6 +23,8 @@ import * as narrative from '../sim/narrative.js';
 import * as designs from '../sim/designs.js';
 import * as investors from '../sim/investors.js';
 import * as explore from '../sim/explore.js';
+import * as eco from '../sim/eco.js';
+import * as colonies from '../sim/colonies.js';
 
 // The lifecycle module (A2) is optional while it is being built: a missing file leaves the registry as in v0.5.
 // Any other failure (syntax error inside the module) is re-thrown so it is never hidden.
@@ -49,9 +51,11 @@ export const MODULES = [
   ['designs', designs],     // Phase B §6: Hangar designs (asVehicle before missions read the vehicle list)
   ['missions', missions],
   ['investors', investors], // Phase B §5: cap table, rounds and mandates (after missions: reads their results)
+  ['colonies', colonies],   // Phase C10: colonies from 2051 (unlocks.colonies; data from the 'colonies' pack, eras e5–e7)
   ['launch', launch],
   ['explore', explore],     // Phase B §8: fog of war of the space map (ids only)
   ['narrative', narrative],
+  ['eco', eco],             // Phase C9 §9: the Eco mystery and the jan/3000 card (reads the step's firsts and news)
 ];
 
 // the newest version this build writes: v2 plus every migration registered by the modules imported above

@@ -2772,6 +2772,15 @@ export function compact(state) {
     if (state.contracts.length > cCap) state.contracts = state.contracts.slice(-cCap);
   }
   if (!Array.isArray(state.missions)) return;
+  if (long) {
+    // drafts nobody scheduled for 5 years (no launch date, no open mandate) are dropped: the hardware and the window
+    // they were planned for are long gone, and a 1,000-year campaign would carry them forever
+    const openMandates = new Set((state.mandates || []).filter((md) => (md.status ?? 'open') === 'open').map((md) => md.id));
+    for (const m of state.missions) {
+      if (m.status !== 'planning' || m.launchTurn != null || (m.mandateId && openMandates.has(m.mandateId))) continue;
+      if (state.turn - (m.createdTurn ?? state.turn) > 5 * 52) { m.status = 'cancelled'; m.result = m.result || { outcome: null, resolvedTurn: state.turn, reason: 'stale' }; }
+    }
+  }
   const keep = [];
   const stubs = [];
   const linked = new Set((state.contracts || []).map((c) => c.missionId).filter(Boolean));

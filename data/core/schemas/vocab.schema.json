@@ -1,0 +1,816 @@
+{
+  "$id": "vocab.schema.json",
+  "description": "Vocabulário congelado da Fase C (core/vocab.json, EXPANSION.md §14 C0). Chaves de cada mapa = ids (^[a-z0-9_]+$).",
+  "type": "object",
+  "required": [
+    "version",
+    "destinations",
+    "destinationFamilies",
+    "bodies",
+    "milestones",
+    "destinationKinds",
+    "missionTypes",
+    "spacecraftKinds",
+    "vehicleClasses",
+    "eventKinds",
+    "eventGroups",
+    "eventTags",
+    "techBranches",
+    "partKinds",
+    "partFamilies",
+    "rocketTemplates",
+    "holderKinds",
+    "investorProfiles",
+    "endings",
+    "techTiers",
+    "colonyStages",
+    "investorArchetypes",
+    "ecoFragments",
+    "scenarios"
+  ],
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "frozen": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "naming": {
+      "type": "object"
+    },
+    "destinations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "body",
+          "kind",
+          "era",
+          "label"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "body": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "kind": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      }
+    },
+    "destinationFamilies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "pattern",
+          "from",
+          "kind",
+          "era"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "pattern": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]*[{](star|planet|region)[}][a-z0-9_]*$"
+          },
+          "from": {
+            "enum": [
+              "stars",
+              "exoplanets",
+              "regions"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          }
+        }
+      }
+    },
+    "bodies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "star",
+              "planet",
+              "moon",
+              "asteroid",
+              "belt",
+              "dwarf",
+              "comet",
+              "exoplanet"
+            ]
+          },
+          "parent": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      }
+    },
+    "milestones": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "era",
+          "kind",
+          "label"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "place",
+              "capability",
+              "colony",
+              "science"
+            ]
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "actor"
+            ]
+          }
+        }
+      }
+    },
+    "techTiers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "era",
+          "n",
+          "label",
+          "themes"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "themes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "colonyStages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "n",
+          "era",
+          "label"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9
+          },
+          "outcomes": {
+            "$ref": "common.schema.json#/$defs/idList"
+          }
+        }
+      }
+    },
+    "investorArchetypes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "kind",
+          "eras",
+          "profile"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "profile": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "eras": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "common.schema.json#/$defs/eraId"
+            }
+          }
+        }
+      }
+    },
+    "ecoFragments": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "era",
+          "order",
+          "label"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "main": {
+            "type": "boolean"
+          },
+          "hint": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "years",
+          "label"
+        ],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "years": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "destinationKinds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "missionTypes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "spacecraftKinds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "vehicleClasses": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "eventKinds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "eventGroups": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "eventTags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "techBranches": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "partKinds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "partFamilies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rocketTemplates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "holderKinds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "investorProfiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "endings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "status": {
+            "enum": [
+              "reserved"
+            ]
+          },
+          "needs": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

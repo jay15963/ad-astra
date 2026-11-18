@@ -1,42 +1,21 @@
 {
-  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e1 em data/packs.json).",
+  "_doc": "Metadados da era 1 (docs/EXPANSION.md §2.3/§2.5; dono C1). Meses base 0 como em src/core/time.js. \"news\" = tom das manchetes da era: \"calendar\" usa as mesmas chaves de data/calendar.json \"news\" (calendar.js lê data.calendar.news; o tom da era precisa que o módulo consulte data.eraPacks[eraId].news.calendar primeiro), \"missionHeadlines\" as mesmas chaves do relatório de lançamento da era 4. \"voice\" orienta quem escreve.",
   "id": "e1",
   "name": "A Corrida",
   "from": 1950,
   "to": 1975,
-  "truthLayers": [
-    "fato"
-  ],
+  "truthLayers": ["fato"],
   "closingMilestone": "Pouso na Lua e Apollo-Soyuz",
   "palette": "ferrugem",
   "chapters": [
-    {
-      "from": {
-        "year": 1950,
-        "month": 0
-      },
-      "title": "O Prólogo: foguetes de guerra, sonhos de órbita"
-    },
-    {
-      "from": {
-        "year": 1957,
-        "month": 9
-      },
-      "title": "Bip-bip: o primeiro satélite"
-    },
-    {
-      "from": {
-        "year": 1961,
-        "month": 3
-      },
-      "title": "Gente no espaço"
-    },
-    {
-      "from": {
-        "year": 1969,
-        "month": 6
-      },
-      "title": "A Lua e depois dela"
-    }
-  ]
+    {"from":{"year":1950,"month":0},"title":"O Prólogo: foguetes de guerra, sonhos de órbita"},
+    {"from":{"year":1957,"month":9},"title":"Bip-bip: o primeiro satélite"},
+    {"from":{"year":1961,"month":3},"title":"Gente no espaço"},
+    {"from":{"year":1969,"month":6},"title":"A Lua e depois dela"}
+  ],
+  "news": {
+    "voice": "Heroico e tenso, como um noticiário de TV em preto e branco: locutor de voz grave, manchetes de oito colunas, telex, radioamadores, painéis de válvulas. Guerra Fria sempre ao fundo; nada de jargão moderno (sem \"app\", \"online\", \"startup\").",
+    "calendar": {"launched":["{owner} lança {name}","Contagem regressiva termina: {name} sobe","Telex urgente: {owner} põe {name} no céu","O rádio confirma: {name} está a caminho"],"launchedBody":"Lançamento confirmado no {vehicle}. Chegada prevista para {date}.","success":["{name}: sucesso!","Missão cumprida: {name}","Vitória no espaço: {name} funciona","Festa no controle: {name} dá certo"],"partial":["{name}: sucesso parcial","{name} cumpre só parte do plano","Meia vitória para {name}"],"failed":["{name} fracassa","Revés na corrida: {name} se perde","Dia negro para {owner}: {name} falha","Silêncio no rádio: {name} termina em fracasso"],"lostCrew":"Luto nacional: tripulação perdida em {name}","first":["Edição extra! {owner} conquista: {milestone}","O mundo para: {owner} consegue {milestone}","Feito histórico: {milestone}, por {owner}"],"firstEra":"Primeira vez neste século: {owner} conquista {milestone}","delayed":["Adiamento: {name} fica para {date}","Contagem suspensa: {name} só em {date}","{name} volta ao hangar; nova data, {date}"],"cancelled":"Cancelado: {name}","debut":"Novo foguete na corrida: {vehicle}"},
+    "missionHeadlines": {"first":["Edição extra! {actor} conquista {milestone}","Primeira vez na história: {milestone}","{mission} põe {actor} na frente da corrida"],"total":["{mission}: sucesso total","Missão cumprida: {mission} funciona como o planejado","Aplausos no controle: {mission} dá certo"],"partial":["{mission} cumpre parte dos objetivos","Meia vitória para {mission}","{mission} chega, mas não como planejado"],"recoverable":["{mission} falha, mas a equipe salva o essencial","Falha de {failure} interrompe {mission}","Revés para {actor}: {mission} não cumpre a missão"],"catastrophic":["Perdemos {mission}: falha de {failure}","Explosão encerra {mission}","Fim abrupto para {mission}; comissão de inquérito instalada"],"death":["Luto nacional: tripulação de {mission} morre","Tragédia em {mission}: {deaths} morte(s)","A corrida cobra o preço: {actor} perde gente em {mission}"],"transit":["{mission} deixa a Terra rumo {to}","{mission} a caminho; chegada prevista em {arrive}"],"rival":["{rival} responde: \"a corrida não acabou\"","{rival} promete acelerar o próprio programa","Do outro lado, {rival} convoca reunião de emergência"]}
+  }
 }

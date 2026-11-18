@@ -681,7 +681,7 @@ Resumo do que já é contrato no código; números, esquemas e o plano das fases
   (`nav`, `available`, `badge`, `load`, `go`, `action`, `soon`). Telas `soon` mostram esboço "em breve" até a fase indicada.
   Tela de título: Campanha 1950–3000 · Cenários · Continuar (espaços). `body[data-era]` é o gancho de pele por era (só e4 hoje).
 - **Service worker**: o crawl do precache segue `data/packs.json` (todo arquivo de pacote e cenário) e os `import()` dinâmicos
-  das telas, então pacote ou tela nova não precisa de edição em sw.js (99 arquivos hoje, teto 250).
+  das telas, então pacote ou tela nova não precisa de edição em sw.js (teto 250). Na v0.8.0 o precache passou a ser por era (ver Fase C).
 
 ## Fase B — o jogador e suas ferramentas (v0.7.0)
 
@@ -729,6 +729,55 @@ Contrato em [docs/EXPANSION.md](docs/EXPANSION.md) §5–§8 e §12. Módulos no
   de fundação em 4 passos (`found-agency.js` + `css/found.css`) a partir da escolha de agência da Campanha.
 - **Motor**: sinais só no primeiro sub-passo de um passo longo (antes cada módulo tratava o mesmo sinal 52 vezes); uma escolha
   de decisão recusada pelo handler (`ok: false`) devolve o cartão à fila em vez de sumir com ele.
+
+## Fase C — conteúdo das 7 eras e o final de 3000 (v0.8.0)
+
+Contrato em [docs/EXPANSION.md](docs/EXPANSION.md) §2, §3, §4, §9, §10 e §14. O que a integração fixou no código:
+
+- **Manifesto** (`data/packs.json`): cada pacote de era lista todos os seus arquivos na ordem de mescla `era, snapshot,
+  lineages, lifecycle, parts, vehicles, spacecraft, destinations, bodies, calendar, tech, events, crew, investors, patches`
+  (só os que existem). `core` ganhou `eco`. Pacotes com `eras: [...]` e sem `era` entram junto de qualquer uma dessas eras:
+  `colonies` (`core/colonies.json`, e5–e7) e `gen` (`gen/gen-events.json`, e5–e7) — assim os dados de partida ficam em
+  ~1,17 MB (teto 1,2 MB). Os 7 cenários curtos estão em `scenarios` e em `data/scenarios/index.json`; `locked: true`
+  (O Grande Silêncio) só aparece depois de um final da campanha (`localStorage adastra.campaign.done`, gravado por app.js).
+- **Corrida Lunar intocada**: `normalizeScenario` marca o `lunar_race` legado com `eraContent: 'meta'`; dos pacotes de era só
+  `era.json` entra na mescla (o golden v0.5 continua idêntico). Os outros cenários e a campanha veem tudo.
+- **Continuidade do catálogo** (`src/core/data.js` `CATALOG_FILES`): quando o jogo sai de uma era, o pacote dela continua na
+  mescla só com `lineages, lifecycle, parts, vehicles, spacecraft, destinations, bodies, tech, investors, patches` (GEO,
+  um Soyuz ou uma agência nascida em 2087 são referenciados por séculos); calendário, eventos, tripulação e snapshot saem.
+  `ensurePacks(…, {prune: true})` corta o resto; `erasLoaded` conta só os pacotes completos (≤ 3). Um cenário que começa no
+  meio da história também recebe o catálogo das eras anteriores.
+- **Determinismo lazy = eager** (§4.2; `tools/full-campaign.mjs --compare-eager` dá saves idênticos até jan/3000):
+  - calendário da campanha instanciado num horizonte de 3 anos (`CAMPAIGN_HORIZON`, menor que a antecedência do pré-carregamento
+    a 85% da era) — itens e `vehicleStats` entram no estado só quando a data chega perto; cenários fixos instanciam tudo;
+  - `rivalCrew.flown` só guarda contagens > 0;
+  - janelas de grupo de eventos (`events.groups`) num lugar só (`data/events.json`); os pacotes de era não redefinem grupos;
+  - caches por objeto `data` trocados por caches pela lista de origem (lifecycle, narrative, investors): o `rebuild` lazy
+    reaproveita o mesmo objeto `data`;
+  - eventos de sinal e sorteios aleatórios só consideram eventos dentro da janela de anos (nenhum evento fora da época gasta
+    sorteio); a IA de missões ignora destinos de pacote ainda fechados (`fromYear`).
+- **Conteúdo gerado** (C8): `src/core/packs.js` chama `genEvents` para cada pacote de era carregado que tenha modelos em
+  `gen/gen-events.json` (semente fixa 3000, ids `gen_ev_<era>_*`): conteúdo como outro qualquer. O validador não confere
+  marcadores dentro de `data/gen/` (os geradores preenchem).
+- **História antes do início** (`calendar.js settleBeforeStart`): num cenário que começa no meio da história (Nova Economia
+  2008, `--from`), itens datados antes do início viram história com o resultado real e os primeiros não reclamados; nunca
+  lançamentos nem mandatos.
+- **Compactação nova** (§10, fora da Corrida Lunar): instâncias do calendário resolvidas há mais de 3 anos saem para
+  `state.calendarPast {id: "s403"}` (status + turno do lançamento; `calendar.instanceOrPast` para ler); `vehicleStats` sem voo há
+  20 anos ficam `{flights, failures}`; `events.history` sem uso há 10 anos sai (eventos `once` ficam, marcados com `once: 1`);
+  `events.missionRisk` só de missões vivas; rascunhos de missão parados há 5 anos sem mandato aberto são cancelados.
+- **IA em passos longos**: com passo ≥ 13 semanas (e5–e7) a IA de missões avalia por trimestre (`opsPeriod`), com a
+  chance de compromisso composta para manter a taxa mensal.
+- **Colônias** (`src/sim/colonies.js`) entram em `MODULES` depois de `investors`; ativas a partir de `unlocks.colonies`.
+- **Política mundial datada**: os 27 eventos de `data/politics.json` têm `minYear/maxYear` (chips e ataque hacker só depois
+  de 1980/1990, ASAT a partir de 1968, discurso da corrida à Lua 1957–2040, nada de Estados nacionais depois de 2200–2300).
+- **Painel**: "Próxima janela" só oferece destinos abertos no ano, com um foguete e uma nave do jogador que chegam lá
+  (nada de Plutão em 1950 nem Psyche em 1976).
+- **Service worker** (precache por era): a instalação leva os pacotes `always`, o `era.json` de cada era e os cenários; o
+  conteúdo de uma era entra quando o jogo pede (`store.ensureEra` manda `{type: 'precache-eras', eras: [atual, próxima]}`;
+  `precacheEras` em sw.js). O resto continua network-first com cópia offline.
+- **Vocabulário**: os 18 pedidos das eras (marcos de e2 e e5, cenário `decada_lunar`) estão em `data/core/vocab.json`; os
+  `vocab-requests.json` voltaram a vazios.
 
 ## Geo: mapa-múndi e blocos vivos (state.geo, dono: politics)
 
