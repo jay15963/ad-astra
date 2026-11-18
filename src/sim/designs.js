@@ -891,6 +891,66 @@ function usableDiameters(state, data) {
   return (P?.tanks?.diameters || []).filter((d) => diameterOk(state, d));
 }
 
+/** pt-BR name of a tech node id (falls back to the id). */
+function techName(data, id) {
+  const n = data?.index?.tech?.[id] || (data?.tech?.nodes || []).find((x) => x.id === id);
+  return n?.name || id;
+}
+
+/**
+ * Why a template is locked and how to open it, for the Hangar (pt-BR):
+ * { reason (one line), why (sentence), how: [{text, nodeId?, go?}], nodeId (first research to open) }.
+ * For "no engine" it lists what would open an engine of this era: the research nodes and the agencies to sign with.
+ */
+function templateHelp(state, data, t, { early, gate }) {
+  if (early) {
+    return { reason: `Disponível em ${t.fromYear}`, why: `Ninguém ainda domina esse tipo de foguete: a tecnologia só existe a partir de ${t.fromYear}.`, how: [{ text: `Espere até ${t.fromYear}.` }], nodeId: null };
+  }
+  if (gate && !gate.ok) {
+    const name = gate.nodeId ? techName(data, gate.nodeId) : null;
+    return {
+      reason: gate.reason,
+      why: name ? `Sua agência ainda não sabe projetar essa família: ela depende da pesquisa ${name}.` : (gate.reason || 'Falta uma pesquisa.'),
+      how: [{ text: name ? `Abra Pesquisa e estude ${name} (e o que vier antes dela na árvore).` : 'Abra Pesquisa.', nodeId: gate.nodeId || null, go: 'pesquisa' }],
+      nodeId: gate.nodeId || null,
+    };
+  }
+  const actorId = state.playerId;
+  const P = partsOf(data);
+  const now = monthNow(state, state.turn);
+  if (!usableParts(state, data, 'engine', actorId).length) {
+    // engines on the market now that this agency cannot use yet, grouped by what opens them
+    const research = new Map();
+    const deals = new Map();
+    for (const p of (P?.list || [])) {
+      if (p.kind !== 'engine' || monthIndex(p.availableFrom) > now || (p.availableUntil && monthIndex(p.availableUntil) < now)) continue;
+      const a = partAccess(state, data, p, actorId, state.turn);
+      if (a.ok) continue;
+      const nodeId = a.nodeId || (p.tech && !research.has(p.tech) && /^Pesquise /.test(a.reason || '') ? p.tech : null)
+        || (/^Pesquise /.test(a.reason || '') ? (data?.tech?.nodes || []).find((n) => n.name === a.reason.slice(9))?.id || null : null);
+      if (/^Pesquise /.test(a.reason || '')) {
+        const key = nodeId || a.reason;
+        if (!research.has(key)) research.set(key, { name: nodeId ? techName(data, nodeId) : a.reason.slice(9), nodeId, engines: [] });
+        research.get(key).engines.push(p.name);
+      } else if (/acordo com/.test(a.reason || '')) {
+        const who = (a.reason.match(/acordo com (.+?)( \(|$)/) || [])[1] || 'a dona do motor';
+        if (!deals.has(who)) deals.set(who, []);
+        deals.get(who).push(p.name);
+      }
+    }
+    const how = [];
+    for (const r of research.values()) how.push({ text: `Pesquise ${r.name}: libera ${r.engines.slice(0, 2).join(', ')}${r.engines.length > 2 ? ` e mais ${r.engines.length - 2}` : ''}.`, nodeId: r.nodeId, go: 'pesquisa' });
+    for (const [who, list] of deals) how.push({ text: `Faça um acordo com ${who} (parceria ou contrato de lançamento, em Mundo › Rivais e diplomacia): libera ${list.slice(0, 2).join(', ')}.`, go: 'mundo' });
+    if (!how.length) how.push({ text: 'Nenhum motor está à venda nesta data; espere os próximos anos ou pesquise propulsão.', go: 'pesquisa' });
+    const first = [...research.values()].find((r) => r.nodeId);
+    return { reason: 'Sem motor disponível', why: 'Todo foguete precisa de pelo menos um motor, e nenhum dos motores desta época está liberado para a sua agência.', how, nodeId: first?.nodeId || null };
+  }
+  if (!usableDiameters(state, data).length) {
+    return { reason: 'Sem ferramental de tanque', why: 'Nenhum diâmetro de tanque está disponível nesta data.', how: [{ text: 'Espere o próximo ferramental de tanque.' }], nodeId: null };
+  }
+  return { reason: 'Os motores disponíveis não servem para esta família', why: 'Os motores liberados não têm empuxo ou eficiência suficientes para montar este rascunho.', how: [{ text: 'Pesquise motores mais potentes ou escolha outra família.', go: 'pesquisa' }], nodeId: null };
+}
+
 /** Best engine for a role (first: thrust × reliability with sea-level Isp; upper: vacuum Isp × reliability). */
 function bestEngine(list, role) {
   const perKN = (e) => num(e.costM, 1) / Math.max(1, num(e.thrustKN, 1));
@@ -1462,13 +1522,14 @@ export const queries = {
       .map((v) => ({ vehicleId: v.id, name: v.name, operator: v.operator, provider: v.provider || null, capacity: v.capacity, costM: v.costM, ...licenseQuote(state, data, v.id) }))
       .map(({ vehicle, ...rest }) => rest);
   },
-  /** Templates with their auto-filled spec for the player now. */
+  /** Templates with their auto-filled spec for the player now, plus why a locked one is locked and how to open it. */
   'designs/templates': (state, data) => (partsOf(data)?.templates || []).map((t) => {
     const early = yearNow(state) < num(t.fromYear, 1950);
     const gate = early ? null : templateGate(state, data, t);
     const spec = !early && gate.ok ? fillTemplate(state, data, t.id) : null;
-    const reason = spec ? null : early ? `Disponível em ${t.fromYear}` : !gate.ok ? gate.reason : 'Faltam peças';
-    return { id: t.id, name: t.name, desc: t.desc, ok: !!spec, reason, nodeId: gate && !gate.ok ? gate.nodeId : null, spec };
+    const help = spec ? null : templateHelp(state, data, t, { early, gate });
+    const reason = spec ? null : help.reason;
+    return { id: t.id, name: t.name, desc: t.desc, ok: !!spec, reason, why: help?.why || null, how: help?.how || [], nodeId: help?.nodeId || null, spec };
   }),
   /** Static tables the Hangar needs (labels). */
   'designs/catalogInfo': (state, data) => {

@@ -180,6 +180,13 @@ const CSS = `
 .hg-prog { height: 4px; border-radius: 2px; background: var(--s4); overflow: hidden; }
 .hg-prog > i { display: block; height: 100%; background: var(--info); }
 .hg-tpl-grid { display: flex; flex-direction: column; gap: 8px; }
+.hg-locked { align-items: flex-start; }
+.hg-locked .hg-mini { opacity: 0.5; }
+.hg-lock-reason { display: flex; align-items: center; gap: 4px; font-size: var(--t12); font-weight: 600; color: var(--amber, var(--yellow)); margin-top: 4px; }
+.hg-lock-why { font-size: var(--t12); color: var(--text-2); line-height: 1.45; }
+.hg-lock-how { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin-top: 4px; font-size: var(--t12); color: var(--text-2); }
+.hg-lock-how .btn { border: 1px solid var(--line-strong); justify-content: flex-start; text-align: left; white-space: normal; height: auto; min-height: 40px; padding: 8px 10px; line-height: 1.35; }
+.hg-lock-step { padding: 2px 0; }
 .hg-input { width: 100%; background: var(--s0); border: 1px solid var(--line-strong); border-radius: var(--r); min-height: 44px; font-size: 16px; color: var(--text); padding: 0 12px; }
 @media (max-width: 360px) {
   .hg-top { grid-template-columns: 92px minmax(0, 1fr); gap: 10px; }
@@ -332,6 +339,7 @@ function renderTemplates(root, store) {
     viewHead('Novo foguete', { lead: 'Escolha a família: o Hangar monta um primeiro rascunho com as peças que você tem hoje.' }));
   const grid = h('div', { class: 'hg-tpl-grid' });
   for (const t of tpls) {
+    if (!t.ok) { grid.append(lockedTemplateCard(store, t)); continue; }
     const prev = t.ok ? q(store, 'designs/preview', null, { spec: t.spec }) : null;
     const der = prev?.derived;
     const box = h('span', { class: 'hg-mini', style: { width: '44px', height: '72px', flex: '0 0 44px' } });
@@ -354,6 +362,30 @@ function renderTemplates(root, store) {
   }
   if (!tpls.length) grid.append(emptyState('Nenhum modelo disponível.', 'chave'));
   root.append(grid);
+}
+
+/**
+ * A family the player cannot build yet: what is missing, why, and one tappable way per option to unlock it
+ * (research node, diplomacy, or just waiting). Not a <button>: it holds its own buttons.
+ */
+function lockedTemplateCard(store, t) {
+  const how = Array.isArray(t.how) ? t.how : [];
+  const goTo = (o) => {
+    if (o.nodeId) { goResearch(o.nodeId); return; }
+    if (o.go) store.ui?.navigate?.(o.go);
+  };
+  return h('div', { class: 'hg-card hg-design hg-locked' },
+    h('span', { class: 'hg-mini', style: { width: '44px', height: '72px', flex: '0 0 44px' } }),
+    h('span', { class: 'hg-txt' },
+      h('b', null, t.name),
+      h('span', { class: 'hg-sub' }, t.desc),
+      h('span', { class: 'hg-lock-reason' }, icon('cadeado', 14), ' ', t.reason || 'Bloqueado'),
+      t.why ? h('span', { class: 'hg-lock-why' }, h('b', null, 'Por quê: '), t.why) : null,
+      how.length ? h('span', { class: 'hg-lock-how' },
+        h('b', null, 'Como liberar:'),
+        ...how.map((o) => (o.nodeId || o.go)
+          ? button(o.text, () => goTo(o), { kind: 'ghost', small: true, icon: o.nodeId ? 'pesquisa' : o.go === 'mundo' ? 'mundo' : 'avancar' })
+          : h('span', { class: 'hg-lock-step' }, o.text))) : null));
 }
 
 // ------------------------------------------------------------------ licenses
