@@ -30,7 +30,7 @@ function withModule(entry, fn) {
 
 test('Corrida Lunar: 1 week per turn, era e4, v0.5 end rule, disc label "+1 sem"', () => {
   const s = newGame(lunar, { seed: 1, playerId: 'nasa' });
-  assert.equal(s.version, 3); // v2 + the v2 → v3 migration of investors.js (Phase B)
+  assert.equal(s.version, 4); // v2 + v2 → v3 (investors.js, Phase B) + v3 → v4 (research.js, Missões v2)
   assert.equal(s.startYear, 2026);
   assert.equal(s.endTurn, 259);
   assert.equal(s.clock.eraId, 'e4');

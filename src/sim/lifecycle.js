@@ -17,6 +17,7 @@ import { addNews, emitSignal, pushDecision, changeActor, log, relKey, clamp } fr
 import { dateToTurn, turnToDate, eraAt, WEEKS_PER_YEAR } from '../core/time.js';
 import * as diplomacy from './diplomacy.js';
 import * as politics from './politics.js';
+import * as research from './research.js';
 
 /** Converted to variable steps: yearly logic reads the window, dated events apply in the tick that contains them. */
 export const meta = { maxDt: 52 };
@@ -1302,6 +1303,8 @@ function foundAgency(state, data, action, ctx) {
   state.playerId = id;
   const def = foundDef(state, data, id, value);
   addActor(state, data, ctx, def, { reason: 'found' });
+  // the founded agency starts its research like a new agency (initialFor + §5.5 historical grant, keys recomputed)
+  if (old && old !== id && state.research) research.resetPlayer(state, data);
   const a = state.actors[id];
   a.custom = true;
   a.tier = 'core';

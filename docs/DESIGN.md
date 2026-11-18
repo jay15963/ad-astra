@@ -639,6 +639,44 @@ label instead of an orange border. Album rarity: rare `--info`, epic `--violet`,
 - Memorial: keep its solemn neutral greys; plates `--s2`, border `--line-strong`; names in `--font` 600
   (serif allowed only here, as a deliberate exception).
 
+### 4.19 Unlock kinds (Missões v2, docs/MISSIONS-V2.md §5.6, §6) — the one exception to rule 1
+
+Tech nodes that **unlock** something (a rocket class, a craft, a satellite/probe/rover type, a station or base
+module, a mission type, a Hangar part) are tagged by **kind**. Kinds are *categories*, not states, and get a fixed
+categorical colour. This is the only hue allowed outside meaning (rule 1), and it is fenced in:
+
+| kind | legend label | token | value | glyph (stroke icon, §2) |
+|---|---|---|---|---|
+| `vehicle` | Foguete | `--uk-vehicle` | `#ff8a4c` | `foguete` |
+| `spacecraft` | Nave | `--uk-spacecraft` | `#f472b6` | `capsula` |
+| `satellite` | Satélite | `--uk-satellite` | `#38bdf8` | `satelite` |
+| `probe` | Sonda | `--uk-probe` | `#818cf8` | `sonda` |
+| `rover` | Rover e veículos | `--uk-rover` | `#a3e635` | `rodas` |
+| `module` | Módulo de estação ou base | `--uk-module` | `#2dd4bf` | `modulo` |
+| `missionType` | Tipo de missão | `--uk-mission` | `#f5f5f4` + dashed band | `alvo` |
+| `part` | Peça do Hangar | `--uk-part` | `#d6b98c` | `chave` |
+
+- **Where the colour may appear**: the 4px band on top of an unlock tile (`.tt-kband`), the 16px corner badge
+  (`.tt-kb`: glyph in the kind colour on a 16% tint, 1px inset ring at 55%), the Legenda sheet, the "Libera"
+  chips of the node sheet (`.tt-uchip`), and "Libera:" chips on other screens (missions builder lock rows).
+  **Never** on buttons, borders that encode state, focus rings, text, or bars.
+- **Never colour alone**: every kind mark carries its glyph, and every list/sheet row its label. The colourblind
+  setting keeps the same kind colours (categorical); the glyphs disambiguate. `missionType` (near-white) adds a
+  dashed band so it never reads as "plain tile".
+- **State keeps its own encoding** on top: available = amber border, researching = `--info` border + ring,
+  done = green border/tint, locked = grey at reduced opacity (the kind band stays, dimmed).
+- **Tile sizes**: unlock tiles 80px; efficiency tiles 60px compact (icon, short name, one mono effect chip such as
+  `−3% lanç.`); cross-era prerequisites are 56px dashed ghost chips "◂ E3 · {short}" at the top of the branch
+  column (tap = jump to that era).
+- Tokens live in `src/ui/techtree.css` (`:root`); a screen outside Pesquisa that shows "Libera:" chips uses the
+  same tokens (copy them to `styles.css` when that screen does not load techtree.css).
+
+**Pesquisa layout (390×844 and 320×640)**: page head, science KPI card, era bar (sideways segmented chips
+`E1 1950–75 · 12/80`, 44px; 36px under 700px of height), toolbar of 4 buttons (Buscar · Legenda · Só liberações ·
+Lista/Grafo; 44px, 34px under 700px), "Próximas liberações" strip (collapsible, collapsed by default under 700px),
+then the era's graph (or the list). Unloaded future eras show a dashed preview card instead of a graph. Only one
+era is ever laid out (≤ 100 tiles).
+
 ---
 
 ## 5. Screen mapping (current -> new) and builder ownership

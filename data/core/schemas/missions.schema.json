@@ -1,0 +1,68 @@
+{
+  "$id": "missions.schema.json",
+  "description": "data/core/missions.json (MISSIONS-V2 §1): tipos, subtipos, tipos de carga e tabelas de missão.",
+  "type": "object",
+  "required": [
+    "subtypes"
+  ],
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "types": {
+      "type": "object"
+    },
+    "subtypes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "type": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "histYear": {
+            "type": "integer"
+          },
+          "leadWeeks": {
+            "type": "number",
+            "minimum": 0
+          },
+          "opsWeeks": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "payloadKinds": {
+      "type": "object"
+    }
+  }
+}

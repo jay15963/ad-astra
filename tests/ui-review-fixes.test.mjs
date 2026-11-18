@@ -69,11 +69,12 @@ test('map "Planejar missão": the builder starts on that destination with a comp
   assert.equal(planMissionFor(store, 'venus_orbit'), true);
   assert.equal(currentDraft().destination, 'venus_orbit');
   assert.ok(idx.venus_orbit.missionTypes.includes(currentDraft().type));
-  assert.equal(defaultTypeFor(idx.lunar_surface), 'lander');
+  // MISSIONS-V2 §1.1: "Pouso" is a probe sent to a surface (the legacy 'lander' type maps to probe)
+  assert.equal(defaultTypeFor(idx.lunar_surface), 'probe');
   assert.equal(defaultTypeFor(idx.leo), 'satellite');
   assert.equal(defaultTypeFor(idx.leo, 'crewed'), 'crewed');
   assert.equal(defaultTypeFor(idx.mars_orbit), 'probe');
-  assert.equal(defaultTypeFor(idx.venus_atmosphere, 'lander'), 'lander');
+  assert.equal(defaultTypeFor(idx.venus_atmosphere, 'lander'), 'probe');
   assert.equal(planMissionFor(store, 'nowhere'), false);
   const opts = store.tryQuery('missions/draftOptions', null, currentDraft());
   const d = (opts?.destinations || []).find((x) => (x.id || x) === 'venus_orbit');

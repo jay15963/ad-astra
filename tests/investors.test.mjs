@@ -544,14 +544,14 @@ test('campaign 1950: NACA starts 60/40 with the government; rounds and yearly hi
 // ------------------------------------------------------------------------------------------------ migration
 
 test('save migration v2 → v3 adds cap and mandates (registered by investors.js)', () => {
-  assert.equal(targetVersion(), 3);
+  assert.equal(targetVersion(), 4); // + v3 → v4 (research.js, Missões v2)
   const s = engine.newGame(campaign, { seed: 4, playerId: 'nasa' });
   const raw = JSON.parse(engine.serialize(s));
   delete raw.cap;
   delete raw.mandates;
   raw.version = 2;
   const m = migrate(JSON.stringify(raw), campaign);
-  assert.equal(m.version, 3);
+  assert.equal(m.version, 4);
   assert.equal(m.cap, null);
   assert.deepEqual(m.mandates, []);
   // the next tick rebuilds the table for the player

@@ -312,6 +312,7 @@ export function worley(x, y, seed=0): number                      // F1 distance
 // canvases + cache
 export function makeCanvas(w, h): HTMLCanvasElement | OffscreenCanvas | null        // null in Node
 export function cached(key: string, w, h, paint: (ctx, w, h) => void): canvas | null  // LRU cache
+export function peekCached(key: string): canvas | null                               // cached canvas or null (never paints)
 export function clearTextureCache(): void
 export function textureStats(): { count, bytes }
 export function sizeBucket(px: number): number                    // 64|128|256|512|1024|2048
@@ -564,3 +565,94 @@ integrator does that last, see §5.0). Known integration notes:
 - Plumes: above ~35 km the texture becomes a translucent under-expanded bell (filled interior + brighter shock
   envelope) that keeps widening along a long length, never a round glow at the nozzle.
 - Falcon pads: `drawStrongback` (transporter-erector) rocks back over the last seconds of the count.
+
+---------------------------------------------------------------------------------------------------------
+
+## 10. Missões v2: stations, docking, module release and surface bases (MISSIONS-V2.md §7)
+
+Owner: launch-visuals. The sim snapshots the target into `state.activeLaunch.target` (`infra.sceneTarget`, §7.1);
+launch-scene.js copies it into the RenderState and the renderer resolves the art itself (`infra.resolveTarget`,
+memoised per object: `modules[i].art`, `vehicles[i].art`, `payloadArt`, `payloadVehicleArt`). No target → the
+classic scenes, unchanged.
+
+### 10.1 RenderState additions (§3)
+```js
+rs.mode: … | 'rendezvous'      // orbit frame without capture: station at the centre-left, Earth limb (or the body's
+                               // disc for rs.target.bodyId ≠ 'earth') below; also used for module release
+rs.target: SceneTarget | null  // { kind: 'station'|'base', assetId, name, newAsset, sequence: 'dock'|'berth'|'release'|'surface',
+                               //   modules: [{id, n}], vehicles: [{id, n}], sizeTier 0..5, stageN, bodyId, site,
+                               //   payload: {kind, moduleId, vehicleTypeId, qty}, traits }
+rs.dockT: { start, rv, dock, release } | null   // animation-clock times (launch-scene infraTimeline): the approach is
+                               // a function of rs.clock (the sim pins the clock at unresolved milestones), so resume and
+                               // replay give the same picture
+rs.flags += { docked, dockFail, rvFail, rvAnomaly, released }   // from the milestones already rolled (infraFlags)
+rs.night: boolean (optional)   // base window lights stronger
+```
+Scene mode: `rendezvous` once every milestone before the first infrastructure milestone is presented (ascent: 2.5 s
+after SECO so the payload separation still reads on the climb view; resume goes straight there). Surface deliveries
+stay in `descent`; the base is drawn when `rs.target.sequence === 'surface'`.
+
+### 10.2 Events (§4 additions; idempotent)
+| milestone / moment | event |
+|---|---|
+| `rendezvous` ok / anomaly | `rendezvous` (anomaly → wobble during the 10 m hold) |
+| `dock` ok / anomaly | `dock` (`berth` when `target.sequence === 'berth'`): contact flash, latch shake, zoom out to the whole station |
+| `dock` fail | `dockFail`: glancing contact, the craft drifts away (fireball only if the sim says catastrophic) |
+| `rendezvous` fail | `rvFail`: the craft drifts at ~30 m |
+| `module_release` ok | `release`: spring puffs, arrays (0.8 s) then radiators unfold, stage turns away + deorbit burn; founding → "Primeiro módulo em posição" |
+| 1.5 s after the visual touchdown of a surface delivery | `unload`: vehicles drive to the lander, crate lowered and loaded |
+
+### 10.3 infra.js (new)
+```js
+resolveTarget(t) → resolved SceneTarget | null
+layoutStation(modules, { seed }) → { parts: [{id, shape, art, x, y, rot, len, d}], ports: [{x, y, dir, free}], port, truss, arm, bbox, hash, count }
+   // pure; core at the origin on x; nodes branch ±y; labs/habs on free radial ports, else extend the chain toward −x;
+   // one truss perpendicular at the core with a wing pair per st_solar; airlock/cupola on surface spots; ring/cylinder
+   // replace the centre (a spindle keeps the port outside the ring). Target port = first free port facing +x.
+paintStation(ctx, layout, { pxPerM, light, t, lightsOn, reduce, armTarget })   // cached sprite per (hash, ⅓-octave scale, light);
+   // too big for a sprite (O'Neill cylinder close up) → direct paint; strobes + docking light per frame
+paintModule(ctx, art, { pxPerM, light, unfold, lights }) · moduleSize(art) · drawArm(ctx, layout, k, light, target) · armJoints
+dockPose({ clock, t, tl, seq, flags, events }) → { range, off, rot, phase, flash, arm, armHold, lights, rcs }
+   // 200 → 30 m (clock start → rv), 30 → 10 m, hold, final 10 → 0.15 m at dock; berth: hold at 10 m, arm reaches,
+   // grapples and pulls; docked / drift beats from event times
+releasePose({ since, released, founding }) → { sep, arrays, radiators, stageRot, stageBurn, stageAway, moduleRot, lights, phase }
+groundProjection(view, { groundY, pxPerM, altM, scrollX, horizonY }) → { project(x, d) → {x, y, s, Z}, hor, hc, f, z0 }
+   // the landing terrain's own perspective (textures.drawTerrain), so the base stands on the same ground
+baseHorizonY(view, groundY)   // a higher camera over a base (ground band 0.13 H): passed to drawTerrain/drawBodyLimb as horizonY
+layoutBase(target, { seed, sizeTier, bodyId, z0, landerW }) → { tier, items, pad, roads, vehicles, payloadVehicles, … }
+   // items from the base's own module list first (counts capped by tier), generic fill by tier for existing bases
+   // (0: 1–2 habs + 2 solar + mast · 1: + pad, lab, 1 vehicle · 2: + buried hab, greenhouse, comms tower, roads ·
+   // 3: domes, garage, mining rig, vehicles · 4: big domes, factory, mass driver · 5: arcologies + megastructure on
+   // the horizon). A base being founded shows only what lands. Bands near/mid/far (scaled up when the lander is small)
+   // and horizon (2–30 km). bs_pad puts a lit pad under the lander.
+vehicleStates(layout, { since, parked }) → per vehicle { x, d, facing, moving, arrived, hover, loader }   // 3 m/s, trips 2–9 s
+drawBase(ctx, view, layout, { proj, light, t, reduce, world, night, alpha })      // roads, pad + chase lights, items far → near,
+   // contact shadows, aerial haze baked per sprite on Mars/Titan, beacons
+drawBaseVehicles(ctx, view, layout, { proj, t, since, parked, light, world, reduce, landerH, crewed })
+   // vehicles + wheel dust (vacuum: ballistic arcs; air: hanging puffs), crate lowered then loaded; no vehicles →
+   // crate + (crewed) two astronauts with helmet lights. Reduced motion / resumed: parked beside the lander.
+baseCounts(layout)   // kind → count (tests, harness HUD)
+```
+Budget: base items are cached sprites (key: id, kind, ¼-octave scale, light, night, haze bucket); per frame only
+drawImage per item, ≤ 6 vehicles, pad lights and beacons. Stations: a sprite up to 0.5 Mpx (bigger ones are painted
+directly, 0.5–0.9 ms); while the camera zooms out a cached sprite up to one octave larger is reused, and craft body
+sprites reuse a neighbour light bucket (±15°) or a larger scale, so the docked zoom-out and the module release turn
+no longer rebuild sprites every few frames (a 100 ms hitch on the O'Neill zoom before). The released stage keeps its
+lighting through its turn-away. Measured in the harness (`bench=120`, desktop, dpr 2, 390×700, after draining the
+progressive background jobs): every docking / berthing / release preset p95 ≤ 1.0 ms, tier-5 bases p95 ≤ 1.8 ms,
+real sim targets (ISS 2012, Mars colony) ≤ 1.8 ms, so a mid phone stays inside 6 ms.
+
+### 10.4 Art (data/vehicle-art.json)
+`modules`: 16 station modules (`shape` module|node|truss|airlock|arm|cupola|inflatable|tank|wheel|shipyard|ring|cylinder,
+real metres) and 15 base modules (`kind` hab|solar|tower|lab|reactor|plant|pad|garage|mound|greenhouse|dome|factory|rail|
+arcology|mega, `w`/`h`, `band`); `baseVehicles`: 8 surface vehicles (`kind` buggy|drone|crane|excavator|cabin|truck|hopper|
+crawler). `_station`, `_base`, `_mast`, `_vehicle` are fallbacks; `vehicles.moduleArt(id)` / `baseVehicleArt(id)` never
+return null. Craft art also covers the Missões v2 generic carriers, rovers and satellites of data/spacecraft.json.
+
+### 10.5 Preview presets (tools/launch-preview.html)
+`?preset=iss|salyut|tiangong|arm|expand|first|ring|oneill|gateway` (docking / berthing / first module; `scene=approach|dock|
+berth|release`, `t` = seconds after the contact / release, `fail=1` glancing contact, `wobble=1` anomalous hold) and
+`?preset=base0…base5|veh0…veh6|newbase|rover&body=moon|mars|titan` (`t` = seconds after touchdown; unload at 1.5 s;
+`night=1`, `reduce=1`). `bench=N` measures N update+draw frames (`window.__bench`).
+Real snapshots: `?targets=<url>&i=N` loads a JSON list `[{label, t}]` of `infra.sceneTarget()` outputs (e.g.
+`tools/_scratch/mv2-infra-sim-targets.json`) and picks the scene from `t.sequence` (dock / berth / release / base).

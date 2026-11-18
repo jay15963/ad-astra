@@ -14,8 +14,16 @@
 //   number, everything else the era id) and `fromYear = era.from` when it has no absolute date.
 // - Never mutates the raw JSON it is given (copy on write), so packs can be re-assembled in any order of loading and
 //   the result only depends on the manifest order and the set of active packs.
+// - Tech packs (MISSIONS-V2 §4.3): `{"id": "tech-e3", "kind": "tech", "techEra": "e3", "eras": ["e3", …, "e7"],
+//   "dir": "tech/e3/", "files": ["tech"]}`. Always merged, whatever eras are loaded (src/core/data.js activeIds:
+//   prerequisites, unlock keys and their years must not depend on the loaded eras); each tech file's `templates`
+//   are expanded by src/core/techgen.js right before the file is merged (generated nodes are content like the
+//   authored ones).
+// - `exclude: [scenarioId, …]` (any pack): the pack is not merged for those scenarios (the Corrida Lunar keeps
+//   exactly its tree).
 
 import { genEvents } from '../gen/events.js';
+import { prepareTechFile } from './techgen.js';
 
 const GEN_EVENTS_SEED = 3000;
 
@@ -215,6 +223,11 @@ export function buildIndex(data) {
   return idx;
 }
 
+/** Effect labels for generated node descriptions: data/tech.json effectLabels + core/techtree.json effectLabels. */
+const techLabels = (data) => ({ ...(data.tech?.effectLabels || {}), ...(data.techtree?.effectLabels || {}) });
+/** Tier number of a tech pack (techEra 'e3' → 3), null when the file says it itself (file.era). */
+const techEraNum = (pack) => { const e = pack?.techEra || pack?.era; return typeof e === 'string' && /^e\d$/.test(e) ? Number(e.slice(1)) : null; };
+
 /**
  * Assemble the data object from raw pack files.
  * @param {object} manifest   data/packs.json (or DEFAULT_MANIFEST)
@@ -230,9 +243,12 @@ export function assemble(manifest, raw, active, { scenario, scenarioId, scenario
   const eraMeta = {};
   const snapshots = {};
   const packsLoaded = {};
-  const metaOnly = normalizeScenario(scenario, scenarioId)?.eraContent === 'meta';
+  const norm = normalizeScenario(scenario, scenarioId);
+  const metaOnly = norm?.eraContent === 'meta';
+  const scenId = norm?.id ?? scenarioId ?? null;
   for (const pack of manifest.packs || []) {
     if (!on.has(pack.id) || !raw[pack.id]) continue;
+    if (Array.isArray(pack.exclude) && scenId != null && pack.exclude.includes(scenId)) continue;
     const { files, hash } = raw[pack.id];
     packsLoaded[pack.id] = hash;
     const isEraDir = !!pack.era && !pack.always && !pack.legacy;
@@ -245,7 +261,8 @@ export function assemble(manifest, raw, active, { scenario, scenarioId, scenario
       if (isEraDir && name === 'snapshot') { snapshots[pack.era] = json; continue; }
       if (name === 'patches') { Object.assign(data, applyPatches(data, json, warn)); continue; }
       const key = pack.legacy ? name : dataKey(name);
-      const value = isEraDir ? stampFile(name, json, pack.era, eraFrom) : json;
+      let value = isEraDir ? stampFile(name, json, pack.era, eraFrom) : json;
+      if (name === 'tech' && Array.isArray(value?.templates)) value = prepareTechFile(value, { labels: techLabels(data), era: techEraNum(pack) });
       data[key] = key in data ? mergeValue(data[key], value, warn, name) : value;
     }
   }

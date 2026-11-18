@@ -18,13 +18,14 @@
 import { validate } from './schema.js';
 import { assemble, LIST_KEYS } from '../../src/core/packs.js';
 import { checkVocab, starIds } from './vocab.js';
+import { checkTechTree } from './techtree.js';
 
 /** Year of the data's "present": items up to it may be 'fato' (the data is up to date as of nov/2026). */
 export const DATA_PRESENT_YEAR = 2026;
 export const CAMPAIGN_FROM = 1950;
 export const CAMPAIGN_TO = 2999; // last era year; jan/3000 is the final event (core/eras.json "final")
 export const PACK_BUDGET = 350 * 1024;
-export const BOOT_BUDGET = 1.2 * 1024 * 1024;
+export const BOOT_BUDGET = 1.6 * 1024 * 1024; // raw JSON; GitHub Pages serves it gzipped (~20% of raw)
 
 /** file -> schema of its list items. */
 export const ITEM_SCHEMAS = {
@@ -35,7 +36,12 @@ export const ITEM_SCHEMAS = {
 /** file -> schema of the whole file. */
 export const FILE_SCHEMAS = {
   era: 'era-meta', eras: 'eras', snapshot: 'snapshot', patches: 'patches', ending: 'ending', 'actor-gen': 'actor-gen',
+  // Missões v2 (docs/MISSIONS-V2.md §9.2)
+  tech: 'tech-file', techtree: 'techtree', missions: 'missions', contracts: 'contracts', modules: 'modules', stations: 'stations',
+  market: 'market',
 };
+/** Core files whose texts are templates filled by code ({asset}, {owner}, {nome}…): placeholders are not checked. */
+const TEMPLATE_TEXT_FILES = new Set(['missions', 'contracts', 'modules', 'stations', 'market', 'techtree']);
 
 /** Truth layer × year (§2.3), calibrated to the data's present (nov/2026). */
 export const TRUTH_YEARS = {
@@ -379,7 +385,7 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
           if (typeof v === 'string' && TEXT_FIELDS.has(k)) {
             if (FORBIDDEN_TEXT.test(v)) err(p.id, `${path}.${k}`, `texto com marcador proibido: "${v.match(FORBIDDEN_TEXT)[0]}"`);
             // generator templates (data/gen) carry their own slot markers, filled by src/gen before the sim sees them
-            if (!p.legacy && !String(p.dir || '').startsWith('gen/')) for (const m of v.matchAll(/\{(\w+)\}/g)) if (!legacyPh.has(m[1])) err(p.id, `${path}.${k}`, `marcador {${m[1]}} desconhecido`);
+            if (!p.legacy && !String(p.dir || '').startsWith('gen/') && !TEMPLATE_TEXT_FILES.has(file)) for (const m of v.matchAll(/\{(\w+)\}/g)) if (!legacyPh.has(m[1])) err(p.id, `${path}.${k}`, `marcador {${m[1]}} desconhecido`);
           } else if (v && typeof v === 'object') walk(v, `${path}.${k}`);
         }
       };
@@ -396,15 +402,22 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
     warn('core', 'core/vocab.json', 'há pedidos de vocabulário, mas core/vocab.json não existe');
   }
 
+  // ---------------------------------------------------------------- tech tree and Missões v2 data (MISSIONS-V2 §9.3)
+  const knownMilestones = new Set([...milestones, ...Object.keys(vocab?.milestones || {})]);
+  const techStats = checkTechTree({ input, merged, packDefs, add, packPath, milestones: knownMilestones });
+
   // ---------------------------------------------------------------- budgets (§4.5)
   const packBytes = (id) => Object.values(sizes[id] || {}).reduce((a, b) => a + b, 0);
   for (const p of eraDefs) {
     const b = packBytes(p.id);
     if (b > PACK_BUDGET) err(p.id, p.dir, `pacote com ${(b / 1024).toFixed(0)} KB (limite ${PACK_BUDGET / 1024} KB)`);
   }
-  const always = packDefs.filter((p) => p.always).reduce((a, p) => a + packBytes(p.id), 0);
-  const biggest = Math.max(0, ...eraDefs.map((p) => packBytes(p.id)));
-  if (Object.keys(sizes).length && always + biggest > BOOT_BUDGET) err('manifest', 'packs.json', `dados de partida com ${(always + biggest) / 1024 | 0} KB (limite 1,2 MB)`);
+  // tech packs are merged whatever the eras (src/core/data.js activeIds: unlock keys must be known from the start)
+  const always = packDefs.filter((p) => p.always || p.kind === 'tech').reduce((a, p) => a + packBytes(p.id), 0);
+  const eraBytes = (p) => packBytes(p.id);
+  const biggest = Math.max(0, ...eraDefs.map(eraBytes));
+  const biggestEra = eraDefs.find((p) => eraBytes(p) === biggest)?.era ?? null;
+  if (Object.keys(sizes).length && always + biggest > BOOT_BUDGET) err('manifest', 'packs.json', `dados de partida com ${(always + biggest) / 1024 | 0} KB (limite 1,6 MB): pacotes sempre carregados (com as árvores) ${(always / 1024) | 0} KB + era ${biggestEra} ${(biggest / 1024) | 0} KB`);
 
   // ---------------------------------------------------------------- density for authors
   const density = {};
@@ -425,6 +438,8 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
     bootBytes: always + biggest,
     packBytes: Object.fromEntries(packDefs.map((p) => [p.id, packBytes(p.id)])),
     vocab: vocabStats,
+    techtree: techStats,
+    bootEra: biggestEra,
   };
   return { issues, density, stats };
 }

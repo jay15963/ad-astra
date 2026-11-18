@@ -1,0 +1,137 @@
+{
+  "$id": "tech-file.schema.json",
+  "description": "Arquivo de tecnologia (data/tech.json e data/tech/eN/tech.json; MISSIONS-V2 §4.3): nós autorais e modelos de nós de eficiência gerados por src/core/techgen.js.",
+  "type": "object",
+  "required": [
+    "nodes"
+  ],
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "_comment": {
+      "type": "string"
+    },
+    "era": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7
+    },
+    "techTier": {
+      "type": "string",
+      "pattern": "^t[1-7]$"
+    },
+    "nodes": {
+      "type": "array"
+    },
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "branch",
+          "effect",
+          "values",
+          "names",
+          "after",
+          "years"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+$"
+          },
+          "branch": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "effect": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]+$"
+          },
+          "values": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {
+              "type": "number"
+            }
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "shorts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            }
+          },
+          "icon": {
+            "type": "string"
+          },
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alsoAfter": {
+            "$ref": "common.schema.json#/$defs/idList"
+          },
+          "years": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "integer"
+            }
+          },
+          "cost": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "science": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "weeks": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "desc": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "era": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "untilYear": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

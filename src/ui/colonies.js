@@ -8,6 +8,7 @@ import { h, button, chip, bar, fmtMoney, fmtMonth, toast, confirmDialog, emptySt
 import { listRow, ensurePainelCss, openDecision } from './decisions.js';
 import { screenHead, section, kpis, pills, listCard, note, countChip, rerender } from './screen-kit.js';
 import { view as simView } from '../sim/colonies.js';
+import { assetViews } from './missions-tab.js';
 
 const CSS = `
 .colonias .cl-card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;text-align:left;width:100%;color:inherit;font:inherit}
@@ -165,6 +166,24 @@ function renderList(container, store, route, v) {
     v.past.length ? section('Memória', {}, listCard(v.past.map((p) => listRow({ title: p.name, sub: `${p.place} · ${p.cause}`, meta: String(p.year) })))) : null));
 }
 
+/**
+ * The colony's physical base (MISSIONS-V2 §3.7: colony.assetId ↔ asset.colonyId): modules, vehicles, supply, with a
+ * link to Infraestrutura. Null when the colony has no base asset (or infra is not loaded).
+ */
+export function baseLink(store, c) {
+  const raw = (store.state?.colonies?.list || []).find((x) => x && x.id === c.id) || {};
+  const assetId = c.assetId || raw.assetId || null;
+  let a = null;
+  try { a = assetViews(store).find((x) => x.id === assetId || (x.colonyId && x.colonyId === c.id)) || null; } catch { a = null; }
+  if (!a) return null;
+  const parts = [`${a.modulesN} módulo${a.modulesN === 1 ? '' : 's'}`, a.vehiclesN ? `${a.vehiclesN} veículo${a.vehiclesN === 1 ? '' : 's'}` : null,
+    Number.isFinite(a.supplyWeeks) ? `suprimentos para ${a.supplyWeeks} semana${a.supplyWeeks === 1 ? '' : 's'}` : null].filter(Boolean);
+  return section('Base física', {}, listCard([listRow({
+    lead: '🏗️', title: a.name, sub: parts.join(' · '), meta: `saúde ${Math.round(a.health)}`,
+    onClick: () => store.ui?.navigate?.('infra', `a/${a.id}`),
+  })]), note('Módulos de base enviados por missões de Carga viram obras da colônia; sem suprimentos, a vida da colônia sofre.', { icon: 'info' }));
+}
+
 function renderDetail(container, store, route, v, c) {
   const st = store.state;
   const nav = (tab, sub) => store.ui?.navigate?.(tab, sub);
@@ -189,6 +208,7 @@ function renderDetail(container, store, route, v, c) {
     screenHead({ title: c.name, lead: `${c.siteName} · ${c.stageLabel}${STATUS[c.status] ? ` (${STATUS[c.status]})` : ''}`, primary }),
     stageTrack(v, c.stage, { labels: true }),
     c.stageDesc ? h('p', { class: 'cl-desc' }, c.stageDesc) : null,
+    baseLink(store, c),
     kpis([
       { label: 'População', value: num(c.population), sub: c.housing ? `moradia para ${num(c.housing)}` : '' },
       { label: 'Bem-estar', value: String(Math.round(c.welfare ?? 0)), tone: c.welfare < 45 ? 'down' : '', sub: c.supplied ? 'com suprimento' : 'falta suprimento' },

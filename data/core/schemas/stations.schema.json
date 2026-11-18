@@ -1,0 +1,48 @@
+{
+  "$id": "stations.schema.json",
+  "description": "data/core/stations.json (MISSIONS-V2 §3.3): estações históricas que viram ativos de IA por data.",
+  "type": "object",
+  "required": [
+    "stations"
+  ],
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "stations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "destination",
+          "owner"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "destination": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "owner": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "partners": {
+            "$ref": "common.schema.json#/$defs/idList"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "modules": {
+            "type": "array"
+          }
+        }
+      }
+    }
+  }
+}

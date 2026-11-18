@@ -10,7 +10,7 @@
 import { botStep } from './golden.mjs';
 import * as lifecycle from '../src/sim/lifecycle.js';
 
-const DEFAULTS = { minPct: 50, buybackCash: 4000, designEveryYears: 12, found: false, maxDesigns: 3, ownMissions: true };
+const DEFAULTS = { minPct: 50, buybackCash: 4000, designEveryYears: 12, found: false, maxDesigns: 3, ownMissions: true, research: true };
 const yearOf = (state) => state.startYear + Math.floor(state.turn / 52);
 const hasAction = (r) => !(r && r.ok === false && /ação desconhecida/.test(String(r.error || '')));
 
@@ -173,6 +173,7 @@ export function phaseBStep(state, data, engine, opts = {}, mem = {}) {
 /** The Phase B moves alone (for bots with their own scheduling loop: tools/smoke.mjs, tools/sim-campaign.mjs). */
 export function phaseBMoves(state, data, engine, opts = {}, mem = {}) {
   const o = { ...DEFAULTS, ...opts };
+  if (o.research) researchMove(state, data, engine, mem);
   for (const dec of state.decisions.slice()) {
     if (state.gameOver) return;
     if (dec.kind === 'investors/round') answerRound(state, data, engine, dec, o);
@@ -199,6 +200,33 @@ export function phaseBMoves(state, data, engine, opts = {}, mem = {}) {
     bookTestFlights(state, data, engine);
     ownMission(state, data, engine, o, mem);
   }
+}
+
+/**
+ * Missões v2 (MISSIONS-V2.md §12): the bot keeps its research slots busy, the cheapest available **unlock** node
+ * first (what the player can build/fly is gated by research), else the cheapest available efficiency node. Checked
+ * at most every 4 weeks; a node the action refuses (science, money, slots) is skipped until next time.
+ */
+export function researchMove(state, data, engine, mem = {}) {
+  // only where research gates the catalog (the Corrida Lunar keeps its v0.8 bot), and never with the money for flights
+  if (state.gameOver || !state.research || !(data.scenario?.techGating ?? state.techGating)) return 0;
+  if (Number.isFinite(mem.researchTurn) && state.turn - mem.researchTurn < 4) return 0;
+  mem.researchTurn = state.turn;
+  let tree = null;
+  try { tree = engine.query(state, data, 'research/tree'); } catch { return 0; }
+  if (!Array.isArray(tree)) return 0;
+  const busy = new Set((state.research.projects || []).map((p) => p.nodeId));
+  const cash = state.actors?.[state.playerId]?.cash ?? 0;
+  const open = tree.filter((n) => n.status === 'available' && !busy.has(n.id) && n.canAffordScience !== false && (n.cost || 0) <= cash * 0.25);
+  const by = (a, b) => (a.science || 0) - (b.science || 0) || (a.cost || 0) - (b.cost || 0) || String(a.id).localeCompare(String(b.id));
+  const pick = [...open.filter((n) => n.kind === 'unlock').sort(by), ...open.filter((n) => n.kind !== 'unlock').sort(by)];
+  let started = 0;
+  for (const n of pick) {
+    const r = engine.dispatch(state, data, { type: 'research/start', nodeId: n.id, approach: 'safe' });
+    if (r?.ok) { started++; mem.researched = (mem.researched || 0) + 1; continue; }
+    if (/limite de|ciência insuficiente/.test(String(r?.error || ''))) break;
+  }
+  return started;
 }
 
 /** Counters of what the Phase B systems did in a run (printed by tools/campaign.mjs). */

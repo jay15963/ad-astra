@@ -140,6 +140,18 @@ export function mandatesDueSoon(st) {
   const now = st?.turn ?? 0;
   return (Array.isArray(st?.mandates) ? st.mandates : []).filter((m) => m && m.status === 'open' && Number.isFinite(m.deadlineTurn) && m.deadlineTurn >= now && m.deadlineTurn - now <= 52);
 }
+/**
+ * Infra badge (MISSIONS-V2 §11): the player's stations/bases (own or partner) with supply for < 13 weeks, or
+ * derelict. Uses the sim's 'infra/list' views (supplyWeeks) when the store answers; else the raw slice (status).
+ */
+export function infraAlerts(st, store = null) {
+  let list = null;
+  try { const q = store?.tryQuery?.('infra/list', null); list = Array.isArray(q) ? q : Array.isArray(q?.list) ? q.list : null; } catch { list = null; }
+  if (!list) list = Array.isArray(st?.assets?.list) ? st.assets.list : [];
+  const pid = st?.playerId;
+  return list.filter((a) => a && a.status !== 'ended' && (a.ownerId === pid || (a.partners || []).some((p) => p?.actorId === pid))
+    && (a.status === 'derelict' || (Number.isFinite(a.supplyWeeks) && a.supplyWeeks < 13))).length;
+}
 /** Rocket designs of the player waiting for their test flights (Phase B builder, state.designs). */
 const designsInTest = (st) => (Array.isArray(st?.designs) ? st.designs : Object.values(st?.designs || {})).filter((d) => d && (!d.owner || d.owner === st.playerId) && d.program?.phase === 'testFlights');
 
@@ -167,6 +179,8 @@ registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', grou
     },
   })),
   badge: (st) => (designsInTest(st).length ? true : 0) });
+registerScreen({ id: 'infra', title: 'Infraestrutura', icon: 'estacao', group: 'operacoes', order: 25, load: () => import('./infra-tab.js'), badge: (st, store) => infraAlerts(st, store) || decisionsOf(st, /^infra\//).length });
+registerScreen({ id: 'mercado', title: 'Mercado de foguetes', short: 'Mercado', icon: 'foguete', group: 'operacoes', order: 40, available: (st) => !!st?.market, load: orStub(() => import('./market.js')), badge: (st) => decisionsOf(st, /^market\/offer/).length });
 registerScreen({ id: 'lancamentos', title: 'Calendário de lançamentos', short: 'Calendário', icon: 'calendario', group: 'operacoes', order: 30, load: () => import('./lancamentos.js'), badge: (st) => mandatesDueSoon(st).length });
 registerScreen({ id: 'veiculo', title: 'Falta o veículo', icon: 'alerta', group: 'operacoes', order: 5, go: 'missoes/lista', available: (st) => missionsNeedingVehicle(st).length > 0, badge: (st) => missionsNeedingVehicle(st).length });
 

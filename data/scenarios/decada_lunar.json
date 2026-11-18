@@ -12,7 +12,9 @@
   "history": "faithful",
   "lifecycle": "on",
   "ending": { "type": "end" },
-  "unlocks": { "builder": { "fromYear": 2026 }, "investors": { "fromYear": 2026 } },
+  "techGating": true,
+  "techStart": "historical",
+  "unlocks": { "market": { "fromYear": 2026 }, "builder": { "fromYear": 2026 }, "investors": { "fromYear": 2026 } },
   "firstShares": { "lunar_south_pole_crewed": 0.35 },
   "historicalFirstsNote": "Feitos realizados antes de 2026 (mesma lista da Corrida Lunar): quem repete leva o 'primeiro do século'.",
   "historicalFirsts": {

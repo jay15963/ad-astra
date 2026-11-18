@@ -162,6 +162,7 @@
   "destinations": [
     {
       "id": "leo",
+      "stationOk": true,
       "name": "Órbita baixa da Terra",
       "emLabel": "na órbita baixa",
       "toLabel": "à órbita baixa",
@@ -187,6 +188,7 @@
     },
     {
       "id": "sso",
+      "stationOk": true,
       "name": "Órbita heliossíncrona",
       "emLabel": "na órbita heliossíncrona",
       "toLabel": "à órbita heliossíncrona",
@@ -210,6 +212,7 @@
     },
     {
       "id": "iss",
+      "assetHist": "iss",
       "name": "Estação Espacial Internacional",
       "emLabel": "na ISS",
       "toLabel": "à ISS",
@@ -218,6 +221,7 @@
       "kind": "station",
       "capacityKey": "leo",
       "capacityFactor": 0.9,
+      "fromYear": 1998,
       "availableUntil": {
         "year": 2030,
         "month": 12
@@ -375,6 +379,7 @@
     },
     {
       "id": "lunar_orbit",
+      "stationOk": true,
       "name": "Órbita lunar",
       "emLabel": "na órbita lunar",
       "toLabel": "à órbita lunar",
@@ -655,6 +660,7 @@
     },
     {
       "id": "mars_orbit",
+      "stationOk": true,
       "name": "Órbita de Marte",
       "emLabel": "na órbita de Marte",
       "toLabel": "à órbita de Marte",
@@ -875,6 +881,7 @@
     },
     {
       "id": "titan",
+      "needsRelay": true,
       "name": "Titã",
       "emLabel": "em Titã",
       "toLabel": "a Titã",
@@ -1151,10 +1158,7 @@
         "phaseTurn": 25,
         "openWeeks": 10
       },
-      "missionTypes": [
-        "probe",
-        "lander"
-      ],
+      "missionTypes": ["probe", "rover"],
       "risk": 0.08,
       "prestige": 24,
       "scienceMult": 2.4,
@@ -1478,10 +1482,7 @@
         "phaseTurn": 19,
         "openWeeks": 8
       },
-      "missionTypes": [
-        "probe",
-        "lander"
-      ],
+      "missionTypes": ["probe", "rover"],
       "risk": 0.09,
       "prestige": 26,
       "scienceMult": 2.2,
@@ -1742,10 +1743,7 @@
         "phaseTurn": 39,
         "openWeeks": 12
       },
-      "missionTypes": [
-        "probe",
-        "lander"
-      ],
+      "missionTypes": ["probe", "rover"],
       "risk": 0.11,
       "prestige": 30,
       "scienceMult": 2.4,

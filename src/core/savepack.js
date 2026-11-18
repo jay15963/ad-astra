@@ -6,6 +6,8 @@
 //     a pair with any other shape is kept as [key, object]);
 //   - every array of ≥ 3 plain objects that share the same keys in the same order as {"$c": [keys], "$r": [[values], …]}
 //     (nested values are encoded the same way), except under state.actors (the title screen reads it raw);
+//   - every object of ≥ 3 plain objects (vehicleStats, tombstones…) the same way, with its keys: {"$k": [keys], …};
+//   - research: rivals' tech id lists share one string table; unlocked, completedTurn and the bonus maps index it;
 //   - a top-level "$pack": 1 marker.
 // unpackState() rebuilds exactly the same objects (same keys, same order, same values), so
 // serialize(deserialize(json)) === json still holds and the sim never sees the encoding. Saves without the marker
@@ -29,7 +31,21 @@ function packValue(v) {
   return v;
 }
 
+// a map of ≥ 3 plain objects sharing a few shapes (vehicleStats, tombstones, annals…): keys once, rows of values
+const MAP_MIN = 3;
+function packMap(o) {
+  const keys = jsonKeys(o);
+  if (keys.length < MAP_MIN || keys.some((k) => k.startsWith('$')) || !keys.every((k) => isPlain(o[k]))) return null;
+  const arr = keys.map((k) => o[k]);
+  const p = packArray(arr);
+  if (p === arr || !(isPackedArray(p) || isShapedArray(p))) return null;
+  return { $k: keys, ...p };
+}
+const isPackedMap = (v) => isPlain(v) && Array.isArray(v.$k) && Array.isArray(v.$r) && (Array.isArray(v.$c) || Array.isArray(v.$s)) && Object.keys(v).length === 3;
+
 function packObject(o) {
+  const m = packMap(o);
+  if (m) return m;
   let out = null;
   for (const k of Object.keys(o)) {
     const v = o[k];
@@ -108,11 +124,84 @@ function packIdLists(obj) {
   }
   return { $t: table, $i: idx };
 }
-const isIdLists = (v) => isPlain(v) && Array.isArray(v.$t) && isPlain(v.$i) && Object.keys(v).length === 2;
+// indexes into a table of ≤ 1296 ids as fixed 2-character base-36 codes, joined in one string ("0a0b1z…")
+const CODE_MAX = 36 * 36;
+const toCodes = (list) => list.map((i) => i.toString(36).padStart(2, '0')).join('');
+function fromCodes(str) {
+  const out = [];
+  for (let i = 0; i < str.length; i += 2) out.push(parseInt(str.slice(i, i + 2), 36));
+  return out;
+}
+const isIdLists = (v) => isPlain(v) && Array.isArray(v.$t) && (isPlain(v.$i) || isPlain(v.$j)) && Object.keys(v).length === 2;
 function unpackIdLists(v) {
   const out = {};
-  for (const k of Object.keys(v.$i)) out[k] = v.$i[k].map((i) => v.$t[i]);
+  if (isPlain(v.$j)) for (const k of Object.keys(v.$j)) out[k] = fromCodes(v.$j[k]).map((i) => v.$t[i]);
+  else for (const k of Object.keys(v.$i)) out[k] = v.$i[k].map((i) => v.$t[i]);
   return out;
+}
+/** Once the table is final: numeric index lists → code strings (when every index fits in 2 characters). */
+function codeResearch(lists, extra) {
+  if (lists.$t.length > CODE_MAX) return lists;
+  if (extra.unlocked) extra.unlocked = { $u: toCodes(extra.unlocked.$u) };
+  if (extra.completedTurn) {
+    const v = extra.completedTurn.$v;
+    // turns as fixed 4-character base-36 codes when they are all whole weeks in 0..36⁴ − 1
+    const turns = v.every((t) => Number.isInteger(t) && t >= 0 && t < 36 ** 4) ? v.map((t) => t.toString(36).padStart(4, '0')).join('') : v;
+    extra.completedTurn = { $k: toCodes(extra.completedTurn.$k), $v: turns };
+  }
+  return { $t: lists.$t, $j: Object.fromEntries(Object.keys(lists.$i).map((k) => [k, toCodes(lists.$i[k])])) };
+}
+const idxList = (v) => (typeof v === 'string' ? fromCodes(v) : v);
+
+// research.unlocked / research.completedTurn / research.bonus: the same tech ids (and effect names) again → indexes
+// into the rivals' string table (ids missing from it are appended) and one table of effect names. Lossless: order of
+// lists and of object keys is kept.
+const isStrList = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string');
+const isNumMap = (v) => isPlain(v) && Object.keys(v).every((k) => typeof v[k] === 'number' && Number.isFinite(v[k]));
+function packResearchExtra(r, lists) {
+  const table = lists.$t;
+  const at = new Map(table.map((id, i) => [id, i]));
+  const ix = (id) => { let i = at.get(id); if (i === undefined) { i = table.length; at.set(id, i); table.push(id); } return i; };
+  const out = {};
+  if (isStrList(r.unlocked)) out.unlocked = { $u: r.unlocked.map(ix) };
+  if (isNumMap(r.completedTurn)) { const ks = Object.keys(r.completedTurn); out.completedTurn = { $k: ks.map(ix), $v: ks.map((k) => r.completedTurn[k]) }; }
+  if (isPlain(r.bonus) && Object.keys(r.bonus).every((a) => isNumMap(r.bonus[a]))) {
+    const names = [];
+    const nat = new Map();
+    const b = {};
+    for (const a of Object.keys(r.bonus)) {
+      const row = [];
+      for (const k of Object.keys(r.bonus[a])) {
+        let i = nat.get(k);
+        if (i === undefined) { i = names.length; nat.set(k, i); names.push(k); }
+        row.push(i, r.bonus[a][k]);
+      }
+      b[a] = row;
+    }
+    out.bonus = { $e: names, $b: b };
+  }
+  return out;
+}
+function unpackResearchExtra(r, table) {
+  if (isPlain(r.unlocked) && r.unlocked.$u != null) r.unlocked = idxList(r.unlocked.$u).map((i) => table[i]);
+  if (isPlain(r.completedTurn) && r.completedTurn.$k != null) {
+    const o = {};
+    const v = r.completedTurn.$v;
+    const turnAt = typeof v === 'string' ? (n) => parseInt(v.slice(n * 4, n * 4 + 4), 36) : (n) => v[n];
+    idxList(r.completedTurn.$k).forEach((i, n) => { o[table[i]] = turnAt(n); });
+    r.completedTurn = o;
+  }
+  if (isPlain(r.bonus) && Array.isArray(r.bonus.$e) && isPlain(r.bonus.$b)) {
+    const names = r.bonus.$e;
+    const o = {};
+    for (const a of Object.keys(r.bonus.$b)) {
+      const row = r.bonus.$b[a];
+      const e = {};
+      for (let i = 0; i < row.length; i += 2) e[names[row[i]]] = row[i + 1];
+      o[a] = e;
+    }
+    r.bonus = o;
+  }
 }
 
 /** The object serialize() writes (the live state is never mutated). */
@@ -131,8 +220,10 @@ export function packState(state) {
     if (k === 'research' && isPlain(v) && isPlain(v.rivals)) {
       const lists = packIdLists(v.rivals);
       if (lists) {
-        const r = packObject({ ...v, rivals: null });
-        out.research = { ...r, rivals: lists };
+        const extra = packResearchExtra(v, lists);
+        const coded = codeResearch(lists, extra);
+        const r = packObject({ ...v, rivals: null, ...Object.fromEntries(Object.keys(extra).map((k) => [k, null])) });
+        out.research = { ...r, rivals: coded, ...extra };
         continue;
       }
     }
@@ -147,6 +238,13 @@ const isPackedArray = (v) => isPlain(v) && Array.isArray(v.$c) && Array.isArray(
 const isShapedArray = (v) => isPlain(v) && Array.isArray(v.$s) && Array.isArray(v.$r) && Object.keys(v).length === 2;
 
 function unpackValue(v) {
+  if (isPackedMap(v)) {
+    const { $k: keys, ...rows } = v;
+    const list = unpackValue(rows);
+    const o = {};
+    keys.forEach((k, i) => { o[k] = list[i]; });
+    return o;
+  }
   if (isPackedArray(v)) {
     const cols = v.$c;
     return v.$r.map((row) => {
@@ -200,10 +298,16 @@ export function unpackState(s) {
       continue;
     }
     if (k === 'research' && isPlain(s.research) && isIdLists(s.research.rivals)) {
-      const rivals = unpackIdLists(s.research.rivals);
-      s.research.rivals = null;
-      unpackValue(s.research);
-      s.research.rivals = rivals;
+      const r = s.research;
+      const table = r.rivals.$t;
+      const rivals = unpackIdLists(r.rivals);
+      const keep = {};
+      for (const f of ['unlocked', 'completedTurn', 'bonus']) if (isPlain(r[f]) && (r[f].$u != null || r[f].$k != null || r[f].$e)) { keep[f] = r[f]; r[f] = null; }
+      r.rivals = null;
+      unpackValue(r);
+      r.rivals = rivals;
+      Object.assign(r, keep);
+      unpackResearchExtra(r, table);
       continue;
     }
     s[k] = unpackValue(s[k]);

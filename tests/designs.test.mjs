@@ -15,6 +15,7 @@ import * as engine from '../src/core/engine.js';
 import { vehicleDef, listVehicles } from '../src/core/catalog.js';
 import { emitSignal } from '../src/core/helpers.js';
 import * as designs from '../src/sim/designs.js';
+import * as gating from '../src/core/gating.js';
 import * as hangar from '../src/ui/hangar.js';
 import * as painter from '../src/ui/launch-render/vehicles.js';
 
@@ -437,13 +438,20 @@ test('preview query is pure: no state change', () => {
 
 // ------------------------------------------------------------------ eras, unlocks, tolerance
 
+/** What history had by `year` (gating.historicalGrant), as research would hold it. */
+function grantHistory(st, data, year) {
+  st.research.unlocked = gating.historicalGrant(data, year + 1, { have: st.research.unlocked });
+  st.research.keys = gating.keysOfNodes(data, st.research.unlocked);
+}
+
 test('campaign: the Hangar opens in 1957; templates use the parts of the era and the nation', () => {
   const st = game(campaign, 'nasa');
   assert.equal(designs.queries['designs/unlocked'](st, campaign).ok, false);
   assert.equal(act(st, campaign, { type: 'design/new', templateId: 'two_stage' }).ok, false);
   st.turn = (1962 - st.startYear) * 52;
+  grantHistory(st, campaign, 1962); // the campaign gates the Hangar by research (MISSIONS-V2 §5.3)
   const tpls = Object.fromEntries(designs.queries['designs/templates'](st, campaign).map((t) => [t.id, t]));
-  assert.ok(tpls.two_stage.ok);
+  assert.ok(tpls.two_stage.ok, JSON.stringify(tpls.two_stage).slice(0, 400));
   assert.equal(tpls.reusable.ok, false);
   for (const id of designs.specPartIds(tpls.two_stage.spec)) {
     const p = P.byId[id];
@@ -454,6 +462,7 @@ test('campaign: the Hangar opens in 1957; templates use the parts of the era and
   assert.ok(s.ok && s.capacity.leo > 0.5, `LEO ${s.capacity.leo}`);
   // far future: speculative parts, big rockets
   st.turn = (2300 - st.startYear) * 52;
+  grantHistory(st, campaign, 2300);
   const far = designs.queries['designs/templates'](st, campaign).find((t) => t.id === 'two_stage');
   assert.ok(far.ok);
   assert.ok(designs.designStats(campaign, far.spec, designs.techCtxFor(st)).capacity.leo > 10);
@@ -523,4 +532,42 @@ test('Hangar helpers: pt-BR formats, stable draft compare', () => {
   assert.equal(hangar.canon({ b: 1, a: { d: 2, c: 3 } }), hangar.canon({ a: { c: 3, d: 2 }, b: 1 }));
   assert.ok(hangar.capFrac(100) > hangar.capFrac(1) && hangar.capFrac(0) === 0 && hangar.capFrac(1e6) === 1);
   assert.equal(typeof hangar.render, 'function');
+});
+
+// ---------------------------------------------------------------- Missões v2: Hangar gated by research (§5.3)
+
+const { withStubTree } = await import('./fixtures/techtree-stub.mjs');
+const gatedCampaign = withStubTree(campaign);
+
+test('v2 Hangar gating: templates and parts need research, with the node to open; research lifts it', () => {
+  const st = engine.newGame(gatedCampaign, { seed: 7, playerId: 'nasa' });
+  st.turn = 10 * 52; // 1960: the Hangar is open (1957) and the parts exist, but only sounding rockets are researched
+  const r = act(st, gatedCampaign, { type: 'design/new', templateId: 'two_stage' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'Pesquise Foguete orbital de dois estágios.');
+  assert.equal(r.nodeId, 'zt1_vehicle_small');
+  const tpl = engine.query(st, gatedCampaign, 'designs/templates').find((t) => t.id === 'two_stage');
+  assert.equal(tpl.ok, false);
+  assert.equal(tpl.nodeId, 'zt1_vehicle_small');
+  // the Hangar row for that lock links to Pesquisa
+  assert.equal(hangar.researchHref('zt1_vehicle_small'), '#pesquisa/n/zt1_vehicle_small');
+  const hyd = engine.query(st, gatedCampaign, 'designs/parts', { kind: 'upper' }).find((p) => p.part.prop === 'hydrolox' && !p.ok && p.nodeId);
+  if (hyd) {
+    const opt = hangar.lockedOption(hyd);
+    assert.equal(opt.disabled, undefined, 'a research lock stays tappable');
+    assert.match(opt.sub, /toque para abrir a pesquisa/);
+  }
+  const dateLocked = hangar.lockedOption({ part: { name: 'X' }, ok: false, reason: 'Disponível em 1990' });
+  assert.equal(dateLocked.disabled, true);
+  // research the node: the template fills and design/new works
+  st.research.unlocked.push('zt1_vehicle_small');
+  st.research.needsRecompute = true;
+  engine.tick(st, gatedCampaign);
+  assert.ok(st.research.keys.includes('vehicle:small'));
+  const ok = act(st, gatedCampaign, { type: 'design/new', templateId: 'two_stage' });
+  assert.equal(ok.ok, true, ok.error);
+  // the same game without techGating: dates only (v0.8 rule)
+  const plain = engine.newGame(withStubTree(campaign, { gated: false }), { seed: 7, playerId: 'nasa' });
+  plain.turn = 10 * 52;
+  assert.equal(act(plain, withStubTree(campaign, { gated: false }), { type: 'design/new', templateId: 'two_stage' }).ok, true);
 });

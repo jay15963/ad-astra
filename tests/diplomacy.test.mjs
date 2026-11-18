@@ -98,8 +98,10 @@ test('queries: relations, treaties, blocs, proposal types, league table', () => 
   const blocs = dip.queries['diplomacy/blocs'](state, data);
   assert.equal(blocs.length, 2);
   const types = dip.queries['diplomacy/proposalTypes'](state, data, 'jaxa');
-  assert.equal(types.length, 8);
+  // 4 bilateral + 2 service agreements (MISSIONS-V2 §8.2: launch_services, station_partnership) + 3 norms + join_bloc
+  assert.equal(types.length, 10);
   assert.ok(types.every((t) => typeof t.chance === 'number'));
+  assert.ok(types.some((t) => t.id === 'launch_services') && types.some((t) => t.id === 'station_partnership'));
   const table = dip.queries['league/table'](state, data);
   assert.equal(table.length, 8);
   assert.deepEqual(table.map((r) => r.rank), [1, 2, 3, 4, 5, 6, 7, 8]);

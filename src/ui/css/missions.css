@@ -238,6 +238,10 @@
   border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow-line); background: var(--s2);
 }
 .missions .type-btn.selected .ms-dot { background: var(--yellow-bg); }
+/* not researched yet (gating): lock badge in the corner, icon and name dimmed; still selectable to read why */
+.missions .type-btn { position: relative; }
+.missions .type-btn.locked .type-icon, .missions .type-btn.locked .type-name { opacity: .55; }
+.missions .type-btn .type-lock { position: absolute; top: 7px; right: 7px; line-height: 0; color: var(--text-3); }
 @media (hover: hover) {
   .missions .type-btn:hover:not(.selected), .missions .dest-card:hover:not(.selected):not(:disabled),
   .missions .veh-card:hover:not(.selected):not(:disabled), .missions .person-pick:hover:not(.selected) { border-color: var(--line-strong); }
@@ -419,3 +423,97 @@ body.reduce-motion .missions > * { animation: none; }
   color: var(--info); border: 1px solid var(--info-line); border-radius: 8px; padding: 0 6px;
 }
 .design-tag.testing { color: var(--text-3); border-color: var(--line-strong); }
+
+/* ---------- Missões v2 (docs/MISSIONS-V2.md §11): subtypes, target block, cargo picker, carrier, preview ---------- */
+.missions .ms-subs { display: flex; flex-direction: column; gap: 8px; }
+.ms-sub-chips > button.chip.locked { color: var(--text-3); border-style: dashed; }
+.ms-sub-chips > button.chip.unfit { color: var(--text-3); }
+.ms-sub-chips > button.chip { display: inline-flex; align-items: center; gap: 6px; }
+.ms-chip-ic { flex: none; line-height: 0; }
+.ms-lock-note { align-items: center; flex-wrap: wrap; }
+.ms-lock-note > span:not(.ms-note-ic) { flex: 1 1 160px; min-width: 0; }
+
+.missions .ms-targets, .missions .ms-cargo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.missions .ms-target {
+  border-radius: var(--r-card); border: 1px solid var(--line); background: var(--s1); min-width: 0; overflow: hidden;
+  transition: border-color .15s, background .15s;
+}
+.missions .ms-target.selected { border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow-line); background: var(--s2); }
+.missions .ms-target.disabled .ms-target-main { opacity: .55; }
+.missions .ms-target-main {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 12px 14px; margin: 0;
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.missions .ms-target-main:disabled { cursor: default; }
+.missions .ms-target-main:active:not(:disabled) { transform: scale(.99); }
+.missions .ms-target-main > .chip { flex: none; }
+.missions .ms-target-ic { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--s3); display: grid; place-items: center; color: var(--text); }
+.missions .ms-target.selected .ms-target-ic { background: var(--yellow-bg); color: var(--yellow); }
+.missions .ms-target-em { flex: none; line-height: 0; }
+.missions .ms-target-em svg { border-radius: 8px; display: block; }
+.missions .ms-target-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.missions .ms-target-text > b { font-weight: 600; font-size: var(--t13); overflow-wrap: anywhere; }
+.missions .ms-target-text .tiny { font-size: var(--t11); color: var(--text-3); line-height: 1.4; }
+.missions .ms-target-bars { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+.missions .ms-target-bars .bar-row { grid-template-columns: auto 1fr; gap: 8px; }
+.missions .ms-target-bars .bar-label { font-size: var(--t10); color: var(--text-3); }
+.missions .ms-supply { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.missions .ms-supply.low { color: var(--red); }
+.missions .ms-target-why {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 8px 14px 10px; border-top: 1px solid var(--line);
+  color: var(--text-2); line-height: 1.4;
+}
+.missions .ms-target-why > span:not(.ms-note-ic) { flex: 1 1 150px; min-width: 0; }
+.missions .ms-target-why > .ms-note-ic { flex: none; color: var(--text-3); }
+.missions .ms-newname { padding: 0 14px 12px; }
+.missions .ms-empty-line { margin: 0; }
+
+.missions .ms-mod-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 340px) { .missions .ms-mod-grid { grid-template-columns: minmax(0, 1fr); } }
+.missions .ms-mod {
+  border-radius: var(--r-card); border: 1px solid var(--line); background: var(--s1); min-width: 0; display: flex; flex-direction: column;
+  transition: border-color .15s, background .15s;
+}
+.missions .ms-mod.selected { border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow-line); background: var(--s2); }
+.missions .ms-mod.locked { border-style: dashed; }
+.missions .ms-mod.locked .ms-mod-main { opacity: .5; }
+.missions .ms-mod-main {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; min-height: 76px; width: 100%; margin: 0; background: none; border: 0;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; flex: 1;
+}
+.missions .ms-mod-main:disabled { cursor: default; }
+.missions .ms-mod-top { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.missions .ms-mod-name { font-weight: 600; font-size: var(--t12); line-height: 1.3; overflow-wrap: anywhere; }
+.missions .ms-mod-facts { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--t10); color: var(--text-2); }
+.missions .ms-mod-adds { font-size: var(--t10); color: var(--text-3); line-height: 1.4; }
+.missions .ms-mod.selected .ms-mod-adds { color: var(--text-2); }
+.missions .ms-mod-lock { padding: 0 12px 10px; color: var(--text-3); line-height: 1.35; }
+.missions .ms-mod-lock .btn-link { font-size: var(--t11); text-align: left; padding: 0; min-height: 0; }
+
+.ms-stepper { display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden; align-self: flex-start; background: var(--s1); }
+.ms-step-btn {
+  width: 44px; height: 44px; display: grid; place-items: center; background: var(--s2); border: 0; color: var(--text); cursor: pointer; padding: 0;
+}
+.ms-step-btn:disabled { color: var(--text-3); opacity: .5; cursor: default; }
+.ms-step-btn:active:not(:disabled) { background: var(--s3); }
+.ms-step-val {
+  min-width: 96px; padding: 0 12px; text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--t13); font-weight: 600;
+}
+.missions .ms-cargo > .chip { align-self: flex-start; }
+
+.missions .ms-carrier {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--s1);
+}
+.missions .ms-carrier.over { border-color: var(--red-line); background: var(--red-bg); }
+.missions .ms-carrier-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.missions .ms-carrier-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--t12); font-weight: 600; }
+.missions .ms-carrier.over .ms-carrier-val { color: var(--red); }
+.missions .ms-carrier-hint { margin: 0; }
+.missions .ms-carrier-fit { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.missions .ms-carrier-fit > .ms-note { align-self: stretch; margin: 0; }
+
+.missions .ms-preview { padding: 12px 14px; gap: 6px; display: flex; flex-direction: column; }
+.missions .ms-preview-title { font-weight: 650; font-size: var(--t14); line-height: 1.3; overflow-wrap: anywhere; }
+.missions .ms-preview .kv-row > span:last-child { max-width: 62%; }
+.missions .ms-preview p { margin: 0; }
+

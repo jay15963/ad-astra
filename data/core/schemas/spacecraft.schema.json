@@ -101,6 +101,33 @@
     "era": {},
     "fromYear": {
       "type": "integer"
+    },
+    "sub": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "subtipo de satélite, sonda ou rover (vocab.missionSubtypes)"
+    },
+    "cargoT": {
+      "type": "number",
+      "minimum": 0
+    },
+    "lifeYears": {
+      "type": "number",
+      "minimum": 0
+    },
+    "gate": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+      },
+      "description": "chaves exigidas (substitui as regras de techtree.json; [] = livre)"
+    },
+    "docking": {
+      "enum": [
+        "auto",
+        "manual",
+        "berth"
+      ]
     }
   }
 }

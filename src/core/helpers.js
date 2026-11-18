@@ -185,6 +185,18 @@ export function isHistoricFirst(state, milestoneId) {
 }
 
 /**
+ * Has anyone reached this milestone, in play (state.firsts, any actor) or before the scenario (state.firstsHistory)?
+ * Used to offer contracts only where someone has already been (MISSIONS-V2.md §2: no "carga para a Lua" before a
+ * robotic landing). Keys with an actor suffix ("crewed_orbit_national:nasa") count for their base id.
+ */
+export function achievedAny(state, milestoneId) {
+  if (!milestoneId) return false;
+  const base = String(milestoneId).split(':')[0];
+  if (state?.firstsHistory?.[base] || state?.firsts?.[base] || state?.firsts?.[milestoneId]) return true;
+  return false;
+}
+
+/**
  * Share of the destination's first points a milestone pays (data/scenario.json firstShares, default 1): a sub-first
  * of a bigger feat (people at the lunar south pole, after people on the Moon) is worth less than the feat itself.
  */

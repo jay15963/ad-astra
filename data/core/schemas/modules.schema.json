@@ -1,0 +1,168 @@
+{
+  "$id": "modules.schema.json",
+  "description": "data/core/modules.json (MISSIONS-V2 §3.2): módulos de estação e de base e veículos de superfície.",
+  "type": "object",
+  "required": [
+    "station",
+    "base",
+    "vehicles"
+  ],
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "tuning": {
+      "type": "object"
+    },
+    "station": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "key",
+          "histYear",
+          "massT"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+          },
+          "histYear": {
+            "type": "integer"
+          },
+          "massT": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "costM": {
+            "type": "number",
+            "minimum": 0
+          },
+          "science": {
+            "type": "number"
+          },
+          "traits": {
+            "$ref": "common.schema.json#/$defs/idList"
+          },
+          "bodies": {
+            "$ref": "common.schema.json#/$defs/idList"
+          }
+        }
+      }
+    },
+    "base": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "key",
+          "histYear",
+          "massT"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+          },
+          "histYear": {
+            "type": "integer"
+          },
+          "massT": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "costM": {
+            "type": "number",
+            "minimum": 0
+          },
+          "science": {
+            "type": "number"
+          },
+          "traits": {
+            "$ref": "common.schema.json#/$defs/idList"
+          },
+          "bodies": {
+            "$ref": "common.schema.json#/$defs/idList"
+          }
+        }
+      }
+    },
+    "vehicles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "key",
+          "histYear",
+          "massT"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+          },
+          "histYear": {
+            "type": "integer"
+          },
+          "massT": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "costM": {
+            "type": "number",
+            "minimum": 0
+          },
+          "science": {
+            "type": "number"
+          },
+          "traits": {
+            "$ref": "common.schema.json#/$defs/idList"
+          },
+          "bodies": {
+            "$ref": "common.schema.json#/$defs/idList"
+          }
+        }
+      }
+    },
+    "names": {
+      "type": "object"
+    },
+    "stageRules": {
+      "type": "object"
+    }
+  }
+}

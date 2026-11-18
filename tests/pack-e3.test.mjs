@@ -13,14 +13,20 @@ import { loadData, nodeReader } from '../src/core/data.js';
 import * as engine from '../src/core/engine.js';
 import * as narrative from '../src/sim/narrative.js';
 import * as designs from '../src/sim/designs.js';
+import { expand as expandTech } from '../src/core/techgen.js';
 import { runCampaign, dataStartingAt } from '../tools/campaign.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(root, 'data', 'eras', 'e3');
-const FILES = ['era', 'snapshot', 'vehicles', 'spacecraft', 'destinations', 'bodies', 'calendar', 'tech', 'events', 'investors', 'crew', 'parts'];
+const FILES = ['era', 'snapshot', 'vehicles', 'spacecraft', 'destinations', 'bodies', 'calendar', 'events', 'investors', 'crew', 'parts'];
 const SCENARIO = 'nova_economia';
 const read = (f) => JSON.parse(fs.readFileSync(path.join(DIR, `${f}.json`), 'utf8'));
 const P = Object.fromEntries(FILES.map((f) => [f, read(f)]));
+// the era-3 tree lives in its own pack since Missões v2 (data/tech/e3/tech.json, MISSIONS-V2 §4.3)
+const readTech = (e) => JSON.parse(fs.readFileSync(path.join(root, 'data', 'tech', e, 'tech.json'), 'utf8'));
+P.tech = readTech('e3');
+// authored + generated nodes of t1..t3 (prerequisites may come from earlier tiers, §4.4)
+const TREE_UP_TO_T3 = new Set(['e1', 'e2', 'e3'].flatMap((e) => expandTech(readTech(e))).map((n) => n.id));
 const FROM = 2000;
 const TO = 2025;
 
@@ -170,7 +176,7 @@ test('e3: tech tier t3, investors, crew flights and starting roster', () => {
   for (const n of nodes) {
     assert.equal(n.era, 3, n.id);
     assert.equal(n.techTier, 't3', n.id);
-    for (const r of n.requires) assert.ok(nodes.some((x) => x.id === r), `${n.id}: ${r}`);
+    for (const r of n.requires) assert.ok(TREE_UP_TO_T3.has(r), `${n.id}: ${r}`);
   }
   for (const inv of P.investors.investors) assert.ok(inv.eras.includes('e3') && inv.untilYear <= 2050, inv.id);
   for (const f of P.crew.config.rivalCrewFlights.flights) assert.ok(f.fromYear >= FROM && f.toYear <= TO, f.id);

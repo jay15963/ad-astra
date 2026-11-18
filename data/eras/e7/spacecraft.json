@@ -61,7 +61,7 @@
       "notes": "Uma estação de escuta para três monges e uma antena de quilômetros. O frio de Kuiper deixa o céu mais nítido, e mais solitário."
     },
     {
-      "id": "olho_da_lente", "name": "Olho da Lente", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "satellite", "crew": 0,
+      "id": "olho_da_lente", "sub": "observatory", "name": "Olho da Lente", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "satellite", "crew": 0,
       "massT": 90, "costM": 1400, "availableFrom": { "year": 2700, "month": 6 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.97,
       "history": { "flights": 0, "failures": 0 }, "destinations": ["region_sgr_a"],
       "compatibleVehicles": ["seta_arquivo", "lanca_aurora", "lanterna_ouvintes"], "access": "open",
@@ -82,11 +82,12 @@
       "notes": "Casco espelhado contra o feixe de antimatéria e oito tripulantes que envelhecem metade do que os parentes em casa."
     },
     {
-      "id": "farol_coro", "name": "Farol do Coro", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "satellite", "crew": 0,
+      "id": "farol_coro", "sub": "interstellar_relay", "name": "Farol do Coro", "operator": "arquivo_estelar", "provider": "Fundação do Arquivo Estelar", "kind": "satellite", "crew": 0,
       "massT": 200, "costM": 1500, "availableFrom": { "year": 2960, "month": 1 }, "availableUntil": { "year": 2999, "month": 12 }, "truthLayer": "especulacao", "estimatedReliability": 0.98,
       "history": { "flights": 0, "failures": 0 }, "destinations": ["kuiper", "region_sgr_a"],
       "compatibleVehicles": ["seta_arquivo", "lanca_aurora", "lanterna_ouvintes", "ultimo_feixe"], "access": "open",
       "notes": "O maior transmissor já feito, pensado para uma única pergunta: se alguém responder ao Silêncio, que seja com a nossa voz."
-    }
+    },
+    {"id":"generic_swarm_segment","name":"Segmento de enxame solar (genérico)","operator":null,"provider":"Fornecedor contratado","kind":"satellite","sub":"power_swarm","crew":0,"massT":40,"costM":8000,"generic":true,"availableFrom":{"year":2650,"month":1},"untilYear":2999,"truthLayer":"especulacao","estimatedReliability":0.95,"destinations":["solar_orbit","mercury_orbit","venus_orbit"],"access":"generic","notes":"Mais um coletor do enxame que cerca o Sol."}
   ]
 }

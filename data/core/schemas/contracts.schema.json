@@ -1,0 +1,81 @@
+{
+  "$id": "contracts.schema.json",
+  "description": "data/core/contracts.json (MISSIONS-V2 §2): contratos e oportunidades com regras de elegibilidade.",
+  "type": "object",
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "type"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "type": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "sub": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 90
+          },
+          "needs": {
+            "type": "object",
+            "properties": {
+              "fromYear": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "untilYear": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "firstsAny": {
+                "$ref": "common.schema.json#/$defs/idList"
+              },
+              "playerKeys": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+                }
+              },
+              "noTensionAbove": {
+                "type": "number"
+              }
+            }
+          },
+          "target": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "opportunities": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

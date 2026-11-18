@@ -14,6 +14,23 @@ const CAP_SHORT = { leo: 'Órbita baixa', gto: 'GTO', tli: 'Lua', mars: 'Marte',
 const PROP_SHORT = { kerolox: 'Querosene', alcolox: 'Álcool', hypergolic: 'Hipergólico', hydrolox: 'Hidrogênio', methalox: 'Metano', nuclear: 'Nuclear', fusion: 'Fusão', solid: 'Sólido' };
 const STATUS_KIND = { project: 'muted', work: 'info', tests: 'warn', operational: 'good', retired: 'muted' };
 
+// ------------------------------------------------------------------ research links (MISSIONS-V2 §5.3)
+
+/** Route of a tech node in Pesquisa (opens its sheet). */
+export const researchHref = (nodeId) => `#pesquisa/n/${encodeURIComponent(nodeId)}`;
+function goResearch(nodeId) { if (nodeId) location.hash = researchHref(nodeId); }
+
+/**
+ * Option row of a locked part: a research lock (nodeId) stays tappable and opens that node in Pesquisa; date or
+ * access locks are plain disabled rows, as before.
+ */
+export function lockedOption(p, right = '') {
+  if (p?.nodeId) {
+    return { title: p.part.name, right, sub: `${p.reason} · toque para abrir a pesquisa`, locked: true, onPick: () => goResearch(p.nodeId) };
+  }
+  return { title: p.part.name, right, sub: p.reason, disabled: true, onPick: () => {} };
+}
+
 // ------------------------------------------------------------------ pure helpers (tested in Node)
 
 /** pt-BR number with up to `d` decimals ("1,5"). */
@@ -320,8 +337,10 @@ function renderTemplates(root, store) {
     const box = h('span', { class: 'hg-mini', style: { width: '44px', height: '72px', flex: '0 0 44px' } });
     if (der?.geometry) box.appendChild(silhouette(previewVehicle(t.name, '', der, null), 42, 70));
     grid.append(h('button', {
-      class: 'hg-card hg-design tappable', type: 'button', disabled: !t.ok,
+      class: ['hg-card hg-design tappable', !t.ok && t.nodeId && 'hg-research'], type: 'button', disabled: !t.ok && !t.nodeId,
+      'aria-label': !t.ok && t.nodeId ? `${t.name}: ${t.reason}. Abrir a pesquisa.` : null,
       onclick: () => {
+        if (!t.ok && t.nodeId) { goResearch(t.nodeId); return; }
         const res = store.dispatch({ type: 'design/new', templateId: t.id });
         if (result(res, 'Rascunho criado')) nav(store, `d/${res.designId}`);
       },
@@ -330,7 +349,7 @@ function renderTemplates(root, store) {
       h('span', { class: 'hg-sub' }, t.desc),
       t.ok && der?.ok
         ? h('span', { class: 'hg-toggles' }, der.capacity.leo > 0 ? chip(`${fmtT(der.capacity.leo)} LEO`, 'muted') : chip('Não chega à órbita', 'warn'), chip(`${fmtMoney(der.costM)}/voo`, 'muted'), prev?.costs ? chip(`${fmtMoney(prev.costs.devCostM)} · ${fmtWeeks(prev.costs.devWeeks)}`, 'muted') : null)
-        : h('span', { class: 'hg-sub' }, t.reason || (der?.errors?.[0] ?? 'Faltam peças'))),
+        : h('span', { class: 'hg-sub' }, t.reason || (der?.errors?.[0] ?? 'Faltam peças'), t.nodeId ? h('span', { class: 'hg-research-link' }, ' · Ver pesquisa') : null)),
     icon('avancar', 16, 'pn-chev')));
   }
   if (!tpls.length) grid.append(emptyState('Nenhum modelo disponível.', 'chave'));
@@ -369,7 +388,12 @@ function renderLicenses(root, store) {
   if (no.length) {
     root.append(sectionTitle('Fora do seu alcance', h('span', { class: 'pn-count' }, String(no.length))));
     const l2 = h('div', { class: 'pn-list' });
-    for (const v of no) l2.append(listRow({ lead: icon('cadeado', 18), title: v.name, sub: v.reason, cls: 'hg-locked' }));
+    for (const v of no) {
+      l2.append(listRow({
+        lead: icon('cadeado', 18), title: v.name, sub: v.nodeId ? `${v.reason} · toque para abrir a pesquisa` : v.reason, cls: 'hg-locked',
+        onClick: v.nodeId ? () => goResearch(v.nodeId) : null,
+      }));
+    }
     root.append(l2);
   }
 }
@@ -634,7 +658,7 @@ function renderEditor(root, store, id) {
         onPick: () => set((x) => { x.stages[i] = spec.stages[i]; }),
       };
     });
-    for (const p of locked) options.push({ title: p.part.name, right: PROP_SHORT[p.part.prop] || '', sub: p.reason, disabled: true, onPick: () => {} });
+    for (const p of locked) options.push(lockedOption(p, PROP_SHORT[p.part.prop] || ''));
     optionsSheet(`Motor do ${i === 0 ? '1º' : `${i + 1}º`} estágio`, options, { note: 'Variação comparada ao projeto atual, com a mesma quantidade de motores.' });
   }
 
@@ -650,7 +674,7 @@ function renderEditor(root, store, id) {
         delta: deltaLine(base, spec), onPick: () => set((x) => { x.stages[i] = { moduleId: p.part.id }; }),
       };
     });
-    for (const p of mods.filter((x) => !x.ok).slice(0, 6)) options.push({ title: p.part.name, sub: p.reason, disabled: true, onPick: () => {} });
+    for (const p of mods.filter((x) => !x.ok).slice(0, 6)) options.push(lockedOption(p));
     if (!options.length) options.push({ title: 'Nenhum módulo disponível', disabled: true, onPick: () => {} });
     optionsSheet('Módulo pronto', options, { note: 'Estágios completos de foguetes reais (Centaur, Fregat, Agena…).' });
   }
@@ -667,7 +691,7 @@ function renderEditor(root, store, id) {
         onPick: () => set((x) => { x.boosters = spec.boosters; }),
       };
     });
-    for (const p of list.filter((x) => !x.ok).slice(0, 6)) options.push({ title: p.part.name, sub: p.reason, disabled: true, onPick: () => {} });
+    for (const p of list.filter((x) => !x.ok).slice(0, 6)) options.push(lockedOption(p));
     optionsSheet('Propulsores laterais', options);
   }
 
@@ -687,7 +711,7 @@ function renderEditor(root, store, id) {
         delta: dr.spec[field] === p.part.id ? null : deltaLine(base, spec), onPick: () => set((x) => { x[field] = p.part.id; }),
       });
     }
-    for (const p of list.filter((x) => !x.ok).slice(0, 4)) options.push({ title: p.part.name, sub: p.reason, disabled: true, onPick: () => {} });
+    for (const p of list.filter((x) => !x.ok).slice(0, 4)) options.push(lockedOption(p));
     optionsSheet(title, options);
   }
 

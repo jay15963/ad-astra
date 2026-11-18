@@ -12,7 +12,9 @@
   "history": "faithful",
   "lifecycle": "on",
   "ending": { "type": "final", "event": "ending/final" },
-  "unlocks": { "builder": { "fromYear": 1957 }, "investors": { "fromYear": 1950 }, "colonies": { "fromYear": 2051 } },
+  "techGating": true,
+  "techStart": "historical",
+  "unlocks": { "market": { "fromYear": 1962 }, "builder": { "fromYear": 1957 }, "investors": { "fromYear": 1950 }, "colonies": { "fromYear": 2051 } },
   "historicalFirsts": null,
   "victory": {
     "description": "Em janeiro de 3000 chega o Grande Silêncio: Contato, Silêncio ou Herança. A Tabela de cada era guarda quem liderou o caminho até lá.",

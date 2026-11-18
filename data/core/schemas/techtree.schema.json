@@ -1,0 +1,257 @@
+{
+  "$id": "techtree.schema.json",
+  "description": "data/core/techtree.json (MISSIONS-V2 §4–§6): tipos de liberação, rótulos e tetos de efeitos, regras de chaves do catálogo, classes de destino e prévia das eras.",
+  "type": "object",
+  "required": [
+    "kinds",
+    "effectLabels",
+    "effectCaps",
+    "gates",
+    "destClass",
+    "lead",
+    "preview"
+  ],
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "tiers": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^t[1-7]$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "integer"
+        }
+      }
+    },
+    "lead": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^t[1-7]$"
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 50
+      }
+    },
+    "targets": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^t[1-7]$"
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "kinds": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "color",
+          "glyph"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "token": {
+            "type": "string",
+            "pattern": "^--uk-[a-z]+$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$"
+          },
+          "glyph": {
+            "type": "string"
+          },
+          "band": {
+            "enum": [
+              "solid",
+              "dashed"
+            ]
+          }
+        }
+      }
+    },
+    "effectLabels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "label",
+          "unit"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "unit": {
+            "enum": [
+              "pp",
+              "pct",
+              "pctAbs",
+              "pctNeg",
+              "int",
+              "num"
+            ]
+          }
+        }
+      }
+    },
+    "effectCaps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "payloadKeys": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+      }
+    },
+    "destClass": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/idList"
+      }
+    },
+    "gates": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "vehicle",
+          "spacecraft",
+          "part",
+          "template"
+        ]
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "match"
+          ],
+          "properties": {
+            "match": {
+              "type": "object"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+              }
+            },
+            "subKey": {
+              "enum": [
+                "satellite",
+                "rover",
+                "probe"
+              ]
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "key"
+              ]
+            },
+            {
+              "required": [
+                "keys"
+              ]
+            },
+            {
+              "required": [
+                "subKey"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^e[1-7]$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "count",
+          "unlockCount",
+          "highlights"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unlockCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "highlights": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "kind"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "kind": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

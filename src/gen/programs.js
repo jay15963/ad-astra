@@ -16,7 +16,15 @@ import { withArticle } from './names.js';
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 /** Follow-up flights of a program without their own `textNext`: never repeat the "first time" prose. */
 const NEXT_TEXT = '{base} {n} segue o caminho aberto por {base} {prev}: {Owner} volta {a} com o que aprendeu no voo anterior.';
-const CRAFT_FOR = { crewed: ['capsule', 'habitat'], lander: ['lander'], cargo: ['cargo'], probe: ['probe'], satellite: ['satellite', 'probe'], station: ['habitat'] };
+const CRAFT_FOR = { crewed: ['capsule', 'habitat'], lander: ['lander'], cargo: ['cargo'], probe: ['probe'], rover: ['rover', 'lander'], satellite: ['satellite', 'probe'], station: ['habitat'] };
+// Missões v2 (MISSIONS-V2.md §1.1): 'lander' is a legacy alias of probe/lander; programs are written with the new taxonomy
+const LEGACY_TYPES = { lander: { type: 'probe', sub: 'lander' }, landing: { type: 'probe', sub: 'lander' } };
+/** {type, sub} a program template flies (legacy 'lander' → probe/lander). */
+export function templateType(t) {
+  const a = LEGACY_TYPES[t?.type];
+  return a ? { type: a.type, sub: t.sub || a.sub } : { type: t?.type, sub: t?.sub || null };
+}
+const craftKindsFor = (tt) => (tt.type === 'probe' && tt.sub === 'lander' ? CRAFT_FOR.lander : CRAFT_FOR[tt.type] || ['probe']);
 const yearOf = (d) => (d == null ? null : typeof d === 'number' ? d : d.year ?? null);
 const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 /** Name used in prose: the full name when short enough, else the short name ("a AEI"). */
@@ -105,7 +113,7 @@ export function genPrograms(data, P, H, opts = {}) {
       // calendar crewSize is the flight crew (1..12, schema); everyone else travels as passengers/colonists
       const crewSize = Math.min(12, people);
       const capKey = dest.capacityKey || 'outer';
-      const kinds = CRAFT_FOR[t.type] || ['probe'];
+      const kinds = craftKindsFor(templateType(t));
       // craft first (it sets the payload), then the cheapest vehicle that lifts it; generate what is missing
       let sc = fitCraft(fleet, owner, year, kinds, dest.id, people);
       if (!sc) {
@@ -140,7 +148,7 @@ export function genPrograms(data, P, H, opts = {}) {
         em: dest.emLabel || `em ${dest.name}`, a: dest.toLabel || `a ${dest.name}`, years: Math.round(weeks / 52),
       };
       out.missions.push({
-        id, name, owner: owner.id, partners: [], type: t.type, destination: dest.id, vehicleId: v.id, spacecraftId: sc.id,
+        id, name, owner: owner.id, partners: [], type: templateType(t).type, ...(templateType(t).sub ? { sub: templateType(t).sub } : {}), destination: dest.id, vehicleId: v.id, spacecraftId: sc.id,
         crewed: t.type === 'crewed', ...(crewSize ? { crewSize } : {}), ...(people > crewSize ? { passengers: people - crewSize } : {}), planned: { year, month }, truthLayer: 'especulacao',
         delay: { ...delay }, prerequisites: prevId ? [prevId] : [],
         milestone: f === 1 ? (t.milestone ?? null) : null, importance: f === 1 ? (t.importance ?? 2) : Math.max(1, (t.importance ?? 2) - 1),

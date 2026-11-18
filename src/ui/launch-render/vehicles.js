@@ -130,6 +130,7 @@ const STACKS = new Map();
 export function setVehicleArt(json) {
   ART = json && typeof json === 'object' ? json : null;
   STACKS.clear();
+  INFRA_ART?.clear();
 }
 
 /** Fetch data/vehicle-art.json once (browser). Resolves to the JSON (or null on failure). */
@@ -301,6 +302,34 @@ export function craftArt(craftId, craftData) {
 
 export function listVehicleArtIds() { return Object.keys(ART?.vehicles || {}); }
 export function listCraftArtIds() { return Object.keys(ART?.craft || {}); }
+
+// Infrastructure art (MISSIONS-V2 §7.3): station/base modules and surface vehicles (data/vehicle-art.json `modules`,
+// `baseVehicles`). Never null: explicit → fallback by prefix (st_ → _station, bs_ → _base) → built-in.
+const BUILTIN_MODULE = { name: 'Módulo', shape: 'module', len: 9, d: 4.2, mat: 'white_paint', windows: 1 };
+const BUILTIN_BASE = { name: 'Módulo de base', kind: 'hab', w: 6, h: 4, mat: 'white_paint', windows: 1, band: 'near', size: 1 };
+const INFRA_ART = new Map();
+const BUILTIN_VEH = { name: 'Veículo', kind: 'buggy', len: 3.5, h: 1.8, wheels: 4, color: '#c9c3b5' };
+/** Art of a station (st_*) or base (bs_*) module id. Each result carries its id. */
+export function moduleArt(id) {
+  const s = String(id || '');
+  const m = ART?.modules || {};
+  const base = /^bs_/.test(s);
+  const key = 'm|' + s;
+  let r = INFRA_ART.get(key);
+  if (!r) { const a = m[s] || (base ? m._base || BUILTIN_BASE : m._station || BUILTIN_MODULE); r = { ...a, id: s, fallback: !m[s] }; INFRA_ART.set(key, r); }
+  return r;
+}
+/** Art of a surface vehicle type id (vh_*). */
+export function baseVehicleArt(id) {
+  const s = String(id || '');
+  const v = ART?.baseVehicles || {};
+  const key = 'v|' + s;
+  let r = INFRA_ART.get(key);
+  if (!r) { r = { ...(v[s] || v._vehicle || BUILTIN_VEH), id: s, fallback: !v[s] }; INFRA_ART.set(key, r); }
+  return r;
+}
+export function listModuleArtIds() { return Object.keys(ART?.modules || {}).filter((k) => k[0] !== '_'); }
+export function listBaseVehicleArtIds() { return Object.keys(ART?.baseVehicles || {}).filter((k) => k[0] !== '_'); }
 
 // ------------------------------------------------------------------ stacks
 
@@ -622,6 +651,17 @@ function bodySprite(body, kDev, fr) {
   const key = `${body.id}|${kb.toFixed(4)}|${fr.lb}`;
   const hit = sprGet(key);
   if (hit) return hit;
+  // Avoid render hitches while a craft turns or the camera zooms out (docking zoom to the whole station, module
+  // release turn-away): reuse a cached sprite lit one bucket (15°) off, or up to one octave larger (downsampled),
+  // instead of rendering a new one at every bucket / ⅓ octave.
+  const nb = [(fr.lb + 1) % 24, (fr.lb + 23) % 24];
+  for (const b of nb) { const h = SPR.get(`${body.id}|${kb.toFixed(4)}|${b}`); if (h) return h; }
+  for (let j = 1; j <= 3; j++) {
+    let kj = Math.pow(2, q + j / 3);
+    const Wj = Math.ceil(2 * prof.maxR * kj) + pad * 2, Hj = Math.ceil(prof.len * kj) + pad * 2;
+    if (Wj > LIM || Hj > LIM) kj *= LIM / Math.max(Wj, Hj);
+    for (const b of [fr.lb, ...nb]) { const up = SPR.get(`${body.id}|${kj.toFixed(4)}|${b}`); if (up) return up; }
+  }
   const c = makeCanvas(W, H);
   if (!c) return null;
   const g = c.getContext('2d');

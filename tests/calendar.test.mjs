@@ -26,7 +26,10 @@ const FIRSTS = ['crewed_lunar_flyby', 'crewed_lunar_orbit', 'crewed_lunar_landin
   'apophis_rendezvous', 'planetary_defense_survey', 'phobos_landing', 'ceres_orbit', 'psyche_arrival', 'trojan_flyby', 'europa_arrival',
   'ganymede_orbit', 'saturn_orbit', 'enceladus_plume', 'uranus_orbit', 'neptune_flyby', 'pluto_flyby', 'kuiper_flyby'];
 const TRUTH = ['fato', 'plano_oficial', 'projecao', 'especulacao'];
-const TYPES = ['satellite', 'probe', 'crewed', 'cargo', 'station', 'lander'];
+// Missões v2 (MISSIONS-V2.md §1.1): 'rover' replaces the retired 'lander' type (calendar items fly probe/lander)
+const TYPES = ['satellite', 'probe', 'rover', 'crewed', 'cargo', 'station'];
+// Missões v2: craft may also list campaign destinations of the era packs (vocab ids: Tiangong, far side...)
+const VOCAB_DESTS = new Set(Object.keys(JSON.parse(await readFile(path.join(root, 'data/core/vocab.json'), 'utf8')).destinations));
 const ACTORS = ['nasa', 'spacex', 'blueorigin', 'cnsa', 'isro', 'esa', 'roscosmos', 'jaxa'];
 
 /** Run only the calendar module, exactly like the engine would (same ctx.rng derivation). */
@@ -74,7 +77,8 @@ test('data: spacecraft reference valid destinations and vehicles', () => {
     assert.ok(['capsule', 'lander', 'probe', 'cargo', 'station_module', 'rover', 'satellite'].includes(s.kind), `${s.id} kind`);
     assert.ok(s.massT > 0 && s.costM > 0 && s.estimatedReliability > 0 && s.estimatedReliability < 1, s.id);
     assert.ok(TRUTH.includes(s.truthLayer), s.id);
-    for (const d of s.destinations) assert.ok(DEST_IDS.includes(d), `${s.id} dest ${d}`);
+    for (const d of s.destinations) assert.ok(DEST_IDS.includes(d) || VOCAB_DESTS.has(d), `${s.id} dest ${d}`);
+    assert.ok(s.destinations.some((d) => DEST_IDS.includes(d)) || s.access === 'generic', `${s.id} reaches a Corrida Lunar destination`);
     for (const v of s.compatibleVehicles || []) assert.ok(data.index.vehicles[v], `${s.id} vehicle ${v}`);
   }
 });

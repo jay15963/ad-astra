@@ -74,6 +74,59 @@
     },
     "fromYear": {
       "type": "integer"
+    },
+    "techTier": {
+      "type": "string",
+      "pattern": "^t[1-7]$"
+    },
+    "histYear": {
+      "type": "integer",
+      "description": "ano histórico (ou projetado) do tema; obrigatório nos pacotes de tecnologia"
+    },
+    "untilYear": {
+      "type": "integer"
+    },
+    "lane": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 12
+    },
+    "secret": {
+      "type": "boolean"
+    },
+    "unlockedBy": {
+      "type": "string"
+    },
+    "revealedBySignal": {
+      "type": "string"
+    },
+    "generated": {
+      "type": "string",
+      "description": "id do modelo (techgen) que gerou o nó"
+    },
+    "unlocks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        }
+      }
     }
   }
 }

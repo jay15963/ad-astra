@@ -31,7 +31,10 @@
  "ending": {
   "type": "end"
  },
+ "techGating": true,
+ "techStart": "historical",
  "unlocks": {
+  "market": { "fromYear": 2380 },
   "builder": {
    "fromYear": 2380
   },

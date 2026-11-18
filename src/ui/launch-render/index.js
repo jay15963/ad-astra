@@ -7,10 +7,37 @@
 import { hash, SUN, sunFor, drawSky, drawStarfield, drawEarthLimb, drawClouds, drawCloudsFront, drawLaunchSite, siteStyleOf, drawTerrain, drawGroundShadow, drawPlanetDisc, textureStats, drawBodyLimb, prewarmBodyLimb, prewarmEarthLimb, prewarmMaps, prewarmSprites, LIMB_BUCKETS } from './textures.js';
 import { resolveStack, attachedParts, detachedBy, activeNozzles, paintVehicle, paintPart, paintCraft, craftArt, craftNozzles, payloadMount, breakupPieces } from './vehicles.js';
 import { createFx, ambientPressure, drawPlume, drawCondensationCollar, drawParachutes, drawReentryPlasma, prewarmPlumes } from './fx.js';
-import { createCamera, ascentFrame, descentFrame, orbitFrame } from './camera.js';
+import { createCamera, ascentFrame, descentFrame, orbitFrame, baseFrameHeightM } from './camera.js';
+import { resolveTarget, layoutStation, paintStation, paintModule, moduleSize, drawArm, dockPose, releasePose, groundProjection, baseHorizonY, layoutBase, drawBase, drawBaseVehicles } from './infra.js';
 
 export { SUN } from './textures.js';
 export { loadVehicleArt, setVehicleArt } from './vehicles.js';
+export { resolveTarget, layoutStation, layoutBase, dockPose, releasePose } from './infra.js';
+
+// ---------------------------------------------------------------- infrastructure targets (MISSIONS-V2 §7)
+const LAYOUT_CACHE = new Map();
+function memoLayout(key, make) {
+  let v = LAYOUT_CACHE.get(key);
+  if (!v) { v = make(); LAYOUT_CACHE.set(key, v); if (LAYOUT_CACHE.size > 12) LAYOUT_CACHE.delete(LAYOUT_CACHE.keys().next().value); }
+  return v;
+}
+const stationLayoutOf = (tg, seed) => memoLayout(`st|${tg.sig}|${seed}`, () => layoutStation(tg.modules, { seed: hash(String(tg.assetId || tg.name || 'st')) ^ (seed & 7) }));
+/** The descent's base layout uses the touchdown distance of the nominal descent framing (stable all scene long). */
+function baseLayoutOf(tg, rs, craft) {
+  const H = rs.view?.H || 700;
+  const hM = baseFrameHeightM(craft?.heightM || 4); // same framing height as camera.descentFrame over a base
+  const z0 = H / Math.max(0.4, Math.min(60, (H * 0.2) / hM));
+  return memoLayout(`bs|${tg.sig}|${Math.round(z0)}|${Math.round(craft?.widthM || 4)}`, () => layoutBase(tg, { seed: hash(String(tg.assetId || tg.name || 'base')), z0, landerW: Math.max(3, Math.min(14, craft?.widthM || 4)) }));
+}
+/** What flies in the rendezvous scene: a station module flies itself, otherwise the mission's spacecraft. */
+function rvCraftOf(rs, tg) {
+  const modArt = tg?.payloadArt && (tg.payload?.kind === 'station_module' || /^st_/.test(tg.payload?.moduleId || '')) ? tg.payloadArt : null;
+  if (modArt) { const sz = moduleSize(modArt); return { type: 'module', art: modArt, lenM: sz.lenM, dM: sz.dM, noseM: sz.lenM / 2 }; }
+  const c = craftArt(rs.craftId);
+  const centred = ['probe', 'module', 'rover', 'spaceplane'].includes(c.template);
+  const h = Math.max(1, c.heightM || 4);
+  return { type: 'craft', craft: c, lenM: h, dM: Math.max(1, c.widthM || 3), noseM: centred ? h / 2 : h, centred };
+}
 
 const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const AIRLESS = new Set(['moon', 'mercury', 'europa', 'ganymede', 'callisto', 'io', 'phobos', 'deimos', 'ceres', 'vesta', 'enceladus', 'triton', 'pluto', 'charon']);
@@ -134,6 +161,7 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
   function vehicleScreenPos(rs) {
     if (!rs) return { x: 0, y: 0 };
     if (rs.mode === 'orbit') { const o = orbitFrame(rs); return { x: o.craftX, y: o.craftY }; }
+    if (rs.mode === 'rendezvous') return rvCraftScreen(rs);
     if (rs.mode === 'descent') { const c = craftArt(descentCraftId(rs)); const d = descentFrame(rs, c.heightM); return { x: d.craftX, y: d.craftY - (c.heightM * d.pxPerM) / 2 }; }
     const st = stackOf(rs);
     const fr = ascentFrame(rs, st.heightM);
@@ -400,6 +428,7 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
   // ≤ ~8 ms, so staging and landing never stall on a texture build.
   const pw = { sig: '', queue: [], running: false };
   function schedulePrewarm(ctx, rs) {
+    if (typeof document === 'undefined') return; // Node (tests): nothing to warm, and no idle loop may keep the process alive
     let dpr = 1, FW = rs.view?.W || 375, FH = rs.view?.H || 700;
     try { const m = ctx.getTransform(); dpr = Math.max(1, Math.min(2, Math.hypot(m.a, m.b) || 1)); if (ctx.canvas?.width) { FW = ctx.canvas.width / dpr; FH = ctx.canvas.height / dpr; } } catch { /* keep */ }
     const sig = `${rs.mode}|${rs.world}|${rs.bodyId}|${Math.round(FW)}x${Math.round(FH)}|${dpr}`;
@@ -444,8 +473,155 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
   let winMode = false;
   const padWinFrame = (rs, st) => ({ pxPerM: ((rs.view?.H || 600) * 0.5) / Math.max(5, st.heightM), anchorX: (rs.view?.W || 375) / 2, anchorY: (rs.view?.H || 600) * 0.9, tilt: 0 });
 
+
+  // ---------------------------------------------------------------- rendezvous, docking and module release (§7.3)
+  // mode 'rendezvous': an orbit frame without capture. With a station target the craft (or the new module) comes
+  // in from +x along the V-bar to the target port; without one the module separates from the upper stage.
+  // Everything is a function of rs.clock / rs.flags / event times, so resume and replay draw the same picture.
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerpN = (a, b, t) => a + (b - a) * t;
+  let rvAcc = 0;
+  function upperPartOf(st) {
+    const ps = (st?.parts || []).filter((p) => !p.x && (p.role === 'upper' || p.role === 'stage'));
+    return ps.filter((p) => p.role === 'upper').slice(-1)[0] || ps.slice(-1)[0] || null;
+  }
+  function rvState(rs) {
+    const tg = resolveTarget(rs.target);
+    const W = rs.view?.W || 375, H = rs.view?.H || 700;
+    const ev = { ...(rs.events || {}), ...events };
+    const fl = rs.flags || {};
+    const cr = rvCraftOf(rs, tg);
+    const seq = tg && (tg.sequence === 'dock' || tg.sequence === 'berth') ? tg.sequence : 'release';
+    const lay = seq !== 'release' && tg.modules.length ? stationLayoutOf(tg, rs.seed || 1) : null;
+    if (lay) {
+      const berth = seq === 'berth' && !!lay.arm;
+      const pose = dockPose({ clock: rs.clock, t: rs.t, tl: rs.dockT || {}, seq: berth ? 'berth' : 'dock', flags: fl, events: ev });
+      const kClose = clamp((W * 0.52) / (pose.range + cr.lenM * 1.5 + 6), 0.2, (W * 0.3) / Math.max(3, cr.lenM));
+      const b = lay.bbox;
+      const bw = b.x1 - b.x0 + cr.lenM + 2, bh = b.y1 - b.y0;
+      const kFit = Math.max(0.02, Math.min((W * 0.86) / bw, (H * 0.5) / bh));
+      const td = Number.isFinite(ev.dock) ? ev.dock : Number.isFinite(ev.berth) ? ev.berth : null;
+      const z = pose.phase === 'docked' ? (td == null ? 1 : sstep(2.5, 6.5, rs.t - td)) : 0;
+      const k = Math.exp(lerpN(Math.log(kClose), Math.log(kFit), z));
+      const port = lay.port;
+      const fx0 = lerpN(port.x, (b.x0 + b.x1 + cr.lenM) / 2, z), fy0 = lerpN(port.y, (b.y0 + b.y1) / 2, z);
+      const sx0 = W * lerpN(0.36, 0.5, z), sy0 = H * 0.42;
+      const ox = sx0 - fx0 * k, oy = sy0 + fy0 * k;
+      const cx = port.x + pose.range + cr.noseM, cy = port.y + pose.off;
+      return { tg, lay, pose, cr, k, ox, oy, cx, cy, seq, berth, W, H, ev };
+    }
+    const released = !!fl.released || ev.release != null;
+    const rp = releasePose({ since: ev.release != null ? rs.t - ev.release : null, released, founding: !!tg?.newAsset && tg?.kind === 'station' });
+    const st = stackOf(rs);
+    const up = upperPartOf(st);
+    const stageL = up ? up.len : 8;
+    const k = clamp((W * 0.55) / (cr.lenM + stageL * 0.9 + 4), 0.5, 40);
+    const mx = W * 0.4 - rp.sep * 0.35 * k, my = H * 0.42;
+    const sx = mx + (cr.lenM / 2 + 0.5 + stageL) * k + rp.sep * 0.65 * k + rp.stageAway * 0.35 * k, sy = my + rp.stageAway * 0.9 * k;
+    return { tg, rp, cr, k, mx, my, st, up, stageL, sx, sy, seq: 'release', W, H, ev };
+  }
+  /** Screen point of the visiting craft (its nose for docking, module centre for release). */
+  function rvCraftScreen(rs, S = rvState(rs)) {
+    if (S.lay) return { x: S.ox + (S.cx - S.cr.noseM) * S.k, y: S.oy - S.cy * S.k };
+    return { x: S.mx, y: S.my };
+  }
+  function paintRvCraft(ctx, S, light, rs, { rot = 0, unfold = 1, lights = true } = {}) {
+    if (S.cr.type === 'module') { ctx.rotate(Math.PI + rot); paintModule(ctx, S.cr.art, { pxPerM: S.k, light, unfold, lights }); return; }
+    ctx.rotate(-Math.PI / 2 + rot);
+    paintCraft(ctx, S.cr.craft, { pxPerM: S.k, light, mode: 'flight', legs: 0, t: rs.t, arrays: unfold });
+  }
+  function craftLight(ctx, x, y, kind, t, reduce, k) {
+    const col = kind === 'docked' ? '120,255,150' : kind === 'abort' ? '255,180,60' : '255,255,240';
+    const a = kind === 'docked' || reduce ? 0.85 : Math.sin(t * 5.1) > 0.4 ? 0.95 : 0.12;
+    const r = Math.max(1.4, 0.4 * k);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+    g.addColorStop(0, `rgba(${col},${a.toFixed(3)})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function drawRendezvous(ctx, rs) {
+    const view = rs.view;
+    const light = lightOf(rs);
+    const S = rvState(rs);
+    const world = S.tg?.bodyId && S.tg.bodyId !== 'earth' ? S.tg.bodyId : 'earth';
+    ctx.fillStyle = '#000'; ctx.fillRect(-40, -40, view.W + 80, view.H + 80);
+    drawStarfield(ctx, view, { alpha: 0.3, drift: (rs.clock || 0) * 0.5, t: rs.t, seed: 17, reduce: rs.reduce });
+    if (world === 'earth') drawEarthLimb(ctx, view, { altKm: 420, light, t: rs.t });
+    else { const r = view.W * 1.6; drawPlanetDisc(ctx, world, view.W * 0.5, view.H + r * 0.6, r, { light, t: rs.t }); }
+    fx.draw(ctx, 'back');
+    if (S.lay) {
+      const { pose, k } = S;
+      ctx.save(); ctx.translate(S.ox, S.oy);
+      paintStation(ctx, S.lay, { pxPerM: k, light, t: rs.t, reduce: rs.reduce, armTarget: S.berth ? null : undefined });
+      ctx.restore();
+      const c = { x: S.ox + S.cx * k, y: S.oy - S.cy * k };
+      if (!rs.flags?.exploded) {
+        ctx.save(); ctx.translate(c.x, c.y);
+        paintRvCraft(ctx, S, light, rs, { rot: pose.rot });
+        ctx.restore();
+        const nose = rvCraftScreen(rs, S);
+        craftLight(ctx, nose.x + S.cr.lenM * 0.15 * k, nose.y - S.cr.dM * 0.3 * k, pose.lights, rs.t, rs.reduce, k);
+      }
+      if (S.berth) { // the arm reaches out, grapples the hovering craft and pulls it to the port
+        const stow = { x: S.lay.arm.x - S.lay.arm.boom * 1.3, y: S.lay.arm.y + S.lay.arm.boom * 0.6 };
+        const grab = { x: S.cx - S.cr.noseM + S.cr.lenM * 0.45, y: S.cy + S.cr.dM * 0.5 };
+        const u = pose.armHold ? 1 : pose.arm;
+        const tgt = { x: lerpN(stow.x, grab.x, u), y: lerpN(stow.y, grab.y, u) };
+        ctx.save(); ctx.translate(S.ox, S.oy); drawArm(ctx, S.lay, k, light, tgt); ctx.restore();
+      }
+      if (pose.flash > 0) { // contact flash at the port
+        const p = { x: S.ox + S.lay.port.x * k, y: S.oy - S.lay.port.y * k };
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        const r = Math.max(8, 2.5 * k);
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        g.addColorStop(0, `rgba(255,250,230,${(0.9 * pose.flash).toFixed(3)})`); g.addColorStop(1, 'rgba(255,250,230,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      if (S.cr.lenM * k < 26 && pose.phase !== 'docked') { // far away: target brackets + range readout
+        const w = Math.max(10, S.cr.lenM * k + 8), h = Math.max(10, S.cr.dM * k + 8);
+        const bx = c.x - (S.cr.noseM - S.cr.lenM / 2) * k;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(160,220,255,0.7)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const x = bx + sx * w / 2, y = c.y + sy * h / 2; ctx.moveTo(x - sx * 4, y); ctx.lineTo(x, y); ctx.lineTo(x, y - sy * 4); }
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(190,230,255,0.85)'; ctx.font = '600 10px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(`${Math.round(pose.range)} m`, bx, c.y + h / 2 + 3);
+        ctx.restore();
+      }
+    } else drawRelease(ctx, rs, S, light);
+    fx.draw(ctx, 'front');
+  }
+  function drawRelease(ctx, rs, S, light) {
+    const { rp, k } = S;
+    if (rs.flags?.exploded) return;
+    // upper stage: axis along x, top toward the module (−x); turns away and burns retrograde after separation
+    const scx = S.sx - (S.stageL / 2) * k, scy = S.sy;
+    ctx.save(); ctx.translate(scx, scy); ctx.rotate(rp.stageRot);
+    if (S.up) {
+      const e = S.up.engines;
+      if (rp.stageBurn > 0 && e) drawPlume(ctx, { x: (S.stageL / 2 + (e.bellLen || 1.5)) * k, y: 0, d: e.bellD || 1.2 }, { prop: e.prop || 'kerolox', pBar: 0, pxPerM: k, t: rs.t, angle: -Math.PI / 2, throttle: 0.55 * rp.stageBurn, lengthM: S.stageL * 0.9, reduce: rs.reduce, seed: 21 });
+      ctx.translate((S.stageL / 2) * k, 0); ctx.rotate(-Math.PI / 2);
+      // the stage keeps its lighting through the turn-away (light turned with it): a re-lit sprite at every 15°
+      // light bucket would cost a render hitch per bucket; the turn is short and the stage small on screen
+      const c = Math.cos(rp.stageRot), s = Math.sin(rp.stageRot);
+      const lax = Number.isFinite(light?.ax) ? light.ax : SUN.ax, lay = Number.isFinite(light?.ay) ? light.ay : SUN.ay;
+      const held = rp.stageRot ? { ...light, ax: lax * c - lay * s, ay: lax * s + lay * c } : light;
+      paintPart(ctx, S.st, S.up, { pxPerM: k, light: held, tilt: -Math.PI / 2 + rp.stageRot, glow: 0, showHiddenEngines: true });
+    }
+    ctx.restore();
+    // the module / payload
+    ctx.save(); ctx.translate(S.mx, S.my);
+    if (S.cr.type === 'module') { ctx.rotate(rp.moduleRot); paintModule(ctx, S.cr.art, { pxPerM: k, light, unfold: rp.phase === 'attached' ? 0 : Math.min(rp.arrays, 1), lights: rp.lights }); }
+    else { ctx.rotate(-Math.PI / 2 + rp.moduleRot); ctx.translate(0, (S.cr.centred ? 0 : S.cr.lenM / 2) * k); paintCraft(ctx, S.cr.craft, { pxPerM: k, light, mode: 'flight', legs: 0, t: rs.t, arrays: rp.arrays }); }
+    ctx.restore();
+    if (rp.lights && rp.phase !== 'attached') craftLight(ctx, S.mx - (S.cr.lenM / 2) * k, S.my, 'docked', rs.t, rs.reduce, k);
+  }
+
   const R = {
-    reset() { events = {}; fx.clear(); prevGround = null; trail.n = 0; trail.head = 0; edlSpawned.shield = edlSpawned.back = false; sepState.done = false; seps.length = 0; ullAcc = 0; ignFlash = false; },
+    reset() { events = {}; fx.clear(); prevGround = null; trail.n = 0; trail.head = 0; edlSpawned.shield = edlSpawned.back = false; sepState.done = false; seps.length = 0; ullAcc = 0; ignFlash = false; rvAcc = 0; },
     events() { return { ...events }; },
 
     event(name, payload = {}) {
@@ -487,6 +663,12 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
           fx.splash(d.craftX, d.groundY, { scale: Math.max(0.6, Math.min(2, (c.widthM || 4) * d.pxPerM / 40)) }); break;
         }
         case 'anomaly': cam.shake(0.4 + 0.8 * (payload.severity || 0)); break;
+        case 'dock': case 'berth': cam.shake(0.25); break;
+        case 'dockFail': cam.shake(0.55); break;
+        case 'release': if (rs.mode === 'rendezvous' && !rs.reduce) { // spring separation: cold-gas puffs at the interface
+          const S = rvState(rs);
+          if (!S.lay) { const x = S.mx + (S.cr.lenM / 2 + 0.3) * S.k; for (const a of [-1.2, 1.2, -1.9, 1.9]) fx.rcs(x, S.my + Math.sign(a) * S.cr.dM * 0.3 * S.k, a); }
+        } break;
         default: break;
       }
     },
@@ -576,6 +758,21 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
           }
         }
       } else if (rs.mode === 'descent') edlDebris(rs, flags);
+      else if (rs.mode === 'rendezvous' && !rs.reduce) {
+        const S = rvState(rs);
+        if (S.lay && S.pose.rcs && !flags.exploded) { // attitude / translation puffs while closing in
+          rvAcc += dt;
+          if (rvAcc > 0.55) {
+            rvAcc = 0;
+            const n = rvCraftScreen(rs, S), up = Math.sin(rs.t * 3.7) > 0 ? 1 : -1;
+            fx.rcs(n.x + S.cr.lenM * 0.25 * S.k, n.y + up * S.cr.dM * 0.45 * S.k, up > 0 ? Math.PI / 2 : -Math.PI / 2);
+            if (S.pose.phase === 'final' || S.pose.phase === 'closing') fx.rcs(n.x, n.y, Math.PI);
+          }
+        } else if (!S.lay && S.rp.phase === 'departure' && S.rp.stageBurn <= 0) {
+          rvAcc += dt;
+          if (rvAcc > 0.4) { rvAcc = 0; fx.rcs(S.sx - S.stageL * S.k, S.sy, -Math.PI / 2); }
+        }
+      }
       if (rs.mode === 'descent' && flags.engineOn && !flags.landed) {
         const c = craftArt(descentCraftId(rs));
         const d = descentFrame(rs, c.heightM);
@@ -600,6 +797,7 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
       const o = cam.offset();
       ctx.translate(o.x, o.y);
       if (rs.mode === 'orbit') drawOrbit(ctx, rs);
+      else if (rs.mode === 'rendezvous') drawRendezvous(ctx, rs);
       else if (rs.mode === 'descent') drawDescent(ctx, rs);
       else drawAscent(ctx, rs);
       ctx.restore();
@@ -810,13 +1008,25 @@ export function createLaunchRenderer({ seed = 1, cap = 600 } = {}) {
     if (world === 'europa') drawPlanetDisc(ctx, 'jupiter', view.W * 0.75, view.H * 0.16, 46, { light, t: rs.t });
     // above ~9 km the world is seen as a curved limb (its map, craters, haze); below ~3 km the perspective terrain
     const limbK = world === 'earth' ? 0 : sstep(3, 9, alt);
-    const limbArgs = { altKm: alt, light, horizonY: Math.min(d.groundY - view.H * 0.05, view.H * 0.62) };
+    const tg = world !== 'earth' ? resolveTarget(rs.target) : null;
+    const baseScene = !!tg && tg.sequence === 'surface';
+    const horY = baseScene ? baseHorizonY(view, d.groundY) : undefined; // a higher camera over a base
+    const limbArgs = { altKm: alt, light, horizonY: horY ?? Math.min(d.groundY - view.H * 0.05, view.H * 0.62) };
     let limbDone = limbK >= 0.999 && drawBodyLimb(ctx, view, world, { ...limbArgs, alpha: 1 });
     if (!limbDone) {
-      drawTerrain(ctx, view, world, { altM: alt * 1000, pxPerM: d.pxPerM, groundY: d.groundY, scrollX: d.scrollX, t: rs.t, seed: hash('site|' + world + '|' + (rs.seed || 0)), light });
+      drawTerrain(ctx, view, world, { altM: alt * 1000, pxPerM: d.pxPerM, groundY: d.groundY, scrollX: d.scrollX, t: rs.t, seed: hash('site|' + world + '|' + (rs.seed || 0)), light, horizonY: horY });
       if (limbK > 0) limbDone = drawBodyLimb(ctx, view, world, { ...limbArgs, alpha: limbK });
     }
     const altM = alt * 1000;
+    // surface base behind the landing site (MISSIONS-V2 §7.3): on the same perspective ground as the terrain
+    if (baseScene && limbK < 0.95) {
+      const proj = groundProjection(view, { groundY: d.groundY, pxPerM: d.pxPerM, altM, scrollX: d.scrollX, horizonY: horY });
+      const lay = baseLayoutOf(tg, rs, craft);
+      const since = events.unload != null ? rs.t - events.unload : null;
+      const parked = !!flags.landed && events.touchdown == null && events.unload == null; // resumed after the landing
+      // one depth-sorted pass: structures, vehicles and the crate together (drawBaseVehicles alone draws only vehicles)
+      drawBase(ctx, view, lay, { proj, light, t: rs.t, reduce: rs.reduce, world, night: !!rs.night, alpha: 1 - limbK, vehicles: { since, parked, reduce: rs.reduce && !!flags.landed, landerH: craft.heightM || 6, landerW: craft.widthM || 4, crewed: !!rs.crewed } });
+    }
     if (world !== 'earth' && limbK < 0.6) drawGroundShadow(ctx, d.craftX, d.groundY, { widthPx: (craft.widthM || 3) * d.pxPerM * 0.6, heightAboveM: altM, pxPerM: d.pxPerM, light, world, objHeightM: craft.heightM, objWidthM: Math.min(craft.widthM || 3, (craft.heightM || 3) * 0.6) });
     fx.draw(ctx, 'back');
     if (!flags.exploded) {

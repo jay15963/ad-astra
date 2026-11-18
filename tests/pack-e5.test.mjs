@@ -18,7 +18,7 @@ import { dateToTurn } from '../src/core/time.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const E5 = path.join(root, 'data/eras/e5');
-const E5_FILES = ['era', 'snapshot', 'lineages', 'lifecycle', 'patches', 'parts', 'vehicles', 'spacecraft', 'destinations', 'calendar', 'tech', 'events', 'investors', 'crew'];
+const E5_FILES = ['era', 'snapshot', 'lineages', 'lifecycle', 'patches', 'parts', 'vehicles', 'spacecraft', 'destinations', 'calendar', 'events', 'investors', 'crew'];
 const SCENARIO = 'fronteira_marciana';
 const SCENARIO_FILE = `scenarios/${SCENARIO}.json`;
 const readE5 = (f) => JSON.parse(fs.readFileSync(path.join(E5, `${f}.json`), 'utf8'));
@@ -35,6 +35,8 @@ const reader = async () => {
 };
 const campaign = await loadData(await reader(), { scenarioId: 'campaign', eras: 'all' });
 const F = Object.fromEntries(E5_FILES.map((f) => [f, readE5(f)]));
+// the era-5 tree lives in its own pack since Missões v2 (data/tech/e5/tech.json, MISSIONS-V2 §4.3)
+F.tech = JSON.parse(fs.readFileSync(path.join(root, 'data/tech/e5/tech.json'), 'utf8'));
 const y = (d) => d?.year;
 const ym = (d) => d.year * 12 + (d.month ?? 1) - 1; // monthBase 1 files
 

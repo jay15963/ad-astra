@@ -59,6 +59,8 @@ async function loadE4(scenarioId = 'campaign', eras = 'all') {
 }
 
 const e4 = Object.fromEntries(E4_FILES.map((f) => [f, readJson(`eras/e4/${f}`)]));
+// the era-4 tree lives in its own pack since Missões v2 (data/tech/e4/tech.json, MISSIONS-V2 §4.3)
+e4.tech = readJson('tech/e4/tech');
 const campaign = await loadE4('campaign');
 
 test('e4: validator clean (pack e4, scenarios and vocabulary) with every e4 file listed', () => {
@@ -71,7 +73,7 @@ test('e4: validator clean (pack e4, scenarios and vocabulary) with every e4 file
   const warns = r.issues.filter((i) => i.level === 'warn' && mine(i) && !/id provisório/.test(i.message));
   assert.deepEqual(warns, [], warns.map((e) => `${e.path}: ${e.message}`).join('\n'));
   assert.ok(r.stats.packBytes.e4 <= 350 * 1024, `pacote e4 com ${r.stats.packBytes.e4} B`);
-  assert.ok(r.stats.bootBytes <= 1.2 * 1024 * 1024, `dados de partida ${r.stats.bootBytes} B`);
+  assert.ok(r.stats.bootBytes <= 1.6 * 1024 * 1024, `dados de partida ${r.stats.bootBytes} B`);
 });
 
 test('e4: ≥ 120 narrative events with year triggers inside the era, all valid for the event DSL', () => {
@@ -138,14 +140,15 @@ test('e4: vehicles and craft carry sources when official, and every new launcher
   }
 });
 
-test('e4: tech tier t4 covers the six branches with era-4 nodes opening 2031–2040', () => {
+test('e4: tech tier t4 covers the six branches with era-4 nodes opening inside the tier (2026–2050)', () => {
   const nodes = e4.tech.nodes;
   const branches = new Set(nodes.map((n) => n.branch));
   assert.equal(branches.size, 6);
   for (const n of nodes) {
     assert.equal(n.era, 4);
     assert.equal(n.techTier, 't4');
-    assert.ok(n.fromYear >= 2031 && n.fromYear <= 2040, `${n.id}: ${n.fromYear}`);
+    assert.ok(n.fromYear >= 2026 && n.fromYear <= 2050, `${n.id}: ${n.fromYear}`);
+    assert.ok(n.histYear >= n.fromYear && n.histYear <= 2050, `${n.id}: histYear ${n.histYear}`);
     for (const r of n.requires) assert.ok(campaign.index.tech[r], `${n.id}: requer ${r}`);
   }
 });
@@ -190,7 +193,8 @@ test('e4: activating the pack does not change the 1950s of the campaign (dates h
 test('e4: the Década Lunar scenario plays 2026→2032 headless, deterministic, no errors in the log', async () => {
   const data = await loadE4(SCENARIO, 'auto');
   // earlier eras come in as catalog only (places, hardware, lineages: src/core/data.js CATALOG_FILES)
-  assert.deepEqual(Object.keys(data.packsLoaded).sort(), ['core', 'e1', 'e2', 'e3', 'e4', 'legacy-e4']);
+  // + every tech pack (src/core/data.js: the whole tree is merged so unlock keys never depend on the loaded eras)
+  assert.deepEqual(Object.keys(data.packsLoaded).sort(), ['core', 'e1', 'e2', 'e3', 'e4', 'legacy-e4', 'tech-e1', 'tech-e2', 'tech-e3', 'tech-e4', 'tech-e5', 'tech-e6', 'tech-e7']);
   assert.deepEqual(erasLoaded(data), ['e4']);
   assert.ok(!data.calendar.missions.some((m) => m.era === 'e3'), 'no dated content of the catalog eras');
   assert.equal(data.scenario.turnWeeks, 4);

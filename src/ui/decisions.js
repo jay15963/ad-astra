@@ -40,6 +40,7 @@ const KIND_LABELS = {
   launch: 'Dia de Lançamento', briefing: 'Briefing', contract: 'Contrato', diplomacy: 'Diplomacia', politics: 'Governo',
   event: 'Evento', crew: 'Equipe', research: 'Pesquisa', mission: 'Missão', budget: 'Orçamento',
   era: 'Nova era', ending: 'O Grande Silêncio', lifecycle: 'Agências', investors: 'Investidores', mandate: 'Investidores',
+  infra: 'Infraestrutura', market: 'Mercado de foguetes', colonies: 'Colônias',
 };
 
 /**
@@ -56,6 +57,21 @@ export function choiceLabel(d, c) {
 export function afterResolveTarget(res) {
   const id = res?.openBuilder ?? null;
   return id ? { tab: 'missoes', sub: `m/${id}`, step: res.step ?? 2 } : null;
+}
+
+/**
+ * Builder prefill after a resolve (MISSIONS-V2 §3.4 "Resgatar" of infra/derelict = a prefilled supply mission):
+ * the sim's own draft ({prefill} / {draft}) or, for the rescue choice, a supply cargo to the card's asset. Pure.
+ */
+export function afterResolvePrefill(d, choiceId, res, assetSite = null) {
+  const draft = res?.prefill || res?.draft || null;
+  if (draft && typeof draft === 'object') return draft;
+  if (String(d?.kind) === 'infra/derelict' && choiceId === 'rescue') {
+    const assetId = d?.payload?.assetId || res?.assetId || null;
+    if (!assetId) return null;
+    return { type: 'cargo', sub: 'supply', destination: d?.payload?.site || assetSite || null, payload: { kind: 'supply', qty: 4, targetAssetId: assetId } };
+  }
+  return null;
 }
 
 /** Kind header of a card. The arrival of a mission reuses 'launch/ready' (payload.phase 'arrival'): it is a "Chegada". */
@@ -165,13 +181,18 @@ export function openDecision(store, id, { onResolved } = {}) {
       const res = store.dispatch({ type: 'decision/resolve', id: d.id, choiceId: selected?.id });
       if (!res?.ok) { toast(res?.error || 'Não foi possível decidir agora.', 'bad'); return; }
       store.vibrate(25);
-      const target = afterResolveTarget(res);
-      toast(target ? 'Missão criada. Agora escolha o foguete e a nave.' : res.message || (selected ? `Decidido: ${selected.label}` : 'Registrado.'), 'good');
+      let target = afterResolveTarget(res);
+      const site = d.payload?.assetId ? (store.state?.assets?.list || []).find((a) => a?.id === d.payload.assetId)?.site : null;
+      const prefill = target ? null : afterResolvePrefill(d, selected?.id, res, site);
+      if (prefill) target = { tab: 'missoes', sub: 'nova', prefill };
+      toast(target?.prefill ? 'Missão de resgate pronta para montar: confira a carga e o foguete.' : target ? 'Missão criada. Agora escolha o foguete e a nave.' : res.message || (selected ? `Decidido: ${selected.label}` : 'Registrado.'), 'good');
       // leaving for another screen: keep the sheet's history entry (a pending history.back() would undo the
       // navigation; components.onPopState skips the stale entry later)
       close(target ? { fromHistory: true } : undefined);
       try { onResolved?.(res, selected); } catch (e) { console.error(e); }
-      if (target) { try { store.ui?.navigate?.(target.tab, target.sub); } catch (e) { console.error(e); } }
+      if (target?.prefill) {
+        import('./missions-tab.js').then((m) => { m.prefillBuilder(target.prefill); store.ui?.navigate?.(target.tab, target.sub); }).catch((e) => console.error(e));
+      } else if (target) { try { store.ui?.navigate?.(target.tab, target.sub); } catch (e) { console.error(e); } }
     };
 
     const choiceBtns = choices.map((c) => {

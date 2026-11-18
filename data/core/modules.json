@@ -1,0 +1,112 @@
+{
+  "_doc": "Módulos de estação e de base, veículos de superfície e números da manutenção (docs/MISSIONS-V2.md §3.2–3.7). Dono: infrastructure-sim (src/sim/infra.js). massT em toneladas, costM e upkeepM em US$ milhões (upkeepM = operação em solo por ano, × tuning.eraScale), storageT/upkeepTYr/isruTYr em toneladas (por ano), science = pontos por ano com a tripulação completa (crewNeed), power/life/ports/crew/housing = contribuição do módulo; ports = portas que o módulo oferece (cada módulo além do primeiro ocupa uma porta livre, menos os de \"attach\": presos a treliças ou ao casco; uma nave visitante precisa de uma porta livre, duas se já houver tripulação a bordo), size = peso no desenho da base (sizeTier). key = chave de liberação (MISSIONS-V2 §0.1); histYear = ano histórico (ou projetado) da chave. Módulos grandes das eras 5–7 são segmentos: cada lançamento leva uma parte do anel ou do cilindro.",
+  "version": 1,
+  "tuning": {
+    "crewTYr": 2.5,
+    "minStorageT": 2,
+    "healYr": 8,
+    "evaHealYr": 4,
+    "ageYr": 6,
+    "graceWeeks": 4,
+    "starveYr": 30,
+    "status": { "active": 40, "degraded": 15 },
+    "degradedScience": 0.5,
+    "derelictYears": 3,
+    "endedKeepYears": 5,
+    "reminderWeeks": 13,
+    "reminderEveryWeeks": 26,
+    "rotationWeeks": 26,
+    "crewWeekShare": 0.05,
+    "experiments": { "boost": 0.5, "weeks": 26 },
+    "servicing": { "years": 5 },
+    "ai": { "supplyFill": 0.8, "pressureMax": 0.6, "growYears": 4, "prestigePerSci": 0.02 },
+    "hist": { "playerShareExtend": 0.25, "extendYears": 5 },
+    "relay": { "bonus": 0.15 },
+    "partialHealth": 70,
+    "eraScale": { "e1": 1, "e2": 1.3, "e3": 1.6, "e4": 2, "e5": 3, "e6": 4, "e7": 5 },
+    "prestigeYr": { "stationBase": 0.5, "stationPerCrew": 0.01, "baseBase": 0.8, "basePerStage": 1, "observatory": 0.3 },
+    "caps": { "player": 60, "ai": 40, "past": 30, "fleetRows": 12, "fleetBucketWeeks": 26, "seen": 30 },
+    "infra": { "max": 6 },
+    "sizeTiers": [2, 6, 15, 40, 120],
+    "colonyStageTier": { "2": 1, "3": 2, "4": 3, "5": 4, "6": 5 },
+    "ports": { "dockNeedsFree": 1 },
+    "rover": {
+      "light": { "lifeYears": 1, "scienceYr": 8, "kmYr": 40 },
+      "micro": { "lifeYears": 0.25, "scienceYr": 4, "kmYr": 0.4 },
+      "medium": { "lifeYears": 3, "scienceYr": 14, "kmYr": 4 },
+      "heavy": { "lifeYears": 10, "scienceYr": 22, "kmYr": 3 },
+      "rotorcraft": { "lifeYears": 2, "scienceYr": 10, "kmYr": 8 },
+      "swarm": { "lifeYears": 6, "scienceYr": 25, "kmYr": 60 },
+      "cryobot": { "lifeYears": 5, "scienceYr": 30, "kmYr": 0.5 },
+      "submarine": { "lifeYears": 4, "scienceYr": 35, "kmYr": 200 }
+    },
+    "roverBase": 30
+  },
+  "station": [
+    { "id": "st_core", "label": "Núcleo", "key": "module:station.core", "histYear": 1971, "massT": 18, "costM": 1200, "upkeepM": 40, "power": 2, "life": 3, "ports": 2, "crew": 3, "storageT": 4, "upkeepTYr": 1.5, "science": 2, "crewNeed": 2, "lifeYears": 15, "size": 2, "traits": ["core"], "desc": "O primeiro bloco: energia, suporte de vida, três beliches e duas portas." },
+    { "id": "st_lab", "label": "Laboratório", "key": "module:station.lab", "histYear": 1973, "massT": 15, "costM": 900, "upkeepM": 25, "power": -1, "life": 0, "ports": 1, "crew": 0, "storageT": 2, "upkeepTYr": 0.8, "science": 8, "crewNeed": 2, "lifeYears": 25, "size": 1.5, "traits": [], "desc": "Bancadas, estufas e racks de experimentos: a razão de ter uma estação." },
+    { "id": "st_multiport", "label": "Núcleo de duas portas", "key": "module:station.multiport", "histYear": 1977, "massT": 6, "costM": 400, "upkeepM": 10, "power": 0, "life": 0, "ports": 3, "crew": 0, "storageT": 1, "upkeepTYr": 0.3, "science": 0, "crewNeed": 0, "lifeYears": 20, "size": 1, "traits": [], "desc": "Uma porta a mais em cada ponta: carga chega com a tripulação a bordo." },
+    { "id": "st_hab", "label": "Habitação", "key": "module:station.hab", "histYear": 1986, "massT": 18, "costM": 1000, "upkeepM": 25, "power": -1, "life": 2, "ports": 1, "crew": 3, "storageT": 3, "upkeepTYr": 0.8, "science": 1, "crewNeed": 0, "lifeYears": 25, "size": 1.5, "traits": [], "desc": "Cabines, cozinha e reciclagem de água para mais três pessoas." },
+    { "id": "st_node", "label": "Nó de conexão", "key": "module:station.node", "histYear": 1998, "massT": 12, "costM": 600, "upkeepM": 15, "power": 0, "life": 0, "ports": 6, "crew": 0, "storageT": 2, "upkeepTYr": 0.3, "science": 0, "crewNeed": 0, "lifeYears": 30, "size": 1, "traits": ["node"], "desc": "Um cruzamento de seis portas: a estação passa a crescer para os lados." },
+    { "id": "st_solar", "label": "Treliça solar", "key": "module:station.solar", "histYear": 2000, "massT": 14, "costM": 700, "upkeepM": 10, "power": 4, "life": 0, "ports": 0, "crew": 0, "storageT": 0, "upkeepTYr": 0.2, "science": 0, "crewNeed": 0, "lifeYears": 25, "size": 2, "attach": true, "traits": ["truss"], "desc": "Viga com dois pares de painéis e radiadores: energia para muitos laboratórios." },
+    { "id": "st_airlock", "label": "Câmara de ar", "key": "module:station.airlock", "histYear": 2001, "massT": 6, "costM": 300, "upkeepM": 8, "power": 0, "life": 0, "ports": 0, "crew": 0, "storageT": 0.5, "upkeepTYr": 0.2, "science": 0.5, "crewNeed": 0, "lifeYears": 25, "size": 0.5, "attach": true, "traits": ["eva"], "desc": "Caminhadas espaciais para reparos: a estação se desgasta 30% mais devagar." },
+    { "id": "st_arm", "label": "Braço robótico", "key": "module:station.arm", "histYear": 2001, "massT": 2, "costM": 450, "upkeepM": 8, "power": -0.5, "life": 0, "ports": 0, "crew": 0, "storageT": 0, "upkeepTYr": 0.1, "science": 0, "crewNeed": 0, "lifeYears": 25, "size": 0.5, "attach": true, "traits": ["arm"], "desc": "Captura naves de carga e monta módulos: acoplagens mais seguras." },
+    { "id": "st_cupola", "label": "Cúpula", "key": "module:station.cupola", "histYear": 2010, "massT": 2, "costM": 200, "upkeepM": 3, "power": 0, "life": 0, "ports": 0, "crew": 0, "storageT": 0, "upkeepTYr": 0.05, "science": 1, "crewNeed": 0, "lifeYears": 25, "size": 0.3, "attach": true, "traits": ["support"], "desc": "Sete janelas para a Terra: fotos, ciência da Terra e muito apoio do público." },
+    { "id": "st_logistics", "label": "Módulo logístico", "key": "module:station.logistics", "histYear": 2011, "massT": 10, "costM": 350, "upkeepM": 6, "power": 0, "life": 0, "ports": 1, "crew": 0, "storageT": 12, "upkeepTYr": 0.1, "science": 0, "crewNeed": 0, "lifeYears": 25, "size": 1, "traits": [], "desc": "Depósito pressurizado: doze toneladas de reserva entre uma carga e outra." },
+    { "id": "st_inflatable", "label": "Módulo inflável", "key": "module:station.inflatable", "histYear": 2016, "massT": 1.5, "costM": 250, "upkeepM": 6, "power": -0.5, "life": 1, "ports": 1, "crew": 2, "storageT": 1, "upkeepTYr": 0.3, "science": 1, "crewNeed": 0, "lifeYears": 15, "size": 1, "traits": ["light"], "desc": "Sobe dobrado e infla em órbita: espaço para duas pessoas por pouca massa." },
+    { "id": "st_depot", "label": "Depósito de propelente", "key": "module:station.depot", "histYear": 2035, "massT": 30, "costM": 900, "upkeepM": 20, "power": -0.5, "life": 0, "ports": 1, "crew": 0, "storageT": 4, "upkeepTYr": 0.5, "science": 0, "crewNeed": 0, "lifeYears": 25, "size": 2, "traits": ["depot"], "desc": "Tanques criogênicos: missões que partem desta órbita levam 5% a mais." },
+    { "id": "st_centrifuge", "label": "Centrífuga", "key": "module:station.centrifuge", "histYear": 2070, "massT": 150, "costM": 6000, "upkeepM": 80, "power": -2, "life": 3, "ports": 1, "crew": 4, "storageT": 6, "upkeepTYr": 1.5, "science": 6, "crewNeed": 2, "lifeYears": 30, "size": 6, "traits": ["gravity"], "desc": "Um braço girante com gravidade parcial: estadias longas sem perder osso." },
+    { "id": "st_shipyard", "label": "Estaleiro orbital", "key": "module:station.shipyard", "histYear": 2110, "massT": 250, "costM": 15000, "upkeepM": 200, "power": -4, "life": 6, "ports": 4, "crew": 20, "storageT": 40, "upkeepTYr": 4, "science": 4, "crewNeed": 10, "lifeYears": 40, "size": 15, "traits": ["shipyard"], "milestone": "first_orbital_shipyard", "desc": "Docas para montar naves em órbita: 10% mais barato lançar daqui." },
+    { "id": "st_ring", "label": "Anel habitacional", "key": "module:station.ring", "histYear": 2250, "massT": 1000, "costM": 120000, "upkeepM": 1500, "power": -20, "life": 60, "ports": 6, "crew": 200, "storageT": 400, "upkeepTYr": 30, "science": 60, "crewNeed": 50, "lifeYears": 80, "size": 60, "traits": ["gravity", "ring"], "milestone": "first_rotating_habitat", "desc": "Um segmento de roda girante: gravidade de verdade para duzentas pessoas." },
+    { "id": "st_cylinder", "label": "Segmento de cilindro O'Neill", "key": "module:station.cylinder", "histYear": 2650, "massT": 3000, "costM": 900000, "upkeepM": 8000, "power": 0, "life": 1500, "ports": 12, "crew": 5000, "storageT": 5000, "upkeepTYr": 200, "science": 400, "crewNeed": 500, "lifeYears": 200, "size": 150, "traits": ["gravity", "cylinder"], "desc": "Uma fatia de mundo girante, com céu, rios e cinco mil moradores." }
+  ],
+  "base": [
+    { "id": "bs_hab_small", "label": "Habitat compacto", "key": "module:base.hab_small", "histYear": 2028, "massT": 6, "costM": 450, "upkeepM": 20, "power": -0.5, "life": 1, "crew": 4, "housing": 4, "storageT": 3, "upkeepTYr": 1, "isruTYr": 0, "food": 0, "science": 1, "crewNeed": 0, "lifeYears": 15, "size": 1, "infraNeed": "moradia", "traits": ["hab"], "desc": "Um cilindro pressurizado para quatro pessoas, coberto de regolito." },
+    { "id": "bs_solar", "label": "Painéis solares", "key": "module:base.solar", "histYear": 2028, "massT": 1.5, "costM": 120, "upkeepM": 3, "power": 1.5, "life": 0, "crew": 0, "housing": 0, "storageT": 0, "upkeepTYr": 0.1, "isruTYr": 0, "food": 0, "science": 0, "crewNeed": 0, "lifeYears": 20, "size": 0.5, "infraNeed": "energia", "traits": ["solar"], "desc": "Mastros de painéis que seguem o Sol; baterias para a noite." },
+    { "id": "bs_comms", "label": "Torre de comunicação", "key": "module:base.comms", "histYear": 2030, "massT": 0.8, "costM": 90, "upkeepM": 3, "power": -0.2, "life": 0, "crew": 0, "housing": 0, "storageT": 0, "upkeepTYr": 0.05, "isruTYr": 0, "food": 0, "science": 1, "crewNeed": 0, "lifeYears": 20, "size": 0.5, "infraNeed": null, "traits": ["comms"], "desc": "Antena alta e rede local: rovers e drones trabalham longe da base." },
+    { "id": "bs_lab", "label": "Laboratório de superfície", "key": "module:base.lab", "histYear": 2030, "massT": 5, "costM": 500, "upkeepM": 18, "power": -1, "life": 0, "crew": 0, "housing": 0, "storageT": 1, "upkeepTYr": 0.5, "isruTYr": 0, "food": 0, "science": 6, "crewNeed": 2, "lifeYears": 20, "size": 1.5, "infraNeed": null, "traits": ["lab"], "desc": "Geologia, biologia e amostras analisadas na hora, sem voltar à Terra." },
+    { "id": "bs_fission", "label": "Reator de fissão compacto", "key": "module:base.fission", "histYear": 2032, "massT": 6, "costM": 700, "upkeepM": 15, "power": 4, "life": 0, "crew": 0, "housing": 0, "storageT": 0, "upkeepTYr": 0.2, "isruTYr": 0, "food": 0, "science": 0, "crewNeed": 0, "lifeYears": 15, "size": 1, "infraNeed": "energia", "traits": ["reactor"], "milestone": "first_fission_surface_power", "desc": "Quarenta quilowatts dia e noite, enterrado longe dos habitats." },
+    { "id": "bs_isru", "label": "Usina de oxigênio do regolito", "key": "module:base.isru", "histYear": 2033, "massT": 7, "costM": 650, "upkeepM": 15, "power": -1.5, "life": 1, "crew": 0, "housing": 0, "storageT": 2, "upkeepTYr": 0.3, "isruTYr": 6, "food": 0, "science": 0.5, "crewNeed": 0, "lifeYears": 15, "size": 2, "infraNeed": "vida", "traits": ["isru"], "desc": "Tira oxigênio e água do solo: seis toneladas a menos por ano vindas da Terra." },
+    { "id": "bs_pad", "label": "Área de pouso", "key": "module:base.pad", "histYear": 2034, "massT": 4, "costM": 300, "upkeepM": 5, "power": 0, "life": 0, "crew": 0, "housing": 0, "storageT": 0, "upkeepTYr": 0.05, "isruTYr": 0, "food": 0, "science": 0, "crewNeed": 0, "lifeYears": 30, "size": 2, "infraNeed": null, "traits": ["pad"], "desc": "Regolito sinterizado e balizas: pousos 10% mais seguros e sem jato de pó." },
+    { "id": "bs_garage", "label": "Garagem e oficina", "key": "module:base.garage", "histYear": 2036, "massT": 7, "costM": 400, "upkeepM": 8, "power": -0.5, "life": 0, "crew": 0, "housing": 0, "storageT": 4, "upkeepTYr": 0.2, "isruTYr": 0, "food": 0, "science": 0, "crewNeed": 0, "lifeYears": 25, "size": 2, "infraNeed": null, "traits": ["garage"], "desc": "Abrigo e oficina para os veículos: eles duram mais e quebram menos." },
+    { "id": "bs_hab_large", "label": "Habitat enterrado", "key": "module:base.hab_large", "histYear": 2038, "massT": 20, "costM": 1100, "upkeepM": 30, "power": -1, "life": 1, "crew": 8, "housing": 12, "storageT": 6, "upkeepTYr": 1.2, "isruTYr": 0, "food": 0, "science": 1, "crewNeed": 0, "lifeYears": 30, "size": 3, "infraNeed": "moradia", "traits": ["hab"], "desc": "Galerias sob três metros de regolito: protegido da radiação, cabe uma equipe inteira." },
+    { "id": "bs_greenhouse", "label": "Estufa", "key": "module:base.greenhouse", "histYear": 2040, "massT": 10, "costM": 600, "upkeepM": 12, "power": -1, "life": 1, "crew": 0, "housing": 0, "storageT": 1, "upkeepTYr": 0.3, "isruTYr": 3, "food": 2, "science": 1, "crewNeed": 0, "lifeYears": 20, "size": 3, "infraNeed": "alimento", "traits": ["greenhouse"], "desc": "Alface, batata e algas sob LEDs: comida fresca e ar reciclado." },
+    { "id": "bs_dome", "label": "Cúpula pressurizada", "key": "module:base.dome", "histYear": 2060, "massT": 35, "costM": 2500, "upkeepM": 60, "power": -2, "life": 3, "crew": 40, "housing": 60, "storageT": 12, "upkeepTYr": 3, "isruTYr": 0, "food": 1, "science": 2, "crewNeed": 0, "lifeYears": 40, "size": 8, "infraNeed": "moradia", "traits": ["dome"], "desc": "Uma praça coberta com jardins: o primeiro lugar onde se vive, não só se trabalha." },
+    { "id": "bs_factory", "label": "Fábrica de regolito", "key": "module:base.factory", "histYear": 2070, "massT": 40, "costM": 4000, "upkeepM": 80, "power": -4, "life": 0, "crew": 0, "housing": 0, "storageT": 10, "upkeepTYr": 1, "isruTYr": 4, "food": 0, "science": 4, "crewNeed": 4, "lifeYears": 30, "size": 10, "infraNeed": "energia", "traits": ["factory"], "desc": "Fornos e impressoras de regolito: a base passa a se construir sozinha." },
+    { "id": "bs_mass_driver", "label": "Lançador eletromagnético", "key": "module:base.mass_driver", "histYear": 2090, "massT": 50, "costM": 12000, "upkeepM": 150, "power": -6, "life": 0, "crew": 0, "housing": 0, "storageT": 0, "upkeepTYr": 1, "isruTYr": 0, "food": 0, "science": 2, "crewNeed": 4, "lifeYears": 40, "size": 20, "infraNeed": null, "traits": ["mass_driver"], "desc": "Um trilho de quilômetros que joga carga em órbita sem foguete." },
+    { "id": "bs_arcology", "label": "Arcologia", "key": "module:base.arcology", "histYear": 2250, "massT": 180, "costM": 60000, "upkeepM": 1200, "power": 0, "life": 30, "crew": 2000, "housing": 3000, "storageT": 300, "upkeepTYr": 20, "isruTYr": 30, "food": 20, "science": 30, "crewNeed": 200, "lifeYears": 100, "size": 60, "infraNeed": "moradia", "traits": ["arcology"], "desc": "Uma torre-cidade fechada: três mil moradores, fazendas e escolas sob o mesmo teto." },
+    { "id": "bs_megastructure", "label": "Estrutura colossal", "key": "module:base.megastructure", "histYear": 2600, "massT": 200, "costM": 400000, "upkeepM": 6000, "power": 0, "life": 400, "crew": 30000, "housing": 50000, "storageT": 3000, "upkeepTYr": 100, "isruTYr": 120, "food": 300, "science": 200, "crewNeed": 2000, "lifeYears": 300, "size": 150, "infraNeed": "moradia", "traits": ["megastructure"], "desc": "Montada em séculos com material local: vista da órbita, parece geografia." }
+  ],
+  "vehicles": [
+    { "id": "vh_lrv", "label": "Jipe não pressurizado", "key": "rover:vh_lrv", "histYear": 1971, "massT": 0.21, "costM": 40, "science": 3, "unload": 0, "isruTYr": 0, "kmYr": 30, "bodies": ["moon", "mars", "mercury", "ceres"], "desc": "Quatro rodas de tela metálica: os astronautas vão além do que o fôlego alcança." },
+    { "id": "vh_drone", "label": "Drone de reconhecimento", "key": "rover:vh_drone", "histYear": 2030, "massT": 0.5, "costM": 60, "science": 2, "unload": 0, "isruTYr": 0, "kmYr": 300, "bodies": ["mars", "venus", "titan"], "atmosphere": true, "desc": "Voa onde há ar: mapeia crateras e procura gelo para a base." },
+    { "id": "vh_pressurized", "label": "Jipe pressurizado", "key": "rover:vh_pressurized", "histYear": 2032, "massT": 5, "costM": 250, "science": 4, "unload": 0, "isruTYr": 0, "kmYr": 600, "bodies": [], "desc": "Uma cabine com beliches sobre rodas: expedições de semanas sem traje." },
+    { "id": "vh_crane", "label": "Guindaste de descarga", "key": "rover:vh_crane", "histYear": 2034, "massT": 3, "costM": 120, "science": 0, "unload": 1, "isruTYr": 0, "kmYr": 20, "bodies": [], "desc": "Tira cargas do topo dos módulos de pouso e as leva até a base." },
+    { "id": "vh_excavator", "label": "Escavadeira de regolito", "key": "rover:vh_excavator", "histYear": 2035, "massT": 2.5, "costM": 140, "science": 0, "unload": 0, "isruTYr": 2, "kmYr": 15, "bodies": [], "desc": "Alimenta a usina de oxigênio e cobre os habitats de regolito." },
+    { "id": "vh_truck", "label": "Caminhão de carga", "key": "rover:vh_truck", "histYear": 2036, "massT": 4, "costM": 160, "science": 0, "unload": 1, "isruTYr": 0, "kmYr": 120, "bodies": [], "desc": "Leva contêineres do campo de pouso até os módulos, sem ninguém ao volante." },
+    { "id": "vh_hopper", "label": "Saltador", "key": "rover:vh_hopper", "histYear": 2045, "massT": 8, "costM": 400, "science": 5, "unload": 0, "isruTYr": 0, "kmYr": 2000, "bodies": [], "desc": "Um pequeno foguete de pernas: salta centenas de quilômetros e pousa de novo." },
+    { "id": "vh_crawler", "label": "Rastejador gigante", "key": "rover:vh_crawler", "histYear": 2200, "massT": 60, "costM": 3000, "science": 10, "unload": 2, "isruTYr": 8, "kmYr": 200, "bodies": [], "desc": "Uma fábrica sobre esteiras que minera, refina e entrega enquanto anda." }
+  ],
+  "names": {
+    "station": ["Aurora", "Horizonte", "Alvorada", "Cruzeiro", "Esperança", "Farol", "Vigia", "Atalaia", "Bandeirante", "Ipê", "Jangada", "Constelação", "Guarani", "Paineira", "Sertão", "Tupã"],
+    "base": ["Base {place}", "Posto {place}", "Estação de superfície {place}", "Acampamento {place}", "Vila {place}", "Base Pioneira {place}"]
+  },
+  "stageRules": {
+    "outpost": { "housing": 1, "power": 1, "visited": true },
+    "base": { "housing": 12, "power": 3, "life": 2, "lifeTraits": ["isru", "greenhouse"], "labs": 1 },
+    "sets": {
+      "outpost": [["bs_hab_small", 1], ["bs_solar", 2], ["bs_comms", 1]],
+      "base": [["bs_hab_small", 2], ["bs_hab_large", 1], ["bs_solar", 2], ["bs_fission", 1], ["bs_isru", 1], ["bs_greenhouse", 1], ["bs_lab", 1], ["bs_pad", 1]],
+      "colony": [["bs_hab_small", 2], ["bs_hab_large", 2], ["bs_solar", 3], ["bs_fission", 2], ["bs_isru", 2], ["bs_greenhouse", 2], ["bs_lab", 2], ["bs_pad", 1], ["bs_garage", 1], ["bs_dome", 2], ["bs_factory", 1]],
+      "city": [["bs_hab_large", 4], ["bs_fission", 4], ["bs_isru", 3], ["bs_greenhouse", 4], ["bs_lab", 3], ["bs_pad", 2], ["bs_garage", 2], ["bs_dome", 6], ["bs_factory", 2], ["bs_mass_driver", 1], ["bs_arcology", 1]],
+      "vehicles": [["vh_lrv", 1], ["vh_pressurized", 1], ["vh_crane", 1], ["vh_truck", 1], ["vh_excavator", 1]]
+    },
+    "colonyStageSet": { "2": "outpost", "3": "base", "4": "colony", "5": "city", "6": "city" }
+  },
+  "aiBases": {
+    "lunar_base": { "site": "lunar_south_pole", "fallback": "lunar_surface", "set": "outpost" },
+    "mars_outpost": { "site": "mars_surface", "set": "outpost" },
+    "mars_base": { "site": "mars_surface", "set": "base" },
+    "ceres_base": { "site": "ceres_surface", "fallback": "ceres", "set": "outpost" }
+  }
+}

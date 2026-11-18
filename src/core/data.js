@@ -88,8 +88,13 @@ function catalogIds(manifest, eraSet) {
   return list.filter((p, i) => i < last && !eraSet.has(p.era)).map((p) => p.id);
 }
 
+/**
+ * Packs merged for a set of eras. Tech packs (`kind: "tech"`) are merged whatever the eras: unlock keys and their
+ * years must be known from the start (a key no loaded node grants would be held by everyone, and the result would
+ * depend on which era packs happen to be loaded; the whole tree is ~160 KB).
+ */
 function activeIds(manifest, eraSet) {
-  return (manifest.packs || []).filter((p) => p.always || (p.era && eraSet.has(p.era)) || (!p.era && Array.isArray(p.eras) && p.eras.some((e) => eraSet.has(e)))).map((p) => p.id);
+  return (manifest.packs || []).filter((p) => p.always || p.kind === 'tech' || (p.era && eraSet.has(p.era)) || (!p.era && Array.isArray(p.eras) && p.eras.some((e) => eraSet.has(e)))).map((p) => p.id);
 }
 
 /** Re-assemble `data` in place (the store keeps its reference) from the cached raw packs. */

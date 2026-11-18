@@ -46,6 +46,7 @@
   "destinations": [
     {
       "id": "mir",
+      "assetHist": "mir",
       "name": "Estação Mir",
       "emLabel": "na Mir",
       "toLabel": "à Mir",

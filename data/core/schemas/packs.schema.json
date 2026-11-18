@@ -55,6 +55,28 @@
               "type": "string",
               "pattern": "^[a-z0-9-]+$"
             }
+          },
+          "kind": {
+            "enum": [
+              "tech"
+            ]
+          },
+          "techEra": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "eras": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "common.schema.json#/$defs/eraId"
+            }
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            }
           }
         }
       }

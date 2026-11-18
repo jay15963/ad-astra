@@ -28,13 +28,14 @@ const CAUSE_KIND = { part: 'Peça', decision: 'Decisão', luck: 'Sorte', environ
 const FAILURE_LABELS = { propulsion: 'Propulsão', structure: 'Estrutura', software: 'Software', human: 'Fator humano', environment: 'Ambiente' };
 
 // default animation times (s) and telemetry keyframes for standard ascent milestones
-const ASCENT_T = { ignition: 2, liftoff: 5, maxq: 16, staging: 29, fairing_or_les: 39, orbit: 54, tli: 68 };
+const ASCENT_T = { ignition: 2, liftoff: 5, maxq: 16, staging: 29, fairing_or_les: 39, orbit: 54, tli: 68, module_release: 63, rendezvous: 67, dock: 80 };
 // real mission elapsed time (s) at each standard milestone: the HUD clock runs on this scale, the same one the
 // sim's TLM radio lines use ("TLM T+3:30 · alt 110 km"), while the animation itself stays compressed
-const ASCENT_MET = { ignition: 0, liftoff: 3, maxq: 72, staging: 160, fairing_or_les: 210, orbit: 530, tli: 3900 };
+const ASCENT_MET = { ignition: 0, liftoff: 3, maxq: 72, staging: 160, fairing_or_les: 210, orbit: 530, tli: 3900, module_release: 900, rendezvous: 10800, dock: 12600 };
 const ASCENT_KEYS = {
   ignition: [0, 0], liftoff: [0.06, 0.02], maxq: [12, 0.45], staging: [68, 2.4],
   fairing_or_les: [115, 3.4], orbit: [200, 7.8], tli: [240, 10.9],
+  module_release: [200, 7.8], rendezvous: [410, 7.66], dock: [410, 7.66],
 };
 const MIN_GAP = 4;          // s between milestones, so radio lines are readable
 const MAX_DURATION = 85;    // s of ascent animation at 1x
@@ -182,6 +183,76 @@ export function metAt(profile, t) {
   const p = keys[keys.length - 2];
   const rate = p && l.t > p.t ? (l.met - p.met) / (l.t - p.t) : 1;
   return l.met + (t - l.t) * Math.max(1, rate);
+}
+
+// ---------------------------------------------------------------- infrastructure beats (MISSIONS-V2 §7)
+// The sim snapshots the target station/base into activeLaunch.target (SceneTarget) and adds the milestones
+// `rendezvous` + `dock` (docking / berthing) or `module_release`; a surface delivery keeps its landing milestones
+// and gets the visual-only `unload` beat. These helpers turn that snapshot into the renderer's mode and flags.
+const RX_RV = /rendez/;
+const RX_DOCK = /(^|_)(dock|berth)|acopl/;
+const RX_REL = /module_release|liberacao_modulo/;
+
+/** Index of the first infrastructure milestone (rendezvous / dock / module_release), or −1. */
+export function infraIndex(milestones) {
+  const ms = Array.isArray(milestones) ? milestones : [];
+  return ms.findIndex((m) => { const id = String(m?.id || ''); return RX_RV.test(id) || RX_DOCK.test(id) || RX_REL.test(id); });
+}
+
+/** Renderer event of a resolved infrastructure milestone: rendezvous | dock | berth | release | rvFail | dockFail | null. */
+export function infraEventOf(m, target) {
+  const id = String(m?.id || '');
+  if (!m || !id) return null;
+  const fail = m.status === 'fail';
+  if (RX_RV.test(id)) return fail ? 'rvFail' : 'rendezvous';
+  if (RX_DOCK.test(id)) return fail ? 'dockFail' : target?.sequence === 'berth' ? 'berth' : 'dock';
+  if (RX_REL.test(id)) return fail ? null : 'release';
+  return null;
+}
+
+/** Flags implied by the milestones resolved so far (resume / replay draw the right picture from these alone). */
+export function infraFlags(milestones, upto, target) {
+  const done = (Array.isArray(milestones) ? milestones : []).slice(0, Math.max(0, upto | 0));
+  const f = { rendezvous: false, docked: false, dockFail: false, rvFail: false, rvAnomaly: false, released: false };
+  for (const m of done) {
+    const e = infraEventOf(m, target);
+    if (e === 'rendezvous') { f.rendezvous = true; if (m.status === 'anomaly') f.rvAnomaly = true; }
+    if (e === 'dock' || e === 'berth') f.docked = true;
+    if (e === 'dockFail') f.dockFail = true;
+    if (e === 'rvFail') f.rvFail = true;
+    if (e === 'release') f.released = true;
+  }
+  return f;
+}
+
+/**
+ * Clock times (s, animation clock) of the docking choreography: start (when the scene switches to the
+ * rendezvous view), rv (rendezvous milestone), dock (contact milestone), release (module_release).
+ */
+export function infraTimeline(profile, milestones, { leadIn = 2.5 } = {}) {
+  const ms = Array.isArray(milestones) ? milestones : [];
+  const times = profile?.times || [];
+  const i0 = infraIndex(ms);
+  if (i0 < 0) return null;
+  const at = (rx) => { const i = ms.findIndex((m) => rx.test(String(m?.id || ''))); return i >= 0 && Number.isFinite(times[i]) ? times[i] : null; };
+  const prev = i0 > 0 && Number.isFinite(times[i0 - 1]) ? times[i0 - 1] : 0;
+  const first = Number.isFinite(times[i0]) ? times[i0] : prev + 11;
+  const start = Math.min(prev + leadIn, first - 1.5);
+  const dock = at(RX_DOCK);
+  const rv = at(RX_RV);
+  return { start: Math.max(0, start), rv: rv ?? (dock != null ? (start + dock) / 2 : null), dock: dock ?? (rv != null ? rv + 11 : null), release: at(RX_REL) };
+}
+
+/** Sequences drawn in the rendezvous view (docking/berthing at a station, or a module release). */
+export function rendezvousActive({ view, target, milestones, presented, secoAge = null, phase = 'ascent' } = {}) {
+  if (view === 'countdown' || view === 'prelaunch') return false;
+  const seq = target?.sequence;
+  if (seq !== 'dock' && seq !== 'berth' && seq !== 'release') return false;
+  const i0 = infraIndex(milestones);
+  if (i0 < 0) return false;
+  if ((presented | 0) < i0) return false;
+  // ascent: a beat of SECO / payload separation on the climb view first (resume skips it: no seco event yet)
+  return phase !== 'ascent' || secoAge == null || secoAge > 2.5;
 }
 
 /** True when no more milestones will be rolled in this scene. */
@@ -381,6 +452,8 @@ function createScene(store, key) {
   const craft = dIdx.spacecraft?.[mission.spacecraftId] || null;
   const actor = store.state?.actors?.[store.state?.playerId] || null;
   const lastMsId = String((al0.milestones || []).slice(-1)[0]?.id || '');
+  const target = al0.target && typeof al0.target === 'object' ? al0.target : null; // SceneTarget snapshot (MISSIONS-V2 §7.1)
+  const dockArrival = phase === 'arrival' && RX_DOCK.test(lastMsId);
   const arrivalKind = phase !== 'arrival' ? null : /touch|land|pouso|splash/.test(lastMsId) ? 'landing' : 'orbit';
   // the "world" drawn under the vehicle (a cislunar return ends in Earth's ocean)
   const world = /splash/.test(lastMsId) ? 'earth' : mission.destination === 'titan' ? 'titan' : body;
@@ -960,6 +1033,8 @@ function createScene(store, key) {
     countEl.innerHTML = '';
     panel.innerHTML = '';
     S.profile = buildProfile(al.milestones, phase, world, arrivalKind);
+    S.dockT = null;
+    S.infra = infraFlags(al.milestones, resume ? Math.min(al.current || 0, (al.milestones || []).length) : 0, target);
     if (resume) {
       // resume from the stored point: no replay of milestones already rolled
       S.presented = Math.min(al.current || 0, (al.milestones || []).length);
@@ -979,7 +1054,7 @@ function createScene(store, key) {
       // resumed above the pad: liftoff happened long ago (no frost, no pad smoke)
       if (telemetryAt(S.profile, S.clock).alt > 0.0004) S.ev.liftoff = S.t - 30;
     } else if (resume) {
-      for (const m of (al.milestones || []).slice(0, S.presented)) if (m.status !== 'fail') visualEvents(m);
+      for (const m of (al.milestones || []).slice(0, S.presented)) if (m.status !== 'fail') visualEvents(m, true);
     }
     S.engineOn = true;
     S.prevAlt = telemetryAt(S.profile, S.clock).alt;
@@ -1001,6 +1076,7 @@ function createScene(store, key) {
     S.landed = phase === 'arrival' && arrivalKind === 'landing' && complete;
     S.inOrbit = phase === 'arrival' && arrivalKind === 'orbit' && complete;
     S.chute = done.some((m) => /parachute|paraq/.test(m.id || '')) && !done.some((m) => /powered|descent|descida/.test(m.id || ''));
+    S.infra = infraFlags(al.milestones, upto, target);
     S.engineOn = !S.exploded && !S.landed;
   }
 
@@ -1083,7 +1159,7 @@ function createScene(store, key) {
     const id = m.id || '';
     if (m.status === 'ok') {
       const finalArr = phase === 'arrival' && i === (al.milestones || []).length - 1;
-      showStamp(label, !finalArr ? 'OK' : arrivalKind === 'orbit' ? 'CAPTURA CONFIRMADA' : world === 'earth' ? 'AMERISSAGEM' : 'POUSO CONFIRMADO', 'ok');
+      showStamp(label, !finalArr ? 'OK' : dockArrival ? 'ACOPLAMENTO CONFIRMADO' : arrivalKind === 'orbit' ? 'CAPTURA CONFIRMADA' : world === 'earth' ? 'AMERISSAGEM' : 'POUSO CONFIRMADO', 'ok');
       audio.chime();
       vibrate(30);
       setMood('happy', 1.6);
@@ -1128,6 +1204,8 @@ function createScene(store, key) {
     S.flash = 0.45; S.flashColor = PAL.amber;
     if (!quiet) { audio.thump(); audio.alarm(); }
     if (phase === 'arrival' && arrivalKind === 'landing' && i === (al.milestones || []).length - 1) touchdown(true);
+    const ie = infraEventOf(m, target);
+    if (ie) { S.infra = infraFlags(al.milestones, i + 1, target); fire(ie); }
   }
 
   function startClimaxPre() {
@@ -1362,6 +1440,7 @@ function createScene(store, key) {
     S.ev = {};
     if (phase === 'ascent') fire('ignition');
     S.staged = false; S.fairingOff = false; S.exploded = false; S.landed = false; S.touch = null; S.engineOn = true; S.frozen = false; S.escaped = null; S.chute = false; S.inOrbit = false;
+    S.infra = infraFlags([], 0, target);
     S.presented = 0;
     S.clock = 0;
     S.resultFx = null;
@@ -1442,7 +1521,7 @@ function createScene(store, key) {
   }
 
   /** Visual events implied by a resolved milestone (stage/fairing/touchdown are fired by their handlers). */
-  function visualEvents(m) {
+  function visualEvents(m, quiet = false) {
     const id = m?.id || '';
     if (!m || m.status === 'fail') return;
     if (phase === 'ascent') {
@@ -1456,11 +1535,25 @@ function createScene(store, key) {
       if (/parachute|paraq/.test(id)) fire('chute');
       if (/powered|descent|descida/.test(id)) fire('powered');
     }
+    const ie = infraEventOf(m, target);
+    if (ie) {
+      const ms = AL()?.milestones || [];
+      const at = ms.findIndex((x) => x === m || (x?.id === m.id && x?.status === m.status));
+      S.infra = infraFlags(ms, (at >= 0 ? at : S.presented - 1) + 1, target);
+      if (quiet) return; // resumed: the flags carry the picture, no contact flash / captions again
+      const first = S.ev[ie] == null;
+      fire(ie);
+      if (first && S.view !== 'replay') {
+        if (ie === 'release' && target?.newAsset && target?.kind !== 'base') caption('Primeiro módulo em posição.', 'event');
+        else if (ie === 'dock' || ie === 'berth') caption(`${ie === 'berth' ? 'Captura pelo braço robótico' : 'Contato e travamento'}${target?.name ? ` em ${target.name}` : ''}.`, 'event');
+      }
+    }
     if (m.status === 'anomaly') { try { R.event('anomaly', { severity: 0.6 }); } catch (e) { renderFailed(e); } }
   }
 
   function sceneMode() {
     if (S.view === 'countdown') return 'pad';
+    if (target && rendezvousActive({ view: S.view, target, milestones: AL()?.milestones, presented: S.presented, phase, secoAge: S.ev.seco != null ? S.t - S.ev.seco : null })) return 'rendezvous';
     if (phase === 'arrival') return arrivalKind === 'landing' ? 'descent' : 'orbit';
     return 'ascent';
   }
@@ -1494,8 +1587,11 @@ function createScene(store, key) {
       flags: {
         engineOn, staged: !!S.staged, fairingOff: !!S.fairingOff, exploded: !!S.exploded, escaped: !!S.escaped,
         landed, chute, inOrbit: !!S.inOrbit, hold: !!al?.pendingHold,
+        docked: !!S.infra?.docked, dockFail: !!S.infra?.dockFail, rvFail: !!S.infra?.rvFail, rvAnomaly: !!S.infra?.rvAnomaly, released: !!S.infra?.released,
       },
       events: S.ev,
+      target, dockT: target ? (S.dockT || (S.dockT = infraTimeline(S.profile, al?.milestones))) : null,
+      ...(mode === 'rendezvous' ? { world: target?.bodyId || (phase === 'arrival' ? world : 'earth') } : {}),
       ...over,
     };
   }
@@ -1611,6 +1707,10 @@ function createScene(store, key) {
       if (rs.mode === 'ascent' && rs.tele.altKm > 0.0004) fire('liftoff');
       if (rs.mode === 'descent' && rs.flags.chute) fire('chute');
       if (rs.mode === 'descent' && S.landed && S.touch && !S.touch.done && rs.tele.altKm <= 0.0008) { visualTouchdown(); rs.flags.landed = true; rs.flags.engineOn = false; }
+      if (rs.mode === 'descent' && target?.sequence === 'surface' && S.ev.touchdown != null && S.ev.unload == null && S.t - S.ev.touchdown > 1.5 && !S.exploded) {
+        fire('unload');
+        if (S.view !== 'replay') caption((target.vehicles || []).length ? 'Veículos a caminho para descarregar.' : 'Descarregando a carga.', 'event');
+      }
       if (!R.draw(g, rs)) plainSky();
       placeOverlays(rs);
     } catch (e) {
@@ -1869,11 +1969,18 @@ function createScene(store, key) {
     const nerv = Math.max(0, Math.min(100, nervBase + (S.view === 'countdown' ? (1 - S.cd / COUNT_FROM) * 12 : 0) + (al.pendingIntervention ? 15 : 0) + (reduce() ? 0 : Math.sin(S.t * 3.1) * 2)));
     const cp = al.commandPoints ?? 0;
     const tlabel = S.view === 'countdown' ? `T−${fmtClock(Math.ceil(S.cd))}` : `T+${fmtClock(metAt(S.profile, S.clock))}`;
-    const altTxt = tele.alt < 1 ? `${Math.round(tele.alt * 1000)} m` : `${fmtNum(tele.alt, tele.alt < 100 ? 1 : 0)} km`;
+    let altTxt = tele.alt < 1 ? `${Math.round(tele.alt * 1000)} m` : `${fmtNum(tele.alt, tele.alt < 100 ? 1 : 0)} km`;
+    let altLbl = 'ALT';
+    if (lastRS?.mode === 'rendezvous' && renderMod?.dockPose && target && target.sequence !== 'release') {
+      try {
+        const r = renderMod.dockPose({ clock: S.clock, t: S.t, tl: lastRS.dockT || {}, seq: target.sequence, flags: lastRS.flags, events: S.ev }).range;
+        altLbl = 'DIST'; altTxt = r < 1 ? `${fmtNum(r, 1)} m` : `${Math.round(r)} m`;
+      } catch { /* keep ALT */ }
+    }
     const velTxt = tele.vel < 1 ? `${Math.round(tele.vel * 1000)} m/s` : `${fmtNum(tele.vel, 2)} km/s`;
     hud.innerHTML =
       `<div class="ls-tele"><div><small>${phase === 'arrival' ? 'TEMPO' : 'MET'}</small>${tlabel}</div>` +
-      (S.view !== 'countdown' ? `<div><small>ALT</small>${altTxt}</div><div><small>VEL</small>${velTxt}</div>` : `<div><small>CLIMA</small>${esc(al.weather?.label || '—')}</div>`) +
+      (S.view !== 'countdown' ? `<div><small>${altLbl}</small>${altTxt}</div><div><small>VEL</small>${velTxt}</div>` : `<div><small>CLIMA</small>${esc(al.weather?.label || '—')}</div>`) +
       `</div><div class="ls-bars">` +
       `<div class="ls-meter m-conf"><small>Confiança</small><i style="width:${conf.toFixed(0)}%"></i></div>` +
       `<div class="ls-meter m-nerv"><small>Nervosismo</small><i style="width:${nerv.toFixed(0)}%"></i></div>` +

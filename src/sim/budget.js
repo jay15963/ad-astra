@@ -4,7 +4,7 @@
 import { addNews, changeActor, log, clamp, player } from '../core/helpers.js';
 import { crossed, yearAt } from './simtime.js';
 
-export const CATEGORIES = ['missions', 'research', 'crew', 'facilities', 'contracts', 'diplomacy', 'grants'];
+export const CATEGORIES = ['missions', 'research', 'crew', 'facilities', 'contracts', 'diplomacy', 'grants', 'infra', 'market'];
 export const CATEGORY_LABELS = {
   missions: 'Missões',
   research: 'Pesquisa',
@@ -13,6 +13,8 @@ export const CATEGORY_LABELS = {
   contracts: 'Contratos',
   diplomacy: 'Diplomacia',
   grants: 'Verba e repasses',
+  infra: 'Infraestrutura',      // MISSIONS-V2 §3.4: ground operations of stations and bases, satellite services
+  market: 'Vendas de foguetes', // MISSIONS-V2 §8.3: launches sold to other agencies
 };
 
 const LEDGER_CAP = 120; // EXPANSION.md §10

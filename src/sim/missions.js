@@ -14,21 +14,47 @@ import * as crewMod from './crew.js';
 import * as research from './research.js';
 import * as narrative from './narrative.js';
 import * as diplomacy from './diplomacy.js';
-import { clamp, nextId, addNews, pushDecision, emitSignal, claimFirst, firstValue, milestoneShare, changeActor, log, relKey } from '../core/helpers.js';
+import { clamp, nextId, addNews, pushDecision, removeDecision, emitSignal, claimFirst, firstValue, milestoneShare, changeActor, log, relKey, achievedAny } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
 import { destPrestige as outcomeDestPrestige, missionPrestige } from '../core/outcome.js';
 import { turnToDate, formatTurn, weeksToText } from '../core/time.js';
 import { vehicleDef as catalogVehicle, spacecraftDef as catalogCraft } from '../core/catalog.js';
 import { crossed, yearAt, destinationOpen, liveActorIds } from './simtime.js';
 
+// Missões v2 (docs/MISSIONS-V2.md §5): the player's research gate. gating.js is pure core code (no sim imports), so it
+// is awaited here without any cycle risk; a missing file (builders working in parallel) leaves every mission ungated.
+const optionalModule = (p) => import(p).catch((e) => {
+  const missing = e?.code === 'ERR_MODULE_NOT_FOUND' || /Failed to fetch|Importing a module script failed|error loading dynamically imported module|Cannot find module/i.test(String(e?.message));
+  if (!missing) throw e;
+  return null;
+});
+const gatingModule = await optionalModule('../core/gating.js');
+
 // ---------------------------------------------------------------------------------------------
 // Tunables and vocabularies (generic rules; content names live in data/*.json)
 // ---------------------------------------------------------------------------------------------
 
-export const TYPES = ['satellite', 'probe', 'crewed', 'cargo', 'station', 'lander'];
+// Missões v2 taxonomy (§1.1): "Pouso" is gone as a type — a probe sent to a surface is the landing, a rover is the
+// long-lived surface mission. `lander`/`landing` stay forever as aliases of probe/lander (old saves, data, programs).
+export const TYPES = ['satellite', 'probe', 'rover', 'crewed', 'cargo', 'station'];
+export const LEGACY_TYPES = Object.freeze({ lander: Object.freeze({ type: 'probe', sub: 'lander' }), landing: Object.freeze({ type: 'probe', sub: 'lander' }) });
 export const TYPE_LABELS = {
-  satellite: 'Satélite', probe: 'Sonda', crewed: 'Tripulada', cargo: 'Carga', station: 'Estação', lander: 'Pouso robótico',
+  satellite: 'Satélite', probe: 'Sonda', rover: 'Rover', crewed: 'Tripulada', cargo: 'Carga', station: 'Estação',
 };
+/** Payload kinds of §1.4 (vocab.payloadKinds). `client` is privileged: contracts only. */
+export const PAYLOAD_KINDS = ['supply', 'experiments', 'station_module', 'base_module', 'base_vehicle', 'propellant', 'servicing', 'client'];
+
+/**
+ * Resolve a (possibly legacy) mission type: 'lander' → {type: 'probe', sub: 'lander'}. Accepts a string or an object
+ * with {type, sub}. Unknown types come back as {type: null}. Pure; used for drafts, calendar items, AI programs, saves.
+ */
+export function missionTypeOf(raw, sub = null) {
+  const t = raw && typeof raw === 'object' ? raw.type : raw;
+  const s = raw && typeof raw === 'object' ? raw.sub ?? sub : sub;
+  const alias = LEGACY_TYPES[t];
+  if (alias) return { type: alias.type, sub: typeof s === 'string' && s ? s : alias.sub };
+  return { type: TYPES.includes(t) ? t : null, sub: typeof s === 'string' && s ? s : null };
+}
 export const STATUS_LABELS = {
   planning: 'Em planejamento', scheduled: 'Agendada', launch: 'Dia de lançamento', transit: 'Em trânsito',
   arrival: 'Chegada', operations: 'Em operação', done: 'Concluída', cancelled: 'Cancelada',
@@ -45,24 +71,32 @@ const TYPE_DESTS = {
   crewed: ['leo', 'iss', 'cislunar', 'lunar_orbit', 'lunar_surface', 'lunar_south_pole', 'mars_orbit', 'mars_surface'],
   cargo: ['leo', 'iss', 'cislunar', 'lunar_orbit', 'lunar_surface', 'lunar_south_pole', 'mars_surface'],
   station: ['leo', 'cislunar', 'lunar_orbit', 'lunar_surface', 'lunar_south_pole'],
-  lander: ['lunar_surface', 'lunar_south_pole', 'mars_surface', 'titan'],
+  rover: ['lunar_surface', 'lunar_south_pole', 'mars_surface', 'titan'],
 };
-// Spacecraft kinds that can fly each mission type.
+// Spacecraft kinds that can fly each mission type (data/core/missions.json types[].scKinds overrides).
 const SC_KINDS = {
   satellite: ['satellite'],
-  probe: ['probe', 'lander', 'rover', 'satellite'],
-  crewed: ['capsule', 'lander'],
+  probe: ['probe', 'lander', 'satellite'],
+  rover: ['rover'],
+  crewed: ['capsule', 'lander', 'habitat'],
   cargo: ['cargo', 'capsule', 'lander'],
   station: ['station_module'],
-  lander: ['lander', 'rover', 'probe'],
 };
 // Difficulty → base prestige: core/outcome.js destPrestige (shared with the AI's calendar results).
 const GENERIC_COST_SCALE = { leo: 1, gto: 1.2, tli: 1.6, mars: 2.4, outer: 4 };
 const OPS_COST_BY_KEY = { leo: 6, gto: 5, tli: 35, mars: 60, outer: 90 }; // US$ mi, operations + ground segment
-const SCIENCE_BASE = { satellite: 6, probe: 40, crewed: 20, cargo: 3, station: 25, lander: 45 };
+const SCIENCE_BASE = { satellite: 6, probe: 40, rover: 30, crewed: 20, cargo: 3, station: 25 };
 const SCIENCE_BODY = { earth: 1, moon: 1.5, mars: 2.2, jupiter: 2.8, saturn: 3 };
-const OPS_WEEKS = { satellite: 0, probe: 10, crewed: 2, cargo: 1, station: 8, lander: 6 };
-const LEAD_WEEKS = { satellite: 6, probe: 10, crewed: 12, cargo: 6, station: 14, lander: 10 };
+const OPS_WEEKS = { satellite: 0, probe: 10, rover: 4, crewed: 2, cargo: 1, station: 8 };
+const LEAD_WEEKS = { satellite: 6, probe: 10, rover: 12, crewed: 12, cargo: 6, station: 14 };
+const ROTATION_WEEKS = 26; // a crew rotation keeps its people on the station/base this long (missions.json rotationWeeks)
+const SERVICING_KIT_T = 0.5;
+const DEFAULT_EXPERIMENTS_T = 1;
+// cargo a carrier holds when its data has no cargoT: share of its own mass (§1.4)
+const CARGO_SHARE = { cargo: 0.35, capsule: 0.35, lander: 0.25, habitat: 0.2 };
+// payload kinds that ride inside a carrier (station/base modules fly themselves only when type is station)
+const CARRIED_KINDS = ['supply', 'experiments', 'base_module', 'base_vehicle', 'propellant', 'servicing'];
+const SURFACE_KINDS = ['surface', 'atmosphere'];
 const LEAD_BY_SOURCE = { calendar: 2, contract: 4 };
 const CREW_COST_PER_PERSON = 15; // US$ mi: training, suits, recovery
 const CONSERVATIVE_EXTRA_WEEKS = 6; // conservative strategy: extra tests before launch
@@ -94,47 +128,43 @@ const MILESTONE_LABELS = {
   crewed_orbit_national: 'primeiro voo orbital tripulado próprio',
 };
 
-// Contract templates (generic commercial demand, GDD "Leilões de contratos").
-const CONTRACT_KINDS = [
-  { kind: 'gto_sat', type: 'satellite', destination: 'gto', clientPayload: true, payload: [3, 6.5], weight: 3, fromYear: 1965,
+// Contracts and opportunities live in data/core/contracts.json (MISSIONS-V2.md §2): rows with eligibility rules
+// (date, someone already reached the place, a concrete asset to supply, the player's research, relations). These
+// fallbacks are used only when the file is absent (in-memory test data); they follow the same rules.
+const FALLBACK_CONTRACTS = [
+  { id: 'gto_comms', kind: 'gto_comms', type: 'satellite', sub: 'comms', destination: 'gto', clientPayload: true, payload: [3, 6.5], weight: 3,
     title: 'Satélite de comunicações para GTO',
     clients: ['Operadora de telecom do Sudeste Asiático', 'Consórcio europeu de banda larga', 'Operadora latino-americana de TV', 'Rede de satélites do Golfo'],
-    body: 'Um satélite geoestacionário precisa de carona até a órbita de transferência. O cliente quer preço, prazo e um foguete confiável.' },
-  { kind: 'sso_sat', type: 'satellite', destination: 'sso', clientPayload: true, payload: [0.5, 2.5], weight: 2, fromYear: 1972,
+    body: 'Um satélite geoestacionário precisa de carona até a órbita de transferência. O cliente quer preço, prazo e um foguete confiável.',
+    needs: { fromYear: 1965, firstsAny: ['first_geostationary_satellite'] } },
+  { id: 'sso_obs', kind: 'sso_obs', type: 'satellite', sub: 'earth_obs', destination: 'sso', clientPayload: true, payload: [0.5, 2.5], weight: 2,
     title: 'Constelação de observação em órbita polar',
     clients: ['Startup de imagens de radar', 'Agência ambiental regional', 'Seguradora agrícola'],
-    body: 'Um lote de satélites de observação precisa de lançamento em órbita heliossíncrona.' },
-  { kind: 'station_cargo', type: 'cargo', destination: 'iss', payload: [2, 4], weight: 2, fromYear: 2000, untilYear: 2030,
-    title: 'Carga para a Estação Espacial',
-    clients: ['Programa de reabastecimento da ISS', 'Laboratório farmacêutico em microgravidade'],
-    body: 'Experimentos, comida e peças de reposição precisam chegar à estação. Atraso aqui vira manchete.' },
-  { kind: 'commercial_cargo', type: 'cargo', destination: 'leo', payload: [2, 5], weight: 1, fromYear: 2028,
-    title: 'Carga para estação comercial',
-    clients: ['Estação comercial em órbita baixa', 'Operadora de hotel orbital'],
-    body: 'A sucessora comercial da ISS precisa de carga regular. Quem entregar agora pode virar fornecedor fixo.' },
-  { kind: 'clps', type: 'lander', destination: 'lunar_surface', payload: [0.3, 1.2], weight: 2, fromYear: 2018,
+    body: 'Um lote de satélites de observação precisa de lançamento em órbita heliossíncrona.',
+    needs: { fromYear: 1972, firstsAny: ['first_weather_satellite'] } },
+  { id: 'station_supply', kind: 'station_supply', type: 'cargo', sub: 'supply', payload: [1, 2.5], weight: 3,
+    title: 'Suprimentos para {asset}', clients: ['{owner}'],
+    body: 'A reserva de {asset} está baixa: comida, água, peças de reposição e experimentos precisam subir. Atraso aqui vira manchete.',
+    target: { assetKind: 'station', owner: 'other', status: ['active', 'degraded'], supplyBelow: 0.6 },
+    needs: { fromYear: 1978, playerKeys: ['missionType:cargo', 'missionType:docking'], relation: { minTrust: 10 }, noTensionAbove: 2 } },
+  { id: 'lunar_delivery', kind: 'lunar_delivery', type: 'cargo', sub: 'experiments', destinations: ['lunar_surface', 'lunar_south_pole'], payload: [0.3, 1.2], weight: 2, carrier: 'lander',
     title: 'Entrega de carga útil na Lua',
     clients: ['Programa de cargas lunares comerciais', 'Universidade com instrumento sísmico', 'Mineradora de olho no regolito'],
-    body: 'Instrumentos científicos precisam pousar na superfície lunar. É dinheiro bom e risco alto: pouso lunar ainda falha muito.' },
+    body: 'Instrumentos científicos precisam pousar na superfície lunar. É dinheiro bom e risco alto: pouso lunar ainda falha muito.',
+    needs: { fromYear: 2018, firstsAny: ['lunar_surface_robotic'] } },
 ];
-
-// Opportunity briefings (custom targets). Drafts are completed from the player's catalog.
-const OPPORTUNITIES = [
-  { sub: 'earth_obs', type: 'satellite', destination: 'sso', grantShare: 0.35, fromYear: 1972,
-    title: 'Satélite de observação da Terra', body: 'Um consórcio de clima oferece financiar parte de um satélite de observação em órbita polar. Missão barata, ciência modesta, apoio garantido.' },
-  { sub: 'comms', type: 'satellite', destination: 'gto', grantShare: 0.3, fromYear: 1965,
+const FALLBACK_OPPORTUNITIES = [
+  { id: 'comms', sub: 'comms', type: 'satellite', destination: 'gto', grantShare: 0.3, needs: { fromYear: 1965 },
     title: 'Satélite de comunicações nacional', body: 'O ministério das comunicações quer um satélite próprio em órbita geoestacionária e topa dividir a conta.' },
-  { sub: 'lunar_orbiter', type: 'probe', destination: 'lunar_orbit', grantShare: 0.2, fromYear: 1966,
+  { id: 'lunar_orbiter', sub: 'orbiter', type: 'probe', destination: 'lunar_orbit', grantShare: 0.2, needs: { fromYear: 1966 },
     title: 'Orbitador lunar de mapeamento', body: 'Cientistas pedem um orbitador para mapear gelo nas crateras. Os dados valem ouro para quem quer pousar depois.' },
-  { sub: 'south_pole_lander', type: 'lander', destination: 'lunar_south_pole', grantShare: 0.15, fromYear: 2019,
-    title: 'Pousador robótico no polo sul', body: 'O polo sul é a disputa da década. Um pousador robótico agora garante lugar na corrida e dados sobre o gelo.' },
-  { sub: 'lunar_lander', type: 'lander', destination: 'lunar_surface', grantShare: 0.15, fromYear: 1966,
+  { id: 'lunar_lander', sub: 'lander', type: 'probe', destination: 'lunar_surface', grantShare: 0.15, needs: { fromYear: 1966 },
     title: 'Pousador lunar de demonstração', body: 'Engenheiros querem provar a tecnologia de pouso antes das missões grandes. Falhar aqui custa menos que falhar depois.' },
-  { sub: 'cislunar_demo', type: 'probe', destination: 'cislunar', grantShare: 0.25, fromYear: 2020,
-    title: 'Demonstrador cislunar', body: 'Um teste de navegação no espaço cislunar, perto da futura estação lunar. Barato e útil para o programa.' },
-  { sub: 'crewed_demo', type: 'crewed', destination: 'leo', grantShare: 0.1, fromYear: 1961,
+  { id: 'crewed_demo', sub: 'orbital', type: 'crewed', destination: 'leo', grantShare: 0.1, needs: { fromYear: 1961 },
     title: 'Voo tripulado de demonstração', body: 'O governo quer astronautas no noticiário. Um voo curto em órbita baixa mantém a tripulação afiada e o público atento.' },
 ];
+const CONTRACT_CAPS = { openOffers: 2, perAssetWeeks: 26, minGapWeeks: 6 };
+
 
 // Natural next step after a success ("o briefing seguinte já nasce disso").
 const NEXT_STEP = {
@@ -165,13 +195,24 @@ export function fmtMoney(m) {
 // 'mission/resolved' signal carries mandateId/holderId/designId for modules that prefer to listen.
 // ---------------------------------------------------------------------------------------------
 
-const peers = { investors: null, designs: null };
-/** Late binding of the Phase B modules. Pass only the ones that exist; null unbinds (tests). */
+// Missões v2 adds three peers (MISSIONS-V2.md §3.8, §5, §8.5): infra.js (assets: stations, bases, fleets, rovers),
+// market.js (treaty access, production queue) and gating.js (research gate; also imported above when present).
+// infra/market import missions-adjacent modules, so they are never imported statically here: they bind themselves
+// (`missions.bindPeers({ infra: self })`, like investors.js) and a lazy import below binds them as a fallback.
+const peers = { investors: null, designs: null, infra: null, market: null, gating: gatingModule };
+/** Late binding of the Phase B / Missões v2 modules. Pass only the ones that exist; null unbinds (tests). */
 export function bindPeers(p = {}) {
   for (const k of Object.keys(peers)) if (k in p) peers[k] = p[k] || null;
   return { ...peers };
 }
 const peerFn = (name, f) => (typeof peers[name]?.[f] === 'function' ? peers[name][f] : null);
+// fallback binding of the v2 sim peers (never awaited: no evaluation cycle; a missing file is simply not bound)
+for (const [k, p] of [['infra', './infra.js'], ['market', './market.js']]) {
+  optionalModule(p).then((mod) => { if (mod && peers[k] === null && !boundOff.has(k)) peers[k] = mod; }, () => {});
+}
+const boundOff = new Set(); // peers a test unbound explicitly (bindPeers({infra: null})) are not re-bound by the lazy import
+/** Tests: unbind a v2 peer and keep the lazy import from binding it again. */
+export function unbindPeer(name) { boundOff.add(name); peers[name] = null; }
 
 // --- player designs (B3, state.designs) as launch vehicles ---------------------------------------
 // A design flies through the same catalog as any rocket: its vehicle view is published into data.index.vehicles
@@ -261,6 +302,220 @@ const destList = (data) => data.destinations?.destinations || [];
 const actorName = (state, id) => state.actors?.[id]?.short || state.actors?.[id]?.name || id;
 const missionById = (state, id) => (state.missions || []).find((m) => m.id === id) || null;
 const fmtT = (state, t) => formatTurn(t, state.startYear);
+const fmtTons = (t) => String(round1(t)).replace('.', ',');
+
+// ---------------------------------------------------------------------------------------------
+// Missões v2 data: subtypes, payloads, modules (data/core/missions.json, data/core/modules.json)
+// ---------------------------------------------------------------------------------------------
+
+const MDATA = new WeakMap(); // data → resolved missions tables (data is immutable during play)
+/** Mission tables of §1: data/core/missions.json when loaded, else the code defaults (types, derive rules). */
+function mtables(data) {
+  const key = data && typeof data === 'object' ? data : null;
+  if (key && MDATA.has(key)) return MDATA.get(key);
+  const md = data?.missions && typeof data.missions === 'object' && !Array.isArray(data.missions) ? data.missions : {};
+  const subs = Array.isArray(md.subtypes) ? md.subtypes.filter((r) => r && r.id && r.type) : [];
+  const byType = {};
+  for (const r of subs) (byType[r.type] || (byType[r.type] = [])).push(r);
+  const out = {
+    has: subs.length > 0,
+    types: md.types || {},
+    derive: md.derive || DEFAULT_DERIVE,
+    subs, byType,
+    payloadKinds: md.payloadKinds || {},
+    carrierShare: { ...CARGO_SHARE, ...(md.carrier?.cargoShare || {}) },
+    rotationWeeks: md.rotationWeeks || {},
+    supplyCost: Array.isArray(md.supplyCostPerT) ? md.supplyCostPerT : [{ fromYear: 0, costM: 20 }],
+    firsts: Array.isArray(md.firsts) ? md.firsts : [],
+  };
+  if (key) MDATA.set(key, out);
+  return out;
+}
+// derivation of the subtype when the draft does not name one (§1.2): "Sonda + superfície" is the landing
+const DEFAULT_DERIVE = {
+  probe: { byKind: { surface: 'lander', atmosphere: 'atmospheric', flyby: 'flyby', orbit: 'orbiter', rendezvous: 'small_body', interstellar: 'interstellar', station: 'orbiter' }, default: 'orbiter' },
+  satellite: { bySc: true, default: 'science' },
+  rover: { bySc: true, default: 'medium' },
+  crewed: { byKind: { station: 'rotation', surface: 'landing' }, otherBody: 'flyby', default: 'orbital' },
+  cargo: { byKind: { station: 'supply', surface: 'experiments' }, client: 'client', default: 'supply' },
+  station: { default: 'found' },
+};
+/** Subtype row of (type, sub), or null. */
+export function subtypeOf(data, type, sub) {
+  if (!type || !sub) return null;
+  return (mtables(data).byType[type] || []).find((r) => r.id === sub) || null;
+}
+/** Subtype rows of a type (data order). */
+export function subtypesFor(data, type) {
+  return (mtables(data).byType[type] || []).slice();
+}
+const typeRow = (data, type) => mtables(data).types?.[type] || null;
+const scKindsFor = (data, type) => (Array.isArray(typeRow(data, type)?.scKinds) ? typeRow(data, type).scKinds : SC_KINDS[type] || []);
+
+/** Does a destination satisfy a subtype's `dest` rule? ids are an alternative to the other criteria. */
+export function subDestOk(row, dest) {
+  const r = row?.dest;
+  if (!r || !dest) return true;
+  if (Array.isArray(r.ids) && r.ids.includes(dest.id)) return true;
+  const crit = ['kinds', 'bodies', 'earth', 'capacityKeys'].filter((k) => r[k] != null);
+  if (!crit.length) return !(Array.isArray(r.ids) && r.ids.length);
+  if (Array.isArray(r.kinds) && !r.kinds.includes(dest.kind)) return false;
+  if (Array.isArray(r.bodies) && !r.bodies.includes(dest.body)) return false;
+  if (typeof r.earth === 'boolean' && ((dest.body ?? 'earth') === 'earth') !== r.earth) return false;
+  if (Array.isArray(r.capacityKeys) && !r.capacityKeys.includes(dest.capacityKey)) return false;
+  return true;
+}
+/** Can this craft fly the subtype? Satellites and rovers carry `sub`; untagged (generic) craft fly `genericOk` subtypes. */
+function scOkForSub(data, sc, type, sub) {
+  if (!sc || !sub) return true;
+  if (type !== 'satellite' && type !== 'rover') return true;
+  const row = subtypeOf(data, type, sub);
+  if (!row) return true;
+  if (sc.sub) return sc.sub === sub || (Array.isArray(sc.subs) && sc.subs.includes(sub));
+  if (Array.isArray(sc.subs)) return sc.subs.includes(sub);
+  return !!row.genericOk;
+}
+
+/** The subtype a draft flies: its own (when given), else derived from client payload / target / craft / destination. */
+export function resolveSub(state, data, d) {
+  if (!d?.type) return null;
+  if (typeof d.sub === 'string' && d.sub) return d.sub;
+  const rules = mtables(data).derive?.[d.type] || DEFAULT_DERIVE[d.type] || {};
+  const dest = destDef(data, d.destination);
+  if (d.type === 'cargo' && d.clientPayload) return rules.client || 'client';
+  if (d.type === 'cargo' && d.payload?.kind && d.payload.kind !== 'client' && subtypeOf(data, 'cargo', d.payload.kind)) return d.payload.kind;
+  if (d.type === 'station') return d.payload?.targetAssetId || dest?.kind === 'station' ? 'expand' : 'found';
+  if (d.type === 'crewed' && d.payload?.targetAssetId) {
+    const a = assetOf(state, d.payload.targetAssetId);
+    if (a?.kind === 'satellite') return 'servicing';
+    if (a) return 'rotation';
+  }
+  const sc = spacecraftDef(data, d.spacecraftId, state);
+  if (rules.bySc && sc?.sub && (!mtables(data).has || subtypeOf(data, d.type, sc.sub))) return sc.sub;
+  if (dest) {
+    if (rules.byId?.[dest.id]) return rules.byId[dest.id];
+    if (rules.byCapacityKey?.[dest.capacityKey]) return rules.byCapacityKey[dest.capacityKey];
+    if (rules.byKind?.[dest.kind]) return rules.byKind[dest.kind];
+    if (rules.otherBody && (dest.body ?? 'earth') !== 'earth') return rules.otherBody;
+  }
+  if (d.type === 'rover' || d.type === 'satellite') {
+    // first subtype this craft (or a generic craft) can fly at this destination
+    const fit = subtypesFor(data, d.type).find((r) => subDestOk(r, dest) && (!sc || scOkForSub(data, sc, d.type, r.id)));
+    if (fit) return fit.id;
+  }
+  return rules.default || null;
+}
+
+/** Payload kind a draft carries: its own, else the subtype's (§1.4); station modules for station missions. */
+function payloadKindOf(data, d, sub = d?.sub) {
+  if (d?.payload?.kind) return d.payload.kind;
+  if (d?.type === 'station') return 'station_module';
+  if (d?.type === 'cargo') {
+    if (d.clientPayload) return 'client';
+    return subtypeOf(data, 'cargo', sub)?.payload || (['supply', 'experiments', 'base_module', 'base_vehicle', 'propellant', 'servicing'].includes(sub) ? sub : null);
+  }
+  return null;
+}
+
+// --- modules and surface vehicles (data/core/modules.json, owner infrastructure-sim) ---
+function moduleRows(data, kind) {
+  const M = data?.modules || {};
+  return Array.isArray(M[kind]) ? M[kind] : [];
+}
+/** Station or base module row by id (null when unknown). */
+export function moduleDef(data, id) {
+  if (!id) return null;
+  return moduleRows(data, 'station').find((x) => x?.id === id) || moduleRows(data, 'base').find((x) => x?.id === id) || null;
+}
+const moduleKindOf = (data, id) => (moduleRows(data, 'station').some((x) => x?.id === id) ? 'station' : moduleRows(data, 'base').some((x) => x?.id === id) ? 'base' : null);
+/** Surface vehicle type row (modules.json vehicles) by id. */
+export function surfaceVehicleDef(data, id) {
+  if (!id) return null;
+  return moduleRows(data, 'vehicles').find((x) => x?.id === id) || null;
+}
+const moduleLabel = (m) => m?.label || m?.name || m?.id || 'módulo';
+
+// --- assets (infra.js) ---
+const infraBound = () => !!peerFn('infra', 'deliver');
+function assetOf(state, id) {
+  if (!id) return null;
+  const f = peerFn('infra', 'assetById');
+  if (f) { try { return f(state, id) || null; } catch { return null; } }
+  return (state?.assets?.list || []).find((a) => a?.id === id) || null;
+}
+/** Deliverable targets for a draft (infra.targetsFor), own first; [] without infra. */
+function targetsOf(state, data, d, sub) {
+  const f = peerFn('infra', 'targetsFor');
+  if (!f || !d?.type || !d.destination) return [];
+  try {
+    const r = f(state, data, { type: d.type, sub, destination: d.destination, payloadKind: payloadKindOf(data, d, sub) }, state.playerId);
+    return Array.isArray(r) ? r : [];
+  } catch { return []; }
+}
+/** Does this subtype need an existing asset (rotation, supply, expand, servicing, propellant)? */
+function needsTargetKinds(data, type, sub) {
+  const row = subtypeOf(data, type, sub);
+  if (Array.isArray(row?.needsTarget)) return row.needsTarget;
+  if (type === 'station' && sub === 'expand') return ['station'];
+  return null;
+}
+/**
+ * The asset a draft delivers to: the explicit one, else (when the subtype needs one) the first deliverable target at
+ * the destination — own assets first, then partners/historical stations (a crewed flight to the ISS targets the ISS).
+ * null when founding a new asset or when no target applies.
+ */
+function resolvedTargetId(state, data, d, sub) {
+  const p = d?.payload || {};
+  if (p.targetAssetId) return p.targetAssetId;
+  if (p.newAsset || (d?.type === 'station' && sub === 'found')) return null;
+  const need = needsTargetKinds(data, d.type, sub);
+  const dest = destDef(data, d.destination);
+  const pk = payloadKindOf(data, d, sub);
+  const docksAtStation = dest?.kind === 'station' && ['crewed', 'cargo', 'station'].includes(d.type);
+  const baseCargo = d.type === 'cargo' && ['base_module', 'base_vehicle', 'experiments'].includes(pk) && SURFACE_KINDS.includes(dest?.kind);
+  if (!need && !docksAtStation && !baseCargo) return null;
+  const list = targetsOf(state, data, d, sub).filter((t) => t?.assetId && (!need || need.includes(t.kind)));
+  const pick = (xs) => xs.find((t) => t.ownerId === state.playerId) || xs[0] || null;
+  const okList = list.filter((t) => t.ok !== false);
+  const own = okList.find((t) => t.ownerId === state.playerId);
+  if (own) return own.assetId;
+  // someone else's asset only when the mission must dock/deliver there; an unreachable one is still picked so that
+  // validate shows why ("Precisa de uma parceria de estação com ...")
+  if (need || docksAtStation) return (pick(okList) || pick(list))?.assetId || null;
+  return null;
+}
+
+/** Era price of one tonne of supplies (missions.json supplyCostPerT). */
+function supplyCostPerT(state, data) {
+  const y = yearAt(state);
+  let v = 20;
+  for (const r of mtables(data).supplyCost) if (y >= (r.fromYear ?? 0)) v = Number(r.costM) || v;
+  return v;
+}
+/** Cargo tonnes a craft carries (data cargoT, else a share of its own mass). */
+export function cargoCapacityOf(data, sc) {
+  if (!sc) return 0;
+  if (Number.isFinite(sc.cargoT)) return sc.cargoT;
+  const share = mtables(data).carrierShare[sc.kind];
+  return Number.isFinite(share) ? round1((sc.massT || 0) * share) : 0;
+}
+/** Mass of what the draft carries (not the carrier): module, vehicles, tonnes of supplies, kit, experiments. */
+function cargoMassOf(state, data, d, kind = payloadKindOf(data, d)) {
+  const p = d?.payload || {};
+  const sc = spacecraftDef(data, d?.spacecraftId, state);
+  switch (kind) {
+    case 'station_module':
+      if (sc?.kind === 'station_module') return 0; // a module craft is its own payload
+      return (moduleDef(data, p.moduleId)?.massT || 0) * Math.max(0.5, 1 + techBonus(state, 'moduleMass'));
+    case 'base_module': return (moduleDef(data, p.moduleId)?.massT || 0) * Math.max(0.5, 1 + techBonus(state, 'moduleMass'));
+    case 'base_vehicle': return (surfaceVehicleDef(data, p.vehicleTypeId)?.massT || 0) * (p.qty || 1);
+    case 'supply': case 'propellant': return p.qty || 1;
+    case 'servicing': return SERVICING_KIT_T;
+    case 'experiments': return Number.isFinite(p.massT) ? p.massT : DEFAULT_EXPERIMENTS_T;
+    case 'client': return Number.isFinite(p.massT) ? p.massT : 0;
+    default: return 0;
+  }
+}
 
 function stat(state, key, delta = 1) {
   state.stats = state.stats || {};
@@ -275,6 +530,7 @@ function crewRatedV(state, data, v) {
 }
 
 function techBonus(state, key) {
+  if (!state) return 0;
   const f = fn(research, 'techBonus');
   const v = f ? f(state, state.playerId, key) : 0;
   return Number.isFinite(v) ? v : 0;
@@ -398,13 +654,24 @@ const destOpenNow = (state, dest) => !!dest && destinationOpen(dest, yearAt(stat
 function destOkForType(dest, type) {
   if (!dest || !type) return false;
   const custom = dest.missionTypes || dest.types;
-  if (Array.isArray(custom) && custom.length) return custom.includes(type);
-  return (TYPE_DESTS[type] || []).includes(dest.id);
+  if (Array.isArray(custom) && custom.length) {
+    if (custom.includes(type)) return true;
+    // legacy lists ("lander"): the landing is a probe now, and a surface reachable by a lander takes a rover too
+    if (custom.includes('lander')) return type === 'probe' || (type === 'rover' && SURFACE_KINDS.includes(dest.kind));
+    return false;
+  }
+  if ((TYPE_DESTS[type] || []).includes(dest.id)) return true;
+  // Missões v2 (§3.3): a station destination takes crews, cargo and new modules (expanding the station there)
+  if (dest.kind === 'station' && ['crewed', 'cargo', 'station'].includes(type)) return true;
+  // orbits flagged stationOk can host a new station (§3)
+  if (type === 'station' && dest.stationOk === true) return true;
+  // probes land on any default surface; rovers go wherever a probe can land
+  return type === 'rover' && SURFACE_KINDS.includes(dest.kind) && (TYPE_DESTS.probe || []).includes(dest.id);
 }
-function scOkForType(sc, type, crewed) {
+function scOkForType(sc, type, crewed, data = null) {
   if (!sc) return false;
   if (crewed) return (sc.crew || 0) > 0;
-  return (SC_KINDS[type] || []).includes(sc.kind);
+  return (data ? scKindsFor(data, type) : SC_KINDS[type] || []).includes(sc.kind);
 }
 function scOkForDest(sc, destId) {
   return !Array.isArray(sc?.destinations) || sc.destinations.length === 0 || sc.destinations.includes(destId);
@@ -458,14 +725,37 @@ function emptyCrew() {
   return { flightDirector: null, commander: null, astronauts: [] };
 }
 
+/** Normalize draft.payload (§1.4). Always an object; unknown kinds become null. */
+export function normalizePayload(p) {
+  const x = p && typeof p === 'object' ? p : {};
+  const num = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
+  const kind = PAYLOAD_KINDS.includes(x.kind) ? x.kind : null;
+  const qty = num(x.qty);
+  const massT = num(x.massT);
+  const name = typeof x.newAssetName === 'string' && x.newAssetName.trim() ? x.newAssetName.trim().slice(0, 32) : null;
+  return {
+    kind,
+    moduleId: typeof x.moduleId === 'string' && x.moduleId ? x.moduleId : null,
+    vehicleTypeId: typeof x.vehicleTypeId === 'string' && x.vehicleTypeId ? x.vehicleTypeId : null,
+    qty: kind === 'base_vehicle' ? clamp(Math.round(qty ?? 1), 1, 4) : round1(clamp(qty ?? 1, 0.1, 400)),
+    targetAssetId: typeof x.targetAssetId === 'string' && x.targetAssetId ? x.targetAssetId : null,
+    newAsset: !!x.newAsset,
+    newAssetName: name,
+    ...(massT != null && massT > 0 ? { massT: round1(massT) } : {}),
+  };
+}
+
 /** Normalize a (partial) draft coming from the UI or from a briefing/contract. */
 export function normalizeDraft(d = {}) {
   const cfg = d.config || {};
   const crew = d.crew || {};
-  const type = TYPES.includes(d.type) ? d.type : null;
+  const rt = missionTypeOf(d.type, d.sub);
+  const type = rt.type;
   return {
     name: typeof d.name === 'string' && d.name.trim() ? d.name.trim().slice(0, 60) : null,
     type,
+    sub: type && rt.sub ? String(rt.sub).slice(0, 40) : null,
+    payload: normalizePayload(d.payload),
     destination: d.destination || null,
     vehicleId: d.vehicleId || null,
     spacecraftId: d.spacecraftId || null,
@@ -541,16 +831,41 @@ function autoCrew(state, data, seats, exceptId) {
   return crew;
 }
 
-function payloadOf(data, d) {
+/**
+ * Mass the launcher lifts (§1.4): an explicit config.payloadT (contracts, ballast, client payloads) wins; else the
+ * carrier's own mass (none for a station module flying itself) plus what it carries.
+ */
+function payloadOf(data, d, state = null) {
   if (d.config?.payloadT) return d.config.payloadT;
-  const sc = spacecraftDef(data, d.spacecraftId);
-  return sc?.massT ?? 1;
+  const sc = spacecraftDef(data, d.spacecraftId, state);
+  const kind = payloadKindOf(data, d);
+  const carrier = sc ? sc.massT ?? 1 : d.type === 'station' && d.payload?.moduleId ? 0 : 1;
+  return round1(carrier + cargoMassOf(state, data, d, kind));
 }
 
 /** Effective capacity of vehicle to destination after research bonus and fuel margin. */
 function effectiveCapacity(state, data, vehicleId, destId, fuelMargin) {
   const raw = capacityTo(data, vehicleId, destId);
-  return { raw, eff: round1(raw * (1 + techBonus(state, 'payload')) * (1 - (fuelMargin ?? 0.1))) };
+  const depot = depotBonus(state, data, destId);
+  return { raw, eff: round1(raw * (1 + techBonus(state, 'payload') + depot) * (1 - (fuelMargin ?? 0.1))), ...(depot ? { depot } : {}) };
+}
+/**
+ * Propellant depot in Earth orbit (st_depot with propellant, §3.2): +5% payload for the agency's flights that leave
+ * Earth orbit (refuelled on the way). 0 without infra or without a stocked depot.
+ */
+function depotBonus(state, data, destId) {
+  const f = peerFn('infra', 'bonusAt');
+  const dest = destDef(data, destId);
+  if (!f || !dest || (dest.body ?? 'earth') === 'earth' || !state?.assets?.list?.length) return 0;
+  let best = 0;
+  const sites = new Set();
+  for (const a of state.assets.list) if (a.kind === 'station' && (a.bodyId ?? 'earth') === 'earth' && a.status === 'active') sites.add(a.site);
+  for (const site of sites) {
+    let b = null;
+    try { b = f(state, data, { site, actorId: state.playerId }); } catch { b = null; }
+    best = Math.max(best, Number(b?.payload) || 0);
+  }
+  return clamp(best, 0, 0.2);
 }
 
 /** Cost breakdown in US$ mi. */
@@ -562,8 +877,11 @@ export function computeCost(state, data, draft) {
   const lines = [];
   const launchCost = v ? (v.costM || 0) * Math.max(0.3, 1 + techBonus(state, 'launchCost')) : 0;
   if (v) lines.push({ label: `Lançador (${v.name})`, amount: round1(launchCost) });
+  // an orbital shipyard of the agency at the destination builds the ship there: −10% on the craft (§3.2 shipyard)
+  const yard = d.destination ? siteBonusOf(state, data, d.destination) : null;
+  const yardMult = yard && yard.costMult < 1 ? yard.costMult : 1;
   // generic hardware is priced per class of destination (a Jupiter probe is not a lunar cubesat)
-  const scCost = sc ? (sc.costM || 0) * (sc.access === 'generic' ? GENERIC_COST_SCALE[dest?.capacityKey] ?? 1 : 1) : 0;
+  const scCost = sc ? (sc.costM || 0) * (sc.access === 'generic' ? GENERIC_COST_SCALE[dest?.capacityKey] ?? 1 : 1) * yardMult : 0;
   if (sc && !d.clientPayload) lines.push({ label: `Espaçonave (${sc.name})`, amount: round1(scCost) });
   const sc2 = spacecraftDef(data, companionOf(state, data, d));
   if (sc2) {
@@ -577,6 +895,24 @@ export function computeCost(state, data, draft) {
   }
   const nCrew = d.crewed ? crewIdsOf(d).length : 0;
   if (nCrew) lines.push({ label: `Tripulação (${nCrew})`, amount: nCrew * CREW_COST_PER_PERSON });
+  // Missões v2 payloads (§1.5): the module, the vehicles or the tonnes of supplies are bought too
+  const pk = payloadKindOf(data, d, d.sub || resolveSub(state, data, d));
+  const p = d.payload || {};
+  let cargoM = 0;
+  if ((pk === 'station_module' || pk === 'base_module') && p.moduleId && sc?.kind !== 'station_module') {
+    const mod = moduleDef(data, p.moduleId);
+    if (mod) { cargoM = Number(mod.costM) || 0; lines.push({ label: `Módulo ${moduleLabel(mod)}`, amount: round1(cargoM) }); }
+  } else if (pk === 'base_vehicle' && p.vehicleTypeId) {
+    const vh = surfaceVehicleDef(data, p.vehicleTypeId);
+    if (vh) { cargoM = (Number(vh.costM) || 0) * (p.qty || 1); lines.push({ label: `Veículos (${p.qty || 1})`, amount: round1(cargoM) }); }
+  } else if (pk === 'supply' || pk === 'propellant') {
+    const t = p.qty || 1;
+    cargoM = supplyCostPerT(state, data) * t * (pk === 'propellant' ? 0.5 : 1);
+    lines.push({ label: pk === 'supply' ? `Suprimentos (${fmtTons(t)} t)` : `Propelente (${fmtTons(t)} t)`, amount: round1(cargoM) });
+  } else if (pk === 'servicing') {
+    cargoM = supplyCostPerT(state, data) * 4;
+    lines.push({ label: 'Kit de reparo', amount: round1(cargoM) });
+  }
   if (v && d.config.fuelMargin > 0) {
     const fm = d.config.fuelMargin;
     lines.push({ label: 'Margem de combustível', amount: round1(launchCost * (Math.min(fm, MARGIN_BASE) * 0.25 + Math.max(0, fm - MARGIN_BASE))) });
@@ -594,6 +930,20 @@ export function computeCost(state, data, draft) {
   return { total: Math.max(0, round1(total)), breakdown: lines };
 }
 
+/**
+ * Production queue of the player's own rocket (designs, own-lineage catalog vehicles): market.js §8.4. null when the
+ * vehicle is bought from others, the market is not bound, or the mission already holds its unit (scheduled on it).
+ */
+function productionQueueFor(state, data, d, missionId = d?.id) {
+  const f = peerFn('market', 'productionQueue');
+  if (!f || !d?.vehicleId) return null;
+  const v = vehicleDef(data, d.vehicleId, state);
+  if (!v || !(v.playerDesign || (v.operator && v.operator === state.playerId))) return null;
+  const m = missionId ? missionById(state, missionId) : null;
+  if (m && m.status !== 'planning' && m.vehicleId === d.vehicleId) return null;
+  try { return f(state, data, d.vehicleId, { exceptMissionId: missionId || null }) || null; } catch { return null; }
+}
+
 function leadWeeks(d) {
   const base = LEAD_BY_SOURCE[d.source] ?? LEAD_WEEKS[d.type] ?? 8;
   // extra tests take time, not only money
@@ -603,7 +953,10 @@ function leadWeeks(d) {
 /** Earliest turn this draft can launch (preparation lead + launch window). */
 function earliestLaunch(state, data, d) {
   // a calendar program's hardware is ready on its own schedule (readyTurn), not the day the plan is approved
-  const from = Math.max(state.turn + leadWeeks(d), Number.isFinite(d.readyTurn) ? d.readyTurn : -Infinity);
+  let from = Math.max(state.turn + leadWeeks(d), Number.isFinite(d.readyTurn) ? d.readyTurn : -Infinity);
+  // a rocket the player builds has a production line (market.productionQueue, §8.4): wait for a free unit
+  const pq = productionQueueFor(state, data, d);
+  if (pq && Number.isFinite(pq.nextFreeTurn)) from = Math.max(from, pq.nextFreeTurn);
   if (!d.destination) return from;
   const w = windowFor(state, data, d.destination, from, d.calendarId);
   return Math.max(from, w.openTurn);
@@ -627,14 +980,26 @@ function validate(state, data, d, opts = {}) {
   else if (!destOpenNow(state, dest)) errors.push(`${dest.name} não existe nesta época.`);
   else if (d.type && !destOkForType(dest, d.type) && d.source !== 'calendar') errors.push(`${dest.name} não é destino para missão do tipo ${typeLabel.toLowerCase()}.`);
 
-  // spacecraft
+  // Missões v2 (§1.2–1.5): subtype, payload, target asset and the research gate
+  const v2 = validateV2(state, data, d, opts, errors, warnings);
+
+  // spacecraft (a station module from modules.json flies itself: no craft)
   if (!d.spacecraftId) {
-    if (!d.clientPayload) errors.push('Escolha a espaçonave.');
+    if (!d.clientPayload && !v2.moduleFliesItself) errors.push('Escolha a espaçonave.');
   } else if (!sc) errors.push('Espaçonave desconhecida.');
   else {
-    if (!spacecraftFor(state, data).some((s) => s.id === sc.id)) errors.push(`${sc.name} não está disponível para a agência agora.`);
-    if (d.type && d.source !== 'calendar' && !scOkForType(sc, d.type, d.crewed)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
+    if (!spacecraftFor(state, data).some((s) => s.id === sc.id) && !keepsBooking(state, data, sc, opts)) errors.push(`${sc.name} não está disponível para a agência agora.`);
+    if (d.type && d.source !== 'calendar' && !scOkForType(sc, d.type, d.crewed, data)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
+    else if (d.type && d.source !== 'calendar' && v2.sub && !scOkForSub(data, sc, d.type, v2.sub)) errors.push(`${sc.name} não é ${(subtypeOf(data, d.type, v2.sub)?.label || v2.sub).toLowerCase()}.`);
     if (dest && !scOkForDest(sc, dest.id)) errors.push(`${sc.name} não foi projetada para ${dest.name}.`);
+    // carriers (§1.4): the craft must hold what it carries; surface deliveries need a cargo lander
+    if (v2.carried) {
+      const cap = cargoCapacityOf(data, sc);
+      if (v2.cargoT > cap + 1e-9) errors.push(`A ${sc.name} leva no máximo ${fmtTons(cap)} t de carga.`);
+      if (dest && SURFACE_KINDS.includes(dest.kind) && !(sc.kind === 'lander' || (sc.kind === 'cargo' && scOkForDest(sc, dest.id) && Array.isArray(sc.destinations) && sc.destinations.includes(dest.id)))) {
+        errors.push('Carga na superfície precisa de um módulo de pouso de carga.');
+      }
+    }
   }
   // companion craft (lander for Orion, capsule for Lanyue)
   const sc2id = companionOf(state, data, d);
@@ -642,20 +1007,20 @@ function validate(state, data, d, opts = {}) {
   if (needsLander(data, d) && !isCrewLander(sc2)) errors.push(`${sc?.name || 'A nave'} precisa de um módulo de pouso tripulado para ${dest?.name || d.destination}, e nenhum está disponível.`);
   if (sc2id && !sc2) errors.push('Módulo de apoio desconhecido.');
   else if (sc2) {
-    if (!spacecraftFor(state, data).some((s) => s.id === sc2.id)) errors.push(`${sc2.name} não está disponível para a agência agora.`);
+    if (!spacecraftFor(state, data).some((s) => s.id === sc2.id) && !keepsBooking(state, data, sc2, opts)) errors.push(`${sc2.name} não está disponível para a agência agora.`);
     if (dest && !companionOk(data, sc2, dest.id)) errors.push(`${sc2.name} não opera em ${dest.name}.`);
     else if (!companionLaunch(state, data, sc2, dest?.id)) errors.push(`Nenhum foguete disponível leva ${sc2.name} até ${dest?.name || d.destination}.`);
   }
 
   // vehicle + payload
-  const payloadT = payloadOf(data, d);
+  const payloadT = payloadOf(data, d, state);
   let capacity = { raw: 0, eff: 0 };
   if (!d.vehicleId) errors.push('Escolha o veículo lançador.');
   else if (!v) errors.push('Veículo desconhecido.');
   else {
     // a design in its test campaign flies only its own test flights (the vehicle is the object of that mission)
     const testing = !!d.testDesignId && d.testDesignId === v.id;
-    if (!testing && !vehiclesFor(state, data).some((x) => x.id === v.id)) {
+    if (!testing && !vehiclesFor(state, data).some((x) => x.id === v.id) && !keepsBooking(state, data, v, opts)) {
       const dz = designList(state).find((x) => x.id === v.id);
       errors.push(dz && designPhase(dz) !== 'operational' ? `${v.name} ainda não terminou os voos de teste.` : `${v.name} não está disponível para a agência agora.`);
     }
@@ -711,6 +1076,8 @@ function validate(state, data, d, opts = {}) {
         if (item && !svc(state, data, item, lt)) errors.push(`${item.name} sai de serviço antes de ${fmtT(state, lt)}.`);
       }
     }
+    const pq = v ? productionQueueFor(state, data, d, opts.missionId) : null;
+    if (pq && Number.isFinite(pq.nextFreeTurn) && lt < pq.nextFreeTurn) errors.push(`Produção do ${v.name} ocupada até ${fmtT(state, pq.nextFreeTurn)}.`);
     const minTurn = state.turn + leadWeeks(d);
     if (!opts.skipLead && lt < minTurn) errors.push(`Preparação mínima de ${weeksToText(leadWeeks(d))}: lançamento a partir de ${fmtT(state, minTurn)}.`);
     if (Number.isFinite(d.readyTurn) && lt < d.readyTurn) errors.push(`O hardware do programa só fica pronto em ${fmtT(state, d.readyTurn)}.`);
@@ -735,14 +1102,125 @@ function validate(state, data, d, opts = {}) {
     if (lt > d.deadlineTurn) warnings.push(`Depois do prazo ${what} (${fmtT(state, d.deadlineTurn)}): ${cost2}.`);
     else warnings.push(`Prazo ${what}: ${fmtT(state, d.deadlineTurn)}.`);
   }
-  return { errors: [...new Set(errors)], warnings: [...new Set(warnings)], payloadT, capacity, seats, cost, window, earliest, launchTurn: lt };
+  return { errors: [...new Set(errors)], warnings: [...new Set(warnings)], payloadT, capacity, seats, cost, window, earliest, launchTurn: lt, v2 };
+}
+
+/**
+ * Missões v2 checks (§1.5), pushed into `errors`/`warnings`. Returns what the rest of validate and the builder need:
+ * { sub, payloadKind, cargoT, carried, targetAssetId, target, moduleFliesItself, gate }.
+ */
+/**
+ * A booked flight keeps hardware it no longer could buy (MISSIONS-V2 §8.1: an agreement that ends leaves launches
+ * ≤ 26 weeks away on their vehicle and craft — farther ones are reassigned by treatyEnded; research grandfathering
+ * §5.3). Embargo and tension ≥ 3 still suspend the launch.
+ */
+function keepsBooking(state, data, item, opts) {
+  const m = opts?.missionId ? missionById(state, opts.missionId) : null;
+  if (!m || !item || !['scheduled', 'launch'].includes(m.status)) return false;
+  if (![m.vehicleId, m.spacecraftId, m.secondarySpacecraftId].includes(item.id)) return false;
+  if (isDesignId(state, item.id) || item.calendarOnly || (item.embargo || []).includes(state.playerId)) return false;
+  const ctrl = item.tensionActor || item.operator;
+  if (ctrl && ctrl !== state.playerId && tensionBetween(state, state.playerId, ctrl) >= 3) return false;
+  return true;
+}
+
+function validateV2(state, data, d, opts, errors, warnings) {
+  const out = { sub: null, payloadKind: null, cargoT: 0, carried: false, targetAssetId: null, target: null, moduleFliesItself: false, gate: null };
+  if (!d.type) return out;
+  const md = mtables(data);
+  const dest = destDef(data, d.destination);
+  const sub = resolveSub(state, data, d);
+  out.sub = sub;
+  const row = subtypeOf(data, d.type, sub);
+  const calendarItem = d.source === 'calendar';
+  const privileged = ['contract', 'cert', 'test'].includes(d.source) || d.clientPayload;
+  if (md.has && sub && !row && !calendarItem) errors.push('Subtipo de missão desconhecido.');
+  if (row?.privileged && !privileged) errors.push(`${row.label} só existe em contratos.`);
+  if (row && dest && !calendarItem && !subDestOk(row, dest)) errors.push(`${row.label} não serve para ${dest.name}.`);
+
+  const pk = payloadKindOf(data, d, sub);
+  out.payloadKind = pk;
+  const p = d.payload || {};
+  // modules and surface vehicles
+  if (pk === 'station_module' || pk === 'base_module') {
+    const sc = spacecraftDef(data, d.spacecraftId, state);
+    if (p.moduleId) {
+      const mod = moduleDef(data, p.moduleId);
+      if (!mod) errors.push('Módulo desconhecido.');
+      else if (moduleKindOf(data, p.moduleId) !== (pk === 'station_module' ? 'station' : 'base')) errors.push(`${moduleLabel(mod)} não é ${pk === 'station_module' ? 'módulo de estação' : 'módulo de base'}.`);
+      if (pk === 'station_module' && !sc) out.moduleFliesItself = true;
+    } else if (!(pk === 'station_module' && sc?.kind === 'station_module') && moduleRows(data, pk === 'station_module' ? 'station' : 'base').length) {
+      errors.push(pk === 'station_module' ? 'Escolha o módulo da estação.' : 'Escolha o módulo da base.');
+    }
+  } else if (pk === 'base_vehicle') {
+    const vh = surfaceVehicleDef(data, p.vehicleTypeId);
+    if (!p.vehicleTypeId) { if (moduleRows(data, 'vehicles').length) errors.push('Escolha o veículo de superfície.'); }
+    else if (!vh) errors.push('Veículo de superfície desconhecido.');
+    else if (Array.isArray(vh.bodies) && vh.bodies.length && dest && !vh.bodies.includes(dest.body)) errors.push(`${moduleLabel(vh)} não opera em ${dest.name}.`);
+  }
+  out.cargoT = round1(cargoMassOf(state, data, d, pk));
+  out.carried = CARRIED_KINDS.includes(pk) && !d.config?.payloadT;
+
+  // target asset (only meaningful when infra.js is bound: without it the v0.8 abstract flow stands)
+  const targetId = resolvedTargetId(state, data, d, sub);
+  out.targetAssetId = targetId;
+  const target = targetId ? assetOf(state, targetId) : null;
+  out.target = target;
+  const need = needsTargetKinds(data, d.type, sub);
+  if (infraBound() && !calendarItem) {
+    if (need && !targetId) errors.push('Escolha a estação ou base de destino.');
+    else if (targetId && !target) errors.push('Estação ou base desconhecida.');
+    else if (target) {
+      if (need && !need.includes(target.kind)) errors.push('Escolha a estação ou base de destino.');
+      const cd = peerFn('infra', 'canDeliver');
+      let res = null;
+      const seats = d.crewed ? crewIdsOf(d).length || (spacecraftDef(data, d.spacecraftId, state)?.crew || 0) : 0;
+      try { res = cd ? cd(state, data, state.playerId, targetId, { type: d.type, sub, payloadKind: pk, seats }) : null; } catch { res = null; }
+      // an awarded contract naming the asset is the permission (§3.3), unless the asset is gone
+      const ctr = d.contractId ? (state.contracts || []).find((c) => c.id === d.contractId) : null;
+      const byContract = ctr && ctr.targetAssetId === targetId && !['derelict', 'ended'].includes(target.status);
+      if (res && res.ok === false && !byContract) errors.push(res.reason || 'Esta estação não aceita a entrega.');
+      if (target.site && d.destination && target.site !== d.destination) errors.push(`${target.name || 'O destino'} fica em ${destDef(data, target.site)?.name || target.site}.`);
+    }
+  }
+
+  // research gate (§5.3): only the player, only in tech-gated scenarios. A committed (scheduled) mission is
+  // grandfathered only for what it already carried: an edit to a new type, subtype, module or surface vehicle is new
+  // content and goes through the gate like a fresh draft.
+  const mg = peerFn('gating', 'missionGate');
+  const existing = opts.missionId ? missionById(state, opts.missionId) : null;
+  const spec = gateSpecOf(state, data, d, sub, pk, target, dest);
+  let grandfathered = false;
+  if (existing && existing.status && existing.status !== 'planning') {
+    const esub = existing.sub || resolveSub(state, data, existing);
+    const etid = resolvedTargetId(state, data, existing, esub);
+    const eSpec = gateSpecOf(state, data, existing, esub, payloadKindOf(data, existing, esub), etid ? assetOf(state, etid) : null, destDef(data, existing.destination));
+    grandfathered = JSON.stringify(eSpec) === JSON.stringify(spec);
+  }
+  if (mg && !grandfathered && !['cert', 'test'].includes(d.source)) {
+    let g = null;
+    try { g = mg(state, data, spec, state.playerId); } catch { g = null; }
+    out.gate = g;
+    if (g && g.ok === false) errors.push(g.reason || 'Pesquise a tecnologia necessária.');
+  }
+  return out;
+}
+
+/** What the research gate looks at in a draft or mission (gating.missionGate spec). */
+function gateSpecOf(state, data, d, sub, pk, target, dest) {
+  const p = d?.payload || {};
+  return {
+    type: d?.type || null, sub: sub || null, payloadKind: pk === 'client' ? null : (pk || null), moduleId: p.moduleId || null,
+    vehicleTypeId: p.vehicleTypeId || null, crewed: !!d?.crewed,
+    targetKind: target?.kind || (dest?.kind === 'station' && ['crewed', 'cargo', 'station'].includes(d?.type) ? 'station' : null),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
 // Risk estimate
 // ---------------------------------------------------------------------------------------------
 
-function planOf(state, d, launchTurn) {
+function planOf(state, d, launchTurn, data = null) {
   return {
     actorId: state.playerId, type: d.type, destination: d.destination, vehicleId: d.vehicleId, spacecraftId: d.spacecraftId,
     secondarySpacecraftId: d.secondarySpacecraftId || undefined,
@@ -750,7 +1228,24 @@ function planOf(state, d, launchTurn) {
     // a draft is "created" now: lets risk show "Prazo apertado" in the builder, same rule as launch day
     createdTurn: Number.isFinite(d.createdTurn) ? d.createdTurn : state.turn,
     calendarId: d.source === 'calendar' ? d.calendarId || undefined : undefined,
+    // Missões v2 (§7.1): docking/berthing/release milestones come from the scene target of this flight
+    sub: d.sub || undefined,
+    target: data ? dockingOf(state, data, d) || undefined : undefined,
+    siteBonus: data ? siteBonusOf(state, data, d.destination) || undefined : undefined,
   };
+}
+
+/**
+ * What the agency's infrastructure at a site gives a flight there (infra.bonusAt, §3.2): landing pad (landing risk),
+ * propellant depot (payload), orbital shipyard (cost). null without infra or without a bonus.
+ */
+function siteBonusOf(state, data, site) {
+  const f = peerFn('infra', 'bonusAt');
+  if (!f || !site) return null;
+  let b = null;
+  try { b = f(state, data, { site, actorId: state.playerId }); } catch { b = null; }
+  if (!b || (!(b.landingRisk < 0) && !(b.payload > 0) && !(b.costMult < 1))) return null;
+  return { landingRisk: b.landingRisk || 0, payload: b.payload || 0, costMult: b.costMult ?? 1 };
 }
 
 /** Our own simple estimate, used when risk.js is unavailable. */
@@ -776,7 +1271,7 @@ function riskFor(state, data, d, launchTurn) {
   let r = null;
   const f = fn(risk, 'missionRisk');
   if (f && d.type && d.destination && d.vehicleId && (d.spacecraftId || d.clientPayload)) {
-    try { r = f(state, data, planOf(state, { ...d, secondarySpacecraftId: companionOf(state, data, d) }, launchTurn)); } catch (e) { log(state, `aviso: risco indisponível (${e.message})`); r = null; }
+    try { r = f(state, data, planOf(state, { ...d, secondarySpacecraftId: companionOf(state, data, d) }, launchTurn, data)); } catch (e) { log(state, `aviso: risco indisponível (${e.message})`); r = null; }
   }
   if (!r || !Number.isFinite(r.p)) r = fallbackRisk(state, data, d);
   const mod = d.riskMod || 0;
@@ -817,9 +1312,14 @@ export const SUGGEST_CHEAPEST = 'Mais barato que leva a carga';
 export const NEEDS_HARDWARE_TEXT = 'Escolha o foguete e a nave antes de agendar.';
 export const ACCEPT_LABEL = 'Aceitar e escolher o veículo';
 
-/** True when the mission still lacks a launcher, or a craft (client payloads fly without one of ours). */
+/**
+ * True when the mission still lacks a launcher, or a craft (client payloads fly without one of ours; a station module
+ * from modules.json flies itself, MISSIONS-V2 §1.1).
+ */
 export function needsHardware(m) {
-  return !!m && (!m.vehicleId || (!m.spacecraftId && !m.clientPayload));
+  if (!m) return false;
+  const selfFlying = m.type === 'station' && !!m.payload?.moduleId;
+  return !m.vehicleId || (!m.spacecraftId && !m.clientPayload && !selfFlying);
 }
 
 function cleanSuggestion(s) {
@@ -901,14 +1401,21 @@ function costRangeText(state, data, draft, fallbackM) {
   return `US$ ${uLo === uHi ? nLo : lo}–${hi} conforme o foguete`;
 }
 
-/** Cheapest valid vehicle+spacecraft for (type, destination), or null. */
-function pickConfig(state, data, { type, destination, crewed = type === 'crewed', extraPayload = 0, payloadOverride = null, clientPayload = false, scKinds = null, actorId = state.playerId }) {
+/**
+ * Cheapest valid vehicle+spacecraft for (type, destination), or null.
+ * Missões v2: `sub` filters satellites/rovers by subtype; `cargoT` (> 0) needs a carrier that holds it (a cargo
+ * lander on a surface); `noCraft` prices a station module that flies itself (payloadOverride = its mass).
+ */
+function pickConfig(state, data, { type, sub = null, destination, crewed = type === 'crewed', extraPayload = 0, payloadOverride = null, clientPayload = false, scKinds = null, actorId = state.playerId, cargoT = 0, noCraft = false }) {
   const dest = destDef(data, destination);
   if (!dest || !destOpenNow(state, dest)) return null;
-  let scs = clientPayload
+  const surface = SURFACE_KINDS.includes(dest.kind);
+  const carrierOk = (s) => cargoT <= 0 || (cargoCapacityOf(data, s) + 1e-9 >= cargoT && (!surface || s.kind === 'lander' || (s.kind === 'cargo' && (s.destinations || []).includes(destination))));
+  let scs = clientPayload || noCraft
     ? [null]
-    : spacecraftFor(state, data, actorId).filter((s) => (scKinds ? scKinds.includes(s.kind) && (!crewed || s.crew > 0) : scOkForType(s, type, crewed)) && scOkForDest(s, destination));
-  if (!clientPayload && scs.length === 0) return null;
+    : spacecraftFor(state, data, actorId).filter((s) => (scKinds ? scKinds.includes(s.kind) && (!crewed || s.crew > 0) : scOkForType(s, type, crewed, data))
+      && scOkForDest(s, destination) && (!sub || scOkForSub(data, s, type, sub)) && carrierOk(s));
+  if (!clientPayload && !noCraft && scs.length === 0) return null;
   // own spacecraft first, then cheaper
   scs = scs.slice().sort((a, b) => ((b?.operator === actorId) - (a?.operator === actorId)) || ((a?.costM || 0) - (b?.costM || 0)));
   const vehicles = vehiclesFor(state, data, actorId);
@@ -928,7 +1435,7 @@ function pickConfig(state, data, { type, destination, crewed = type === 'crewed'
   return best;
 }
 
-const NAME_TYPE = { satellite: 'Satélite', probe: 'Sonda', crewed: 'Voo tripulado', cargo: 'Carga', station: 'Módulo', lander: 'Pousador' };
+const NAME_TYPE = { satellite: 'Satélite', probe: 'Sonda', rover: 'Rover', crewed: 'Voo tripulado', cargo: 'Carga', station: 'Módulo' };
 const NAME_DEST = {
   leo: 'LEO', sso: 'Polar', gto: 'GEO', iss: 'ISS', cislunar: 'Cislunar', lunar_orbit: 'Lunar', lunar_surface: 'Lunar',
   lunar_south_pole: 'Polo Sul', mars_orbit: 'Marte', mars_surface: 'Marte', jupiter: 'Júpiter', titan: 'Titã',
@@ -945,6 +1452,17 @@ function nameFor(state, data, d) {
 // Mission creation and actions
 // ---------------------------------------------------------------------------------------------
 
+/** The draft's payload with its kind and its target asset filled in (explicit target kept, else auto-resolved). */
+function withResolvedTarget(state, data, d) {
+  const p = normalizePayload(d.payload);
+  const sub = d.sub || resolveSub(state, data, d);
+  if (!p.kind) p.kind = payloadKindOf(data, d, sub);
+  if (!p.targetAssetId) p.targetAssetId = resolvedTargetId(state, data, { ...d, payload: p }, sub);
+  // nothing carried, no target (satellites, probes, rovers, plain crewed flights): no payload object in the save
+  const empty = !p.kind && !p.targetAssetId && !p.moduleId && !p.vehicleTypeId && !p.newAsset && !p.newAssetName && p.massT == null && p.qty === 1;
+  return empty ? null : p;
+}
+
 function createMission(state, data, draft) {
   const d = normalizeDraft(draft);
   if (!d.type) return { ok: false, error: 'Tipo de missão inválido.' };
@@ -956,6 +1474,8 @@ function createMission(state, data, draft) {
     calendarId: d.calendarId,
     contractId: d.contractId,
     type: d.type,
+    sub: resolveSub(state, data, d),
+    payload: withResolvedTarget(state, data, d),
     destination: d.destination,
     vehicleId: d.vehicleId,
     spacecraftId: d.spacecraftId,
@@ -1079,7 +1599,7 @@ function cancelMission(state, data, m, { reason = 'player', penalty = true } = {
   return { ok: true, refund };
 }
 
-const PATCH_KEYS = ['name', 'type', 'destination', 'vehicleId', 'spacecraftId', 'secondarySpacecraftId', 'crew', 'config', 'crewed'];
+const PATCH_KEYS = ['name', 'type', 'sub', 'destination', 'vehicleId', 'spacecraftId', 'secondarySpacecraftId', 'crew', 'config', 'crewed', 'payload'];
 
 /** Amount the player actually paid for a mission (older saves: the cost at scheduling). */
 function paidOf(m) {
@@ -1089,8 +1609,11 @@ function paidOf(m) {
 
 /** Mission type a calendar definition flies as (same rule as calendarDraft). */
 function calendarTypeOf(def) {
-  return TYPES.includes(def?.type) ? def.type : def?.crewed ? 'crewed' : 'probe';
+  const t = missionTypeOf(def?.type).type;
+  return t || (def?.crewed ? 'crewed' : 'probe');
 }
+/** Subtype a calendar item flies (its own, or the legacy alias's: 'lander' → 'lander'). */
+const calendarSubOf = (def) => missionTypeOf(def?.type, def?.sub).sub || null;
 
 /**
  * Does the mission still fly its calendar program? Same type and crew flag, and the same destination
@@ -1139,6 +1662,13 @@ function updateMission(state, data, m, patch = {}) {
   if (patch.type && !('crewed' in patch)) merged.crewed = patch.type === 'crewed' || (m.crewed && m.source === 'calendar');
   // hardware/destination changed without a companion choice: pick it again
   if (!('secondarySpacecraftId' in patch) && ['type', 'destination', 'spacecraftId', 'crewed'].some((k) => k in patch)) merged.secondarySpacecraftId = null;
+  // the subtype follows type/destination/craft unless the player picks one; a new type drops the old payload
+  if (!('sub' in patch) && ['type', 'destination', 'spacecraftId'].some((k) => k in patch && patch[k] !== m[k])) merged.sub = null;
+  if (!('payload' in patch) && 'type' in patch && patch.type !== m.type) merged.payload = null;
+  else if ('payload' in patch) merged.payload = { ...(m.payload || {}), ...(patch.payload || {}) };
+  // a contract fixes what is delivered and where; a client payload is never something the player can ask for
+  if (m.contractId) { merged.payload = m.payload || null; merged.sub = m.sub || null; }
+  if (merged.payload?.kind === 'client' && m.payload?.kind !== 'client') merged.payload = { ...merged.payload, kind: null };
   // taking the engineers' craft also takes the companion they planned with it (program landers)
   if (!('secondarySpacecraftId' in patch) && m.suggestion?.secondarySpacecraftId && merged.spacecraftId === m.suggestion.spacecraftId
     && merged.destination === m.destination && !!merged.crewed === !!m.crewed) merged.secondarySpacecraftId = m.suggestion.secondarySpacecraftId;
@@ -1174,7 +1704,8 @@ function updateMission(state, data, m, patch = {}) {
   }
   if (d.name) m.name = d.name;
   Object.assign(m, {
-    type: d.type, destination: d.destination, vehicleId: d.vehicleId, spacecraftId: d.spacecraftId, crewed: d.crewed,
+    type: d.type, sub: resolveSub(state, data, d), payload: withResolvedTarget(state, data, d),
+    destination: d.destination, vehicleId: d.vehicleId, spacecraftId: d.spacecraftId, crewed: d.crewed,
     secondarySpacecraftId: companionOf(state, data, d) || null,
     crew: d.crewed ? d.crew : { flightDirector: d.crew.flightDirector, commander: null, astronauts: [] }, config: d.config,
   });
@@ -1193,7 +1724,7 @@ function calendarDraft(state, data, inst, def) {
   const sc = spacecraftDef(data, def.spacecraftId);
   const crewed = !!def.crewed;
   const d = {
-    name: def.name, source: 'calendar', calendarId: inst.id, type: TYPES.includes(def.type) ? def.type : crewed ? 'crewed' : 'probe',
+    name: def.name, source: 'calendar', calendarId: inst.id, type: calendarTypeOf(def), sub: calendarSubOf(def),
     destination: def.destination, vehicleId: def.vehicleId || null, spacecraftId: def.spacecraftId || null, crewed,
     secondarySpacecraftId: def.secondarySpacecraftId || null,
     crew: autoCrew(state, data, crewed ? sc?.crew || 0 : 0), config: { strategy: 'balanced', fuelMargin: 0.1 },
@@ -1279,7 +1810,7 @@ function adoptTransitPrograms(state, data) {
     const arriveTurn = Math.max(state.turn, inst.arrivalTurn ?? inst.plannedTurn ?? state.turn);
     const m = {
       id: nextId(state, 'mis'), name: def.name, source: 'calendar', calendarId: inst.id, contractId: null,
-      type: calendarTypeOf(def), destination: def.destination, vehicleId: def.vehicleId || null, spacecraftId: def.spacecraftId || null,
+      type: calendarTypeOf(def), sub: calendarSubOf(def) || resolveSub(state, data, { type: calendarTypeOf(def), destination: def.destination, spacecraftId: def.spacecraftId }), payload: null, destination: def.destination, vehicleId: def.vehicleId || null, spacecraftId: def.spacecraftId || null,
       vehicleName: def.vehicleName || def.inTransit?.vehicleName || null, // retired launcher shown by name (Ariane 5)
       secondarySpacecraftId: null, crewed: false, crew: autoCrew(state, data, 0),
       config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: null },
@@ -1437,22 +1968,189 @@ function programBeyondEnd(state, data, inst, def, reach) {
   stat(state, 'programBeyondEnd');
 }
 
+// --- Missões v2 eligibility (§2): contracts and opportunities only when they make sense ---
+
+const contractRows = (data) => (Array.isArray(data?.contracts?.contracts) ? data.contracts.contracts : FALLBACK_CONTRACTS);
+const opportunityRows = (data) => (Array.isArray(data?.contracts?.opportunities) ? data.contracts.opportunities : FALLBACK_OPPORTUNITIES);
+const contractCaps = (data) => ({ ...CONTRACT_CAPS, ...(data?.contracts?.caps || {}) });
+
+function trustBetween(state, a, b) {
+  const f = fn(diplomacy, 'relation');
+  let r = null;
+  try { r = f ? f(state, a, b) : null; } catch { r = null; }
+  r = r || state.relations?.[relKey(a, b)];
+  return Number(r?.trust) || 0;
+}
+function tensionBetween(state, a, b) {
+  const f = fn(diplomacy, 'tensionOf');
+  let v = null;
+  try { v = f ? f(state, a, b) : null; } catch { v = null; }
+  if (!Number.isFinite(v)) v = state.tension?.[relKey(a, b)];
+  return Number(v) || 0;
+}
+/** Does the player hold a key (gating.keyHeld; everyone holds every key without gating.js)? */
+function playerHolds(state, data, key) {
+  const f = peerFn('gating', 'keyHeld');
+  if (!f || !key) return true;
+  try { return f(state, data, key, state.playerId) !== false; } catch { return true; }
+}
+/** Research check of a row (type/sub/payload keys + needs.playerKeys): {ok, nodeId, reason}. */
+function rowResearch(state, data, row) {
+  const mg = peerFn('gating', 'missionGate');
+  if (mg && row?.type) {
+    let g = null;
+    const pk = payloadKindOf(data, { type: row.type, clientPayload: !!row.clientPayload }, row.sub);
+    try { g = mg(state, data, { type: row.type, sub: row.sub || null, payloadKind: pk === 'client' ? null : pk, crewed: row.type === 'crewed' }, state.playerId); } catch { g = null; }
+    if (g && g.ok === false) return { ok: false, nodeId: g.nodeId || null, reason: g.reason || null };
+  }
+  for (const k of row?.needs?.playerKeys || []) if (!playerHolds(state, data, k)) return { ok: false, reason: k };
+  return { ok: true };
+}
+
+/** Storage of an asset (Σ module storageT × n, min 2 t), for the supply ratio. */
+function assetStorageT(data, a) {
+  let s = 0;
+  for (const x of a?.modules || []) s += (Number(moduleDef(data, x.id)?.storageT) || 0) * (x.n || 1);
+  return Math.max(2, Number(a?.storageT) || s);
+}
+/** Modules an asset still plans to receive (historical stations: plannedModules). */
+function plannedModulesLeft(a) {
+  const have = (a?.modules || []).reduce((n, x) => n + (x.n || 1), 0);
+  if (Array.isArray(a?.plannedModules)) return Math.max(0, a.plannedModules.length - have);
+  return Math.max(0, (Number(a?.plannedModules) || 0) - have);
+}
+/** Next module a station/base plans (planned list first, else a laboratory / a habitat). */
+function nextModuleFor(data, a, kind) {
+  const have = new Set((a?.modules || []).map((x) => x.id));
+  const plan = Array.isArray(a?.plannedModules) ? a.plannedModules.map((x) => (typeof x === 'string' ? x : x?.id)).filter(Boolean) : [];
+  const fromPlan = plan.find((id) => !have.has(id) && moduleDef(data, id));
+  if (fromPlan) return fromPlan;
+  const pref = kind === 'base' ? ['bs_hab_small', 'bs_solar', 'bs_lab', 'bs_hab_large'] : ['st_lab', 'st_hab', 'st_node', 'st_logistics'];
+  return pref.find((id) => moduleDef(data, id)) || moduleRows(data, kind)[0]?.id || null;
+}
+/** Fraction of life left of a satellite fleet / rover (0..1), 1 when unknown. */
+function lifeLeftOf(state, data, a) {
+  const row = subtypeOf(data, a?.kind === 'rover' ? 'rover' : 'satellite', a?.sub);
+  const life = (Number(row?.asset?.lifeYears) || 10) * 52;
+  const ends = Array.isArray(a?.units) && a.units.length ? Math.min(...a.units.map((u) => u.endTurn)) : a?.lifeEndTurn;
+  if (!Number.isFinite(ends)) return 1;
+  return clamp((ends - state.turn) / life, 0, 1);
+}
+
+/** Does an asset satisfy a contract row's `target` (and the per-asset demand cap)? */
+function assetMatches(state, data, t, a, caps) {
+  if (!a || !t) return false;
+  const pid = state.playerId;
+  if (t.assetKind && a.kind !== t.assetKind) return false;
+  if ((t.owner ?? 'other') === 'other' && a.ownerId === pid) return false;
+  if (t.owner === 'self' && a.ownerId !== pid) return false;
+  if (Array.isArray(t.status) && !t.status.includes(a.status || 'active')) return false;
+  if (['ended', 'derelict'].includes(a.status) && !Array.isArray(t.status)) return false;
+  if (t.sub && a.sub !== t.sub) return false;
+  if (t.ownerKind && state.actors?.[a.ownerId]?.kind !== t.ownerKind) return false;
+  if (t.module && !(a.modules || []).some((x) => x.id === t.module)) return false;
+  if (Number.isFinite(t.supplyBelow) && (Number(a.supplyT) || 0) / assetStorageT(data, a) >= t.supplyBelow) return false;
+  if (t.plannedModulesLeft && plannedModulesLeft(a) <= 0) return false;
+  if (Number.isFinite(t.lifeLeftBelow) && lifeLeftOf(state, data, a) >= t.lifeLeftBelow) return false;
+  if (a.site && !destOpenNow(state, destDef(data, a.site))) return false;
+  // ≤ 1 offer per asset per 26 weeks
+  if ((state.contracts || []).some((c) => c.targetAssetId === a.id && state.turn - (c.createdTurn ?? -999) < caps.perAssetWeeks)) return false;
+  return true;
+}
+
+/**
+ * Is a contract/opportunity row eligible now? (§2 rules 1–5) → {ok, why}. `asset`: the concrete asset of a target
+ * row (rule 3); rows with a target and no asset are never eligible ("carga para a Lua" needs someone there first).
+ */
+export function contractEligible(state, data, row, { asset = null } = {}) {
+  if (!row) return { ok: false, why: 'row' };
+  const n = row.needs || {};
+  const y = yearAt(state);
+  const from = n.fromYear ?? row.fromYear;
+  const until = n.untilYear ?? row.untilYear;
+  if (Number.isFinite(from) && y < from) return { ok: false, why: 'date' };
+  if (Number.isFinite(until) && y > until) return { ok: false, why: 'date' };
+  for (const id of n.firstsAny || []) if (!achievedAny(state, id)) return { ok: false, why: `firsts:${id}` };
+  const rr = rowResearch(state, data, row);
+  if (!rr.ok) return { ok: false, why: 'research', nodeId: rr.nodeId || null };
+  if (row.target) {
+    if (!asset) return { ok: false, why: 'target' };
+    if (!assetMatches(state, data, row.target, asset, contractCaps(data))) return { ok: false, why: 'asset' };
+    const owner = asset.ownerId;
+    if (owner && owner !== state.playerId) {
+      if (Number.isFinite(n.relation?.minTrust) && trustBetween(state, state.playerId, owner) < n.relation.minTrust) return { ok: false, why: 'relation' };
+      if (Number.isFinite(n.noTensionAbove) && tensionBetween(state, state.playerId, owner) > n.noTensionAbove) return { ok: false, why: 'tension' };
+      if (!state.actors?.[owner] || state.actors[owner].dead || state.actors[owner].status === 'gone') return { ok: false, why: 'owner' };
+    }
+  } else if (!rowDestinations(state, data, row).length) return { ok: false, why: 'destination' };
+  if (row.noOwnAsset) {
+    let list = [];
+    try { list = peerFn('infra', 'listAssets')?.(state, { ownerId: state.playerId, kind: row.noOwnAsset }) || []; } catch { list = []; }
+    if (list.some((a) => a.ownerId === state.playerId && !['ended', 'derelict'].includes(a.status))) return { ok: false, why: 'own' };
+  }
+  return { ok: true, why: null };
+}
+
+/** Open destinations a row without target can use (row.destination or row.destinations). */
+function rowDestinations(state, data, row) {
+  const ids = Array.isArray(row?.destinations) ? row.destinations : row?.destination ? [row.destination] : [];
+  return ids.filter((id) => {
+    const dest = destDef(data, id);
+    if (!dest || !destOpenNow(state, dest)) return false;
+    if (row.type && !destOkForType(dest, missionTypeOf(row.type).type)) return false;
+    const sr = subtypeOf(data, missionTypeOf(row.type).type, row.sub);
+    return !sr || subDestOk(sr, dest) || row.sub === 'client';
+  });
+}
+
+/** Every eligible (row, asset|null, destination) a contract could be made of now, in a stable order. */
+export function contractCandidates(state, data) {
+  const out = [];
+  const listAssets = peerFn('infra', 'listAssets');
+  for (const row of contractRows(data)) {
+    if (row.target) {
+      if (!listAssets) continue;
+      let list = [];
+      try { list = listAssets(state, { kind: row.target.assetKind }) || []; } catch { list = []; }
+      for (const a of list) if (contractEligible(state, data, row, { asset: a }).ok) out.push({ row, asset: a, destination: a.site });
+    } else if (contractEligible(state, data, row).ok) {
+      for (const id of rowDestinations(state, data, row)) out.push({ row, asset: null, destination: id });
+    }
+  }
+  return out;
+}
+
 // --- opportunities: windows, rival moves, custom targets, follow-ups ---
 
 function hasPendingOpportunity(state) {
   return state.decisions.some((x) => x.kind === 'briefing' && x.payload?.kind && x.payload.kind !== 'calendar');
 }
 
-function pushOpportunity(state, data, { sub, title, body, type, destination, grantShare = 0, crewed, declineSupport = 0, urgency = 1, extra = {} }) {
+/**
+ * A briefing card with a pre-filled draft. `kind`: the briefing family (window, rival, followup, retry, or a row id);
+ * `sub`/`payload`: the mission's subtype and payload (Missões v2). Returns the decision or null.
+ */
+function pushOpportunity(state, data, { kind, title, body, type, sub = null, payload = null, destination, grantShare = 0, crewed, declineSupport = 0, urgency = 1, extra = {} }) {
   // investors hold the agenda (§5.2): no pitch for an own mission the player has no slot for
   const ag = agendaOf(state, data);
   if (ag?.enforced && ag.left <= 0) return null;
-  const cfg = pickConfig(state, data, { type, destination, crewed: crewed ?? type === 'crewed' });
+  const isCrewed = crewed ?? type === 'crewed';
+  const pl = payload ? normalizePayload(payload) : null;
+  const d0 = { type, sub, destination, crewed: isCrewed, payload: pl };
+  const subR = sub || resolveSub(state, data, d0);
+  // no pitch for something the player has not researched (§2 rule 4)
+  if (!rowResearch(state, data, { type, sub: subR }).ok) return null;
+  // a station module that flies itself (modules.json) is priced by its mass, without a craft
+  const mod = pl?.moduleId ? moduleDef(data, pl.moduleId) : null;
+  const noCraft = type === 'station' && !!mod;
+  const pk = payloadKindOf(data, d0, subR);
+  const cargoT = !noCraft && pl && CARRIED_KINDS.includes(pk) ? cargoMassOf(state, data, d0, pk) : 0;
+  const cfg = pickConfig(state, data, { type, sub: subR, destination, crewed: isCrewed, noCraft, payloadOverride: noCraft ? mod.massT || 1 : null, cargoT, extraPayload: cargoT });
   if (!cfg) return null;
   const sc = spacecraftDef(data, cfg.spacecraftId);
-  const isCrewed = crewed ?? type === 'crewed';
   const draft = {
-    type, destination, vehicleId: cfg.vehicleId, spacecraftId: cfg.spacecraftId, crewed: isCrewed, source: 'custom',
+    type, sub: subR, destination, vehicleId: cfg.vehicleId, spacecraftId: cfg.spacecraftId, crewed: isCrewed, source: 'custom',
+    ...(pl ? { payload: pl } : {}),
     crew: autoCrew(state, data, isCrewed ? sc?.crew || 0 : 0), config: { strategy: 'balanced', fuelMargin: 0.1 }, ...extra,
   };
   draft.grantShare = grantShare;
@@ -1461,6 +2159,7 @@ function pushOpportunity(state, data, { sub, title, body, type, destination, gra
   const dest = destDef(data, destination);
   stat(state, 'opportunities');
   state.stats['missions.lastOpportunityTurn'] = state.turn;
+  const subLabel = subtypeOf(data, type, subR)?.label;
   return pushDecision(state, {
     kind: 'briefing',
     title,
@@ -1469,9 +2168,9 @@ function pushOpportunity(state, data, { sub, title, body, type, destination, gra
     urgency,
     expiresTurn: state.turn + 8,
     defaultChoice: 'decline',
-    payload: { kind: sub, draft },
+    payload: { kind, draft },
     choices: [
-      { id: 'accept', label: ACCEPT_LABEL, preview: `Cria a missão em planejamento (${TYPE_LABELS[type]}, ${dest?.name || destination}). Sugestão dos engenheiros: ${hardwareNames(data, draft)}.` },
+      { id: 'accept', label: ACCEPT_LABEL, preview: `Cria a missão em planejamento (${TYPE_LABELS[type]}${subLabel ? ` · ${subLabel}` : ''}, ${dest?.name || destination}). Sugestão dos engenheiros: ${hardwareNames(data, draft)}.` },
       { id: 'decline', label: 'Deixar passar', preview: declineSupport ? `−${declineSupport} apoio.` : 'Nada muda.' },
     ],
   });
@@ -1486,9 +2185,10 @@ function windowOpportunity(state, data) {
     if (weeks < 14 || weeks > 40 || w.openTurn > state.endTurn) continue;
     // a probe that would arrive after the end of the era is not an opportunity the government pitches
     if (w.openTurn + (dest.transitWeeks || 0) > state.endTurn) continue;
-    const type = dest.id.includes('surface') ? 'lander' : 'probe';
+    if (!destOkForType(dest, 'probe')) continue;
+    // "Sonda + superfície" is the landing (R1): the subtype comes from the destination
     const d = pushOpportunity(state, data, {
-      sub: 'window', type, destination: dest.id, grantShare: 0.1, urgency: 2,
+      kind: 'window', type: 'probe', destination: dest.id, grantShare: 0.1, urgency: 2,
       title: `Janela para ${dest.name}`,
       body: `Os planetas se alinham: a janela para ${dest.name} abre em ${fmtT(state, w.openTurn)} e fecha em ${fmtT(state, w.closeTurn)}. Perder esta significa esperar ${weeksToText(dest.window.periodWeeks)}.`,
     });
@@ -1506,11 +2206,12 @@ function rivalOpportunity(state, data) {
     // same rule as windowOpportunity: no pitch for a mission that could only arrive after the end of the era
     const w = windowFor(state, data, dest.id, state.turn + (LEAD_WEEKS.probe ?? 8));
     if (w.openTurn >= state.endTurn || w.openTurn + (dest.transitWeeks || 0) > state.endTurn) continue;
-    const tryTypes = s.crewed ? ['crewed', 'lander', 'probe'] : [s.missionType, 'lander', 'probe'];
+    const theirs = missionTypeOf(s.missionType).type;
+    const tryTypes = s.crewed ? ['crewed', 'probe'] : [theirs, SURFACE_KINDS.includes(dest.kind) ? 'rover' : null, 'probe'];
     for (const type of [...new Set(tryTypes)]) {
       if (!TYPES.includes(type) || !destOkForType(dest, type)) continue;
       const d = pushOpportunity(state, data, {
-        sub: 'rival', type, destination: dest.id, grantShare: 0.2, declineSupport: 2, urgency: 2,
+        kind: 'rival', type, destination: dest.id, grantShare: 0.2, declineSupport: 2, urgency: 2,
         title: `Resposta a ${actorName(state, s.actorId)}`,
         body: `${actorName(state, s.actorId)} chegou a ${dest.name}. O governo quer uma resposta à altura e promete ajudar a pagar.`,
       });
@@ -1520,12 +2221,23 @@ function rivalOpportunity(state, data) {
   return null;
 }
 
+/** First module of a new station (modules.json st_core), as a payload; null without modules data. */
+function stationFoundPayload(data) {
+  const core = moduleDef(data, 'st_core') || moduleRows(data, 'station')[0] || null;
+  return core ? { kind: 'station_module', moduleId: core.id, newAsset: true } : null;
+}
+
 function customOpportunity(state, data, rng) {
-  const pool = rng.shuffle(OPPORTUNITIES);
+  const pool = rng.shuffle(opportunityRows(data));
   for (const o of pool) {
-    if (!destOpenNow(state, destDef(data, o.destination)) || (o.fromYear && yearAt(state) < o.fromYear) || (o.untilYear && yearAt(state) > o.untilYear)) continue;
-    if ((state.missions || []).some((m) => m.destination === o.destination && m.type === o.type && !['done', 'cancelled'].includes(m.status))) continue;
-    const d = pushOpportunity(state, data, { ...o });
+    if (!contractEligible(state, data, o).ok) continue;
+    const type = missionTypeOf(o.type, o.sub);
+    if ((state.missions || []).some((m) => m.destination === o.destination && m.type === type.type && !['done', 'cancelled'].includes(m.status))) continue;
+    const payload = type.type === 'station' ? stationFoundPayload(data) : o.payload || null;
+    const d = pushOpportunity(state, data, {
+      kind: o.kind || o.id, type: type.type, sub: type.sub, payload, destination: o.destination, grantShare: o.grantShare || 0,
+      crewed: o.crewed, title: o.title, body: o.body, declineSupport: o.declineSupport || 0, urgency: o.urgency || 1,
+    });
     if (d) return d;
   }
   return null;
@@ -1542,22 +2254,45 @@ function opportunities(state, data, ctx) {
   if (state.turn - last >= 10 && rng.chance(0.12)) customOpportunity(state, data, rng);
 }
 
+/**
+ * The natural next step after a success (§2 "Opportunities"): a lunar orbiter → a probe landing there; a landing →
+ * a rover; a first station module → the next module; otherwise the next destination of the route. pushOpportunity
+ * drops steps the player has not researched. → spec | null
+ */
+export function nextStepOf(state, data, m) {
+  const dest = destDef(data, m.destination);
+  if (m.type === 'station' && (m.assetId || m.payload?.targetAssetId)) {
+    const assetId = m.assetId || m.payload.targetAssetId;
+    const a = assetOf(state, assetId);
+    const modId = a ? nextModuleFor(data, a, 'station') : null;
+    if (modId && a.ownerId === state.playerId) {
+      return { type: 'station', sub: 'expand', destination: m.destination, payload: { kind: 'station_module', moduleId: modId, targetAssetId: assetId },
+        title: `Próximo módulo: ${a.name || 'estação'}`, body: `O módulo está em posição. Os engenheiros já preparam o próximo: ${moduleLabel(moduleDef(data, modId)).toLowerCase()}.` };
+    }
+  }
+  if (m.type === 'probe' && m.sub === 'lander' && dest && destOkForType(dest, 'rover')) {
+    return { type: 'rover', destination: m.destination, title: `Próximo passo: rodas em ${dest.name}`,
+      body: `O pouso de ${m.name} provou o caminho. Agora um rover pode rodar por ${dest.name} e mandar ciência por meses.` };
+  }
+  const next = NEXT_STEP[m.destination];
+  const nd = destDef(data, next);
+  if (!nd) return null;
+  const text = { title: `Próximo passo: ${nd.name}`, body: `O sucesso de ${m.name} abriu caminho. Os engenheiros já desenham a próxima etapa: ${nd.name}.` };
+  return m.crewed ? { type: 'crewed', destination: next, crewed: true, ...text } : { type: 'probe', destination: next, ...text };
+}
+
 /** After a result: offer the natural next step or a retry. Non-blocking. */
 function followUp(state, data, m, success) {
   if (hasPendingOpportunity(state) || m.source === 'contract') return;
   if (success) {
-    const next = NEXT_STEP[m.destination];
-    const dest = destDef(data, next);
-    if (!dest || !destOpenNow(state, dest)) return;
-    const type = m.crewed ? 'crewed' : next.includes('surface') || next.includes('pole') ? 'lander' : 'probe';
-    pushOpportunity(state, data, {
-      sub: 'followup', type, destination: next, crewed: m.crewed, grantShare: 0.1,
-      title: `Próximo passo: ${dest.name}`,
-      body: `O sucesso de ${m.name} abriu caminho. Os engenheiros já desenham a próxima etapa: ${dest.name}.`,
-    });
+    const step = nextStepOf(state, data, m);
+    const dest = destDef(data, step?.destination);
+    if (!step || !dest || !destOpenNow(state, dest) || !destOkForType(dest, step.type)) return;
+    pushOpportunity(state, data, { kind: 'followup', grantShare: 0.1, ...step });
   } else {
     pushOpportunity(state, data, {
-      sub: 'retry', type: m.type, destination: m.destination, crewed: m.crewed, grantShare: 0.15,
+      kind: 'retry', type: m.type, sub: m.sub || null, payload: m.payload?.kind && m.payload.kind !== 'client' ? { ...m.payload } : null,
+      destination: m.destination, crewed: m.crewed, grantShare: 0.15,
       title: `Tentar de novo: ${m.name}`,
       body: 'O seguro cobre parte de uma nova tentativa. A equipe quer provar que aprendeu com a falha.',
     });
@@ -1568,34 +2303,70 @@ function followUp(state, data, m, success) {
 // Contracts and auctions
 // ---------------------------------------------------------------------------------------------
 
-/** Rough market cost of fulfilling a contract (cheapest capable hardware across the catalog). */
-function marketCost(state, data, k, payloadT) {
-  const dest = destDef(data, k.destination);
-  const ops = dest?.opsCostM ?? OPS_COST_BY_KEY[dest?.capacityKey] ?? 10;
-  const vehicles = (data.vehicles?.vehicles || []).filter((v) => availableByDate(state, v));
+/** What a contract asks the carrier to hold (t): its tonnes, a module, a repair kit; 0 for crew and client payloads. */
+function contractCargoT(data, c) {
+  if (c.clientPayload) return 0;
+  switch (c.payloadKind) {
+    case 'supply': case 'propellant': case 'experiments': return c.payloadT || 0;
+    case 'servicing': return SERVICING_KIT_T;
+    case 'base_module': return moduleDef(data, c.moduleId)?.massT || 0;
+    default: return 0;
+  }
+}
+/** A contract as a mission spec for pickConfig (§1.4: carrier, module that flies itself, client payload). */
+function contractSpec(state, data, c, actorId = state.playerId) {
+  const type = missionTypeOf(c.type, c.sub).type;
+  const mod = c.payloadKind === 'station_module' ? moduleDef(data, c.moduleId) : null;
+  const cargoT = contractCargoT(data, c);
+  return {
+    type, sub: c.sub || null, destination: c.destination, crewed: type === 'crewed', clientPayload: !!c.clientPayload, actorId,
+    noCraft: !!mod, cargoT, extraPayload: c.clientPayload ? 0 : cargoT,
+    payloadOverride: c.clientPayload ? c.payloadT : mod ? mod.massT || 1 : null,
+  };
+}
+
+/** Rough market cost of fulfilling a contract (cheapest capable hardware across the catalog, any operator). */
+function marketCost(state, data, c) {
+  const dest = destDef(data, c.destination);
+  if (!dest) return null;
+  const ops = dest.opsCostM ?? OPS_COST_BY_KEY[dest.capacityKey] ?? 10;
+  const type = missionTypeOf(c.type, c.sub).type;
+  const crewed = type === 'crewed';
+  const vehicles = (data.vehicles?.vehicles || []).filter((v) => availableByDate(state, v) && (!crewed || v.crewRated));
   let scCost = 0;
-  let extra = 0;
-  if (!k.clientPayload) {
-    const scs = (data.spacecraft?.spacecraft || []).filter((s) => availableByDate(state, s) && (SC_KINDS[k.type] || []).includes(s.kind) && scOkForDest(s, k.destination));
+  let need = c.payloadT || 0;
+  let goods = 0;
+  const mod = c.moduleId ? moduleDef(data, c.moduleId) : null;
+  if (c.payloadKind === 'station_module' && mod) {
+    need = mod.massT || 1;
+    goods = Number(mod.costM) || 0;
+  } else if (!c.clientPayload) {
+    const cargoT = contractCargoT(data, c);
+    const surface = SURFACE_KINDS.includes(dest.kind);
+    const scs = (data.spacecraft?.spacecraft || []).filter((s) => availableByDate(state, s) && scKindsFor(data, type).includes(s.kind) && scOkForDest(s, c.destination)
+      && (!crewed || (s.crew || 0) > 0) && (cargoT <= 0 || (cargoCapacityOf(data, s) >= cargoT && (!surface || s.kind === 'lander' || s.kind === 'cargo'))));
     if (!scs.length) return null;
     const cheapest = scs.reduce((a, b) => ((a.costM || 0) <= (b.costM || 0) ? a : b));
     scCost = cheapest.costM || 0;
-    extra = cheapest.massT || 0;
+    need = (cheapest.massT || 0) + cargoT;
+    if (c.payloadKind === 'base_module' && mod) goods = Number(mod.costM) || 0;
+    if (c.payloadKind === 'supply' || c.payloadKind === 'propellant') goods = supplyCostPerT(state, data) * (c.payloadT || 0) * (c.payloadKind === 'propellant' ? 0.5 : 1);
   }
-  const caps = vehicles.filter((v) => capacityTo(data, v.id, k.destination) * 0.9 >= payloadT + extra);
+  const caps = vehicles.filter((v) => capacityTo(data, v.id, c.destination) * 0.9 >= need);
   if (!caps.length) return null;
   const vc = Math.min(...caps.map((v) => v.costM || 0));
-  return vc + scCost + ops;
+  return vc + scCost + ops + goods + (crewed ? 2 * CREW_COST_PER_PERSON : 0);
 }
 
 /** Can this actor fly the contract? Returns best vehicle reliability or 0. */
 function actorCapability(state, data, actorId, c) {
-  const extraMass = c.clientPayload ? 0 : (pickConfig(state, data, { type: c.type, destination: c.destination, actorId })?.payloadT ?? null);
-  if (!c.clientPayload && extraMass == null) return 0;
-  const need = c.clientPayload ? c.payloadT : extraMass + c.payloadT;
+  const cfg = pickConfig(state, data, contractSpec(state, data, c, actorId));
+  if (!cfg) return 0;
+  const crewed = missionTypeOf(c.type).type === 'crewed';
   let best = 0;
   for (const v of vehiclesFor(state, data, actorId)) {
-    if (capacityTo(data, v.id, c.destination) * 0.9 < need) continue;
+    if (crewed && !crewRatedV(state, data, v)) continue;
+    if (capacityTo(data, v.id, c.destination) * 0.9 < cfg.payloadT) continue;
     best = Math.max(best, vehicleReliability(state, data, v.id).mean);
   }
   return best;
@@ -1631,28 +2402,55 @@ function winChances(state, c, playerRel) {
   return out;
 }
 
-function makeContract(state, data, rng) {
-  const year = turnToDate(state.turn, state.startYear).year;
-  const kinds = CONTRACT_KINDS.filter((k) => destOpenNow(state, destDef(data, k.destination)) && (!k.untilYear || year <= k.untilYear) && (!k.fromYear || year >= k.fromYear));
-  if (!kinds.length) return null;
-  const k = rng.weighted(kinds);
-  const payloadT = round1(rng.range(k.payload[0], k.payload[1]));
-  const base = marketCost(state, data, k, payloadT);
-  if (!base) return null;
+const fillAsset = (t, vars) => String(t || '').replace(/\{(asset|owner)\}/g, (_, k) => vars[k] ?? '');
+
+/**
+ * A new contract from the eligible candidates (§2): rows without a target at an open destination, rows with a
+ * target once per concrete asset (its site, its owner as client). null when nothing is eligible.
+ */
+function makeContract(state, data, rng, stepEnd = state.turn + 1) {
+  const cands = contractCandidates(state, data);
+  if (!cands.length) return null;
+  // a row's weight is shared by its candidates (ten stations do not make supply contracts ten times likelier)
+  const perRow = new Map();
+  for (const x of cands) perRow.set(x.row, (perRow.get(x.row) || 0) + 1);
+  const pick = rng.weighted(cands.map((x) => ({ ...x, weight: (Number(x.row.weight) || 1) / perRow.get(x.row) })));
+  if (!pick) return null;
+  const { row: k, asset } = pick;
+  const type = missionTypeOf(k.type, k.sub);
+  const sub = type.sub || resolveSub(state, data, { type: type.type, destination: pick.destination, clientPayload: !!k.clientPayload });
+  const payloadKind = payloadKindOf(data, { type: type.type, clientPayload: !!k.clientPayload }, sub);
+  const range = Array.isArray(k.payload) ? k.payload : [0, 0];
+  let payloadT = round1(rng.range(range[0], range[1]));
+  let moduleId = null;
+  if (payloadKind === 'station_module' || payloadKind === 'base_module') {
+    moduleId = nextModuleFor(data, asset, payloadKind === 'station_module' ? 'station' : 'base');
+    if (!moduleId) return null;
+    payloadT = round1(moduleDef(data, moduleId)?.massT || 0);
+  } else if (payloadKind === 'servicing') payloadT = SERVICING_KIT_T;
+  const ownerName = asset ? actorName(state, asset.ownerId) : '';
+  const vars = { asset: asset?.name || destDef(data, pick.destination)?.name || '', owner: ownerName };
   const c = {
     id: nextId(state, 'ctr'),
-    kind: k.kind, title: k.title, client: rng.pick(k.clients), body: k.body,
-    type: k.type, destination: k.destination, payloadT, clientPayload: !!k.clientPayload,
-    valueM: Math.round(base * rng.range(1.25, 1.6)),
-    createdTurn: state.turn, closeTurn: state.turn + 4, deadlineTurn: state.turn + rng.int(30, 56),
+    kind: k.kind || k.id, title: fillAsset(k.title, vars).slice(0, 80), client: fillAsset(rng.pick(k.clients || ['Cliente']), vars), body: fillAsset(k.body, vars),
+    type: type.type, sub, payloadKind, destination: pick.destination, payloadT, clientPayload: !!k.clientPayload,
+    ...(moduleId ? { moduleId } : {}), ...(asset ? { targetAssetId: asset.id, clientActorId: asset.ownerId } : {}),
+    valueM: 0,
+    // bids stay open 4 weeks, and never close before the player has seen the card (a 13-week step creates offers in
+    // its weekly substeps: closing them inside the same step showed cards for contracts already awarded)
+    createdTurn: state.turn, closeTurn: Math.max(state.turn + 4, stepEnd), deadlineTurn: 0,
     status: 'open', rivals: [], playerBid: null, winner: null, winningPrice: null, missionId: null,
     advancePaidM: 0, late: false,
   };
-  c.deadlineTurn = Math.min(c.deadlineTurn, state.endTurn);
-  // rival bidders: capable actors, hidden bids rolled now (deterministic)
+  const base = marketCost(state, data, c);
+  if (!base) return null;
+  const vm = Array.isArray(k.valueMult) ? k.valueMult : [1.25, 1.6];
+  c.valueM = Math.round(base * rng.range(vm[0], vm[1]));
+  const dl = Array.isArray(k.deadline) ? k.deadline : [30, 56];
+  c.deadlineTurn = Math.min(c.closeTurn - 4 + rng.int(dl[0], dl[1]), state.endTurn);
+  // rival bidders: capable actors, hidden bids rolled now (deterministic); the asset's owner is the client, not a bidder
   const bidRng = rngFor(state.seed, 'missions', 'contractBids', c.id);
-  // bidders: live core actors (background actors do not bid for contracts)
-  const pool = liveActorIds(state, { tier: 'core' }).map((id) => state.actors[id]).filter((a) => a && a.id !== state.playerId);
+  const pool = liveActorIds(state, { tier: 'core' }).map((id) => state.actors[id]).filter((a) => a && a.id !== state.playerId && a.id !== c.clientActorId);
   const capable = pool.map((a) => ({ a, rel: actorCapability(state, data, a.id, c) })).filter((x) => x.rel > 0);
   for (const { a, rel } of bidRng.shuffle(capable).slice(0, 3)) {
     const price = Math.round(c.valueM * (0.8 + bidRng.next() * 0.38 - 0.12 * (a.ai?.aggression ?? 0.5)));
@@ -1661,10 +2459,21 @@ function makeContract(state, data, rng) {
   return c;
 }
 
+/** "Carga: 2,5 t até a ISS" / "Módulo Laboratório para a Mir" / "Tripulação para a ISS" (contract card line). */
+function contractWhatText(state, data, c) {
+  const dest = destDef(data, c.destination);
+  const where = dest?.name || c.destination;
+  const asset = c.targetAssetId ? assetOf(state, c.targetAssetId) : null;
+  const to = asset?.name || where;
+  if (c.payloadKind === 'station_module' || c.payloadKind === 'base_module') return `Módulo ${moduleLabel(moduleDef(data, c.moduleId))} (${fmtTons(c.payloadT)} t) para ${to}.`;
+  if (c.type === 'crewed') return c.sub === 'tourism' ? `Turistas em ${where}.` : `Tripulação para ${to}.`;
+  if (c.payloadKind === 'servicing') return `Kit de reparo para ${to}.`;
+  return `Carga: ${fmtTons(c.payloadT)} t até ${to}.`;
+}
+
 function offerContract(state, data, c) {
   const playerRel = actorCapability(state, data, state.playerId, c);
   const chances = playerRel > 0 ? winChances(state, c, playerRel) : {};
-  const dest = destDef(data, c.destination);
   const why = 'A agência não tem veículo e nave capazes para esta entrega.';
   const choices = Object.entries(BID_LEVELS).map(([id, f]) => ({
     id, label: `${BID_LABELS[id]} · ${fmtMoney(c.valueM * f)}`,
@@ -1676,7 +2485,7 @@ function offerContract(state, data, c) {
   pushDecision(state, {
     kind: 'contract/offer',
     title: `Contrato: ${c.title}`,
-    body: `${c.client}. ${c.body}\nCarga: ${String(c.payloadT).replace('.', ',')} t até ${dest?.name || c.destination}. Prazo: ${fmtT(state, c.deadlineTurn)}. Valor de referência: ${fmtMoney(c.valueM)}.\nConcorrentes: ${rivals}. Preço, prazo e reputação decidem.`,
+    body: `${c.client}. ${c.body}\n${contractWhatText(state, data, c)} Prazo: ${fmtT(state, c.deadlineTurn)}. Valor de referência: ${fmtMoney(c.valueM)}.\nConcorrentes: ${rivals}. Preço, prazo e reputação decidem.`,
     portrait: null,
     urgency: 1,
     expiresTurn: c.closeTurn,
@@ -1689,12 +2498,13 @@ function offerContract(state, data, c) {
 function contractOffers(state, data, ctx) {
   state.contracts = state.contracts || [];
   const open = state.contracts.filter((c) => c.status === 'open' || c.status === 'bidding').length;
-  if (open >= 2) return;
+  const caps = contractCaps(data);
+  if (open >= caps.openOffers) return;
   const last = state.contracts.reduce((mx, c) => Math.max(mx, c.createdTurn), -99);
   const rng = ctx.rng('contract');
-  if (state.turn - last < 6 || !rng.chance(state.turn < 8 ? 0.35 : 0.22)) return;
+  if (state.turn - last < caps.minGapWeeks || !rng.chance(state.turn < 8 ? 0.35 : 0.22)) return;
   if (state.turn > state.endTurn - 20) return;
-  const c = makeContract(state, data, rng);
+  const c = makeContract(state, data, rng, Number.isFinite(ctx?.stepEnd) ? ctx.stepEnd : state.turn + 1);
   if (!c) return;
   state.contracts.push(c);
   offerContract(state, data, c);
@@ -1709,7 +2519,7 @@ function contractOffers(state, data, ctx) {
 
 function resolveContractOffer(state, data, dec, choiceId) {
   const c = (state.contracts || []).find((x) => x.id === dec.payload?.contractId);
-  if (!c || c.status !== 'open') return { ok: true };
+  if (!c || c.status !== 'open') return { ok: true, status: 'gone', message: 'Este contrato já foi decidido.' };
   if (BID_LEVELS[choiceId]) {
     c.playerBid = { level: choiceId, price: Math.round(c.valueM * BID_LEVELS[choiceId]) };
     c.status = 'bidding';
@@ -1734,6 +2544,8 @@ function closeAuctions(state, data) {
       }
     }
     entries.sort((a, b) => b.score - a.score);
+    // the bid card goes with the auction (never shown for a contract that is already decided)
+    for (const d of (state.decisions || []).filter((x) => x.kind === 'contract/offer' && x.payload?.contractId === c.id)) removeDecision(state, d.id);
     const win = entries[0];
     if (!win) { c.status = 'expired'; continue; }
     c.winner = win.actorId;
@@ -1753,17 +2565,33 @@ function closeAuctions(state, data) {
   }
 }
 
+/** The mission payload a contract asks for (§1.4): tonnes, module, kit, client mass; with its target asset. */
+function contractPayload(data, c) {
+  const pk = c.payloadKind || (c.clientPayload ? 'client' : null);
+  if (!pk && !c.targetAssetId) return null;
+  const p = { kind: pk || null, targetAssetId: c.targetAssetId || null };
+  if (pk === 'supply' || pk === 'propellant') p.qty = c.payloadT;
+  if (pk === 'experiments' || pk === 'client') p.massT = c.payloadT;
+  if (pk === 'station_module' || pk === 'base_module') p.moduleId = c.moduleId || null;
+  return p;
+}
+
 function awardToPlayer(state, data, c) {
   const pid = state.playerId;
   c.status = 'awarded';
-  const cfg = pickConfig(state, data, {
-    type: c.type, destination: c.destination, clientPayload: c.clientPayload,
-    extraPayload: c.clientPayload ? 0 : c.payloadT, payloadOverride: c.clientPayload ? c.payloadT : null,
-  });
+  const type = missionTypeOf(c.type, c.sub);
+  const cfg = pickConfig(state, data, contractSpec(state, data, c, pid));
+  const crewed = type.type === 'crewed';
+  const sc = spacecraftDef(data, cfg?.spacecraftId);
+  const payload = contractPayload(data, c);
+  // v0.8 contracts (and client payloads) carry the total mass in config.payloadT; v2 cargo carries its tonnes in payload
+  const legacyMass = c.clientPayload || !c.payloadKind;
   const draft = {
-    name: `Contrato ${(state.stats?.["missions.contractsWon"] || 0) + 1}: ${c.title}`.slice(0, 60), source: 'contract', contractId: c.id, type: c.type, destination: c.destination,
-    vehicleId: cfg?.vehicleId || null, spacecraftId: cfg?.spacecraftId || null, clientPayload: c.clientPayload, crewed: false,
-    crew: autoCrew(state, data, 0), config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: cfg?.payloadT ?? c.payloadT },
+    name: `Contrato ${(state.stats?.["missions.contractsWon"] || 0) + 1}: ${c.title}`.slice(0, 60), source: 'contract', contractId: c.id,
+    type: type.type, sub: c.sub || type.sub || null, ...(payload ? { payload } : {}), destination: c.destination,
+    vehicleId: cfg?.vehicleId || null, spacecraftId: cfg?.spacecraftId || null, clientPayload: c.clientPayload, crewed,
+    crew: autoCrew(state, data, crewed ? sc?.crew || 0 : 0),
+    config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: legacyMass ? cfg?.payloadT ?? c.payloadT : null },
     deadlineTurn: c.deadlineTurn,
   };
   // the bid estimate used the cheapest capable hardware; the player now picks the real one (a pricier rocket eats the margin)
@@ -1847,6 +2675,63 @@ function settleContract(state, data, m, level) {
 // ---------------------------------------------------------------------------------------------
 // Launch day, transit, arrival and operations
 // ---------------------------------------------------------------------------------------------
+
+// --- Missões v2: the launch scene's target (§7.1) ---
+
+/**
+ * SceneTarget snapshot for Launch Day (JSON): infra.sceneTarget when infra.js is bound, else a fallback from the
+ * destination (a station destination such as the ISS → 'dock'; a station module founding a station → 'release';
+ * a base module/vehicle or supply landing on a surface → 'surface'). null for flights without a target.
+ */
+export function sceneTarget(state, data, m) {
+  if (!m) return null;
+  const f = peerFn('infra', 'sceneTarget');
+  if (f) {
+    try {
+      const t = f(state, data, m);
+      if (t !== undefined) return t ? JSON.parse(JSON.stringify(t)) : null;
+    } catch { /* fallback below */ }
+  }
+  return fallbackSceneTarget(state, data, m);
+}
+
+function fallbackSceneTarget(state, data, m) {
+  const { type } = missionTypeOf(m.type, m.sub);
+  const dest = destDef(data, m.destination);
+  if (!type || !dest) return null;
+  const sub = m.sub || resolveSub(state, data, { ...m, type });
+  const pk = payloadKindOf(data, { ...m, type }, sub);
+  const p = m.payload || {};
+  const payload = { kind: pk || null, moduleId: p.moduleId || null, vehicleTypeId: p.vehicleTypeId || null, qty: p.qty || 1 };
+  const base = { assetId: p.targetAssetId || null, modules: [], vehicles: [], sizeTier: 0, stageN: 0, bodyId: dest.body || 'earth', site: dest.id, payload, traits: [] };
+  const asset = assetOf(state, p.targetAssetId);
+  if (asset) {
+    base.modules = (asset.modules || []).map((x) => ({ id: x.id, n: x.n || 1 }));
+    base.vehicles = (asset.vehicles || []).map((x) => ({ id: x.id, n: x.n || 1 }));
+    base.sizeTier = asset.sizeTier || 0;
+    base.stageN = asset.stageN || 0;
+  }
+  const stationTarget = asset?.kind === 'station' || (dest.kind === 'station' && !asset);
+  if (type === 'station' && (sub === 'found' || (!asset && dest.kind !== 'station'))) {
+    return { ...base, kind: 'station', name: p.newAssetName || 'Nova estação', newAsset: true, sequence: 'release' };
+  }
+  if (['crewed', 'cargo', 'station'].includes(type) && stationTarget && !SURFACE_KINDS.includes(dest.kind)) {
+    return { ...base, kind: 'station', name: asset?.name || dest.short || dest.name, newAsset: false, sequence: 'dock' };
+  }
+  if (type === 'cargo' && SURFACE_KINDS.includes(dest.kind) && (asset?.kind === 'base' || ['base_module', 'base_vehicle', 'supply'].includes(pk))) {
+    return { ...base, kind: 'base', name: asset?.name || p.newAssetName || `Base em ${dest.name}`, newAsset: !asset, sequence: 'surface' };
+  }
+  return null;
+}
+
+/** {sequence, traits, inOrbit} of a flight's docking (risk.js docking milestones), or null. */
+function dockingOf(state, data, d) {
+  if (!d?.type || !['crewed', 'cargo', 'station'].includes(d.type)) return null;
+  let t = null;
+  try { t = sceneTarget(state, data, { ...d, sub: d.sub || resolveSub(state, data, d), payload: { ...(d.payload || {}), targetAssetId: resolvedTargetId(state, data, d, d.sub || resolveSub(state, data, d)) } }); } catch { t = null; }
+  if (!t || !['dock', 'berth', 'release'].includes(t.sequence)) return null;
+  return { sequence: t.sequence, traits: Array.isArray(t.traits) ? t.traits.slice(0, 8) : [] };
+}
 
 const hasArrivalScene = (data, m) => (destDef(data, m.destination)?.arrivalMilestones || []).length > 0;
 /** True when a successful ascent still leaves a transit/arrival phase ahead (the ascent is not the final word). */
@@ -1975,6 +2860,9 @@ function rollArrival(state, data, m, rng) {
   return { level, failureType, causes, headline: null, crewLost: [] };
 }
 
+/** Weeks an arrival waits for its control-room scene before it is resolved without one. */
+const ARRIVAL_SCENE_WAIT = 13;
+
 function transitTick(state, data, ctx) {
   for (const m of state.missions || []) {
     if (m.status === 'transit' && m.transit) {
@@ -1986,8 +2874,13 @@ function transitTick(state, data, ctx) {
       }
     }
     if (m.status === 'arrival') {
-      if (hasArrivalScene(data, m)) {
-        if (!launchPending(state, m.id) && !anyLaunchBusy(state)) pushLaunchReady(state, data, m, 'arrival');
+      // the control room is offered while the arrival is fresh; one that waited a quarter behind other launches and
+      // arrivals (one blocking scene at a time: 13- and 52-week steps launch faster than scenes can be watched) is
+      // resolved off-screen, so arrivals never pile up in the save
+      const waited = state.turn - (Number.isFinite(m.transit?.arriveTurn) ? m.transit.arriveTurn : state.turn);
+      const pending = launchPending(state, m.id);
+      if (hasArrivalScene(data, m) && (pending || waited < ARRIVAL_SCENE_WAIT)) {
+        if (!pending && !anyLaunchBusy(state)) pushLaunchReady(state, data, m, 'arrival');
       } else {
         onLaunchResolved(state, data, m.id, 'arrival', rollArrival(state, data, m, ctx.rng(`arrival:${m.id}`)));
       }
@@ -2070,6 +2963,62 @@ function headline(state, data, key, vars, rng) {
   return fill(rng.pick(pool), vars);
 }
 
+// --- Missões v2: results (§1.3) ---
+
+/** Weeks of operations after success: crew rotations stay on the asset, subtypes may override the type's figure. */
+function opsWeeksOf(state, data, m) {
+  const sub = m.sub || null;
+  const row = subtypeOf(data, m.type, sub);
+  if (m.type === 'crewed' && sub === 'rotation' && (m.payload?.targetAssetId || infraBound())) {
+    const a = assetOf(state, m.payload?.targetAssetId);
+    const tbl = mtables(data).rotationWeeks;
+    return Math.max(1, Math.round(row?.rotationWeeks ?? tbl?.[a?.kind] ?? ROTATION_WEEKS));
+  }
+  if (Number.isFinite(row?.opsWeeks)) return row.opsWeeks;
+  // a rover lives on as an asset (infra.js pays its yearly science): a short commissioning period here
+  if (m.crewed) return OPS_WEEKS.crewed;
+  const t = typeRow(data, m.type);
+  if (Number.isFinite(t?.opsWeeks)) return t.opsWeeks;
+  return OPS_WEEKS[m.type] ?? 2;
+}
+/** One-shot science base of a result (type, or the subtype's onArrival). */
+function scienceBaseOf(data, m) {
+  const row = subtypeOf(data, m.type, m.sub);
+  if (Number.isFinite(row?.science?.onArrival)) return row.science.onArrival;
+  if (m.crewed) return SCIENCE_BASE.crewed;
+  const t = typeRow(data, m.type);
+  return Number.isFinite(t?.science) ? t.science : SCIENCE_BASE[m.type] ?? 5;
+}
+/** Milestones a successful flight of this type/subtype claims (missions.json firsts). */
+function subtypeFirsts(data, m, dest) {
+  const out = [];
+  for (const r of mtables(data).firsts) {
+    if (!r?.milestone || r.type !== m.type) continue;
+    if (r.sub && r.sub !== m.sub) continue;
+    if (r.body && r.body !== (dest?.body ?? 'earth')) continue;
+    if (Array.isArray(r.dests) && !r.dests.includes(dest?.id)) continue;
+    if (m.clientPayload) continue;
+    out.push(r.milestone);
+  }
+  return [...new Set(out)];
+}
+/**
+ * Hand the result to infra.js (§3): satellite fleets, rovers, station/base modules, supplies, crew rotations and
+ * servicing. Records the asset on the mission. Without infra.js nothing changes (the v0.8 abstract flow).
+ */
+function deliverToInfra(state, data, m, level) {
+  const f = peerFn('infra', 'deliver');
+  if (!f || m.testDesignId || m.certVehicleId) return null;
+  if (m.clientPayload) return null; // a client's satellite or cargo is the client's business
+  let res = null;
+  try { res = f(state, data, m, level); } catch (e) { log(state, `aviso: entrega à infraestrutura falhou (${e.message})`); res = null; }
+  if (res?.assetId) {
+    m.assetId = res.assetId;
+    if (m.payload && typeof m.payload === 'object' && !m.payload.targetAssetId) m.payload.targetAssetId = res.assetId;
+  }
+  return res;
+}
+
 /**
  * Called by launch at the end of each scene (and by missions for arrivals without a scene).
  * outcome = { level, failureType, causes, headline?, crewLost? }
@@ -2118,7 +3067,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
     m.transit = { departTurn: state.turn, arriveTurn: state.turn + weeks, events: [] };
     if (level === 'partial') m.riskMod = (m.riskMod || 0) - 0.05; // wrong orbit: less margin at arrival
   } else if (success) {
-    const opsWeeks = m.testDesignId ? 0 : m.crewed ? OPS_WEEKS.crewed : OPS_WEEKS[m.type] ?? 2; // ballast has no operations
+    const opsWeeks = m.testDesignId ? 0 : opsWeeksOf(state, data, m); // ballast has no operations
     m.status = opsWeeks > 0 ? 'operations' : 'done';
     if (opsWeeks > 0) m.ops = { startTurn: state.turn, untilTurn: state.turn + opsWeeks, events: [], science: 0 };
   } else {
@@ -2168,6 +3117,15 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
         prestige += wasFirst ? firstValue(state, id, firstPts) : laterPts;
         if (wasFirst) { firsts.push(id); emitSignal(state, 'first', { milestoneId: id, actorId: pid }); }
       }
+      // Missões v2 subtype firsts (missions.json firsts: first weather satellite, first rover on Mars, ...)
+      for (const id of subtypeFirsts(data, m, dest)) {
+        if (ms.includes(id) || state.firsts?.[id]?.actorId === pid || (state.stats?.[`missions.reached.${id}`] || 0) > 0) continue;
+        stat(state, `reached.${id}`);
+        const firstPts = Math.round((20 + Math.round(base)) * share * milestoneShare(data, id));
+        const wasFirst = claimFirst(state, id, pid, firstPts, Math.round(3 * share));
+        prestige += wasFirst ? firstValue(state, id, firstPts) : Math.round(3 * share);
+        if (wasFirst) { firsts.push(id); emitSignal(state, 'first', { milestoneId: id, actorId: pid }); }
+      }
       const natKey = `crewed_orbit_national:${pid}`;
       if (m.crewed && !state.firsts?.[natKey]) {
         claimFirst(state, natKey, pid, 15, 0);
@@ -2176,7 +3134,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
         emitSignal(state, 'first', { milestoneId: natKey, actorId: pid });
       }
       // science: part now, the rest at the end of operations
-      const sci = (SCIENCE_BASE[m.crewed ? 'crewed' : m.type] ?? 5) * (dest?.scienceMult ?? SCIENCE_BODY[dest?.body] ?? 1) * (1 + techBonus(state, 'sciencePerMission')) * (level === 'total' ? 1 : 0.5);
+      const sci = scienceBaseOf(data, m) * (dest?.scienceMult ?? SCIENCE_BODY[dest?.body] ?? 1) * (1 + techBonus(state, 'sciencePerMission')) * (level === 'total' ? 1 : 0.5);
       science = Math.round(sci * (m.ops ? 0.6 : 1));
       if (science > 0) addScience(state, science, m);
       if (m.ops) m.ops.science = Math.round(sci - science);
@@ -2223,6 +3181,8 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
       const paid = settleContract(state, data, m, level);
       if (paid > 0) headlines.push(`Cliente satisfeito: ${fmtMoney(paid)} entram no caixa`);
     }
+    // Missões v2 (§1.3): what the flight leaves behind — satellite fleet, rover, station/base module, cargo delivered
+    if (success) deliverToInfra(state, data, m, level);
     followUp(state, data, m, success && !deadIds.length);
   }
 
@@ -2258,7 +3218,8 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
   }
 
   emitSignal(state, 'mission/resolved', {
-    missionId: m.id, calendarId: m.calendarId || null, actorId: pid, destination: m.destination, missionType: m.type, // NOT "type": emitSignal spreads payload over the signal type
+    missionId: m.id, calendarId: m.calendarId || null, actorId: pid, destination: m.destination, missionType: m.type, sub: m.sub || null,
+    ...(m.assetId || m.payload?.targetAssetId ? { assetId: m.assetId || m.payload.targetAssetId } : {}), // NOT "type": emitSignal spreads payload over the signal type
     crewed: !!m.crewed, outcome: level, failureType, phase, final,
     ...(m.mandateId || m.holderId ? { mandateId: m.mandateId || null, holderId: m.holderId || null } : {}),
     ...(m.vehicleId && isDesignId(state, m.vehicleId) ? { designId: m.vehicleId, test: !!m.testDesignId } : {}),
@@ -2272,6 +3233,61 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
 // Builder query (3 steps)
 // ---------------------------------------------------------------------------------------------
 
+/** What a module adds, for the builder cards: {science, crew, power, storageT, ports, life, isruTYr, housing}. */
+function moduleAdds(m) {
+  const out = {};
+  for (const k of ['science', 'crew', 'power', 'storageT', 'ports', 'life', 'isruTYr', 'housing', 'food']) if (Number(m?.[k])) out[k] = Number(m[k]);
+  return out;
+}
+
+/**
+ * Missões v2 builder data (§11) for a normalized draft: resolved subtype, the subtype chips (locked/invalid ones
+ * with a reason), payload kinds, station/base modules and surface vehicles (locked ones with the research link) and
+ * the asset targets at the destination. Pure.
+ */
+function draftOptionsV2(state, data, d, gateOf) {
+  const dest = destDef(data, d.destination);
+  const sub = d.type ? resolveSub(state, data, d) : null;
+  const sc = spacecraftDef(data, d.spacecraftId, state);
+  const subs = d.type ? subtypesFor(data, d.type).filter((r) => !r.privileged || r.id === sub).map((r) => {
+    const reasons = [];
+    if (dest && !subDestOk(r, dest)) reasons.push(`Não serve para ${dest.name}.`);
+    if (sc && !scOkForSub(data, sc, d.type, r.id)) reasons.push(`${sc.name} não é ${String(r.label).toLowerCase()}.`);
+    return { id: r.id, label: r.label, key: r.key || null, histYear: r.histYear ?? null, selected: r.id === sub, derived: !d.sub && r.id === sub,
+      valid: reasons.length === 0, reasons, locked: gateOf({ type: d.type, sub: r.id }) };
+  }) : [];
+  const pk = d.type ? payloadKindOf(data, d, sub) : null;
+  const payloadKinds = d.type === 'cargo'
+    ? subtypesFor(data, 'cargo').filter((r) => r.payload && r.payload !== 'client').map((r) => ({
+      id: r.payload, sub: r.id, label: mtables(data).payloadKinds?.[r.payload]?.label || r.label, selected: r.payload === pk,
+      valid: !dest || subDestOk(r, dest), locked: gateOf({ type: 'cargo', sub: r.id, payloadKind: r.payload }) }))
+    : d.type === 'station' ? [{ id: 'station_module', sub, label: 'Módulo de estação', selected: true, valid: true, locked: null }] : [];
+  const p = d.payload || normalizePayload(null);
+  const modKind = pk === 'station_module' ? 'station' : pk === 'base_module' ? 'base' : null;
+  const modules = modKind ? moduleRows(data, modKind).map((m) => ({
+    id: m.id, label: moduleLabel(m), massT: m.massT ?? null, costM: m.costM ?? null, histYear: m.histYear ?? null, adds: moduleAdds(m), traits: m.traits || [],
+    selected: m.id === p.moduleId, locked: gateOf({ type: d.type, sub, payloadKind: pk, moduleId: m.id }),
+  })) : [];
+  const surfaceVehicles = pk === 'base_vehicle' ? moduleRows(data, 'vehicles').map((v) => {
+    const reasons = Array.isArray(v.bodies) && v.bodies.length && dest && !v.bodies.includes(dest.body) ? [`Não opera em ${dest.name}.`] : [];
+    return { id: v.id, label: moduleLabel(v), massT: v.massT ?? null, costM: v.costM ?? null, science: v.science ?? 0, selected: v.id === p.vehicleTypeId,
+      valid: reasons.length === 0, reasons, locked: gateOf({ type: 'cargo', sub, payloadKind: pk, vehicleTypeId: v.id }) };
+  }) : [];
+  const targetId = d.type ? resolvedTargetId(state, data, d, sub) : null;
+  const need = d.type ? needsTargetKinds(data, d.type, sub) : null;
+  const targets = d.type && d.destination ? targetsOf(state, data, d, sub).map((t) => ({ ...t, selected: t.assetId === targetId })) : [];
+  const foundsKind = subtypeOf(data, d.type, sub)?.foundsAsset || (d.type === 'station' ? 'station' : null);
+  const cargoT = d.type ? round1(cargoMassOf(state, data, d, pk)) : 0;
+  return {
+    sub, subs, payloadKinds, modules, surfaceVehicles, targets,
+    payload: { ...p, kind: p.kind || pk || null, targetAssetId: targetId },
+    targetAssetId: targetId, needsTarget: !!need,
+    canFound: !!foundsKind && !need, foundsKind: foundsKind || null,
+    cargoT, carried: CARRIED_KINDS.includes(pk) && !d.config?.payloadT,
+    carrierCapT: sc ? cargoCapacityOf(data, sc) : null,
+  };
+}
+
 /** Everything the 3-step builder needs for a partial draft. Pure; never throws on partial input. */
 export function draftOptions(state, data, draftIn = {}) {
   syncDesignCatalog(state, data);
@@ -2283,10 +3299,18 @@ export function draftOptions(state, data, draftIn = {}) {
     d.mandateId = existing.mandateId || null; d.holderId = existing.holderId || null; d.testDesignId = existing.testDesignId || null;
     if (d.deadlineTurn == null && Number.isFinite(existing.deadlineTurn)) d.deadlineTurn = existing.deadlineTurn;
     if (existing.clientPayload) d.clientPayload = true;
+    if (existing.contractId) { d.contractId = existing.contractId; d.source = existing.source; d.payload = normalizePayload(existing.payload); d.sub = existing.sub || d.sub; }
   }
   const pid = state.playerId;
   const cash = state.actors?.[pid]?.cash ?? 0;
-  const types = TYPES.map((t) => ({ id: t, label: TYPE_LABELS[t], selected: t === d.type }));
+  const gateOf = (spec) => {
+    const mg = peerFn('gating', 'missionGate');
+    if (!mg) return null;
+    try { const g = mg(state, data, spec, pid); return g && g.ok === false ? { reason: g.reason || 'Pesquise a tecnologia necessária.', nodeId: g.nodeId || null } : null; } catch { return null; }
+  };
+  const types = TYPES.map((t) => ({ id: t, label: TYPE_LABELS[t], selected: t === d.type, locked: gateOf({ type: t }) }));
+  // Missões v2 builder lists (§11): subtypes, payload kinds, modules, surface vehicles, targets — locked ones included
+  const v2 = draftOptionsV2(state, data, d, gateOf);
 
   const destinations = destList(data).map((x) => {
     const w = windowFor(state, data, x.id, state.turn);
@@ -2299,7 +3323,7 @@ export function draftOptions(state, data, draftIn = {}) {
     };
   });
 
-  const payloadT = payloadOf(data, d);
+  const payloadT = payloadOf(data, d, state);
   const vehicles = vehiclesFor(state, data).map((v) => {
     const rel = vehicleReliability(state, data, v.id);
     const cap = d.destination ? effectiveCapacity(state, data, v.id, d.destination, d.config.fuelMargin) : { raw: 0, eff: 0 };
@@ -2350,7 +3374,13 @@ export function draftOptions(state, data, draftIn = {}) {
 
   const spacecraft = spacecraftFor(state, data).map((s) => {
     const reasons = [];
-    if (d.type && !(d.source === 'calendar' && s.id === d.spacecraftId) && !scOkForType(s, d.type, d.crewed)) reasons.push(d.crewed ? 'Não leva tripulação.' : 'Tipo incompatível.');
+    const calendarCraft = d.source === 'calendar' && s.id === d.spacecraftId;
+    if (d.type && !calendarCraft && !scOkForType(s, d.type, d.crewed, data)) reasons.push(d.crewed ? 'Não leva tripulação.' : 'Tipo incompatível.');
+    else if (d.type && !calendarCraft && v2.sub && !scOkForSub(data, s, d.type, v2.sub)) reasons.push(`Não é ${(subtypeOf(data, d.type, v2.sub)?.label || v2.sub).toLowerCase()}.`);
+    const cargoCapT = cargoCapacityOf(data, s);
+    if (v2.carried && v2.cargoT > cargoCapT + 1e-9) reasons.push(`Leva no máximo ${fmtTons(cargoCapT)} t de carga.`);
+    const destX = destDef(data, d.destination);
+    if (v2.carried && destX && SURFACE_KINDS.includes(destX.kind) && s.kind !== 'lander' && !(s.kind === 'cargo' && (s.destinations || []).includes(destX.id))) reasons.push('Carga na superfície precisa de um módulo de pouso de carga.');
     if (d.destination && !scOkForDest(s, d.destination)) reasons.push('Não serve para este destino.');
     if (d.vehicleId && Array.isArray(s.compatibleVehicles) && s.compatibleVehicles.length && !s.compatibleVehicles.includes(d.vehicleId)) {
       const names = s.compatibleVehicles.map((id) => vehicleDef(data, id)?.name || id);
@@ -2358,7 +3388,7 @@ export function draftOptions(state, data, draftIn = {}) {
     }
     const rel = spacecraftReliability(state, data, s.id);
     return {
-      id: s.id, name: s.name, operator: s.operator, kind: s.kind, crew: s.crew || 0, massT: s.massT ?? null, costM: s.costM || 0,
+      id: s.id, name: s.name, operator: s.operator, kind: s.kind, crew: s.crew || 0, massT: s.massT ?? null, costM: s.costM || 0, sub: s.sub || null, cargoT: cargoCapT,
       reliability: { mean: rel.mean, low: rel.low, high: rel.high }, truthLayer: s.truthLayer,
       valid: reasons.length === 0, reasons, selected: s.id === d.spacecraftId,
     };
@@ -2417,6 +3447,9 @@ export function draftOptions(state, data, draftIn = {}) {
     errors: v.errors,
     warnings: v.warnings,
     valid: v.errors.length === 0,
+    // Missões v2 (§11)
+    ...v2,
+    sub: v2.sub, payload: v2.payload,
   };
 }
 
@@ -2424,8 +3457,60 @@ export function draftOptions(state, data, draftIn = {}) {
 // Module interface
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Legacy "Pouso" (§1.1, §10): missions and contracts still typed 'lander' (a v0.8 save the v4 migration did not see,
+ * or a record made by old code) become probe/lander. Idempotent, same result as migrations/v4.js step 1.
+ */
+function normalizeLegacyTypes(state) {
+  for (const list of [state.missions, state.contracts]) {
+    for (const x of list || []) {
+      const a = x && LEGACY_TYPES[x.type];
+      if (!a) continue;
+      x.type = a.type;
+      if (!x.sub) x.sub = a.sub;
+    }
+  }
+}
+
+/**
+ * A launch agreement ended (§8.1): the player's missions booked on a rocket the market no longer sells them go back
+ * to planning without a rocket (launches ≤ 26 weeks away keep it), with the engineers' suggestion and one card each.
+ */
+function treatyEnded(state, data) {
+  if (!(state.signals || []).some((s) => s?.type === 'treaty/broken' || s?.type === 'treaty/expired')) return;
+  const access = peerFn('market', 'treatyAccess');
+  if (!access) return;
+  const pid = state.playerId;
+  for (const m of state.missions || []) {
+    if (!['planning', 'scheduled'].includes(m.status) || !m.vehicleId || m.testDesignId || m.certVehicleId) continue;
+    const v = vehicleDef(data, m.vehicleId, state);
+    if (!v) continue;
+    const closed = (item) => {
+      if (!item) return false;
+      let r = null;
+      try { r = access(state, data, pid, item); } catch { r = null; }
+      return !!r && r.ok === false;
+    };
+    const lostV = closed(v);
+    const sc = spacecraftDef(data, m.spacecraftId, state);
+    const lostSc = closed(sc);
+    if (!lostV && !lostSc) continue;
+    if (m.status === 'scheduled' && Number.isFinite(m.launchTurn) && m.launchTurn - state.turn <= 26) continue;
+    const cfg = pickConfig(state, data, { type: m.type, sub: m.sub || null, destination: m.destination, crewed: !!m.crewed });
+    m.suggestion = { vehicleId: lostV ? cfg?.vehicleId || null : m.vehicleId, spacecraftId: lostSc ? cfg?.spacecraftId || null : m.spacecraftId || cfg?.spacecraftId || null, secondarySpacecraftId: m.secondarySpacecraftId || null, reason: SUGGEST_CHEAPEST };
+    m.vehicleId = null;
+    if (lostSc) m.spacecraftId = null;
+    if (m.status === 'scheduled') { m.status = 'planning'; m.launchTurn = null; m.windowTurn = null; }
+    state.decisions = state.decisions.filter((x) => !(x.kind === 'launch/ready' && x.payload?.missionId === m.id));
+    const who = actorName(state, lostV ? v.operator : sc.operator);
+    issueCard(state, `Acordo encerrado: ${m.name}`, `O acordo com ${who} acabou: escolha outro foguete para ${m.name}.`);
+    stat(state, 'treatyReassigned');
+  }
+}
+
 export function init(state, data) {
   state.missions = state.missions || [];
+  normalizeLegacyTypes(state);
   syncDesignCatalog(state, data);
   state.contracts = state.contracts || [];
   state.stats = state.stats || {};
@@ -2437,6 +3522,8 @@ export function tick(state, data, ctx) {
   state.missions = state.missions || [];
   state.contracts = state.contracts || [];
   syncDesignCatalog(state, data);
+  normalizeLegacyTypes(state);
+  treatyEnded(state, data);
   contractDeadlines(state, data);
   closeAuctions(state, data);
   adoptTransitPrograms(state, data);
@@ -2575,6 +3662,9 @@ export function publicDraft(draft) {
   const d = { ...(draft && typeof draft === 'object' ? draft : {}) };
   for (const k of PRIVILEGED_DRAFT_KEYS) delete d[k];
   d.source = 'custom';
+  // Missões v2: client payloads are contract-only (§1.4)
+  if (d.payload && typeof d.payload === 'object' && d.payload.kind === 'client') d.payload = { ...d.payload, kind: null };
+  if (d.sub === 'client') d.sub = null;
   return d;
 }
 
@@ -2639,6 +3729,9 @@ function decorate(state, data, m) {
     ...m,
     statusLabel: STATUS_LABELS[m.status] || m.status,
     typeLabel: TYPE_LABELS[m.type] || m.type,
+    subLabel: subtypeOf(data, m.type, m.sub)?.label || null,
+    targetName: m.payload?.targetAssetId ? assetOf(state, m.payload.targetAssetId)?.name || null : null,
+    moduleName: m.payload?.moduleId ? moduleLabel(moduleDef(data, m.payload.moduleId)) : null,
     destinationName: dest?.name || m.destination,
     vehicleName: m.vehicleName || (m.calendarId && data?.index?.calendar?.[m.calendarId]?.vehicleName) || vehicleDef(data, m.vehicleId)?.name || null,
     spacecraftName: spacecraftDef(data, m.spacecraftId)?.name || null,
@@ -2759,7 +3852,8 @@ function slimResults(state, list = state.missions) {
 }
 /**
  * Caps: contracts keep ≤ 40 (resolved ones older than a year go first); missions done/cancelled more than 5 years
- * ago become a stub in state.missionsArchive (≤ 80 B each), stubs older than 50 years fold into per-destination counts.
+ * ago become a stub in state.missionsArchive (≤ 80 B each), stubs older than 50 years (8 in a long campaign) fold into
+ * per-destination counts.
  */
 export function compact(state) {
   const live = ['open', 'bidding', 'awarded', 'late'];
@@ -2770,6 +3864,13 @@ export function compact(state) {
   if (Array.isArray(state.contracts) && state.contracts.length > cCap) {
     state.contracts = state.contracts.filter((c) => live.includes(c.status) || state.turn - (c.createdTurn ?? 0) < 52);
     if (state.contracts.length > cCap) state.contracts = state.contracts.slice(-cCap);
+  }
+  // resolved auctions of a long campaign keep who won, the bids and the price; the pitch text goes after half a year
+  if (long) {
+    for (const c of state.contracts || []) {
+      if (live.includes(c.status) || state.turn - (c.createdTurn ?? state.turn) <= 26) continue;
+      if (c.body) c.body = '';
+    }
   }
   if (!Array.isArray(state.missions)) return;
   if (long) {
@@ -2814,7 +3915,7 @@ export function compact(state) {
   }
   const arc = state.missionsArchive || (state.missionsArchive = { stubs: [], byDest: {} });
   arc.stubs.push(...stubs);
-  const foldAfter = (long ? 15 : 50) * 52;
+  const foldAfter = (long ? 8 : 50) * 52;
   const old = arc.stubs.filter((s) => state.turn - s.t > foldAfter);
   if (old.length) {
     arc.stubs = arc.stubs.filter((s) => state.turn - s.t <= foldAfter);
@@ -2983,16 +4084,17 @@ export function createMandateMission(state, data, mandate) {
     }
   }
   if (!mandate?.type || !mandate?.destination) return { ok: false, error: 'Mandato sem tipo ou destino.' };
-  if (!TYPES.includes(mandate.type)) return { ok: false, error: 'Tipo de missão inválido.' };
+  const mt = missionTypeOf(mandate.type, mandate.sub);
+  if (!mt.type) return { ok: false, error: 'Tipo de missão inválido.' };
   if (!destDef(data, mandate.destination)) return { ok: false, error: 'Destino desconhecido.' };
-  const crewed = mandate.crewed ?? mandate.type === 'crewed';
-  const cfg = pickConfig(state, data, { type: mandate.type, destination: mandate.destination, crewed });
+  const crewed = mandate.crewed ?? mt.type === 'crewed';
+  const cfg = pickConfig(state, data, { type: mt.type, sub: mt.sub, destination: mandate.destination, crewed });
   const sc = spacecraftDef(data, cfg?.spacecraftId);
   const done = mid ? state.missions.filter((m) => m.mandateId === mid && m.status !== 'cancelled').length : 0;
   const title = snap.title || null;
   const draft = {
     name: title ? `${title}${snap.count > 1 ? ` ${done + 1}/${snap.count}` : ''}`.slice(0, 60) : undefined,
-    source: 'custom', type: mandate.type, destination: mandate.destination,
+    source: 'custom', type: mt.type, sub: mt.sub, destination: mandate.destination,
     vehicleId: cfg?.vehicleId || null, spacecraftId: cfg?.spacecraftId || null, crewed,
     crew: autoCrew(state, data, crewed ? sc?.crew || 0 : 0), config: { strategy: 'balanced', fuelMargin: 0.1 },
     deadlineTurn: snap.deadlineTurn, mandateId: mid, holderId: snap.holderId,
@@ -3136,7 +4238,13 @@ function testFlightsView(state) {
 function suggestFor(state, data, draftIn = {}) {
   const d = normalizeDraft(draftIn);
   if (!d.type || !d.destination) return null;
-  const cfg = pickConfig(state, data, { type: d.type, destination: d.destination, crewed: d.crewed });
+  // Missões v2: the pick respects the subtype (an observatory needs an observatory craft) and the carried payload
+  const sub = resolveSub(state, data, d);
+  const pk = payloadKindOf(data, d, sub);
+  const mod = d.payload?.moduleId ? moduleDef(data, d.payload.moduleId) : null;
+  const noCraft = d.type === 'station' && !!mod;
+  const cargoT = !noCraft && CARRIED_KINDS.includes(pk) ? cargoMassOf(state, data, d, pk) : 0;
+  const cfg = pickConfig(state, data, { type: d.type, sub, destination: d.destination, crewed: d.crewed, noCraft, payloadOverride: noCraft ? mod.massT || 1 : null, cargoT, extraPayload: cargoT });
   if (!cfg) return null;
   return {
     vehicleId: cfg.vehicleId, spacecraftId: cfg.spacecraftId, reason: SUGGEST_CHEAPEST,

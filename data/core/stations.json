@@ -1,0 +1,122 @@
+{
+  "_doc": "Estações históricas e projetadas (docs/MISSIONS-V2.md §3.3). Dono: infrastructure-sim (src/sim/infra.js). Cada linha vira um ativo da IA na data 'from' (mês 1–12), com os módulos que já estavam lá; os outros entram nas datas listadas ('by' = quem pagou o módulo, para as cotas). A estação termina em 'until' (reentrada) a menos que o jogador tenha ≥ 25% de cota e continue mandando suprimentos (cada ano abastecido adia o fim em 5 anos). 'destination' = destino do catálogo que as missões usam para chegar nela. Datas depois de 2026 são projeção; as da Era 5 são especulação.",
+  "version": 1,
+  "stations": [
+    {
+      "id": "salyut", "destination": "salyut", "owner": "roscosmos", "partners": [], "name": "Salyut",
+      "from": { "year": 1971, "month": 4 }, "until": { "year": 1986, "month": 6 }, "crew": 2, "truthLayer": "fato",
+      "modules": [
+        { "id": "st_core", "at": { "year": 1971, "month": 4 } },
+        { "id": "st_multiport", "at": { "year": 1977, "month": 9 } }
+      ],
+      "plannedModules": 2,
+      "reentry": "As Salyut cumprem a missão: a última reentra sobre o Pacífico depois de quinze anos de voos soviéticos de longa duração."
+    },
+    {
+      "id": "skylab", "destination": "skylab", "owner": "nasa", "partners": [], "name": "Skylab",
+      "from": { "year": 1973, "month": 5 }, "until": { "year": 1979, "month": 7 }, "crew": 3, "truthLayer": "fato",
+      "modules": [
+        { "id": "st_core", "at": { "year": 1973, "month": 5 } },
+        { "id": "st_lab", "at": { "year": 1973, "month": 5 } }
+      ],
+      "plannedModules": 2,
+      "reentry": "O Skylab reentra antes do previsto e espalha destroços sobre o oeste da Austrália."
+    },
+    {
+      "id": "mir", "destination": "mir", "owner": "roscosmos", "partners": [], "name": "Mir",
+      "from": { "year": 1986, "month": 2 }, "until": { "year": 2001, "month": 3 }, "crew": 3, "truthLayer": "fato",
+      "modules": [
+        { "id": "st_core", "at": { "year": 1986, "month": 2 } },
+        { "id": "st_multiport", "at": { "year": 1986, "month": 2 } },
+        { "id": "st_lab", "at": { "year": 1987, "month": 4 } },
+        { "id": "st_hab", "at": { "year": 1989, "month": 12 } },
+        { "id": "st_lab", "at": { "year": 1990, "month": 6 } },
+        { "id": "st_lab", "at": { "year": 1995, "month": 6 } },
+        { "id": "st_node", "at": { "year": 1995, "month": 11 }, "by": "nasa" },
+        { "id": "st_lab", "at": { "year": 1996, "month": 4 } }
+      ],
+      "plannedModules": 8,
+      "reentry": "A Mir cai no Pacífico Sul depois de quinze anos e de gente de doze países a bordo."
+    },
+    {
+      "id": "iss", "destination": "iss", "owner": "nasa", "partners": ["roscosmos", "esa", "jaxa", "csa"], "name": "Estação Espacial Internacional",
+      "from": { "year": 1998, "month": 11 }, "until": { "year": 2030, "month": 12 }, "crew": 6, "truthLayer": "fato",
+      "modules": [
+        { "id": "st_core", "at": { "year": 1998, "month": 11 }, "by": "roscosmos" },
+        { "id": "st_node", "at": { "year": 1998, "month": 12 } },
+        { "id": "st_hab", "at": { "year": 2000, "month": 7 }, "by": "roscosmos" },
+        { "id": "st_solar", "at": { "year": 2000, "month": 12 } },
+        { "id": "st_lab", "at": { "year": 2001, "month": 2 } },
+        { "id": "st_arm", "at": { "year": 2001, "month": 4 }, "by": "csa" },
+        { "id": "st_airlock", "at": { "year": 2001, "month": 7 } },
+        { "id": "st_solar", "at": { "year": 2002, "month": 4 } },
+        { "id": "st_solar", "at": { "year": 2006, "month": 9 } },
+        { "id": "st_node", "at": { "year": 2007, "month": 10 } },
+        { "id": "st_lab", "at": { "year": 2008, "month": 2 }, "by": "esa" },
+        { "id": "st_lab", "at": { "year": 2008, "month": 6 }, "by": "jaxa" },
+        { "id": "st_solar", "at": { "year": 2009, "month": 3 } },
+        { "id": "st_hab", "at": { "year": 2010, "month": 2 } },
+        { "id": "st_cupola", "at": { "year": 2010, "month": 2 }, "by": "esa" },
+        { "id": "st_logistics", "at": { "year": 2011, "month": 2 } },
+        { "id": "st_inflatable", "at": { "year": 2016, "month": 4 } },
+        { "id": "st_lab", "at": { "year": 2021, "month": 7 }, "by": "roscosmos" }
+      ],
+      "plannedModules": 18,
+      "reentry": "A ISS é guiada para o Ponto Nemo e se despede em uma trilha de fogo sobre o Pacífico."
+    },
+    {
+      "id": "tiangong", "destination": "tiangong", "owner": "cnsa", "partners": [], "name": "Tiangong",
+      "from": { "year": 2021, "month": 4 }, "until": { "year": 2050, "month": 12 }, "crew": 3, "truthLayer": "fato",
+      "modules": [
+        { "id": "st_core", "at": { "year": 2021, "month": 4 } },
+        { "id": "st_lab", "at": { "year": 2022, "month": 7 } },
+        { "id": "st_lab", "at": { "year": 2022, "month": 10 } },
+        { "id": "st_multiport", "at": { "year": 2027, "month": 6 } },
+        { "id": "st_hab", "at": { "year": 2030, "month": 6 } }
+      ],
+      "plannedModules": 5,
+      "reentry": "A Tiangong encerra a operação e reentra sobre o Pacífico, depois de três décadas de tripulações chinesas e convidadas."
+    },
+    {
+      "id": "commercial", "destination": "commercial_leo_station", "owner": "blueorigin", "partners": ["nasa"], "name": "Estação comercial",
+      "from": { "year": 2029, "month": 6 }, "until": { "year": 2060, "month": 12 }, "crew": 4, "truthLayer": "projecao",
+      "modules": [
+        { "id": "st_core", "at": { "year": 2029, "month": 6 } },
+        { "id": "st_inflatable", "at": { "year": 2030, "month": 9 } },
+        { "id": "st_lab", "at": { "year": 2032, "month": 3 }, "by": "nasa" },
+        { "id": "st_solar", "at": { "year": 2033, "month": 6 } },
+        { "id": "st_node", "at": { "year": 2035, "month": 6 } }
+      ],
+      "plannedModules": 6,
+      "reentry": "A primeira estação comercial é aposentada: os módulos mais novos já viraram parte de outras."
+    },
+    {
+      "id": "gateway", "destination": "lunar_gateway", "owner": "nasa", "partners": ["esa", "jaxa", "csa"], "name": "Estação em órbita lunar",
+      "from": { "year": 2036, "month": 3 }, "until": { "year": 2070, "month": 12 }, "crew": 4, "truthLayer": "projecao",
+      "modules": [
+        { "id": "st_core", "at": { "year": 2036, "month": 3 } },
+        { "id": "st_hab", "at": { "year": 2038, "month": 9 }, "by": "esa" },
+        { "id": "st_logistics", "at": { "year": 2040, "month": 6 }, "by": "esa" },
+        { "id": "st_arm", "at": { "year": 2041, "month": 3 }, "by": "csa" },
+        { "id": "st_airlock", "at": { "year": 2042, "month": 6 } }
+      ],
+      "plannedModules": 5,
+      "reentry": "A estação em órbita lunar é desativada e enviada para uma órbita de descarte em torno do Sol."
+    },
+    {
+      "id": "orbital_habitat", "destination": "earth_orbital_habitat", "owner": "spacex", "partners": ["nasa", "blueorigin"], "name": "Habitat orbital rotativo",
+      "from": { "year": 2072, "month": 1 }, "until": null, "crew": 40, "truthLayer": "especulacao",
+      "modules": [
+        { "id": "st_core", "at": { "year": 2072, "month": 1 } },
+        { "id": "st_node", "at": { "year": 2072, "month": 1 } },
+        { "id": "st_solar", "at": { "year": 2072, "month": 6 } },
+        { "id": "st_centrifuge", "at": { "year": 2074, "month": 6 } },
+        { "id": "st_centrifuge", "at": { "year": 2078, "month": 6 }, "by": "nasa" },
+        { "id": "st_logistics", "at": { "year": 2080, "month": 1 }, "by": "blueorigin" },
+        { "id": "st_hab", "at": { "year": 2082, "month": 1 } }
+      ],
+      "plannedModules": 8,
+      "reentry": "O habitat orbital rotativo é desmontado: as rodas viram matéria-prima de estaleiros."
+    }
+  ]
+}

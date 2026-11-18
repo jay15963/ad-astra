@@ -1,0 +1,92 @@
+/* Infraestrutura (drawer › Operações) — docs/MISSIONS-V2.md §11, docs/DESIGN.md §4 (cards, chips, bars, notes).
+   Linked once by infra-tab.js. CSmanager references: .dir-bloco (asset card), .dir-kpi (stats), .aviso (alerts).
+   Nothing here is wider than 320 px: stats wrap 2 per row, actions wrap, names clamp to 2 lines. */
+
+.infra { gap: 12px; }
+.infra .if-tabs { margin: 0; }
+.infra .if-tabs .seg { min-width: 0; }
+/* four segments fit at 320: tighter padding, the count moves into the section title */
+@media (max-width: 380px) {
+  .infra .segmented.tabs .if-seg-n { display: none; }
+  .infra .segmented.tabs .seg { padding-left: 8px; padding-right: 8px; }
+}
+@media (max-width: 340px) { .infra .segmented.tabs .seg { padding-left: 6px; padding-right: 6px; font-size: var(--t12); } }
+.infra .if-seg-n {
+  font-family: var(--mono); font-size: var(--t10); color: var(--text-3); margin-left: 4px; font-variant-numeric: tabular-nums;
+}
+.infra .if-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.infra .if-empty { display: flex; flex-direction: column; gap: 10px; }
+.infra .if-empty .empty { padding: 24px 16px; }
+.if-wide { width: 100%; }
+
+/* asset card */
+.if-card {
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+}
+.if-card.st-degraded { border-color: var(--yellow-line, #e3b34155); }
+.if-card.st-derelict { border-color: var(--red-line, #d9534f66); }
+.if-head {
+  display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%; padding: 0; margin: 0; background: none; border: 0;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.if-head > .chip { flex: none; }
+.if-chev { flex: none; color: var(--text-3); line-height: 0; }
+.if-dot {
+  flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--s3); display: grid; place-items: center; color: var(--text-2);
+}
+.if-card.mine .if-dot { color: var(--text); }
+.if-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.if-name {
+  font-weight: 600; font-size: var(--t14); line-height: 1.3; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.if-sub { font-size: var(--t12); color: var(--text-3); line-height: 1.4; overflow-wrap: anywhere; }
+
+.if-owners { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.if-owner { gap: 5px; padding-left: 4px; max-width: 100%; }
+.if-owner > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.if-owner.me { border-color: var(--line-strong); color: var(--text); }
+.if-owner-em { line-height: 0; flex: none; }
+.if-owner-em svg { border-radius: 50%; }
+
+.if-card .bar-row, .if-detail .bar-row { grid-template-columns: auto 1fr auto; gap: 10px; }
+.if-card .bar-label, .if-detail .bar-label { color: var(--text-3); font-size: var(--t11); }
+
+.if-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.if-stat {
+  background: var(--s2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.if-stat-l {
+  font-size: var(--t10); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.if-stat-v {
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--t13, 13px); font-weight: 600; color: var(--text);
+  line-height: 1.3; overflow-wrap: anywhere; /* values wrap instead of being cut ("US$ 1,2 bi", "2,5 anos" at 320) */
+}
+.if-stat.low .if-stat-v { color: var(--red); }
+
+.if-alerts { display: flex; flex-direction: column; gap: 6px; }
+.if-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.if-actions .btn-small { min-height: 36px; }
+@media (max-height: 700px) { .if-actions .btn-small { min-height: 34px; } }
+
+/* detail sheet */
+.if-sheet .if-detail { display: flex; flex-direction: column; gap: 12px; }
+.if-detail-hero { display: flex; align-items: center; gap: 12px; }
+.if-detail-hero .chips { flex: 1; min-width: 0; }
+.if-eyebrow { margin-bottom: 6px; }
+.if-kv { background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); padding: 2px 14px; display: flex; flex-direction: column; }
+.if-kv .kv-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; font-size: var(--t12); border-bottom: 1px solid var(--line); }
+.if-kv .kv-row:last-child { border-bottom: 0; }
+.if-kv .kv-row > span:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.if-mods {
+  list-style: none; margin: 0; padding: 0; background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden;
+}
+.if-mods > li { padding: 9px 14px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; font-size: var(--t12); }
+.if-mods > li:last-child { border-bottom: 0; }
+.if-mod-name { font-weight: 600; color: var(--text); }
+.if-actions-full .btn-small { flex: 1 1 calc(50% - 6px); justify-content: center; min-height: 44px; }
+.if-rename { display: flex; flex-direction: column; gap: 12px; }

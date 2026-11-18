@@ -464,7 +464,8 @@
           },
           "status": {
             "enum": [
-              "reserved"
+              "reserved",
+              "legacy"
             ]
           },
           "needs": {
@@ -472,6 +473,20 @@
           },
           "note": {
             "type": "string"
+          },
+          "aliasOf": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "sub": {
+                "type": "string"
+              }
+            }
           }
         }
       }
@@ -808,6 +823,377 @@
           },
           "note": {
             "type": "string"
+          }
+        }
+      }
+    },
+    "missionSubtypes": {
+      "type": "object",
+      "description": "MISSIONS-V2 §1.2: {tipo: {subtipo: {label, era, key, histYear}}}",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "label",
+                "era"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 90
+                },
+                "era": {
+                  "$ref": "common.schema.json#/$defs/eraId"
+                },
+                "key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+                },
+                "histYear": {
+                  "type": "integer"
+                },
+                "note": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "payloadKinds": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "assetKinds": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "assetStatus": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "unlockKinds": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-zA-Z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "proposalTypes": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "stationModules": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label",
+              "era",
+              "key"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "key": {
+                "type": "string",
+                "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "baseModules": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label",
+              "era",
+              "key"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "key": {
+                "type": "string",
+                "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "baseVehicles": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-z0-9_]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "label",
+              "era",
+              "key"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 90
+              },
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "key": {
+                "type": "string",
+                "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "unlockKeys": {
+      "type": "object",
+      "description": "MISSIONS-V2 §0/§4.5: chave <tipo>:<id> → {era, label}",
+      "propertyNames": {
+        "pattern": "^(_doc|[a-zA-Z]+:[a-z0-9_.]+)$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "era",
+              "label"
+            ],
+            "properties": {
+              "era": {
+                "$ref": "common.schema.json#/$defs/eraId"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "techEffects": {
+      "type": "object",
+      "description": "MISSIONS-V2 §4.6: chaves de efeito dos nós de tecnologia e sua unidade",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "unit"
+        ],
+        "properties": {
+          "unit": {
+            "enum": [
+              "pp",
+              "pct",
+              "pctAbs",
+              "pctNeg",
+              "int",
+              "num"
+            ]
+          },
+          "era": {
+            "$ref": "common.schema.json#/$defs/eraId"
           }
         }
       }

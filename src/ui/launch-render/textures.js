@@ -235,6 +235,13 @@ export function setTextureBudget(ms) { BUDGET_MS = ms > 0 && Number.isFinite(ms)
 
 /** Cached texture: paint(ctx, w, h) runs once per key. Returns the canvas (or null in Node, or null while a
  *  deferrable texture waits for budget: opts.defer). */
+/** The cached canvas of `key` (LRU touch) or null; never paints. */
+export function peekCached(key) {
+  const hit = CACHE.get(key);
+  if (!hit) return null;
+  CACHE.delete(key); CACHE.set(key, hit);
+  return hit.canvas;
+}
 export function cached(key, w, h, paint, opts = null) {
   const hit = CACHE.get(key);
   if (hit) { CACHE.delete(key); CACHE.set(key, hit); return hit.canvas; } // LRU touch
@@ -2880,7 +2887,7 @@ export function drawTerrain(ctx, view, world, opts = {}) {
   const W = num(view?.W, 375), H = num(view?.H, 700);
   if (world === 'earth' || typeof document === 'undefined') return drawTerrainRaw(ctx, view, world, opts);
   const dpr = devScale(ctx);
-  const sig = [world, W, H, dpr, Math.round(num(opts.groundY) * 2), Math.round(num(opts.pxPerM, 4) * 500), Math.round(num(opts.scrollX) * 2), lightBucket(opts.light || SUN), opts.seed].join('|');
+  const sig = [world, W, H, dpr, Math.round(num(opts.horizonY, -1) * 2), Math.round(num(opts.groundY) * 2), Math.round(num(opts.pxPerM, 4) * 500), Math.round(num(opts.scrollX) * 2), lightBucket(opts.light || SUN), opts.seed].join('|');
   if (TERR.c && TERR.csig === sig) { ctx.drawImage(TERR.c, 0, 0, W, H); return; }
   if (sig !== TERR.sig) { TERR.sig = sig; TERR.n = 0; }
   if (++TERR.n < 12) return drawTerrainRaw(ctx, view, world, opts);
@@ -2893,14 +2900,15 @@ export function drawTerrain(ctx, view, world, opts = {}) {
   ctx.drawImage(c, 0, 0, W, H);
 }
 
-function drawTerrainRaw(ctx, view, world, { altM = 0, pxPerM = 4, groundY, scrollX = 0, t = 0, seed = 1, light = SUN } = {}) {
+function drawTerrainRaw(ctx, view, world, { altM = 0, pxPerM = 4, groundY, scrollX = 0, t = 0, seed = 1, light = SUN, horizonY } = {}) {
   tick();
   const W = num(view?.W, 375), H = num(view?.H, 700);
   const ppm = Math.max(0.05, num(pxPerM, 4));
   const gy = num(groundY, H * 0.8);
   const alt = Math.max(0, num(altM));
   const lb = lightBucket(light);
-  const hor = Math.min(gy - H * 0.05, H * 0.62);
+  // horizonY (optional): a higher camera over a surface base (MISSIONS-V2 §7.3) lifts the horizon above the default
+  const hor = Number.isFinite(horizonY) ? clamp(horizonY, H * 0.15, gy - 2) : Math.min(gy - H * 0.05, H * 0.62);
   const f = H;
   const hcGeo = Math.max(0.5, (gy - hor) / ppm);
   const hc = lerp(hcGeo, Math.max(hcGeo, alt * 0.5), sstep(H * 0.95, H * 1.35, gy));

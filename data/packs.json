@@ -1,5 +1,5 @@
 {
-  "_doc": "Manifesto dos pacotes de dados (docs/EXPANSION.md §4). Ordem = ordem de mescla. 'always' = sempre carregado; pacotes de era ('era' + 'years' [de, até]) são carregados sob demanda (src/core/data.js). 'legacy-e4' são os arquivos de hoje em data/, intocados. Um pacote com \"eras\" (lista) e sem \"era\" é carregado junto de qualquer uma dessas eras (colônias: só a partir de 2051).",
+  "_doc": "Manifesto dos pacotes de dados (docs/EXPANSION.md §4). Ordem = ordem de mescla. 'always' = sempre carregado; pacotes de era ('era' + 'years' [de, até]) são carregados sob demanda (src/core/data.js). 'legacy-e4' são os arquivos de hoje em data/, intocados. Um pacote com \"eras\" (lista) e sem \"era\" é carregado junto de qualquer uma dessas eras (colônias: só a partir de 2051). Pacotes \"kind\": \"tech\" (MISSIONS-V2 §4.3): a árvore de cada era em data/tech/eN/, sempre mesclada inteira (as chaves de liberação precisam ser conhecidas desde o início; \"eras\" fica como documentação), com os modelos de nós gerados expandidos ao montar; \"exclude\" = cenários em que o pacote não entra (a Corrida Lunar mantém só data/tech.json).",
   "version": 1,
   "packs": [
     {
@@ -18,7 +18,13 @@
         "hq-sites",
         "investors",
         "parts",
-        "eco"
+        "eco",
+        "techtree",
+        "missions",
+        "contracts",
+        "modules",
+        "stations",
+        "market"
       ]
     },
     {
@@ -57,11 +63,31 @@
         "spacecraft",
         "destinations",
         "calendar",
-        "tech",
         "events",
         "crew",
         "investors",
         "patches"
+      ]
+    },
+    {
+      "id": "tech-e1",
+      "kind": "tech",
+      "techEra": "e1",
+      "eras": [
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5",
+        "e6",
+        "e7"
+      ],
+      "dir": "tech/e1/",
+      "files": [
+        "tech"
+      ],
+      "exclude": [
+        "lunar_race"
       ]
     },
     {
@@ -81,11 +107,30 @@
         "destinations",
         "bodies",
         "calendar",
-        "tech",
         "events",
         "crew",
         "investors",
         "patches"
+      ]
+    },
+    {
+      "id": "tech-e2",
+      "kind": "tech",
+      "techEra": "e2",
+      "eras": [
+        "e2",
+        "e3",
+        "e4",
+        "e5",
+        "e6",
+        "e7"
+      ],
+      "dir": "tech/e2/",
+      "files": [
+        "tech"
+      ],
+      "exclude": [
+        "lunar_race"
       ]
     },
     {
@@ -105,10 +150,28 @@
         "destinations",
         "bodies",
         "calendar",
-        "tech",
         "events",
         "crew",
         "investors"
+      ]
+    },
+    {
+      "id": "tech-e3",
+      "kind": "tech",
+      "techEra": "e3",
+      "eras": [
+        "e3",
+        "e4",
+        "e5",
+        "e6",
+        "e7"
+      ],
+      "dir": "tech/e3/",
+      "files": [
+        "tech"
+      ],
+      "exclude": [
+        "lunar_race"
       ]
     },
     {
@@ -129,10 +192,27 @@
         "spacecraft",
         "destinations",
         "calendar",
-        "tech",
         "events",
         "crew",
         "investors"
+      ]
+    },
+    {
+      "id": "tech-e4",
+      "kind": "tech",
+      "techEra": "e4",
+      "eras": [
+        "e4",
+        "e5",
+        "e6",
+        "e7"
+      ],
+      "dir": "tech/e4/",
+      "files": [
+        "tech"
+      ],
+      "exclude": [
+        "lunar_race"
       ]
     },
     {
@@ -177,11 +257,27 @@
         "spacecraft",
         "destinations",
         "calendar",
-        "tech",
         "events",
         "crew",
         "investors",
         "patches"
+      ]
+    },
+    {
+      "id": "tech-e5",
+      "kind": "tech",
+      "techEra": "e5",
+      "eras": [
+        "e5",
+        "e6",
+        "e7"
+      ],
+      "dir": "tech/e5/",
+      "files": [
+        "tech"
+      ],
+      "exclude": [
+        "lunar_race"
       ]
     },
     {
@@ -202,10 +298,25 @@
         "spacecraft",
         "destinations",
         "calendar",
-        "tech",
         "events",
         "crew",
         "investors"
+      ]
+    },
+    {
+      "id": "tech-e6",
+      "kind": "tech",
+      "techEra": "e6",
+      "eras": [
+        "e6",
+        "e7"
+      ],
+      "dir": "tech/e6/",
+      "files": [
+        "tech"
+      ],
+      "exclude": [
+        "lunar_race"
       ]
     },
     {
@@ -226,10 +337,24 @@
         "spacecraft",
         "destinations",
         "calendar",
-        "tech",
         "events",
         "crew",
         "investors"
+      ]
+    },
+    {
+      "id": "tech-e7",
+      "kind": "tech",
+      "techEra": "e7",
+      "eras": [
+        "e7"
+      ],
+      "dir": "tech/e7/",
+      "files": [
+        "tech"
+      ],
+      "exclude": [
+        "lunar_race"
       ]
     }
   ],

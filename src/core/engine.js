@@ -25,10 +25,17 @@ import * as investors from '../sim/investors.js';
 import * as explore from '../sim/explore.js';
 import * as eco from '../sim/eco.js';
 import * as colonies from '../sim/colonies.js';
+import * as infra from '../sim/infra.js';
 
 // The lifecycle module (A2) is optional while it is being built: a missing file leaves the registry as in v0.5.
 // Any other failure (syntax error inside the module) is re-thrown so it is never hidden.
 const lifecycle = await import('../sim/lifecycle.js').catch((e) => {
+  const missing = e?.code === 'ERR_MODULE_NOT_FOUND' || /Failed to fetch|Importing a module script failed|error loading dynamically imported module/i.test(String(e?.message));
+  if (!missing) throw e;
+  return null;
+});
+// The rocket market (MISSIONS-V2 §8, src/sim/market.js) is optional the same way while it is being built.
+const market = await import('../sim/market.js').catch((e) => {
   const missing = e?.code === 'ERR_MODULE_NOT_FOUND' || /Failed to fetch|Importing a module script failed|error loading dynamically imported module/i.test(String(e?.message));
   if (!missing) throw e;
   return null;
@@ -50,7 +57,9 @@ export const MODULES = [
   ['crew', crew],
   ['designs', designs],     // Phase B §6: Hangar designs (asVehicle before missions read the vehicle list)
   ['missions', missions],
+  ['infra', infra],         // Missões v2 §3: stations, bases, satellite fleets and rovers (after missions: deliveries)
   ['investors', investors], // Phase B §5: cap table, rounds and mandates (after missions: reads their results)
+  ...(market ? [['market', market]] : []), // Missões v2 §8: rocket market (after investors)
   ['colonies', colonies],   // Phase C10: colonies from 2051 (unlocks.colonies; data from the 'colonies' pack, eras e5–e7)
   ['launch', launch],
   ['explore', explore],     // Phase B §8: fog of war of the space map (ids only)
@@ -199,6 +208,8 @@ function makeCtx(state, data, moduleName, extra = {}) {
     dt,
     prevTurn,
     turn,
+    /** end of the whole player step (a substep of a 13-week step still knows when the player next decides) */
+    stepEnd: extra.stepEnd ?? prevTurn + dt,
     eraId: clock?.eraId ?? null,
     year: yearOf(state, turn),
     get hooks() { return hooks || (hooks = makeHooks(state, data)); },
@@ -278,7 +289,7 @@ const maxDtOf = (mod) => {
 function tickModule(state, data, name, mod, prevTurn, dt) {
   const max = maxDtOf(mod);
   if (dt <= max) {
-    mod.tick(state, data, makeCtx(state, data, name, { prevTurn, dt }));
+    mod.tick(state, data, makeCtx(state, data, name, { prevTurn, dt, stepEnd: prevTurn + dt }));
     return;
   }
   const saved = state.turn;
@@ -287,7 +298,7 @@ function tickModule(state, data, name, mod, prevTurn, dt) {
     for (let sub = prevTurn; sub < prevTurn + dt; sub += max) {
       const sdt = Math.min(max, prevTurn + dt - sub);
       state.turn = sub;
-      mod.tick(state, data, makeCtx(state, data, name, { prevTurn: sub, dt: sdt }));
+      mod.tick(state, data, makeCtx(state, data, name, { prevTurn: sub, dt: sdt, stepEnd: prevTurn + dt }));
       if (state.gameOver) break;
       // the step's signals are delivered once, in the first substep: before this, a 52-week step made every
       // substepped module handle each signal 52 times (diplomacy re-ran its AI evaluation every week for each

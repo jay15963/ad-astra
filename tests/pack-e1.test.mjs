@@ -21,6 +21,8 @@ const E1_FILES = ['era', 'snapshot', ...fs.readdirSync(E1).filter((f) => f.endsW
 const SCENARIO = 'a_corrida';
 const SCENARIO_FILE = `scenarios/${SCENARIO}.json`;
 const raw = Object.fromEntries(E1_FILES.map((f) => [f, readJson(`eras/e1/${f}`)]));
+// the era-1 tree lives in its own pack since Missões v2 (data/tech/e1/tech.json, MISSIONS-V2 §4.3)
+raw.tech = readJson('tech/e1/tech');
 
 function withE1(manifest) {
   const m = JSON.parse(JSON.stringify(manifest));

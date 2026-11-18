@@ -13,7 +13,9 @@
   "history": "faithful",
   "lifecycle": "on",
   "ending": { "type": "final", "event": "ending/final" },
-  "unlocks": { "builder": { "fromYear": 2950 }, "investors": { "fromYear": 2950 }, "colonies": { "fromYear": 2950 } },
+  "techGating": true,
+  "techStart": "historical",
+  "unlocks": { "market": { "fromYear": 2950 }, "builder": { "fromYear": 2950 }, "investors": { "fromYear": 2950 }, "colonies": { "fromYear": 2950 } },
   "unlockNote": "Liberado depois de terminar a campanha uma vez (core/vocab.json scenarios.grande_silencio).",
   "historicalFirsts": {
     "first_interstellar_probe_arrival": { "holder": "Século XXVI", "year": 2599, "mission": "Era Interplanetária e Interestelar" },

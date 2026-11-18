@@ -46,7 +46,7 @@
       "name": "Brisa de Trappist",
       "owner": "isro",
       "partners": [],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "trappist_1e_surface",
       "vehicleId": "lanca_aurora",
       "spacecraftId": "pousador_brisa",

@@ -36,8 +36,10 @@
         "cargo",
         "station",
         "probe",
-        "satellite"
-      ]
+        "satellite",
+        "rover"
+      ],
+      "description": "lander = legado (sonda com sub lander)"
     },
     "destination": {
       "$ref": "common.schema.json#/$defs/id"
@@ -152,6 +154,60 @@
     "era": {},
     "fromYear": {
       "type": "integer"
+    },
+    "sub": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "subtipo (vocab.missionSubtypes[type])"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "supply",
+            "experiments",
+            "station_module",
+            "base_module",
+            "base_vehicle",
+            "propellant",
+            "servicing",
+            "client",
+            null
+          ]
+        },
+        "moduleId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vehicleTypeId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "qty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "targetAssetId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "newAsset": {
+          "type": "boolean"
+        },
+        "newAssetName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 32
+        }
+      }
     }
   }
 }

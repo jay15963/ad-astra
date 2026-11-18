@@ -16,7 +16,8 @@ const data = await loadDataNode(root);
 const bodies = data.bodies.bodies;
 const B = Object.fromEntries(bodies.map((b) => [b.id, b]));
 const dests = data.destinations.destinations;
-const TYPES = ['satellite', 'probe', 'crewed', 'cargo', 'station', 'lander'];
+// Missões v2 (MISSIONS-V2.md §1.1): 'rover' replaces the retired 'lander' type (now probe/lander)
+const TYPES = ['satellite', 'probe', 'rover', 'crewed', 'cargo', 'station'];
 const PLAYABLE = data.scenario.playableActors;
 const turnOf = (year, month) => (year - 2026) * 52 + Math.ceil((month - 1) * (52 / 12));
 

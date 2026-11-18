@@ -74,6 +74,8 @@ async function loadE2(scenarioId = 'campaign') {
 const { input, missing } = e2Input();
 const result = checkData(input, {});
 const raw = Object.fromEntries(E2_FILES.map((f) => [f, readJson(`eras/e2/${f}`)]));
+// the era-2 tree lives in its own pack since Missões v2 (data/tech/e2/tech.json, MISSIONS-V2 §4.3)
+raw.tech = readJson('tech/e2/tech');
 
 test('e2: validator clean (pack e2, scenarios and vocabulary)', () => {
   const errors = result.issues.filter((i) => i.level === 'error' && (i.pack === 'e2' || i.pack === 'scenarios' || String(i.path).includes('eras/e2/')));

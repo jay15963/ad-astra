@@ -88,6 +88,8 @@ export function craftReach(spec, dests, year) {
     if (until != null && year != null && until < year) return false;
     switch (spec.kind) {
       case 'lander': return d.kind === 'surface';
+      // Missões v2: rovers drive on surfaces (rotorcraft and submarines in atmospheres and seas)
+      case 'rover': return d.kind === 'surface' || d.kind === 'atmosphere';
       case 'capsule': return d.kind !== 'surface';
       case 'probe': return d.kind !== 'station';
       case 'cargo': return ['station', 'orbit', 'surface'].includes(d.kind);
@@ -101,6 +103,7 @@ export function craftReach(spec, dests, year) {
 /** Kinds the era tables do not list but programs may need. */
 const EXTRA_KINDS = {
   satellite: { kind: 'satellite', crew: [0, 0], massT: [2, 20], costM: [40, 300], reach: ['leo', 'gto', 'tli'] },
+  rover: { kind: 'rover', crew: [0, 0], massT: [0.5, 6], costM: [80, 1500], reach: ['tli', 'mars', 'outer'] },
 };
 
 const listOf = (v, key) => (Array.isArray(v) ? v : Array.isArray(v?.[key]) ? v[key] : []);

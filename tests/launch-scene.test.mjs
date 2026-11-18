@@ -114,3 +114,81 @@ test('scene helpers work with real milestone data shapes from data/destinations.
     assert.equal(telemetryAt(p, 1e6).alt, 0, d.id);
   }
 });
+
+// ------------------------------------------------------------------ infrastructure beats (MISSIONS-V2 §7.1–7.2)
+const sceneMod = await import('../src/ui/launch-scene.js');
+const { infraIndex, infraEventOf, infraFlags, infraTimeline, rendezvousActive } = sceneMod;
+const DOCK_MS = ['ignition', 'liftoff', 'maxq', 'staging', 'fairing_or_les', 'orbit', 'rendezvous', 'dock'].map((id) => ({ id, label: id, status: 'ok' }));
+const REL_MS = ['ignition', 'liftoff', 'maxq', 'staging', 'fairing_or_les', 'orbit', 'module_release'].map((id) => ({ id, label: id, status: 'ok' }));
+const ISS_T = { kind: 'station', assetId: 'as_1', name: 'ISS', newAsset: false, sequence: 'dock', modules: [{ id: 'st_core', n: 1 }, { id: 'st_arm', n: 1 }], vehicles: [], sizeTier: 3, stageN: 0, bodyId: 'earth', site: 'iss', payload: { kind: null, moduleId: null, vehicleTypeId: null, qty: 1 }, traits: ['arm'] };
+
+test('infra milestones: index, events per sequence, failures', () => {
+  assert.equal(infraIndex(DOCK_MS), 6);
+  assert.equal(infraIndex(REL_MS), 6);
+  assert.equal(infraIndex(ASCENT), -1);
+  assert.equal(infraIndex(undefined), -1);
+  assert.equal(infraEventOf({ id: 'rendezvous', status: 'ok' }, ISS_T), 'rendezvous');
+  assert.equal(infraEventOf({ id: 'dock', status: 'ok' }, ISS_T), 'dock');
+  assert.equal(infraEventOf({ id: 'dock', status: 'anomaly' }, { ...ISS_T, sequence: 'berth' }), 'berth');
+  assert.equal(infraEventOf({ id: 'dock', status: 'fail' }, ISS_T), 'dockFail');
+  assert.equal(infraEventOf({ id: 'rendezvous', status: 'fail' }, ISS_T), 'rvFail');
+  assert.equal(infraEventOf({ id: 'module_release', status: 'ok' }, null), 'release');
+  assert.equal(infraEventOf({ id: 'orbit', status: 'ok' }, ISS_T), null);
+  assert.equal(infraEventOf({ id: 'undock', status: 'ok' }, ISS_T), null, 'undocking is not a docking beat');
+});
+
+test('infra timeline: the rendezvous view starts after SECO and the dock comes after the rendezvous', () => {
+  const p = buildProfile(DOCK_MS, 'ascent');
+  const tl = infraTimeline(p, DOCK_MS);
+  const tOrbit = p.times[5], tRv = p.times[6], tDock = p.times[7];
+  assert.ok(tl.start > tOrbit && tl.start < tRv, 'starts between SECO and the rendezvous milestone');
+  assert.equal(tl.rv, tRv); assert.equal(tl.dock, tDock);
+  assert.ok(tDock - tRv >= 4, 'room for hold + final approach');
+  assert.ok(telemetryAt(p, tRv).alt >= 200, 'station altitude');
+  const pr = buildProfile(REL_MS, 'ascent');
+  const tr = infraTimeline(pr, REL_MS);
+  assert.equal(tr.release, pr.times[6]);
+  assert.equal(tr.dock, null);
+  assert.equal(infraTimeline(buildProfile(ASCENT, 'ascent'), ASCENT), null);
+  // arrival list (beyond Earth orbit): rendezvous + dock appended to the arrival milestones
+  const arr = ['loi', 'rendezvous', 'dock'].map((id) => ({ id, status: 'ok' }));
+  const pa = buildProfile(arr, 'arrival', 'moon', 'orbit');
+  const ta = infraTimeline(pa, arr);
+  assert.ok(ta.start <= ta.rv && ta.rv < ta.dock);
+});
+
+test('sequence from the snapshot: rendezvous view only for dock / berth / release, after SECO', () => {
+  const base = { view: 'ascent', target: ISS_T, milestones: DOCK_MS, phase: 'ascent' };
+  assert.equal(rendezvousActive({ ...base, presented: 5 }), false, 'still climbing');
+  assert.equal(rendezvousActive({ ...base, presented: 6, secoAge: 1 }), false, 'SECO beat on the climb view first');
+  assert.equal(rendezvousActive({ ...base, presented: 6, secoAge: 3 }), true);
+  assert.equal(rendezvousActive({ ...base, presented: 6, secoAge: null }), true, 'resume: straight to the rendezvous view');
+  assert.equal(rendezvousActive({ ...base, presented: 8, secoAge: 30 }), true);
+  assert.equal(rendezvousActive({ ...base, view: 'countdown', presented: 8 }), false);
+  assert.equal(rendezvousActive({ ...base, target: { ...ISS_T, sequence: 'surface' }, presented: 8 }), false, 'surface deliveries stay in the descent view');
+  assert.equal(rendezvousActive({ ...base, target: null, presented: 8 }), false, 'no target → classic scene');
+  assert.equal(rendezvousActive({ ...base, milestones: ASCENT, presented: 7 }), false, 'no infra milestones → classic scene');
+  assert.equal(rendezvousActive({ view: 'ascent', target: { ...ISS_T, sequence: 'release', newAsset: true }, milestones: REL_MS, presented: 6, secoAge: 5, phase: 'ascent' }), true);
+  assert.equal(rendezvousActive({ view: 'ascent', target: ISS_T, milestones: [{ id: 'loi' }, { id: 'rendezvous' }, { id: 'dock' }], presented: 1, phase: 'arrival' }), true, 'arrival: right after insertion');
+});
+
+test('resume mid-docking: flags from the milestones already rolled draw the same picture', () => {
+  assert.deepEqual(infraFlags(DOCK_MS, 6, ISS_T), { rendezvous: false, docked: false, dockFail: false, rvFail: false, rvAnomaly: false, released: false });
+  const mid = infraFlags(DOCK_MS, 7, ISS_T);
+  assert.equal(mid.rendezvous, true); assert.equal(mid.docked, false);
+  assert.equal(infraFlags(DOCK_MS, 8, ISS_T).docked, true);
+  const anomalous = DOCK_MS.map((m) => (m.id === 'rendezvous' ? { ...m, status: 'anomaly' } : m));
+  assert.equal(infraFlags(anomalous, 7, ISS_T).rvAnomaly, true, 'wobble during the hold');
+  const failed = DOCK_MS.map((m) => (m.id === 'dock' ? { ...m, status: 'fail' } : m));
+  const f = infraFlags(failed, 8, ISS_T);
+  assert.equal(f.docked, false); assert.equal(f.dockFail, true);
+  assert.equal(infraFlags(REL_MS, 7, { sequence: 'release' }).released, true);
+  // the resumed clock sits at the last rolled milestone: the renderer's pose is then exactly the 30 m hold point
+  const p = buildProfile(DOCK_MS, 'ascent');
+  const tl = infraTimeline(p, DOCK_MS);
+  return import('../src/ui/launch-render/infra.js').then(({ dockPose }) => {
+    const pose = dockPose({ clock: p.times[6], t: 0, tl, flags: mid });
+    assert.equal(pose.range, 30);
+    assert.equal(dockPose({ clock: p.times[7], t: 0, tl, flags: infraFlags(DOCK_MS, 8, ISS_T) }).phase, 'docked');
+  });
+});

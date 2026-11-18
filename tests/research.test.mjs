@@ -231,3 +231,94 @@ test('unlockNode short form (state, nodeId) used by narrative works', () => {
   assert.equal(research.unlockNode(s, 'comp_fault_tolerant'), false);
   assert.equal(research.unlockNode(s, 'not_a_node'), false);
 });
+
+// ---------------------------------------------------------------- Missões v2 (MISSIONS-V2 §4.6, §4.7, §5.1, §5.5, §6.3)
+
+const { withStubTree } = await import('./fixtures/techtree-stub.mjs');
+const gating = await import('../src/core/gating.js');
+const campaignData = await loadDataNode(root, { scenarioId: 'campaign', eras: 'all' });
+const stubData = withStubTree(campaignData);
+
+test('v2: research.keys caches the unlock keys of research.unlocked (init, unlock, recompute)', () => {
+  const s = newGame(stubData, { seed: 21, playerId: 'nasa' });
+  assert.deepEqual(s.research.keys, gating.keysOfNodes(stubData, s.research.unlocked));
+  assert.deepEqual(s.research.keys, ['part:prop.alcolox', 'vehicle:sounding'], 'historical start, 1950');
+  assert.ok(research.unlockNode(s, stubData, 'zt1_vehicle_small'));
+  assert.ok(s.research.keys.includes('vehicle:small') && s.research.keys.includes('missionType:satellite'));
+  assert.deepEqual(s.research.keys, [...s.research.keys].sort());
+  assert.deepEqual(research.queries['research/keys'](s, stubData), s.research.keys);
+  // without techStart the player starts with initialFor only (Corrida Lunar and v0.8 behaviour)
+  const plain = newGame(withStubTree(campaignData, { historical: false }), { seed: 21, playerId: 'nasa' });
+  assert.ok(!plain.research.unlocked.includes('zt1_vehicle_sounding'));
+});
+
+test('v2: era scenarios start with everything history had by their start year', () => {
+  const d = { ...stubData, scenario: { ...stubData.scenario, startYear: 1976 } };
+  const s = createState(d, { seed: 2, playerId: 'nasa' });
+  s.startYear = 1976;
+  s.actors = { nasa: { id: 'nasa', budget: 5000, cash: 1e6 } };
+  research.init(s, d, ctxFor(s));
+  for (const id of ['zt1_vehicle_heavy', 'zt1_station_core', 'zt1_part_hydrolox', 'zt1_vehicle_medium']) assert.ok(s.research.unlocked.includes(id), id);
+  assert.ok(!s.research.unlocked.includes('zt3_vehicle_reusable'));
+});
+
+test('v2: effect caps (techtree.effectCaps) clamp the summed bonus after summing', () => {
+  const big = { id: 'zz_big', branch: 'propulsion', era: 4, name: 'Big', cost: 1, science: 1, weeks: 1, requires: [], effects: { launchCost: -0.9, reliability: 0.5, sciencePerMission: 9 } };
+  const d = { ...stubData, tech: { ...stubData.tech, nodes: [...stubData.tech.nodes, big] }, index: { ...stubData.index, tech: { ...stubData.index.tech, zz_big: big } } };
+  const s = newGame(d, { seed: 3, playerId: 'nasa' });
+  research.unlockNode(s, d, 'zz_big');
+  assert.equal(research.techBonus(s, 'nasa', 'launchCost'), -0.7, 'min');
+  assert.equal(research.techBonus(s, 'nasa', 'reliability'), 0.12, 'max');
+  assert.equal(research.techBonus(s, 'nasa', 'sciencePerMission'), 3, "'*' default cap");
+  // without the table nothing is capped (v0.8 data)
+  const d2 = { ...d, techtree: undefined };
+  const s2 = newGame(d2, { seed: 3, playerId: 'nasa' });
+  research.unlockNode(s2, d2, 'zz_big');
+  assert.ok(research.techBonus(s2, 'nasa', 'launchCost') < -0.7);
+});
+
+test('v2: rival option cache is invisible — same picks with and without it over 520 weeks', () => {
+  const run = (cache) => {
+    research._setRivalCache(cache);
+    try {
+      const s = mini('nasa', 41);
+      s.startYear = 2026;
+      step(s, 520);
+      return JSON.stringify({ rivals: s.research.rivals, projects: s.research.rivalProjects, bonus: s.research.bonus });
+    } finally { research._setRivalCache(true); }
+  };
+  assert.equal(run(true), run(false));
+});
+
+test('v2: tree views carry kind, unlocks, era and cross-era stubs; era/next/kinds queries', () => {
+  const s = newGame(stubData, { seed: 4, playerId: 'nasa' });
+  const tree = research.queries['research/tree'](s, stubData);
+  const v = tree.find((x) => x.id === 'zt1_vehicle_small');
+  assert.equal(v.kind, 'unlock');
+  assert.equal(v.unlockKind, 'vehicle');
+  assert.equal(v.eraId, 'e1');
+  assert.equal(v.histYear, 1957);
+  assert.deepEqual(v.unlocks.map((u) => u.key), ['vehicle:small', 'missionType:satellite']);
+  assert.equal(v.unlocks[1].kindLabel, 'Tipo de missão');
+  const eff = tree.find((x) => !stubData.index.tech[x.id].unlocks);
+  assert.equal(eff.kind, 'efficiency');
+  assert.equal(eff.unlockKind, null);
+  const reuse = tree.find((x) => x.id === 'zt3_vehicle_reusable');
+  assert.deepEqual(reuse.stubs.map((x) => [x.id, x.eraId]), [['zt1_vehicle_heavy', 'e1']]);
+  const e1 = research.queries['research/era'](s, stubData, 'e1');
+  assert.ok(e1.length > 0 && e1.every((x) => x.eraId === 'e1'));
+  s.turn = 6 * 52; // 1956: the first orbital nodes open (fromYear 1954)
+  const next = research.queries['research/nextUnlocks'](s, stubData, 'e1', 3);
+  assert.ok(next.length >= 1 && next.length <= 3);
+  assert.ok(next.every((x) => x.kind === 'unlock' && (x.status === 'available' || x.status === 'active')));
+  const kinds = research.queries['research/kinds'](s, stubData);
+  assert.equal(kinds.length, 8);
+  assert.ok(kinds.find((k) => k.id === 'vehicle').total >= 5);
+  const eras = research.queries['research/eras'](s, stubData);
+  assert.deepEqual(eras.map((e) => e.id), ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7']);
+  assert.ok(eras[0].current && eras[0].loaded && eras[0].total > 0);
+  const t = research.queries['research/targets'](s, stubData, 'vehicle:heavy');
+  assert.ok(t.total >= 1 && t.names.length <= 6);
+  const sum = research.queries['research/summary'](s, stubData);
+  assert.equal(sum.gated, true);
+});

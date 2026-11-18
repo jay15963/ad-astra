@@ -8,6 +8,7 @@
 //   --eager          load every pack up front (Node default) instead of lazily
 //   --compare-eager  play the same seed twice (lazy and eager) and require identical saves (determinism rule §4.2)
 //   --to eN          stop when the game leaves era eN
+// runFullCampaign({onYearSave(year, kb, json)}) hands every year-boundary save to the caller (budget analysis).
 // Prints per era: turns, total and per-turn ms, p99 tick, save KB at the end of the era and the largest save at a
 // year boundary, era packs in memory and data size. Exit 1 on any error (crash, stuck, NaN, save over 400 KB).
 import path from 'node:path';
@@ -58,7 +59,7 @@ const pct = (arr, p) => (arr.length ? arr.slice().sort((a, b) => a - b)[Math.min
  * Play one campaign. Returns {state, eras:[…], errors, totalMs, lazy}.
  * @param {{seed?:number, playerId?:string, eager?:boolean, toEra?:string|null, log?:(line:string)=>void}} opts
  */
-export async function runFullCampaign({ seed = 7919, playerId = 'nasa', eager = false, toEra = null, log = () => {} } = {}) {
+export async function runFullCampaign({ seed = 7919, playerId = 'nasa', eager = false, toEra = null, log = () => {}, onYearSave = null } = {}) {
   const reader = await nodeReader(ROOT);
   const data = await loadData(reader, { scenarioId: 'campaign', eras: eager ? 'all' : 'auto' });
   const bot = await loadBot();
@@ -98,7 +99,9 @@ export async function runFullCampaign({ seed = 7919, playerId = 'nasa', eager = 
       if (!eager) await ensurePacks(data, reader, want, { prune: true });
       maxPacks = Math.max(maxPacks, erasLoaded(data).length);
       if (year !== lastYear && lastYear >= 0) {
-        const kb = Math.round(engine.serialize(state).length / 1024);
+        const json = engine.serialize(state);
+        const kb = Math.round(json.length / 1024);
+        if (onYearSave) onYearSave(year, kb, json);
         cur.maxSaveKB = Math.max(cur.maxSaveKB, kb);
         if (kb > SAVE_BUDGET_KB) errors.push(`save com ${kb} KB em ${year} (limite ${SAVE_BUDGET_KB} KB)`);
       }

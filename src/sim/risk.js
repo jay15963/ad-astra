@@ -63,7 +63,32 @@ function destBaseFail(dest) {
 }
 
 /** Minimum preparation (weeks between creation and launch) before rushing adds risk. */
-const PREP_WEEKS = { satellite: 6, cargo: 8, probe: 12, crewed: 16, lander: 14, station: 16 };
+const PREP_WEEKS = { satellite: 6, cargo: 8, probe: 12, rover: 14, crewed: 16, lander: 14, station: 16 };
+
+// ---------- Missões v2 docking (MISSIONS-V2.md §7.1) ----------
+// A flight to an existing station adds 'rendezvous' + 'dock' (berth: captured by the arm); a module founding a station
+// adds 'module_release'. In Earth orbit they ride on the ascent scene; beyond it, on the arrival scene. Their hazard is
+// their own (not the rocket's): base values below, scaled by strategy, research (dockingReliability) and trait 'arm'.
+export const DOCK_FAIL = { rendezvous: 0.006, dock: 0.014, berth: 0.011, module_release: 0.005 };
+const DOCK_T = { module_release: 96, rendezvous: 104, dock: 120 };
+const DOCK_WEIGHTS = {
+  rendezvous: { propulsion: 0.3, structure: 0.05, software: 0.45, human: 0.2, environment: 0 },
+  dock: { propulsion: 0.2, structure: 0.2, software: 0.35, human: 0.25, environment: 0 },
+  module_release: { propulsion: 0.15, structure: 0.45, software: 0.3, human: 0.1, environment: 0 },
+};
+export const DOCK_IDS = ['rendezvous', 'dock', 'module_release'];
+
+/** Docking milestone defs for a plan target {sequence, traits}: [{id, label, t, pFail0, weights}] (empty without). */
+export function dockingDefs(target) {
+  const seq = target?.sequence;
+  if (seq === 'release') return [{ id: 'module_release', label: 'Liberação do módulo', t: DOCK_T.module_release, pFail0: DOCK_FAIL.module_release, weights: DOCK_WEIGHTS.module_release }];
+  if (seq !== 'dock' && seq !== 'berth') return [];
+  const arm = seq === 'berth' || (Array.isArray(target.traits) && target.traits.includes('arm'));
+  return [
+    { id: 'rendezvous', label: 'Encontro orbital', t: DOCK_T.rendezvous, pFail0: DOCK_FAIL.rendezvous, weights: DOCK_WEIGHTS.rendezvous },
+    { id: 'dock', label: seq === 'berth' ? 'Captura pelo braço robótico' : 'Acoplagem', t: DOCK_T.dock, pFail0: (seq === 'berth' ? DOCK_FAIL.berth : DOCK_FAIL.dock) * (arm ? 0.9 : 1), weights: DOCK_WEIGHTS.dock },
+  ];
+}
 
 export const STRATEGIES = {
   // prestige multipliers are applied by missions when the mission resolves (less risk, less glory)
@@ -107,6 +132,8 @@ const KNOWN_GROUPS = new Set(['ignition', 'liftoff', 'maxq', 'staging', 'fairing
 export function msGroup(id) {
   const s = String(id);
   if (KNOWN_GROUPS.has(s)) return s;
+  if (s === 'module_release') return 'deploy';
+  if (s === 'rendezvous') return 'dock';
   if (/insert|loi|moi|capture|captura|orbit/.test(s)) return 'insertion';
   if (/touch|land|pouso|contact/.test(s)) return 'landing';
   if (/descent|descida|pdi|braking/.test(s)) return 'descent';
@@ -119,6 +146,11 @@ export function msGroup(id) {
 /** How a failure at this milestone ends: shares of {partial, recoverable, catastrophic} (sum 1). */
 export function failureSplit(id, phase, crewed) {
   let s;
+  if (DOCK_IDS.includes(id)) {
+    s = id === 'module_release' ? { partial: 0.6, recoverable: 0.25, catastrophic: 0.15 } : { partial: 0.5, recoverable: 0.38, catastrophic: 0.12 };
+    if (crewed) s = { partial: 0, recoverable: s.recoverable + s.partial, catastrophic: s.catastrophic };
+    return s;
+  }
   if (phase === 'ascent') {
     if (id === 'ignition') s = { partial: 0, recoverable: 0.8, catastrophic: 0.2 };
     else if (id === 'fairing_or_les' || id === 'orbit') s = { partial: 0.45, recoverable: 0.15, catastrophic: 0.4 };
@@ -640,6 +672,25 @@ export function missionRisk(state, data, plan = {}) {
     w.environment += weatherRisk * (ENV_SENSITIVITY[id] ?? 0) * 0.4;
     milestones.push(makeMs(id, ascentLabel(id, { crewed, dest }), ASCENT_T[id], h, w, 'ascent', crewed));
   }
+  // Missões v2 docking/berthing/release (§7.1): Earth orbit (or no arrival scene) → ascent scene, else arrival scene
+  const dockDefs = dockingDefs(plan.target);
+  const dockOnArrival = dockDefs.length > 0 && arr.length > 0 && (dest?.transitWeeks || 0) > 0;
+  const dockMs = [];
+  if (dockDefs.length) {
+    const dockBonus = clamp(Number(safe(research.techBonus, [state, actorId, 'dockingReliability'], 0)) || 0, 0, 0.6);
+    const flown = Math.max(0, relS.flights ?? 0);
+    for (const d of dockDefs) {
+      // research and a craft that has docked before both make the contact safer
+      let h = H(1 - d.pFail0) * strat.hazard * (1 - dockBonus) * (1 + 0.5 / (1 + flown));
+      if (crewed && !crewSel.commander) h *= 1.15;
+      const phaseX = dockOnArrival ? 'arrival' : 'ascent';
+      const ms = makeMs(d.id, d.label, dockOnArrival ? 200 + d.t : d.t, h, { ...d.weights }, phaseX, crewed);
+      dockMs.push(ms);
+    }
+    if (!dockOnArrival) milestones.push(...dockMs);
+    const dp = dockMs.reduce((q, m) => q * (1 - m.pFail), 1);
+    factors.push({ label: dockDefs[0].id === 'module_release' ? 'Liberação do módulo em órbita' : 'Encontro e acoplagem', delta: r3(dp - 1), kind: 'environment', ...(dockOnArrival ? {} : { stages: ['asc'] }) });
+  }
   for (const m of arr) {
     // own data risk (scaled by all modifiers via seg.arr) + share of spacecraft/destination hazard
     const own = explicitArrival ? (seg.arr * H(1 - m.extraFail)) / (arrPre.reduce((s2, x) => s2 + H(1 - x.extraFail), 0) || 1) : H(1 - m.extraFail);
@@ -648,11 +699,15 @@ export function missionRisk(state, data, plan = {}) {
     h += WEATHER_FAIL * 0.5 * weatherRisk * m.env;
     const w = { ...m.failureWeights };
     w.environment = (w.environment || 0) + weatherRisk * m.env * 0.3;
+    // Missões v2 (§7.1): a landing pad of the agency's base at the site (bs_pad) makes descent and touchdown safer
+    const padRisk = clamp(Number(plan.siteBonus?.landingRisk) || 0, -0.5, 0);
+    if (padRisk && ['landing', 'descent'].includes(msGroup(m.id))) h *= 1 + padRisk;
     const ms = makeMs(m.id, m.label, m.t, h, w, 'arrival', crewed);
     if (m.anomalyBand != null) ms.anomalyBand = r3(clamp(Math.max(m.anomalyBand, ms.pFail * 1.2), 0.02, 0.3));
     if (m.radio) ms.radio = m.radio;
     milestones.push(ms);
   }
+  if (dockOnArrival) milestones.push(...dockMs);
   // nudge failure types toward 'human' with a weak or missing crew
   if (!crewSel.flightDirector || cm.delta < 0) for (const m of milestones) m.failureWeights = normWeights({ ...m.failureWeights, human: m.failureWeights.human + 0.08 });
 

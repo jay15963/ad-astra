@@ -10,6 +10,7 @@ import { hash32, makeRng } from '../core/rng.js';
 import { formatTurn, weeksToText, WEEKS_PER_YEAR } from '../core/time.js';
 import { crossed, yearAt, aiGoals, retireYearOf, resolveActorId, liveActorIds } from './simtime.js';
 import { backgroundCrewLoss } from './crew.js';
+import { itemGate, itemHeld, techGated } from '../core/gating.js';
 
 // outcome.js belongs to launch-core; load it defensively so this module works while it is missing.
 let outcomeMod = null;
@@ -407,6 +408,16 @@ function actorDef(state, data, id) {
   return state?.actors?.[id] || (data?.actors?.actors || []).find((x) => x.id === id) || null;
 }
 
+// Treaty-gated buying for the player (MISSIONS-V2 §8.1): market.js registers market.treatyAccess here with
+// setTreatyAccess(fn) when it is imported (no import cycle with calendar). fn(state, data, buyerId, item) →
+// {ok, reason} decides (replacing the fixed own/bloc rules), or null = no opinion (today's rules).
+let treatyAccessHook = null;
+export function setTreatyAccess(fn) { treatyAccessHook = typeof fn === 'function' ? fn : null; }
+/** The registered hook (tests restore it). */
+export const treatyAccessFn = () => treatyAccessHook;
+// fallback when market.js never registers itself: pick its export up once the module graph has it
+import('./market.js').then((m) => { if (!treatyAccessHook && typeof m?.treatyAccess === 'function') treatyAccessHook = m.treatyAccess; }).catch(() => { /* no market yet */ });
+
 /** Can `actorId` buy/use this catalog entry? → {ok, reason} (reason pt-BR when blocked). */
 export function accessFor(state, data, actorId, item) {
   if (!item) return { ok: false, reason: 'desconhecido' };
@@ -418,13 +429,16 @@ export function accessFor(state, data, actorId, item) {
   if ((item.embargo || []).includes(actorId)) return { ok: false, reason: 'Embargo: o operador não vende para você' };
   const t = tensionBetween(state, actorId, ctrl);
   if (t >= 3) return { ok: false, reason: `Bloqueado pela tensão com ${actorName(state, data, ctrl)}` };
-  if (item.access === 'own') return { ok: false, reason: 'Uso exclusivo do operador' };
+  // the player buys through treaties (market.treatyAccess); null = no opinion, today's fixed rules below
+  const treaty = actorId === state?.playerId && treatyAccessHook ? treatyAccessHook(state, data, actorId, item) : null;
+  if (treaty && !treaty.ok) return { ok: false, reason: treaty.reason || 'Sem acordo com o operador' };
+  if (!treaty && item.access === 'own') return { ok: false, reason: 'Uso exclusivo do operador' };
   // national launch policy (NASA by law, CNSA and Roscosmos in practice): launchers must be domestic
   const me = actorDef(state, data, actorId);
   if (me?.launchPolicy === 'domestic' && item.capacity && item.country && me.country && !String(item.country).includes(me.country)) {
     return { ok: false, reason: 'Política nacional: só lançadores do próprio país' };
   }
-  if (item.access === 'bloc' && !inSameBloc(state, data, actorId, ctrl) && !hasTreaty(state, actorId, ctrl)) {
+  if (!treaty && item.access === 'bloc' && !inSameBloc(state, data, actorId, ctrl) && !hasTreaty(state, actorId, ctrl)) {
     return { ok: false, reason: 'Só para o bloco e parceiros do operador' };
   }
   return { ok: true, reason: null };
@@ -435,14 +449,42 @@ export function inServiceAt(state, data, item, turn) {
   return !!item && inCatalogAt(state, data, item, turn);
 }
 
-export function availableVehicles(state, data, actorId) {
-  const turn = state?.turn ?? 0;
-  return vehiclesOf(data).filter((v) => inCatalogAt(state, data, v, turn) && accessFor(state, data, actorId, v).ok);
+/**
+ * Research gate of a catalog item for an actor (MISSIONS-V2 §5.3): only the player of a `techGating` scenario is
+ * gated; AI rivals keep the history/date rules of the catalog. → {ok, key, nodeId, reason}.
+ */
+export function researchGate(state, data, actorId, kind, item, opts = {}) {
+  if (actorId !== state?.playerId || !techGated(state, data)) return { ok: true, key: null, nodeId: null, reason: null };
+  return itemGate(state, data, kind, item, actorId, opts);
 }
 
-export function availableSpacecraft(state, data, actorId) {
+/**
+ * Hardware in service the actor can buy now. `{withLocked: true}` → every in-service entry as
+ * {item, ok, reason, nodeId, key} (access or research reason; nodeId = tech node to research, for the UI link).
+ * `crewed` adds the crew-rating keys of vehicles (gates with `crewRated`).
+ */
+function availableOf(state, data, actorId, list, kind, { withLocked = false, crewed = false } = {}) {
   const turn = state?.turn ?? 0;
-  return spacecraftOf(data).filter((s) => inCatalogAt(state, data, s, turn) && accessFor(state, data, actorId, s).ok);
+  const out = [];
+  for (const it of list) {
+    if (!inCatalogAt(state, data, it, turn)) continue;
+    const acc = accessFor(state, data, actorId, it);
+    if (!withLocked) {
+      if (acc.ok && (actorId !== state?.playerId || !techGated(state, data) || itemHeld(state, data, kind, it, actorId, { crewed }))) out.push(it);
+      continue;
+    }
+    const g = researchGate(state, data, actorId, kind, it, { crewed });
+    out.push({ item: it, ok: acc.ok && g.ok, reason: !acc.ok ? acc.reason : g.reason, nodeId: g.ok ? null : g.nodeId, key: g.ok ? null : g.key });
+  }
+  return out;
+}
+
+export function availableVehicles(state, data, actorId, opts) {
+  return availableOf(state, data, actorId, vehiclesOf(data), 'vehicle', opts);
+}
+
+export function availableSpacecraft(state, data, actorId, opts) {
+  return availableOf(state, data, actorId, spacecraftOf(data), 'spacecraft', opts);
 }
 
 /** Prerequisite status for a calendar item: {ok, pending: [id], failed: [id], cancelled: [id]}. */
@@ -1886,11 +1928,13 @@ function vehicleCard(state, data, v, actorId) {
   const st = state?.vehicleStats?.[v.id] || null;
   const inCatalog = inCatalogAt(state, data, v, turn);
   const acc = accessFor(state, data, actorId, v);
+  const gate = researchGate(state, data, actorId, 'vehicle', v);
   const availableTurn = availableTurnOf(state, data, v);
   return {
     ...v,
-    available: inCatalog && acc.ok,
+    available: inCatalog && acc.ok && gate.ok,
     inCatalog,
+    gate,
     availableTurn,
     availableText: availableTurn == null ? 'aguarda a estreia' : availableTurn > turn ? fmt(state, data, availableTurn) : null,
     access: acc,
@@ -1908,8 +1952,9 @@ function spacecraftCard(state, data, s, actorId) {
   const turn = state?.turn ?? 0;
   const inCatalog = inCatalogAt(state, data, s, turn);
   const acc = accessFor(state, data, actorId, s);
+  const gate = researchGate(state, data, actorId, 'spacecraft', s);
   return {
-    ...s, available: inCatalog && acc.ok, inCatalog, access: acc,
+    ...s, available: inCatalog && acc.ok && gate.ok, inCatalog, access: acc, gate,
     availableTurn: availableTurnOf(state, data, s),
     reliability: spacecraftReliability(state, data, s.id),
     truthLabel: TRUTH_LABELS[s.truthLayer] || s.truthLayer,

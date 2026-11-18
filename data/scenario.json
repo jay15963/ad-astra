@@ -5,6 +5,8 @@
   "startYear": 2026,
   "endYear": 2030,
   "era": 4,
+  "techGating": false,
+  "unlocks": { "market": { "fromYear": 2026 } },
   "playableActors": ["nasa", "cnsa", "isro", "esa", "spacex"],
   "firstSharesNote": "Parte dos pontos de 'primeiro' do destino que um marco paga (padrão 1). Pessoas no polo sul lunar é um marco dentro de outro maior (pessoas na Lua): vale menos que um feito inédito por inteiro.",
   "firstShares": { "lunar_south_pole_crewed": 0.35 },

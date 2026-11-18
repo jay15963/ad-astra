@@ -24,7 +24,7 @@
         "names": ["Picareta", "Veio de Ferro", "Garimpo Orbital", "Bateia"],
         "text": "Uma mineradora robótica {doOwner} parte rumo {a}. Se a primeira tonelada de metal voltar inteira, os contratos de dez anos se pagam sozinhos.",
         "textNext": "{base} {n} volta ao cinturão. O primeiro carregamento provou que dá lucro; agora {Owner} quer provar que dá rotina." },
-      { "id": "europa_ocean", "w": 2, "type": "lander", "destinations": ["europa_ocean", "europa_surface"], "milestone": "europa_ocean_reached", "importance": 3, "flights": [1, 2], "gapYears": [4, 6],
+      { "id": "europa_ocean", "w": 2, "type": "probe", "sub": "lander", "destinations": ["europa_ocean", "europa_surface"], "milestone": "europa_ocean_reached", "importance": 3, "flights": [1, 2], "gapYears": [4, 6],
         "names": ["Broca Profunda", "Mergulho Europa", "Termo-Sonda"],
         "text": "{Owner} pousa no gelo de Europa uma sonda que derrete a crosta, quilômetro a quilômetro, até o oceano escuro. Ninguém sabe o que a câmera vai encontrar lá embaixo.", "textNext": "{base} {n} desce pelo mesmo poço aberto no gelo de Europa. Desta vez a sonda leva um submarino do tamanho de uma mala e luz própria." },
       { "id": "venus_aerostat", "w": 2, "type": "crewed", "crewSize": [3, 6], "destinations": ["venus_aerostat"], "milestone": "venus_aerostat_habitat", "importance": 3, "flights": [1, 2], "gapYears": [2, 4],
@@ -48,7 +48,7 @@
         "names": ["Gruta Selene", "Abrigo Fundo", "Caverna Clara"],
         "text": "Um tubo de lava sob o Mar da Tranquilidade protege de radiação e micrometeoritos. {Owner} instala ali um abrigo para {crew} pessoas {em}.",
         "textNext": "{base} {n} leva mais {crew} pessoas ao abrigo {em}. O tubo de lava já tem eletricidade, ar e um mural pintado pela primeira turma." },
-      { "id": "triton_probe", "w": 1, "type": "lander", "destinations": ["triton_surface", "enceladus_surface"], "milestone": null, "importance": 2, "flights": [1, 1], "gapYears": [1, 1],
+      { "id": "triton_probe", "w": 1, "type": "probe", "sub": "lander", "destinations": ["triton_surface", "enceladus_surface"], "milestone": null, "importance": 2, "flights": [1, 1], "gapYears": [1, 1],
         "names": ["Gêiser", "Frio Azul", "Pluma"],
         "text": "{Owner} manda um módulo de pouso {a}, onde gêiseres de nitrogênio e água sopram do gelo. Uma década de viagem por algumas horas de dados." }
     ],

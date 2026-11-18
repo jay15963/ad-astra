@@ -282,6 +282,9 @@ function planFor(state, mission, al) {
     calendarId: mission.calendarId || undefined,
     crewed: mission.crewed ?? (mission.type === 'crewed' || undefined),
     weather: al.weather,
+    // Missões v2 (§7.1): docking/berthing/release milestones follow the scene target frozen when the scene opened
+    sub: mission.sub || undefined,
+    target: al.target && ['dock', 'berth', 'release'].includes(al.target.sequence) ? { sequence: al.target.sequence, traits: al.target.traits || [] } : undefined,
   };
 }
 
@@ -450,6 +453,18 @@ function shouldForce(al, i) {
 
 // ---------- scene lifecycle ----------
 
+/** SceneTarget of this scene (missions.sceneTarget → infra.sceneTarget), or null. */
+function sceneTargetFor(state, data, mission, phase) {
+  if (typeof missions.sceneTarget !== 'function') return null;
+  let t = null;
+  try { t = missions.sceneTarget(state, data, mission); } catch { t = null; }
+  if (!t) return null;
+  const dest = lookup(data, 'destinations', mission.destination);
+  const arrivalScene = (dest?.arrivalMilestones || []).length > 0 && (dest?.transitWeeks || 0) > 0;
+  // in Earth orbit the whole flight is the ascent scene; beyond it, the meeting happens on arrival (targetPhase)
+  return { ...t, targetPhase: arrivalScene ? 'arrival' : 'ascent' };
+}
+
 /** Create state.activeLaunch for a mission. Returns the scene or null. */
 export function openScene(state, data, missionId, phase = 'ascent') {
   const mission = findMission(state, missionId);
@@ -503,7 +518,10 @@ export function openScene(state, data, missionId, phase = 'ascent') {
     startTurn: state.turn,
     pool: Number.isFinite(state.commandPoints) ? state.commandPoints : null,
     arrivalAhead: phase === 'ascent' && typeof missions.needsTransit === 'function' && !!missions.needsTransit(data, mission),
-    snapshot: { id: mission.id, type: mission.type, destination: mission.destination, vehicleId: mission.vehicleId, spacecraftId: mission.spacecraftId, crew: mission.crew || {}, config: mission.config || {}, launchTurn: mission.launchTurn, createdTurn: mission.createdTurn, name: mission.name },
+    // Missões v2 (§7.1): what the flight meets — the station it docks with, the module it releases, the base it lands
+    // beside (JSON snapshot: save/resume safe). targetPhase says which scene meets it (arrival beyond Earth orbit).
+    target: sceneTargetFor(state, data, mission, phase),
+    snapshot: { id: mission.id, type: mission.type, sub: mission.sub || null, payload: mission.payload || null, destination: mission.destination, vehicleId: mission.vehicleId, spacecraftId: mission.spacecraftId, crew: mission.crew || {}, config: mission.config || {}, launchTurn: mission.launchTurn, createdTurn: mission.createdTurn, name: mission.name },
   };
   state.activeLaunch = al;
   rebuild(state, data, al);

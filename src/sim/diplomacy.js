@@ -1,16 +1,20 @@
 // Diplomacy: actors, relations, blocs, treaties, proposals, utility-based AI and the Tabela da Era.
 // No script: every alliance is born, cools and breaks from state (trust, dependence, rivalry, tension,
 // budget pressure, goals and culture). Pure JS, deterministic (ctx.rng / rngFor only), JSON state.
-import { clamp, relKey, nextId, addNews, pushDecision, emitSignal, changeActor, log, firstValue, milestoneShare } from '../core/helpers.js';
+import { clamp, relKey, nextId, addNews, pushDecision, emitSignal, changeActor, log, firstValue, milestoneShare, resolveActor } from '../core/helpers.js';
 import { crossed, yearAt, liveActorIds, aiGoals } from './simtime.js';
 const DATA_REF = { data: null }; // last data seen by tick/init (goals by era read the lineage table)
 import { rngFor } from '../core/rng.js';
 import * as politics from './politics.js';
+import { itemAvailable } from '../core/catalog.js';
 
 // ---------------------------------------------------------------- constants
 export const BILATERAL_TYPES = ['mission_partnership', 'cost_sharing', 'crew_exchange', 'tech_transfer'];
 export const NORM_TYPES = ['peaceful_use', 'lunar_resources', 'orbital_traffic'];
-export const PROPOSAL_TYPES = [...BILATERAL_TYPES, ...NORM_TYPES, 'join_bloc'];
+// MISSIONS-V2 §8.2: service agreements. Not in the AI's generic bilateral loop (their own AI rules are below:
+// stationPartnershipAi, launchServicesAi); the player proposes them from Mundo, Mercado and Infraestrutura.
+export const SERVICE_TYPES = ['launch_services', 'station_partnership'];
+export const PROPOSAL_TYPES = [...BILATERAL_TYPES, ...SERVICE_TYPES, ...NORM_TYPES, 'join_bloc'];
 
 const ACCEPT_T = 8;      // acceptance threshold (utility)
 const PROPOSE_T = 24;    // AI only proposes when the best option clears this
@@ -91,6 +95,116 @@ function txt(data, rng, key, sub, vars, fallback) {
 
 const isCompany = (state, id) => state.actors?.[id]?.kind === 'company';
 const isPlayer = (state, id) => id === state.playerId;
+
+// ---------------------------------------------------------------- service agreements (MISSIONS-V2 §8.2)
+// launch_services: {seller, buyer, vehicleIds: [..]|'*', launches, priceMult}; station_partnership: {assetId, owner}.
+// Stations are infra assets (state.assets, owner infra.js): read here, never written.
+
+const vehicleList = (data) => data?.vehicles?.vehicles || NO_LIST;
+const vehicleName = (data, id) => data?.index?.vehicles?.[id]?.name || firstById(vehicleList(data), id)?.name || id;
+
+/** Catalog rockets an actor sells today: its own lineage's (operator or controlling actor), in service, not generic. */
+export function sellerVehicles(state, data, seller) {
+  if (!seller) return [];
+  const out = [];
+  for (const v of vehicleList(data)) {
+    if (!v?.operator || v.access === 'generic' || v.calendarOnly || !v.capacity) continue;
+    if (resolveActor(state, v.operator) !== seller && resolveActor(state, v.tensionActor || v.operator) !== seller) continue;
+    if (!itemAvailable(data, state, v, state.turn)) continue;
+    out.push(v);
+  }
+  return out;
+}
+
+/** An active launch contract from `seller` to `buyer` already covers `vehicleId`. */
+function launchCovered(state, buyer, seller, vehicleId) {
+  return (state.treaties || []).some((t) => t.status === 'active' && t.type === 'launch_services' && t.parties?.includes(buyer)
+    && (t.terms?.seller ?? t.parties.find((p) => p !== buyer)) === seller
+    && (t.terms?.vehicleIds === '*' || (Array.isArray(t.terms?.vehicleIds) && t.terms.vehicleIds.includes(vehicleId))));
+}
+
+const LIVE_STATION = ['active', 'degraded', 'derelict'];
+export function stationAssets(state, ownerId = null) {
+  return (state.assets?.list || NO_LIST).filter((a) => a?.kind === 'station' && LIVE_STATION.includes(a.status || 'active') && (!ownerId || a.ownerId === ownerId));
+}
+const assetById = (state, id) => (id ? (state.assets?.list || NO_LIST).find((a) => a?.id === id) || null : null);
+
+/** Supply reserve of a station 0..1 (supplyT over the modules' storage; data/core/modules.json). */
+export function stationSupplyRatio(state, data, a) {
+  if (!a) return 1;
+  if (Number.isFinite(a.supplyRatio)) return clamp(a.supplyRatio, 0, 1);
+  if (!Number.isFinite(a.supplyT)) return 1;
+  const defs = data?.modules?.station || NO_LIST;
+  let storage = 0;
+  for (const md of a.modules || NO_LIST) storage += (firstById(defs, md.id)?.storageT || 0) * (md.n || 1);
+  return clamp(a.supplyT / Math.max(2, storage), 0, 1);
+}
+
+/** The owner's station that most needs a partner (lowest reserve), or null. */
+function pickStation(state, data, ownerId) {
+  let best = null;
+  for (const a of stationAssets(state, ownerId)) {
+    const r = stationSupplyRatio(state, data, a);
+    if (!best || r < best.r || (r === best.r && a.id < best.a.id)) best = { a, r };
+  }
+  return best?.a || null;
+}
+
+function vehiclesText(data, ids) {
+  if (ids === '*') return 'de qualquer foguete';
+  const names = (Array.isArray(ids) ? ids : []).map((id) => vehicleName(data, id));
+  if (!names.length) return 'de nenhum foguete';
+  const shown = names.slice(0, 3).join(', ');
+  return `do ${shown}${names.length > 3 ? ` e mais ${names.length - 3}` : ''}`;
+}
+
+/** Does `buyer` fly its own rocket of each class `ids` cover? 1 = lacks one of them, 0.3 = has them all. */
+function serviceNeed(state, data, buyer, seller, ids) {
+  const own = new Set(sellerVehicles(state, data, buyer).map((v) => v.class));
+  const list = ids === '*' ? sellerVehicles(state, data, seller) : (Array.isArray(ids) ? ids : []).map((id) => firstById(vehicleList(data), id)).filter(Boolean);
+  return list.some((v) => !own.has(v.class)) ? 1 : 0.3;
+}
+
+/** Utility of a service agreement for `self` (Factors, as dealUtility). */
+function serviceUtility(state, data, self, other, type, terms = {}, role = 'propose') {
+  const f = new Factors();
+  const v = view(state, self, other);
+  if (v.tension >= 3) return f.add('conflito aberto', -999);
+  f.add('valor do acordo', typeDef(data, type).base || 0);
+  if (remembers(state, self, 'brokenBy', other, BREAK_MEMORY)) f.add('já rompeu conosco', -25);
+  if (type === 'launch_services') {
+    const ids = terms.vehicleIds;
+    if (!(ids === '*' || (Array.isArray(ids) && ids.length))) return f.add('nada a vender', -999);
+    const seller = terms.seller ?? other;
+    if (self === seller) {
+      f.add('verba apertada', budgetPressure(state, self) * 20);
+      f.add('confiança', v.trust / 10);
+      f.add('rivalidade', -v.rivalry / 10);
+      f.add('tensão política', -v.tension * 8);
+      if (isCompany(state, self)) f.add('cliente comercial', 15);
+      const list = ids === '*' ? sellerVehicles(state, data, self) : ids.map((id) => firstById(vehicleList(data), id)).filter(Boolean);
+      if (list.some((x) => x.access === 'own')) f.add('foguete de uso exclusivo', -12);
+    } else {
+      f.add('precisa do foguete', serviceNeed(state, data, self, seller, ids) * 15);
+      f.add('preço', -(Number(terms.priceMult) || 1.1) * 10);
+      f.add('confiança', v.trust / 20);
+    }
+  } else {
+    const a = assetById(state, terms.assetId);
+    if (!a || (a.ownerId !== self && a.ownerId !== other)) return f.add('estação inexistente', -999);
+    f.add('confiança', v.trust / 10);
+    f.add('rivalidade', -v.rivalry / 10);
+    f.add('tensão política', -v.tension * 8);
+    if (a.ownerId === self) f.add('falta de suprimentos', (1 - stationSupplyRatio(state, data, a)) * 30);
+    else {
+      const has = stationAssets(state, self).length > 0;
+      f.add(has ? 'mais uma estação' : 'acesso a uma estação', has ? 3 : 10);
+      f.add('verba apertada', -budgetPressure(state, self) * 8);
+    }
+  }
+  if (role === 'accept' && terms.counterAsk) f.add('contraproposta exigente', -terms.counterAsk * 30);
+  return f;
+}
 
 // ---------------------------------------------------------------- public helpers (contract)
 
@@ -361,6 +475,17 @@ export function defaultTerms(state, data, type, self, other, rng) {
       const b = blocOf(state, self);
       return b ? { blocId: b.id, member: other } : { blocId: blocOf(state, other)?.id, member: self };
     }
+    case 'launch_services': {
+      // the side with rockets to sell sells (the other one, when both do: a proposal asks to buy)
+      const seller = sellerVehicles(state, data, other).length || !sellerVehicles(state, data, self).length ? other : self;
+      const buyer = seller === other ? self : other;
+      const ids = sellerVehicles(state, data, seller).filter((v) => !launchCovered(state, buyer, seller, v.id)).map((v) => v.id).slice(0, 6);
+      return { seller, buyer, vehicleIds: ids, launches: 4, priceMult: 1.1 };
+    }
+    case 'station_partnership': {
+      const st = pickStation(state, data, other) || pickStation(state, data, self);
+      return { assetId: st?.id ?? null, owner: st?.ownerId ?? null };
+    }
     default: return {};
   }
 }
@@ -374,6 +499,7 @@ export function dealUtility(state, data, self, other, type, terms = {}, role = '
   const S = state.actors[self], O = state.actors[other];
   if (!S || !O) return f.add('ator desconhecido', -999);
   if (type === 'join_bloc') return joinBlocUtility(state, data, self, other, terms, role);
+  if (SERVICE_TYPES.includes(type)) return serviceUtility(state, data, self, other, type, terms, role);
   const td = typeDef(data, type);
   const v = view(state, self, other);
   if (v.tension >= 3) return f.add('conflito aberto', -999);
@@ -602,6 +728,7 @@ export function tick(state, data, ctx) {
     const every = Math.round(clamp(Math.round(6 - (ac.culture || 0) / 40), 3, 9) * slow);
     ac.ai.nextEvalTurn = state.turn + every + r.int(-1, 2);
   }
+  if (crossed(state, ctx, 13, 9)) serviceAgreementsAi(state, data, ctx.rng('services'));
   if (crossed(state, ctx, 13, 0)) {
     for (const ac of Object.values(state.actors)) {
       ac.ai.prestigeHistory.push(Math.round(ac.prestige || 0));
@@ -800,6 +927,7 @@ function expireTreaties(state, data, rng) {
     if (t.status !== 'active' || t.terms?.untilTurn == null || state.turn < t.terms.untilTurn) continue;
     t.status = 'expired';
     t.endedTurn = state.turn;
+    emitSignal(state, 'treaty/expired', { treatyId: t.id, treatyType: t.type, parties: t.parties.slice() });
     const involvesPlayer = t.parties.includes(state.playerId);
     const headline = txt(data, rng, 'expired', null, { treaty: t.name, parties: listNames(state, t.parties) });
     if (!involvesPlayer) { log(state, `diplomacia: ${headline}`); continue; } // routine AI-AI expiry: log only
@@ -938,6 +1066,51 @@ function incidents(state, data, rng) {
     });
     state.stats[`diplomacy.${kind}`] = (state.stats[`diplomacy.${kind}`] || 0) + 1;
   }
+}
+
+// ---------------------------------------------------------------- service agreements: AI (MISSIONS-V2 §8.2)
+
+/**
+ * Quarterly. (1) An AI station owner short of supplies (reserve < 40%) that trusts the player (≥ 30) asks the player
+ * for a station partnership. (2) AI-AI launch contracts (news only: AI access rules do not read them).
+ */
+export function serviceAgreementsAi(state, data, rng) {
+  const me = state.playerId;
+  if (me && state.actors[me] && canProposeToPlayer(state)) {
+    for (const a of stationAssets(state).slice().sort((x, y) => (x.id < y.id ? -1 : 1))) {
+      const owner = a.ownerId;
+      if (!owner || owner === me || !state.actors[owner]) continue;
+      if (stationSupplyRatio(state, data, a) >= 0.4 || a.status === 'derelict') continue;
+      if (relation(state, owner, me).trust < 30 || tensionOf(state, owner, me) >= 3) continue;
+      if (state.proposals.some((p) => (p.from === owner && p.to === me) || (p.from === me && p.to === owner))) continue;
+      if (remembers(state, owner, 'rejected', `${me}:station_partnership`, 52)) continue;
+      if (activeTreaties(state).some((t) => t.type === 'station_partnership' && t.terms?.assetId === a.id && t.parties.includes(me))) continue;
+      const terms = { assetId: a.id, owner };
+      const f = serviceUtility(state, data, owner, me, 'station_partnership', terms, 'propose');
+      if (f.u + rng.normal(0, NOISE) < ACCEPT_T) continue;
+      createProposal(state, data, owner, me, 'station_partnership', terms, f);
+      break;
+    }
+  }
+  if (!rng.chance(0.25)) return;
+  const ids = sortedIds(state).filter((id) => !isPlayer(state, id));
+  const buyers = ids.filter((id) => !isCompany(state, id));
+  if (!buyers.length) return;
+  const buyer = rng.pick(buyers);
+  let best = null;
+  for (const seller of ids) {
+    if (seller === buyer || tensionOf(state, buyer, seller) >= 3) continue;
+    if (treatiesBetween(state, buyer, seller, 'launch_services').length) continue;
+    const vs = sellerVehicles(state, data, seller).filter((v) => v.access !== 'own');
+    if (!vs.length) continue;
+    const terms = { seller, buyer, vehicleIds: vs.map((v) => v.id).slice(0, 6), launches: 4, priceMult: 1.1 };
+    const fb = serviceUtility(state, data, buyer, seller, 'launch_services', terms, 'propose');
+    const fs = serviceUtility(state, data, seller, buyer, 'launch_services', terms, 'accept');
+    const u = Math.min(fb.u, fs.u);
+    if (!best || u > best.u) best = { seller, terms, u };
+  }
+  if (!best || best.u + rng.normal(0, NOISE) < ACCEPT_T) return;
+  signTreaty(state, data, { type: 'launch_services', parties: [best.seller, buyer], terms: best.terms, proposer: buyer }, rng);
 }
 
 // ---------------------------------------------------------------- AI evaluation
@@ -1175,6 +1348,11 @@ function describeTerms(state, data, type, terms) {
     case 'crew_exchange': return `${terms.seats || 1} vaga(s) por ano para cada lado.`;
     case 'tech_transfer': return `${short(state, terms.giver)} ensina ${short(state, terms.receiver)}: ~${terms.points || 20} pontos de pesquisa em 2 anos.`;
     case 'join_bloc': return `${short(state, terms.member)} entra no bloco ${state.blocs?.[terms.blocId]?.name || terms.blocId}.`;
+    case 'launch_services': return `${short(state, terms.seller)} vende lançamentos ${vehiclesText(data, terms.vehicleIds)} para ${short(state, terms.buyer)}: até ${terms.launches || 4} voos em 3 anos, preço ×${String(terms.priceMult ?? 1.1).replace('.', ',')}.`;
+    case 'station_partnership': {
+      const a = assetById(state, terms.assetId);
+      return a ? `Parceria na estação ${a.name} (${short(state, a.ownerId)}): o parceiro leva módulos, suprimentos e tripulação e divide a ciência.` : 'Parceria numa estação espacial.';
+    }
     default: return typeDef(data, type).description || '';
   }
 }
@@ -1188,6 +1366,11 @@ function acceptPreview(state, data, p) {
   if (p.type === 'cost_sharing') bits.push(`missões conjuntas ${pct(p.terms.share ?? 0.15)} mais baratas`);
   if (p.type === 'tech_transfer') bits.push(p.terms.receiver === me ? `+${p.terms.points} pontos de pesquisa` : 'você cede tecnologia; ele fica dependente');
   if (p.type === 'crew_exchange') bits.push(state.actors[me]?.capabilities?.crewed ? 'você cede assentos' : 'seus astronautas ganham vagas');
+  if (p.type === 'launch_services') bits.push(p.terms.buyer === me ? `você pode comprar lançamentos ${vehiclesText(data, p.terms.vehicleIds)}` : `${short(state, p.terms.buyer)} pode comprar seus foguetes`);
+  if (p.type === 'station_partnership') {
+    const a = assetById(state, p.terms.assetId);
+    bits.push(a?.ownerId === me ? `${short(state, p.from)} ajuda a manter a ${a?.name || 'estação'}` : `você pode enviar módulos, carga e tripulação para a ${a?.name || 'estação'}`);
+  }
   if (p.type === 'join_bloc') {
     const bloc = state.blocs[p.terms.blocId];
     if (p.terms.member === me) {
@@ -1211,6 +1394,10 @@ function counterTerms(state, data, p) {
       if (t.receiver === me) t.points = Math.round((t.points || 20) * 1.5);
       else { t.points = Math.round((t.points || 20) * 0.6); }
       break;
+    case 'launch_services':
+      t.counterAsk = 0.3;
+      t.priceMult = clamp(round((Number(t.priceMult) || 1.1) + (t.buyer === me ? -0.1 : 0.1), 2), 0.9, 1.3);
+      break;
     default: t.counterAsk = 0.3;
   }
   return t;
@@ -1221,6 +1408,7 @@ function counterText(state, data, p, t) {
     case 'mission_partnership': return 'Exigir a liderança do programa';
     case 'crew_exchange': return `Pedir ${t.seats} vagas por ano`;
     case 'tech_transfer': return t.receiver === state.playerId ? `Pedir ${t.points} pontos` : `Ceder só ${t.points} pontos`;
+    case 'launch_services': return `${t.buyer === state.playerId ? 'Pedir' : 'Cobrar'} preço ×${String(t.priceMult).replace('.', ',')}`;
     default: return 'Pedir condições melhores';
   }
 }
@@ -1373,6 +1561,8 @@ export function signTreaty(state, data, { type, parties, terms = {}, name, propo
   const vars = {
     a: short(state, a), b: short(state, b), program: prog?.name || 'missão conjunta', share: pct(terms.share ?? 0.15),
     seats: terms.seats || 1, giver: short(state, terms.giver), receiver: short(state, terms.receiver),
+    seller: short(state, terms.seller), buyer: short(state, terms.buyer), vehicles: vehiclesText(data, terms.vehicleIds).replace(/^d[oe] /, ''),
+    asset: assetById(state, terms.assetId)?.name || 'estação',
   };
   let body = '';
   const racing = v.shared.filter((g) => g !== prog?.milestone);
@@ -1532,6 +1722,17 @@ function validatePlayerProposal(state, data, me, to, type, terms) {
   if (!typeAllowed(state, data, type, me, to)) return 'Esse tipo de acordo não se aplica a esse ator.';
   if (tensionOf(state, me, to) >= 3) return 'Conflito aberto: não há canal diplomático.';
   if (state.proposals.some((p) => ((p.from === me && p.to === to) || (p.from === to && p.to === me)) && p.type === type)) return 'Já existe uma proposta em aberto.';
+  if (type === 'launch_services') {
+    if (!sellerVehicles(state, data, to).length) return `${short(state, to)} não tem foguetes para vender.`;
+    const nt = normalizeTerms(state, data, type, me, to, terms);
+    if (nt.vehicleIds !== '*' && !nt.vehicleIds.length) return 'Você já tem contrato para esses foguetes.';
+  }
+  if (type === 'station_partnership') {
+    const a = assetById(state, normalizeTerms(state, data, type, me, to, terms).assetId);
+    if (!a) return 'Nenhuma estação para essa parceria.';
+    if (a.status === 'derelict') return `${a.name} está abandonada.`;
+    if (activeTreaties(state).some((t) => t.type === type && t.terms?.assetId === a.id && t.parties.includes(me) && t.parties.includes(to))) return 'Já existe parceria nessa estação.';
+  }
   if (type === 'mission_partnership') {
     if (treatiesBetween(state, me, to, type).some((t) => t.terms?.program === terms.program)) return 'Já existe parceria nesse programa.';
   } else if (BILATERAL_TYPES.includes(type) && treatiesBetween(state, me, to, type).length) return 'Já existe um acordo desse tipo em vigor.';
@@ -1551,6 +1752,27 @@ function normalizeTerms(state, data, type, me, to, terms = {}) {
   }
   if (type === 'mission_partnership' && !programDef(data, t.program)) t.program = defaultTerms(state, data, type, me, to, null).program;
   if (type === 'mission_partnership') t.lead = t.lead === to ? to : me;
+  if (type === 'launch_services') {
+    // from the player's side: the other actor sells, the player buys (the Mercado screen sells the player's rockets)
+    t.seller = to;
+    t.buyer = me;
+    if (terms.vehicleIds === '*') t.vehicleIds = '*';
+    else {
+      const sell = new Set(sellerVehicles(state, data, to).map((v) => v.id));
+      const want = Array.isArray(terms.vehicleIds) ? terms.vehicleIds : (Array.isArray(t.vehicleIds) ? t.vehicleIds : []);
+      t.vehicleIds = [...new Set(want)].filter((id) => sell.has(id) && !launchCovered(state, me, to, id)).slice(0, 6);
+    }
+    t.launches = clamp(Math.round(Number(t.launches) || 4), 1, 12);
+    t.priceMult = clamp(round(Number(t.priceMult) || 1.1, 2), 0.9, 1.3);
+  }
+  if (type === 'station_partnership') {
+    const a = assetById(state, t.assetId);
+    if (!a || (a.ownerId !== me && a.ownerId !== to)) {
+      const d = defaultTerms(state, data, type, me, to, null);
+      t.assetId = d.assetId;
+      t.owner = d.owner;
+    } else t.owner = a.ownerId;
+  }
   return t;
 }
 
@@ -1652,6 +1874,11 @@ function actCancelProposal(state, data, action) {
   if (!p) return { ok: false, error: 'Proposta não encontrada.' };
   dropProposal(state, p.id);
   return { ok: true };
+}
+
+/** Proposal API for other modules (market/requestAccess, the Infra screen): same rules as the Mundo screen. */
+export function proposeTo(state, data, action, ctx) {
+  return actPropose(state, data, action, ctx);
 }
 
 export const actions = {

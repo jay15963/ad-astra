@@ -9,6 +9,8 @@
 import { addNews, emitSignal, clamp, changeActor, pushDecision, removeDecision } from '../core/helpers.js';
 import * as budget from './budget.js';
 import { yearAt, inYearWindow, legacyFromYear } from './simtime.js';
+import * as gating from '../core/gating.js';
+import { applyResearchGrant } from '../core/migrations/v4.js'; // also registers the v3 → v4 save migration
 
 const DEFAULT_CFG = {
   startPoints: 30, baseSciencePerWeek: 1, engineerSciencePerWeek: 0.12, maxProjects: 2,
@@ -47,6 +49,7 @@ function ensure(state) {
   r.bonus ??= {};
   r.completedTurn ??= {};
   r.earned ??= 0;
+  r.keys ??= [];
   return r;
 }
 
@@ -57,10 +60,10 @@ function actorName(state, id) {
 
 // ---------- effects / bonus cache ----------
 
-/** Sum of a node list's effects (times quality multipliers), as {key: value}. */
-function sumEffects(data, ids, quality = {}) {
-  const out = {};
-  for (const id of ids || []) {
+/** Raw (unrounded) sum of the effects of ids[from..] into `out`, in list order. */
+function addEffects(data, out, ids, quality, from = 0) {
+  for (let i = from; i < ids.length; i++) {
+    const id = ids[i];
     const n = nodeById(data, id);
     if (!n?.effects) continue;
     const q = quality[id] ?? 1;
@@ -69,6 +72,31 @@ function sumEffects(data, ids, quality = {}) {
       out[k] = (out[k] || 0) + v * q;
     }
   }
+  return out;
+}
+
+/** Sum of a node list's effects (times quality multipliers), as {key: value}. */
+function sumEffects(data, ids, quality = {}, raw = null) {
+  return roundEffects({ ...(raw || addEffects(data, {}, ids || [], quality)) });
+}
+
+// Rivals only ever append to their list, so their raw sums are kept per game state and actor and extended by the new
+// ids (same order, same float operations as a full sum: the result is identical, MISSIONS-V2 §4.7 tick budget).
+const RIVAL_SUMS = new WeakMap();
+function rivalRawSum(state, data, actorId, ids) {
+  let m = RIVAL_SUMS.get(state);
+  if (!m) { m = new Map(); RIVAL_SUMS.set(state, m); }
+  const c = rivalCacheOn ? m.get(actorId) : null;
+  if (c && c.ids === ids && c.data === data && c.len <= ids.length && (c.len === 0 || ids[c.len - 1] === c.last)) {
+    if (c.len < ids.length) { addEffects(data, c.raw, ids, {}, c.len); c.len = ids.length; c.last = ids[ids.length - 1]; }
+    return c.raw;
+  }
+  const raw = addEffects(data, {}, ids, {});
+  m.set(actorId, { ids, data, len: ids.length, last: ids[ids.length - 1], raw });
+  return raw;
+}
+
+function roundEffects(out) {
   for (const k of Object.keys(out)) out[k] = round2(out[k] * 1000) / 1000; // avoid float noise (keeps 5 decimals)
   for (const k of ['commandPoints', 'researchSlots']) if (out[k] != null) out[k] = Math.floor(out[k] + 1e-9);
   return out;
@@ -80,10 +108,31 @@ function unlockedFor(state, actorId) {
   return actorId === state.playerId ? r.unlocked || [] : r.rivals?.[actorId] || [];
 }
 
+/**
+ * Effect caps (data.techtree.effectCaps, MISSIONS-V2 §4.6), applied after summing: {key: {min?, max?}} or
+ * {key: [min, max]}; '*' (or '_default') caps every other key. Without the table nothing is capped.
+ */
+function capEffects(data, out) {
+  const caps = data?.techtree?.effectCaps;
+  if (!caps || typeof caps !== 'object') return out;
+  const dflt = caps['*'] ?? caps._default ?? null;
+  for (const k of Object.keys(out)) {
+    let c = caps[k] ?? dflt;
+    if (Array.isArray(c)) c = { min: c[0], max: c[1] };
+    if (!c || typeof c !== 'object') continue;
+    if (typeof c.min === 'number' && out[k] < c.min) out[k] = c.min;
+    if (typeof c.max === 'number' && out[k] > c.max) out[k] = c.max;
+  }
+  return out;
+}
+
 function recompute(state, data, actorId) {
   const r = ensure(state);
   const isPlayer = actorId === state.playerId;
-  r.bonus[actorId] = sumEffects(data, unlockedFor(state, actorId), isPlayer ? r.quality : {});
+  const ids = unlockedFor(state, actorId);
+  r.bonus[actorId] = capEffects(data, isPlayer ? sumEffects(data, ids, r.quality) : sumEffects(data, ids, {}, rivalRawSum(state, data, actorId, ids)));
+  // keys the player holds (MISSIONS-V2 §5.1): a sorted cache of the unlock keys of research.unlocked
+  if (isPlayer) r.keys = gating.keysOfNodes(data, r.unlocked);
 }
 
 /**
@@ -177,7 +226,8 @@ function sciencePerWeek(state, data) {
 
 /** ["+2 p.p. confiabilidade das missões", "−6% custo de lançamento", ...] */
 export function describeEffects(data, effects = {}, mult = 1) {
-  const labels = data?.tech?.effectLabels || {};
+  // Missões v2 effect keys (lifetime, maintenance…) are labelled in data/core/techtree.json
+  const labels = data?.techtree?.effectLabels ? { ...(data?.tech?.effectLabels || {}), ...data.techtree.effectLabels } : (data?.tech?.effectLabels || {});
   const out = [];
   for (const [k, raw] of Object.entries(effects || {})) {
     if (typeof raw !== 'number') continue;
@@ -200,13 +250,46 @@ export function describeEffects(data, effects = {}, mult = 1) {
 
 // ---------- init ----------
 
+/**
+ * Nodes an actor starts with: the ones data gives it (initialFor). With `techStart: "historical"` (the campaign) an
+ * initialFor node from a later year is not given yet (the 2026 start set of the Corrida must not reach 1950).
+ */
+function initialNodes(state, data, actorId, { secret = true } = {}) {
+  const historical = data?.scenario?.techStart === 'historical';
+  const year = yearAt(state);
+  return nodesOf(data).filter((n) => (secret || !n.secret) && (n.initialFor || []).includes(actorId)
+    && !(historical && gating.histYearOf(n) > year)).map((n) => n.id);
+}
+
+/** The player's starting research (initialFor + the §5.5 historical grant), keys recomputed. */
+function startPlayer(state, data) {
+  const r = ensure(state);
+  r.unlocked = initialNodes(state, data, state.playerId);
+  // MISSIONS-V2 §5.5: a gated scenario starts the player with what history had by the start year (histYear ≤
+  // start: the 1950 campaign gets the sounding rockets and their roots; same rule as the v3 → v4 migration)
+  if (data?.scenario?.techStart === 'historical') {
+    r.unlocked = gating.historicalGrant(data, (state.startYear ?? yearAt(state)) + 1, { have: r.unlocked });
+  }
+  ensureRivals(state, data);
+  recompute(state, data, state.playerId);
+}
+
 export function init(state, data, ctx) {
   lastData = data;
   const r = ensure(state);
   r.points = cfg(data).startPoints ?? 30;
-  r.unlocked = nodesOf(data).filter((n) => (n.initialFor || []).includes(state.playerId)).map((n) => n.id);
-  ensureRivals(state, data);
-  recompute(state, data, state.playerId);
+  startPlayer(state, data);
+}
+
+/**
+ * The player became another actor before the first turn (agency/found on a game created for someone else): its
+ * research starts over as a new agency's would (§5.5), and the old actor joins the rivals.
+ */
+export function resetPlayer(state, data) {
+  if (!state.research) return;
+  const r = state.research;
+  delete r.rivals?.[state.playerId];
+  startPlayer(state, data);
 }
 
 /** Rivals = every actor except the player. Added lazily so a late diplomacy init still works. */
@@ -214,7 +297,7 @@ function ensureRivals(state, data) {
   const r = ensure(state);
   for (const id of Object.keys(state.actors || {})) {
     if (id === state.playerId || r.rivals[id]) continue;
-    r.rivals[id] = nodesOf(data).filter((n) => !n.secret && (n.initialFor || []).includes(id)).map((n) => n.id);
+    r.rivals[id] = initialNodes(state, data, id, { secret: false });
     recompute(state, data, id);
   }
 }
@@ -224,6 +307,7 @@ function ensureRivals(state, data) {
 export function tick(state, data, ctx) {
   lastData = data;
   const r = ensure(state);
+  if (r.needsGrant) { applyResearchGrant(state, data); r.needsRecompute = true; }
   if (r.needsRecompute) { recompute(state, data, state.playerId); delete r.needsRecompute; }
   ensureRivals(state, data);
   revealSecrets(state, data);
@@ -397,18 +481,38 @@ function rivalWeight(actor, node) {
   return w * 20 / Math.max(10, node.weeks || 20);
 }
 
+// Rival option lists (MISSIONS-V2 §4.7): ~540 nodes × a dozen rivals every week is too much to filter from scratch,
+// so the list is cached per game state and actor, keyed by (year, has.length, data). A rival's list only grows by
+// push (or is replaced when the actor is born/merged, which changes the length), so the key pins the content and the
+// cached list is exactly what the filter would return: picks are identical with or without the cache.
+const RIVAL_OPTIONS = new WeakMap();
+let rivalCacheOn = true;
+/** Tests: switch the cache off to compare picks. */
+export function _setRivalCache(on) { rivalCacheOn = !!on; }
+
+function rivalOptions(state, data, id, has) {
+  const year = yearAt(state);
+  let m = rivalCacheOn ? RIVAL_OPTIONS.get(state) : null;
+  const hit = m?.get(id);
+  if (hit && hit.year === year && hit.len === has.length && hit.data === data && hit.has === has) return hit.options;
+  // same filter as before, with set lookups and the year window read once
+  const hasSet = new Set(has);
+  const undatedFrom = legacyFromYear(data);
+  const options = nodesOf(data).filter((n) => !n.secret && !hasSet.has(n.id) && (n.requires || []).every((req) => hasSet.has(req))
+    && inYearWindow(n, year, { undatedFrom }));
+  if (rivalCacheOn) {
+    if (!m) { m = new Map(); RIVAL_OPTIONS.set(state, m); }
+    m.set(id, { year, len: has.length, data, has, options });
+  }
+  return options;
+}
+
 function advanceRival(state, data, ctx, id) {
   const r = state.research;
   const has = r.rivals[id] || (r.rivals[id] = []);
   let proj = r.rivalProjects[id];
   if (!proj) {
-    // same filter as before, with set lookups and the year window read once (rivals that ran out of open nodes
-    // repeat this every week)
-    const hasSet = new Set(has);
-    const year = yearAt(state);
-    const undatedFrom = legacyFromYear(data);
-    const options = nodesOf(data).filter((n) => !n.secret && !hasSet.has(n.id) && (n.requires || []).every((req) => hasSet.has(req))
-      && inYearWindow(n, year, { undatedFrom }));
+    const options = rivalOptions(state, data, id, has);
     if (!options.length) return;
     const rng = ctx.rng(`rival-pick:${id}`);
     const actor = state.actors?.[id];
@@ -558,44 +662,138 @@ export const decisionHandlers = {
 
 // ---------- queries ----------
 
-function nodeView(state, data, n) {
+/** Shared lookups for a batch of node views (sets instead of list scans: the tree has ~540 nodes). */
+function viewCtx(state, data) {
   const r = state.research || {};
-  const unlocked = r.unlocked || [];
-  const proj = (r.projects || []).find((p) => p.nodeId === n.id);
-  const done = unlocked.includes(n.id);
+  const rivalsBy = new Map();
+  for (const [id, l] of Object.entries(r.rivals || {})) for (const nid of l || []) {
+    if (!rivalsBy.has(nid)) rivalsBy.set(nid, []);
+    rivalsBy.get(nid).push(id);
+  }
+  return {
+    unlocked: new Set(r.unlocked || []),
+    projects: new Map((r.projects || []).map((p) => [p.nodeId, p])),
+    rivalsBy,
+    speedSafe: weeklySpeed(state, data, 'safe'),
+    speedBold: weeklySpeed(state, data, 'bold'),
+    kinds: Object.fromEntries(gating.kindsOf(data).map((k) => [k.id, k])),
+  };
+}
+
+function nodeView(state, data, n, vc = viewCtx(state, data)) {
+  const r = state.research || {};
+  const unlocked = vc.unlocked;
+  const proj = vc.projects.get(n.id);
+  const done = unlocked.has(n.id);
   let status = 'locked';
   if (done && !proj) status = 'done';
   else if (proj) status = 'active';
-  else if (requiresMet(unlocked, n) && nodeOpen(state, data, n)) status = 'available';
-  const speedSafe = weeklySpeed(state, data, 'safe');
-  const speedBold = weeklySpeed(state, data, 'bold');
+  else if ((n.requires || []).every((x) => unlocked.has(x)) && nodeOpen(state, data, n)) status = 'available';
   const q = r.quality?.[n.id] ?? 1;
   const branch = (data?.tech?.branches || []).find((b) => b.id === n.branch);
   const eta = proj
     ? Math.ceil(((1 - proj.progress) * (proj.weeks || n.weeks || 10)) / weeklySpeed(state, data, proj.approach))
     : null;
+  const eraId = gating.eraIdOf(n);
+  const keys = gating.nodeKeys(n);
+  const unlocks = (n.unlocks || []).map((u) => {
+    const key = typeof u === 'string' ? u : u?.key;
+    if (!key) return null;
+    const kind = gating.keyKind(key);
+    return { key, kind, kindLabel: vc.kinds[kind]?.label || kind, label: (typeof u === 'object' && u.label) || gating.keyLabel(data, key) };
+  }).filter(Boolean);
+  // prerequisites of another era: drawn as stubs at the top of the branch column (MISSIONS-V2 §6.1)
+  const stubs = [];
+  for (const id of n.requires || []) {
+    const p = nodeById(data, id);
+    if (!p) continue;
+    const pe = gating.eraIdOf(p);
+    if (pe !== eraId) stubs.push({ id, eraId: pe, name: p.name || id, short: p.short || p.name || id, status: unlocked.has(id) ? 'done' : 'locked' });
+  }
   return {
     id: n.id, branch: n.branch, branchName: branch?.name || n.branch, name: n.name, description: n.description,
-    era: n.era, secret: !!n.secret, status, fromYear: n.fromYear ?? null, icon: n.icon || null, short: n.short || null,
-    tier: n.tier ?? null, row: n.row ?? null,
+    era: n.era, eraId, secret: !!n.secret, status, fromYear: n.fromYear ?? null, histYear: n.histYear ?? null,
+    icon: n.icon || null, short: n.short || null, tier: n.tier ?? null, row: n.row ?? null, lane: n.lane ?? null,
+    kind: keys.length ? 'unlock' : 'efficiency', unlockKind: keys.length ? gating.keyKind(keys[0]) : null, unlocks,
     cost: nodeMoneyCost(state, data, n, 'safe'), costBold: nodeMoneyCost(state, data, n, 'bold'),
     science: n.science || 0, canAffordScience: (r.points || 0) >= (n.science || 0),
-    weeks: Math.ceil((n.weeks || 10) / speedSafe), weeksBold: Math.ceil((n.weeks || 10) / speedBold),
-    requires: n.requires || [], requiresNames: (n.requires || []).map((id) => nodeById(data, id)?.name || id),
+    weeks: Math.ceil((n.weeks || 10) / vc.speedSafe), weeksBold: Math.ceil((n.weeks || 10) / vc.speedBold),
+    requires: n.requires || [], requiresNames: (n.requires || []).map((id) => nodeById(data, id)?.name || id), stubs,
     effects: n.effects || {}, effectText: describeEffects(data, n.effects, done ? q : 1),
     quality: done ? q : null, canRefine: done && q < 1 && !proj,
     progress: proj ? proj.progress : done ? 1 : 0, approach: proj?.approach || null, stalled: !!proj?.stalled,
     refining: !!proj?.refine, etaWeeks: eta, spent: proj?.spent || 0, projectCost: proj?.cost || null,
-    rivalsWith: Object.entries(r.rivals || {}).filter(([, l]) => l.includes(n.id)).map(([id]) => id),
+    rivalsWith: vc.rivalsBy.get(n.id) || [],
   };
 }
 
+const visibleNodes = (state, data) => nodesOf(data).filter((n) => isVisible(state, n));
+const treeViews = (state, data, list = visibleNodes(state, data)) => {
+  const vc = viewCtx(state, data);
+  return list.map((n) => nodeView(state, data, n, vc));
+};
+
+/** Era rows for the era bar: loaded eras with counts, unloaded ones from techtree.preview. */
+function eraRows(state, data) {
+  const eras = data?.eras?.eras || [];
+  const counts = {};
+  const unlocked = new Set(state.research?.unlocked || []);
+  for (const n of visibleNodes(state, data)) {
+    const e = gating.eraIdOf(n);
+    const c = (counts[e] ||= { total: 0, done: 0, unlock: 0 });
+    c.total++;
+    if (unlocked.has(n.id)) c.done++;
+    if (gating.nodeKind(n) === 'unlock') c.unlock++;
+  }
+  const ids = eras.length ? eras.map((e) => e.id) : Object.keys(counts).sort();
+  const curYear = yearAt(state);
+  return ids.map((id) => {
+    const e = eras.find((x) => x.id === id) || {};
+    const c = counts[id];
+    const pv = data?.techtree?.preview?.[id] || null;
+    const from = e.from?.year ?? null, to = e.to?.year ?? null;
+    return {
+      id, name: e.name || id, from, to, current: from != null && curYear >= from && (to == null || curYear <= to),
+      loaded: !!c, total: c?.total ?? pv?.count ?? 0, done: c?.done ?? 0, unlockCount: c?.unlock ?? pv?.unlockCount ?? 0,
+      preview: c ? null : pv,
+    };
+  });
+}
+
 export const queries = {
-  'research/tree': (state, data) => nodesOf(data).filter((n) => isVisible(state, n)).map((n) => nodeView(state, data, n)),
+  'research/tree': (state, data) => treeViews(state, data),
   'research/node': (state, data, id) => {
     const n = nodeById(data, id);
     return n && isVisible(state, n) ? nodeView(state, data, n) : null;
   },
+  /** Views of one era's nodes only (MISSIONS-V2 §6.3). */
+  'research/era': (state, data, eraId) => treeViews(state, data, visibleNodes(state, data).filter((n) => gating.eraIdOf(n) === eraId)),
+  /** Era bar rows: [{id, name, from, to, current, loaded, total, done, unlockCount, preview}]. */
+  'research/eras': (state, data) => eraRows(state, data),
+  /** Up to n unlock nodes of an era the player can work on now (active first, then available by year and cost). */
+  'research/nextUnlocks': (state, data, eraId, n = 3) => {
+    const list = visibleNodes(state, data).filter((x) => gating.nodeKind(x) === 'unlock' && (!eraId || gating.eraIdOf(x) === eraId));
+    const views = treeViews(state, data, list).filter((v) => v.status === 'available' || v.status === 'active');
+    const rank = (v) => (v.status === 'active' ? 0 : 1);
+    return views.sort((a, b) => rank(a) - rank(b) || (a.histYear ?? a.fromYear ?? 0) - (b.histYear ?? b.fromYear ?? 0) || a.science - b.science || (a.id < b.id ? -1 : 1)).slice(0, n);
+  },
+  /** Legend: the unlock kinds with researched/total unlock nodes of each (by primary kind). */
+  'research/kinds': (state, data) => {
+    const unlocked = new Set(state.research?.unlocked || []);
+    const out = gating.kindsOf(data).map((k) => ({ ...k, total: 0, done: 0 }));
+    const by = Object.fromEntries(out.map((k) => [k.id, k]));
+    for (const n of visibleNodes(state, data)) {
+      const k = by[gating.unlockKindOf(n)];
+      if (!k) continue;
+      k.total++;
+      if (unlocked.has(n.id)) k.done++;
+    }
+    return out;
+  },
+  /** Unlock keys the player holds (sorted). */
+  'research/keys': (state, data) => (Array.isArray(state.research?.keys) ? state.research.keys.slice() : gating.keysOfNodes(data, state.research?.unlocked || [])),
+  /** What a key unlocks in the catalog now: {names, more, total}. */
+  'research/targets': (state, data, key) => gating.unlockTargets(data, state, key),
   'research/branches': (state, data) => data?.tech?.branches || [],
   'research/points': (state) => Math.floor(state.research?.points || 0),
   'research/summary': (state, data) => ({
@@ -609,6 +807,8 @@ export const queries = {
     engineerFactor: round2(engineerFactor(state, data)),
     bonus: { ...(state.research?.bonus?.[state.playerId] || {}) },
     approaches: cfg(data).approaches,
+    gated: gating.techGated(state, data),
+    migratedGrant: state.research?.migratedGrant || 0,
   }),
   'research/rivals': (state, data) =>
     Object.entries(state.research?.rivals || {}).map(([id, list]) => {

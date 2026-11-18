@@ -18,7 +18,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const E7_DIR = path.join(ROOT, 'data', 'eras', 'e7');
 /** Every file of the e7 pack, in merge order (the manifest entry the integrator should write). */
 export const E7_FILES = ['era', 'snapshot', 'lineages', 'lifecycle', 'parts', 'vehicles', 'spacecraft', 'destinations', 'calendar',
-  'tech', 'events', 'crew', 'investors'];
+  'events', 'crew', 'investors'];
 const SCENARIO_ID = 'grande_silencio';
 const SCENARIO_FILE = `scenarios/${SCENARIO_ID}.json`;
 const readJson = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, 'data', rel), 'utf8'));

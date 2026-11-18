@@ -20,7 +20,7 @@
 
 import { nextId, addNews, emitSignal, clamp, relKey, dueIn, expiryIn, pushDecision } from '../core/helpers.js';
 import { turnToDate, yearOf } from '../core/time.js';
-import { vehicleDef as catalogVehicle, itemAvailable, monthIndex } from '../core/catalog.js';
+import { vehicleDef as catalogVehicle, itemAvailable, monthIndex, researchGateOf } from '../core/catalog.js';
 import * as budget from './budget.js';
 import * as calendar from './calendar.js';
 import * as research from './research.js';
@@ -518,6 +518,9 @@ export function partAccess(state, data, part, actorId = state?.playerId, turn = 
     }
   }
   if (licensed.includes(part.id)) return { ok: true, reason: null };
+  // MISSIONS-V2 §5.3: the gated player needs the part's unlock keys (data.techtree.gates.part, or `gate`)
+  const g = researchGateOf(data, state, 'part', part, actorId);
+  if (!g.ok) return { ok: false, reason: g.reason, nodeId: g.nodeId };
   if (part.access && part.access !== 'generic' && part.operator) {
     const a = calendar.accessFor(state, data, actorId, part);
     if (!a.ok) return { ok: false, reason: a.reason || 'Sem acesso' };
@@ -550,7 +553,7 @@ export function lockedParts(state, data, spec, actorId = state?.playerId, licens
   const out = [];
   for (const id of specPartIds(spec)) {
     const a = partAccess(state, data, P.byId[id], actorId, state?.turn, { licensed });
-    if (!a.ok) out.push({ id, name: P.byId[id]?.name || id, reason: a.reason });
+    if (!a.ok) out.push({ id, name: P.byId[id]?.name || id, reason: a.reason, nodeId: a.nodeId || null });
   }
   for (const s of spec?.stages || []) {
     if (s.tank && !licensed.includes(s.tank) && P.dia[s.tank] && !diameterOk(state, P.dia[s.tank])) out.push({ id: s.tank, name: `Tanque de ${fmtD(P.dia[s.tank].d)}`, reason: `Disponível em ${P.dia[s.tank].availableFrom.year}` });
@@ -600,6 +603,9 @@ export function licenseQuote(state, data, vehicleId, actorId = state?.playerId) 
   if (!P || !v) return { ok: false, reason: 'Foguete desconhecido', feeM: 0, vehicle: v };
   if (!catalogDesign(data, vehicleId)) return { ok: false, reason: 'Sem projeto detalhado disponível', feeM: 0, vehicle: v };
   if (!itemAvailable(data, state, v, state.turn)) return { ok: false, reason: 'Fora de serviço nesta data', feeM: 0, vehicle: v };
+  // the gated player needs the vehicle's unlock keys to build it under license (MISSIONS-V2 §5.3)
+  const g = researchGateOf(data, state, 'vehicle', v, actorId, { fmt: (name) => `Pesquise ${name} para licenciar` });
+  if (!g.ok) return { ok: false, reason: g.reason, nodeId: g.nodeId, feeM: 0, vehicle: v };
   const lic = P.dev.license || {};
   const own = v.operator && (v.operator === actorId || state?.lifecycle?.aliases?.[v.operator] === actorId);
   if (!own) {
@@ -895,6 +901,11 @@ function bestEngine(list, role) {
   return cands.sort((a, b) => score(b) - score(a) || (a.id < b.id ? -1 : 1))[0] || null;
 }
 
+/** Research gate of a Hangar template for the actor (data.techtree.gates.template): {ok, key, nodeId, reason}. */
+export function templateGate(state, data, t, actorId = state?.playerId) {
+  return researchGateOf(data, state, 'template', t, actorId);
+}
+
 /**
  * Auto-filled spec for a template with the actor's parts now: engines by role, diameter by engine count,
  * tank steps sized for the template's liftoff TWR / upper-stage share. null when nothing fits.
@@ -905,6 +916,7 @@ export function fillTemplate(state, data, templateId, actorId = state?.playerId)
   if (!t) return null;
   const year = yearNow(state);
   if (year < num(t.fromYear, 1950)) return null;
+  if (!templateGate(state, data, t, actorId).ok) return null;
   const engines = usableParts(state, data, 'engine', actorId);
   const dias = usableDiameters(state, data).slice().sort((a, b) => a.d - b.d);
   if (!engines.length || !dias.length) return null;
@@ -1271,6 +1283,9 @@ export const actions = {
     const un = builderUnlocked(state, data);
     if (!un.ok) return { ok: false, error: `O Hangar abre em ${un.fromYear}.` };
     if (capReached(state, data, state.playerId)) return { ok: false, error: 'Limite de projetos ativos atingido: aposente algum.' };
+    const tg = P.templates.find((x) => x.id === action.templateId);
+    const gate = tg ? templateGate(state, data, tg) : null;
+    if (gate && !gate.ok) return { ok: false, error: `${gate.reason}.`, nodeId: gate.nodeId };
     const spec = action.spec ? normalizeSpec(action.spec) : fillTemplate(state, data, action.templateId);
     if (!spec) return { ok: false, error: 'Ainda não há peças para esse tipo de foguete.' };
     const t = P.templates.find((x) => x.id === action.templateId);
@@ -1449,8 +1464,11 @@ export const queries = {
   },
   /** Templates with their auto-filled spec for the player now. */
   'designs/templates': (state, data) => (partsOf(data)?.templates || []).map((t) => {
-    const spec = yearNow(state) >= num(t.fromYear, 1950) ? fillTemplate(state, data, t.id) : null;
-    return { id: t.id, name: t.name, desc: t.desc, ok: !!spec, reason: spec ? null : (yearNow(state) < num(t.fromYear, 1950) ? `Disponível em ${t.fromYear}` : 'Faltam peças'), spec };
+    const early = yearNow(state) < num(t.fromYear, 1950);
+    const gate = early ? null : templateGate(state, data, t);
+    const spec = !early && gate.ok ? fillTemplate(state, data, t.id) : null;
+    const reason = spec ? null : early ? `Disponível em ${t.fromYear}` : !gate.ok ? gate.reason : 'Faltam peças';
+    return { id: t.id, name: t.name, desc: t.desc, ok: !!spec, reason, nodeId: gate && !gate.ok ? gate.nodeId : null, spec };
   }),
   /** Static tables the Hangar needs (labels). */
   'designs/catalogInfo': (state, data) => {

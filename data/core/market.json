@@ -1,0 +1,78 @@
+{
+  "_doc": "Mercado de foguetes (docs/MISSIONS-V2.md §8.3–8.4). Números iniciais da Fase D. src/sim/market.js lê 'tuning' (cada campo tem padrão no código: um arquivo ausente nunca quebra a partida). Interesse 0..100 por (foguete do jogador, agência compradora), recalculado a cada trimestre.",
+  "tuning": {
+    "interest": {
+      "flightsRef": 40,
+      "relFloor": 0.8,
+      "relSpan": 0.17,
+      "wFlights": 0.35,
+      "wRel": 0.35,
+      "wTrust": 0.15,
+      "wBloc": 0.15,
+      "needNone": 1,
+      "needHas": 0.3,
+      "domesticHas": 0,
+      "domesticNone": 0.5,
+      "failPenalty": 25,
+      "failWindowWeeks": 104,
+      "pricePenalty": 40,
+      "tensionPenalty": 18,
+      "smoothing": 0.35,
+      "periodWeeks": 13,
+      "phase": 5,
+      "keepMin": 0.5,
+      "maxSellables": 8,
+      "refPriceFallback": 1.5,
+      "affordShare": 0.15,
+      "refAskCap": 1.25,
+      "cheapBoost": 1
+    },
+    "ask": { "default": 1.2, "min": 0.9, "max": 2.0, "step": 0.05 },
+    "offer": {
+      "minInterest": 55,
+      "pPerQuarter": 0.25,
+      "cooldownWeeks": 52,
+      "maxOpen": 2,
+      "maxContracts": 4,
+      "unitsBase": 2,
+      "unitsPerInterest": 25,
+      "spanWeeks": [52, 156],
+      "priceBase": 0.95,
+      "pricePerInterest": 400,
+      "expiryWeeks": 6,
+      "counterMult": 1.15,
+      "counterBase": 50,
+      "counterSpan": 40,
+      "counterMin": 0.1,
+      "counterMax": 0.9
+    },
+    "propose": {
+      "base": 40,
+      "span": 50,
+      "min": 0.05,
+      "max": 0.95,
+      "pricePenalty": 0.8,
+      "maxUnits": 8,
+      "spanWeeks": 104,
+      "maxPriceMult": 2
+    },
+    "contract": {
+      "advance": 0.2,
+      "trustOk": 2,
+      "repEvery": 3,
+      "trustFail": -6,
+      "interestFail": -30,
+      "refundShare": 0.5,
+      "maxFailures": 2,
+      "keepYears": 3,
+      "buildCostShare": 0.5,
+      "trustSigned": 2
+    },
+    "production": {
+      "byClass": { "small": 10, "medium": 6, "heavy": 3, "superheavy": 1.5 },
+      "reusableMult": 1.5,
+      "horizonWeeks": 52,
+      "catalogDefault": 6
+    }
+  }
+}

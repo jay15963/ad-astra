@@ -149,6 +149,14 @@
     },
     "design": {
       "type": "object"
+    },
+    "gate": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z]+:[a-z0-9_.]+$"
+      },
+      "description": "chaves exigidas (substitui as regras de techtree.json; [] = livre)"
     }
   }
 }

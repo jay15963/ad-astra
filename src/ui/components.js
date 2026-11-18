@@ -99,9 +99,76 @@ export function esc(s) {
 // ---------------------------------------------------------------- labels (pt-BR)
 
 export const TYPE_LABELS = {
-  satellite: 'Satélite', probe: 'Sonda', crewed: 'Tripulada', cargo: 'Carga', station: 'Estação', lander: 'Pouso',
+  satellite: 'Satélite', probe: 'Sonda', rover: 'Rover', crewed: 'Tripulada', cargo: 'Carga', station: 'Estação',
+  // legacy alias (MISSIONS-V2 §1.1): old "Pouso" missions are probes with sub 'lander'
+  lander: 'Sonda',
+  colony: 'Colônia', mining: 'Mineração', interstellar: 'Interestelar',
 };
-export const TYPE_ICONS = { satellite: '🛰️', probe: '🔭', crewed: '👩‍🚀', cargo: '📦', station: '🏗️', lander: '🌘' };
+export const TYPE_ICONS = { satellite: '🛰️', probe: '🔭', rover: '🚙', crewed: '👩‍🚀', cargo: '📦', station: '🏗️', lander: '🌘', colony: '🏘️', mining: '⛏️', interstellar: '✨' };
+
+/** Mission type of a stored/raw type: the legacy 'lander' is a probe (MISSIONS-V2 §1.1). */
+export function missionTypeOf(type) {
+  return type === 'lander' ? 'probe' : (type || null);
+}
+
+/** Subtype labels by type (MISSIONS-V2 §1.2; ids frozen). */
+export const SUB_LABELS = {
+  satellite: {
+    science: 'Científico', weather: 'Meteorológico', navigation: 'Navegação', comms: 'Comunicações', earth_obs: 'Observação da Terra',
+    observatory: 'Observatório espacial', deep_observatory: 'Observatório profundo em L2', relay: 'Retransmissor lunar/planetário',
+    constellation: 'Megaconstelação', power: 'Energia solar orbital', gravity_lens: 'Telescópio de lente solar',
+    interstellar_relay: 'Retransmissor interestelar', power_swarm: 'Segmento de enxame solar',
+  },
+  probe: {
+    flyby: 'Sobrevoo', orbiter: 'Orbitador', impactor: 'Impactador', lander: 'Pouso de sonda', atmospheric: 'Sonda atmosférica',
+    sample_return: 'Retorno de amostras', small_body: 'Asteroides e cometas', interstellar_precursor: 'Precursora interestelar',
+    interstellar: 'Sonda interestelar', beamed_sail: 'Vela a laser',
+  },
+  rover: {
+    light: 'Rover leve', micro: 'Microrrover', medium: 'Rover médio', heavy: 'Rover pesado', rotorcraft: 'Helicóptero/aeronave',
+    swarm: 'Enxame de microrrovers', cryobot: 'Criorrobô de gelo', submarine: 'Submarino de mares alienígenas',
+  },
+  crewed: {
+    orbital: 'Voo orbital', rotation: 'Rodízio de tripulação', flyby: 'Sobrevoo', landing: 'Pouso tripulado',
+    servicing: 'Manutenção em órbita', tourism: 'Turismo espacial',
+  },
+  cargo: {
+    supply: 'Suprimentos/manutenção', experiments: 'Experimentos científicos', base_module: 'Módulo de base',
+    base_vehicle: 'Veículo de superfície', propellant: 'Propelente para depósito', servicing: 'Kit de reparo de observatório',
+    client: 'Carga de cliente',
+  },
+  station: { found: 'Nova estação', expand: 'Ampliar estação' },
+};
+/** Year each subtype becomes historically possible (fallback lock text when the sim gives none; §1.2). */
+export const SUB_YEARS = {
+  satellite: { science: 1958, weather: 1960, navigation: 1960, comms: 1962, earth_obs: 1972, observatory: 1968, deep_observatory: 2021, relay: 2018, constellation: 2019, power: 2045, gravity_lens: 2200, interstellar_relay: 2350, power_swarm: 2650 },
+  probe: { flyby: 1959, orbiter: 1959, impactor: 1959, lander: 1966, atmospheric: 1967, sample_return: 1970, small_body: 1996, interstellar_precursor: 2080, interstellar: 2250, beamed_sail: 2300 },
+  rover: { light: 1970, micro: 1997, medium: 2004, heavy: 2012, rotorcraft: 2021, swarm: 2070, cryobot: 2120, submarine: 2150 },
+  crewed: { orbital: 1961, rotation: 1971, flyby: 1968, landing: 1969, servicing: 1984, tourism: 2001 },
+  cargo: { supply: 1978, experiments: 1978, base_module: 2028, base_vehicle: 2028, propellant: 2035, servicing: 2030, client: 1965 },
+  station: { found: 1971, expand: 1971 },
+};
+/** "Sonda · Pouso de sonda" style label of a mission's type and subtype (legacy 'lander' handled). */
+export function typeSubLabel(type, sub = null) {
+  const t = missionTypeOf(type);
+  const s = sub || (type === 'lander' ? 'lander' : null);
+  const sl = s ? SUB_LABELS[t]?.[s] : null;
+  return [TYPE_LABELS[t] || t || '', sl].filter(Boolean).join(' · ');
+}
+/** Payload kinds of cargo/station missions (MISSIONS-V2 §1.4). */
+export const PAYLOAD_LABELS = {
+  supply: 'Suprimentos', experiments: 'Experimentos', station_module: 'Módulo de estação', base_module: 'Módulo de base',
+  base_vehicle: 'Veículos de superfície', propellant: 'Propelente', servicing: 'Kit de reparo', client: 'Carga do cliente',
+};
+export const ASSET_KIND_LABELS = { station: 'Estação', base: 'Base', satellite: 'Satélites', rover: 'Rover' };
+export const ASSET_STATUS_LABELS = { active: 'Ativa', degraded: 'Degradada', derelict: 'Abandonada', ended: 'Encerrada' };
+/** Unlock kinds of the tech tree (MISSIONS-V2 §5.6): legend label + stroke glyph (an ICONS name). */
+export const UNLOCK_KINDS = {
+  vehicle: { label: 'Foguete', glyph: 'foguete' }, spacecraft: { label: 'Nave', glyph: 'capsula' },
+  satellite: { label: 'Satélite', glyph: 'satelite' }, probe: { label: 'Sonda', glyph: 'sonda' },
+  rover: { label: 'Rover e veículos', glyph: 'rodas' }, module: { label: 'Módulo de estação ou base', glyph: 'modulo' },
+  missionType: { label: 'Tipo de missão', glyph: 'alvo' }, part: { label: 'Peça do Hangar', glyph: 'chave' },
+};
 export const STATUS_LABELS = {
   planning: 'Em planejamento', scheduled: 'Agendada', launch: 'No pátio', transit: 'Em trânsito', arrival: 'Chegando',
   operations: 'Em operação', done: 'Concluída', cancelled: 'Cancelada',
@@ -117,11 +184,17 @@ export const EFFECT_LABELS = {
   reliability: 'Confiabilidade', launchCost: 'Custo de lançamento', payload: 'Carga útil', chanceBand: 'Precisão da estimativa',
   commandPoints: 'Pontos de Comando', sciencePerMission: 'Ciência por missão', landingReliability: 'Confiabilidade de pouso',
   crewSafety: 'Segurança da tripulação', delayReduction: 'Redução de atrasos',
+  // Missões v2 (§4.6): techtree.json.effectLabels is the tree's source; these are the UI fallback
+  lifetime: 'Vida útil', maintenance: 'Manutenção', stationScience: 'Ciência das estações', baseScience: 'Ciência das bases',
+  roverScience: 'Ciência dos rovers', observatoryScience: 'Ciência dos observatórios', satRevenue: 'Receita de satélites',
+  dockingReliability: 'Confiabilidade de acoplagem', moduleMass: 'Massa dos módulos', isru: 'Recursos locais',
+  transitTime: 'Tempo de viagem', devTime: 'Tempo de desenvolvimento', production: 'Cadência de produção', marketInterest: 'Interesse do mercado',
 };
 export const PROPOSAL_LABELS = {
   mission_partnership: 'Parceria de missão', cost_sharing: 'Divisão de custos', crew_exchange: 'Troca de tripulantes',
   tech_transfer: 'Transferência de tecnologia', peaceful_use: 'Tratado de uso pacífico', lunar_resources: 'Recursos lunares',
   orbital_traffic: 'Tráfego orbital', join_bloc: 'Adesão a bloco',
+  launch_services: 'Contrato de lançamento', station_partnership: 'Parceria de estação',
 };
 
 // "Os Primeiros" — fixed milestone vocabulary from ARCHITECTURE.md
@@ -185,6 +258,15 @@ export const ICONS = {
   vela: '<path d="M9 10.5h6v10H9z"/><path d="M12 10.5V8M12 3.5c1.6 1.6 1.6 3.2 0 4.5-1.6-1.3-1.6-2.9 0-4.5zM6.5 20.5h11"/>',
   acoes: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V12l6 6"/>',
   eco: '<path d="M3.5 12h2l2-5 3 10 3-14 3 12 2-3h2"/>',
+  // Missões v2 (§5.6 unlock-kind glyphs, Infraestrutura): same 24 grid, 1.8 stroke
+  foguete: '<path d="M12 2.8c2.9 1.9 4.4 5 4.4 8.9v4.8H7.6v-4.8c0-3.9 1.5-7 4.4-8.9z"/><circle cx="12" cy="9.8" r="1.7"/><path d="M7.6 12.8l-2.6 2.6v3.6l2.6-1.6M16.4 12.8l2.6 2.6v3.6l-2.6-1.6M10.2 19.4L12 21.2l1.8-1.8"/>',
+  capsula: '<path d="M9.2 4.5h5.6l3.7 12.5h-13z"/><path d="M5.5 17h13l-1.2 2.5H6.7zM10.5 8.5h3"/><circle cx="12" cy="12.3" r="1.6"/>',
+  satelite: '<rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" transform="rotate(45 12 12)"/><path d="M9.2 9.2L6.8 6.8M14.8 14.8l2.4 2.4M2.8 6.8l4-4 3 3-4 4zM21.2 17.2l-4 4-3-3 4-4z"/><path d="M15.6 5.6a3.4 3.4 0 0 1 2.8 2.8"/>',
+  sonda: '<circle cx="12" cy="9.5" r="3"/><path d="M12 12.5v5M8 21l4-3.5 4 3.5M3.5 9.5H9M15 9.5h5.5M12 2.8v3.7"/>',
+  rodas: '<path d="M3.5 14.5V10A1.5 1.5 0 0 1 5 8.5h9l3 3h2a1.5 1.5 0 0 1 1.5 1.5v1.5"/><circle cx="7" cy="17" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="M9.5 17h5M10 8.5V5.5h3"/>',
+  modulo: '<rect x="7" y="7.5" width="10" height="9" rx="2"/><path d="M3 12h4M17 12h4M12 3.5v4M12 16.5v4M10 12h4"/>',
+  estacao: '<rect x="10" y="8.5" width="4" height="7" rx="1"/><path d="M10 12H7.5M14 12h2.5"/><rect x="2.5" y="8.8" width="5" height="6.4" rx=".6"/><rect x="16.5" y="8.8" width="5" height="6.4" rx=".6"/><path d="M5 8.8v6.4M19 8.8v6.4M12 8.5V5.5M10.4 5.5h3.2M12 15.5v3"/>',
+  base: '<path d="M2.5 19.5h19"/><path d="M4.5 19.5V16a4 4 0 0 1 8 0v3.5M14.5 19.5v-6h5v6M17 13.5v-4M15.5 9.5h3"/>',
 };
 
 /** SVG markup string for a stroke icon. Unknown name -> empty svg (never throws). */

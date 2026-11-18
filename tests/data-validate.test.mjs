@@ -18,7 +18,7 @@ test('the repository data is valid (no errors)', () => {
   const e = errorsOf(r);
   assert.deepEqual(e, [], e.map((i) => `${i.path}: ${i.message}`).join('\n'));
   assert.ok(r.stats.entities > 400);
-  assert.ok(r.stats.bootBytes < 1.2 * 1024 * 1024, 'boot budget');
+  assert.ok(r.stats.bootBytes < 1.6 * 1024 * 1024, 'boot budget');
   assert.ok(r.density[1957] >= 1 && r.density[1961] >= 1, 'density counts the e1 seeds');
 });
 

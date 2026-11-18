@@ -13,7 +13,9 @@
   "history": "faithful",
   "lifecycle": "on",
   "ending": { "type": "end" },
-  "unlocks": { "builder": { "fromYear": 1957 }, "investors": { "fromYear": 1950 } },
+  "techGating": true,
+  "techStart": "historical",
+  "unlocks": { "market": { "fromYear": 1981 }, "builder": { "fromYear": 1957 }, "investors": { "fromYear": 1950 } },
   "historicalFirsts": {
     "first_satellite": { "holder": "URSS", "year": 1957, "mission": "Sputnik 1" },
     "first_crewed_orbit": { "holder": "URSS", "year": 1961, "mission": "Vostok 1" },

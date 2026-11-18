@@ -1,0 +1,13 @@
+{
+  "$id": "market.schema.json",
+  "description": "data/core/market.json (MISSIONS-V2 §8.3–8.4): números do mercado de foguetes.",
+  "type": "object",
+  "properties": {
+    "_doc": {
+      "type": "string"
+    },
+    "tuning": {
+      "type": "object"
+    }
+  }
+}

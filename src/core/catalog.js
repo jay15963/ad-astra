@@ -6,6 +6,7 @@
 // state.startYear (src/core/time.js).
 
 import { turnToDate } from './time.js';
+import { itemGate, techGated } from './gating.js';
 
 const asVehicle = (d) => d?.asVehicle ?? (d?.kind === 'vehicle' ? d : null);
 const asCraft = (d) => d?.asSpacecraft ?? d?.asCraft ?? (d?.kind === 'spacecraft' ? d : null);
@@ -84,16 +85,30 @@ function designList(state, actorId, pick) {
   return out;
 }
 
-/** Vehicles in the catalog at `turn` (default: now) plus the actor's designs, catalog order then designs. */
-export function listVehicles(data, state, { turn, actorId } = {}) {
+/**
+ * Research gate of a catalog entry (MISSIONS-V2 §5): {ok, key, nodeId, reason}. Only the player of a scenario with
+ * `techGating` is gated; player designs (built in the Hangar) are never gated here (their parts are, in designs.js).
+ */
+export function researchGateOf(data, state, kind, item, actorId = state?.playerId, opts = {}) {
+  if (!item || actorId !== state?.playerId || !techGated(state, data) || item.owner === actorId) return { ok: true, key: null, nodeId: null, reason: null };
+  return itemGate(state, data, kind, item, actorId, opts);
+}
+
+/**
+ * Vehicles in the catalog at `turn` (default: now) plus the actor's designs, catalog order then designs.
+ * `gated: true` also drops catalog entries the (gated) player has not researched yet.
+ */
+export function listVehicles(data, state, { turn, actorId, gated = false } = {}) {
   const t = turn ?? state?.turn ?? 0;
-  const catalog = (data?.vehicles?.vehicles || []).filter((v) => itemAvailable(data, state, v, t));
+  const catalog = (data?.vehicles?.vehicles || []).filter((v) => itemAvailable(data, state, v, t)
+    && (!gated || researchGateOf(data, state, 'vehicle', v, actorId).ok));
   return catalog.concat(designList(state, actorId, asVehicle).filter((v) => itemAvailable(data, state, v, t)));
 }
 
-/** Spacecraft in the catalog at `turn` (default: now) plus the actor's designs. */
-export function listSpacecraft(data, state, { turn, actorId } = {}) {
+/** Spacecraft in the catalog at `turn` (default: now) plus the actor's designs (`gated` as listVehicles). */
+export function listSpacecraft(data, state, { turn, actorId, gated = false } = {}) {
   const t = turn ?? state?.turn ?? 0;
-  const catalog = (data?.spacecraft?.spacecraft || []).filter((v) => itemAvailable(data, state, v, t));
+  const catalog = (data?.spacecraft?.spacecraft || []).filter((v) => itemAvailable(data, state, v, t)
+    && (!gated || researchGateOf(data, state, 'spacecraft', v, actorId).ok));
   return catalog.concat(designList(state, actorId, asCraft).filter((v) => itemAvailable(data, state, v, t)));
 }

@@ -115,10 +115,18 @@ function chuteFraming(rs) {
   return ends.length ? 1 - smooth((t - Math.min(...ends)) / 1.5) : 0;
 }
 
+/** Framing height (m) of a descent over a surface base: at least 6.5 m so every lander sees the base at one scale. */
+export function baseFrameHeightM(craftHeightM) {
+  return Math.max(6.5, num(craftHeightM, 4));
+}
+
 export function descentFrame(rs, craftHeightM) {
   const W = num(rs?.view?.W, 375), H = num(rs?.view?.H, 600);
   const altM = Math.max(0, num(rs?.tele?.altKm)) * 1000;
-  const hM = Math.max(1, num(craftHeightM, 4));
+  const tg = rs?.target;
+  const overBase = !!tg && (tg.sequence === 'surface' || tg.kind === 'base') && rs?.world !== 'earth';
+  // over a base a short / wide lander does not zoom the camera in: one scale for the base's habitats and roads
+  const hM = overBase ? baseFrameHeightM(craftHeightM) : Math.max(1, num(craftHeightM, 4));
   // under parachutes the camera pulls back and drops the craft lower so the canopies fit above it
   const k = chuteFraming(rs);
   const pxPerM = clamp((H * 0.2) / hM, 0.4, 60) * (1 - 0.68 * k);
@@ -132,6 +140,16 @@ export function descentFrame(rs, craftHeightM) {
   const groundY = craftY + dist;
   const horizonY = Math.min(groundY - H * 0.05, H * 0.62);
   const scrollX = num(rs?.clock) * 40 * clamp(altM / 2000, 0, 1);
+  // over a surface base (MISSIONS-V2 §7.3) the last ~3 km lock the ground: the pad sits in the foreground
+  // (≈ 0.66 H) from the start of the approach and the lander drops onto it, in the same world frame as touchdown
+  // (the terminal descent is time-compressed: the lander's height over the pad is shown on a log scale)
+  const b = overBase ? (1 - smooth((altM - 4500) / 2500)) * (1 - k) : 0;
+  if (b > 0) {
+    const gFix = H * 0.66, S = H * 0.4;
+    const cyB = landed ? gFix : gFix - S * clamp(Math.log10(1 + altM / 5) / Math.log10(1 + 4500 / 5), 0, 1);
+    const gy = groundY + (gFix - groundY) * b, cy = (landed ? groundY : craftY) + (cyB - (landed ? groundY : craftY)) * b;
+    return { pxPerM, craftX, craftY: cy, groundY: gy, horizonY: Math.min(gy - H * 0.05, H * 0.62), scrollX: scrollX * (1 - b), landedY: gy };
+  }
   return { pxPerM, craftX, craftY: landed ? groundY : craftY, groundY, horizonY, scrollX, landedY: groundY };
 }
 

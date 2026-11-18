@@ -18,7 +18,7 @@ import * as designs from '../src/sim/designs.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const E6_DIR = path.join(root, 'data/eras/e6');
-const E6_FILES = ['era', 'snapshot', 'lineages', 'lifecycle', 'vehicles', 'spacecraft', 'destinations', 'parts', 'calendar', 'tech', 'events', 'investors', 'crew'];
+const E6_FILES = ['era', 'snapshot', 'lineages', 'lifecycle', 'vehicles', 'spacecraft', 'destinations', 'parts', 'calendar', 'events', 'investors', 'crew'];
 const SCENARIO = 'scenarios/primeira_estrela.json';
 const readE6 = (f) => JSON.parse(fs.readFileSync(path.join(E6_DIR, `${f}.json`), 'utf8'));
 const vocab = JSON.parse(fs.readFileSync(path.join(root, 'data/core/vocab.json'), 'utf8'));
@@ -58,7 +58,7 @@ test('validator: the e6 pack and its scenario have no errors or warnings', () =>
   const mine = r.issues.filter((i) => i.pack === 'e6' || /eras\/e6|primeira_estrela/.test(i.path));
   assert.deepEqual(mine, [], mine.map((i) => `${i.level} ${i.path}: ${i.message}`).join('\n'));
   assert.ok(r.stats.packBytes.e6 < 350 * 1024, `pacote e6 ${r.stats.packBytes.e6} B (limite 350 KB)`);
-  assert.ok(r.stats.bootBytes < 1.2 * 1024 * 1024, 'boot budget');
+  assert.ok(r.stats.bootBytes < 1.6 * 1024 * 1024, 'boot budget');
 });
 
 test('every pack file parses and the era meta is the e6 window', () => {
@@ -189,14 +189,18 @@ test('vehicles: Hangar designs reproduce the catalog capacity (±10%) and parts 
   for (const p of readE6('parts').parts) assert.ok(vocab.partFamilies[p.family] || !p.family, p.id);
 });
 
-test('tech tier t6: every branch, internal requirements, era 6', async () => {
+test('tech tier t6: every branch, requirements of the same or an earlier tier, era 6', async () => {
   const data = await campaignData();
   const nodes = e6(data.tech.nodes.map((n) => ({ ...n, era: n.era === 6 ? 'e6' : n.era })));
   assert.ok(nodes.length >= 12);
-  const ids = new Set(nodes.map((n) => n.id));
   for (const n of nodes) {
     assert.equal(n.techTier, 't6');
-    for (const r of n.requires) assert.ok(ids.has(r), `${n.id} requer ${r}`);
+    // MISSIONS-V2 §4.4: requires only ids of the same or an earlier tier
+    for (const r of n.requires) {
+      const req = data.index.tech[r];
+      assert.ok(req, `${n.id} requer ${r}`);
+      assert.ok(Number(String(req.techTier || 't4').slice(1)) <= 6, `${n.id} requer ${r} (${req.techTier})`);
+    }
   }
   assert.deepEqual([...new Set(nodes.map((n) => n.branch))].sort(), Object.keys(vocab.techBranches).sort());
 });

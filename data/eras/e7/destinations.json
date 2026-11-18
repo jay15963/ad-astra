@@ -19,7 +19,7 @@
     { "id": "eridani_82_c_surface", "name": "Superfície de 82 Eridani c", "emLabel": "em 82 Eridani c", "toLabel": "a 82 Eridani c", "short": "82 Eri c",
       "body": "eridani_82_c", "kind": "surface", "capacityKey": "outer", "capacityFactor": 0.5,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "eridani_82_c_surface", "dv": 60012 }],
-      "transitWeeks": 4264, "window": null, "missionTypes": ["lander", "crewed", "cargo"], "risk": 0.14, "prestige": 75, "scienceMult": 4.2,
+      "transitWeeks": 4264, "window": null, "missionTypes": ["probe", "rover", "crewed", "cargo"], "risk": 0.14, "prestige": 75, "scienceMult": 4.2,
       "arrivalMilestones": [
         { "id": "braking", "label": "Frenagem e captura", "pFail": 0.04, "anomalyBand": 0.08,
           "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
@@ -52,7 +52,7 @@
     { "id": "gliese_667c_c_surface", "name": "Superfície de Gliese 667 Cc", "emLabel": "em Gliese 667 Cc", "toLabel": "a Gliese 667 Cc", "short": "667 Cc",
       "body": "gliese_667c_c", "kind": "surface", "capacityKey": "outer", "capacityFactor": 0.5,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 60000 }, { "from": "cruzeiro_relativistico", "to": "gliese_667c_c_surface", "dv": 60012 }],
-      "transitWeeks": 5148, "window": null, "missionTypes": ["lander", "crewed", "cargo"], "risk": 0.15, "prestige": 78, "scienceMult": 4.4,
+      "transitWeeks": 5148, "window": null, "missionTypes": ["probe", "rover", "crewed", "cargo"], "risk": 0.15, "prestige": 78, "scienceMult": 4.4,
       "arrivalMilestones": [
         { "id": "braking", "label": "Frenagem e captura", "pFail": 0.04, "anomalyBand": 0.08,
           "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },
@@ -96,7 +96,7 @@
     { "id": "trappist_1e_surface", "name": "Superfície de TRAPPIST-1 e", "emLabel": "em TRAPPIST-1 e", "toLabel": "a TRAPPIST-1 e", "short": "Trappist-1e",
       "body": "trappist_1e", "kind": "surface", "capacityKey": "outer", "capacityFactor": 0.5,
       "route": [{ "from": "earth", "to": "leo", "dv": 9.4 }, { "from": "leo", "to": "cruzeiro_relativistico", "dv": 75000 }, { "from": "cruzeiro_relativistico", "to": "trappist_1e_surface", "dv": 75008 }],
-      "transitWeeks": 8632, "window": null, "missionTypes": ["lander", "crewed", "cargo"], "risk": 0.14, "prestige": 80, "scienceMult": 4.5,
+      "transitWeeks": 8632, "window": null, "missionTypes": ["probe", "rover", "crewed", "cargo"], "risk": 0.14, "prestige": 80, "scienceMult": 4.5,
       "arrivalMilestones": [
         { "id": "braking", "label": "Frenagem e captura", "pFail": 0.04, "anomalyBand": 0.08,
           "failureWeights": { "propulsion": 0.5, "structure": 0.2, "software": 0.2, "human": 0, "environment": 0.1 },

@@ -207,6 +207,16 @@
       "base": -2, "budgetWeight": 6, "cultureWeight": 0, "breakReputation": 7, "multilateral": false
     },
     {
+      "id": "launch_services", "name": "Contrato de lançamento", "icon": "🚀", "treatyName": "Contrato de lançamento",
+      "description": "Um operador vende lançamentos dos seus foguetes ao parceiro por 3 anos.", "durationWeeks": 156, "allowCompanies": true,
+      "base": 6, "budgetWeight": 0, "cultureWeight": 0, "breakReputation": 5, "multilateral": false
+    },
+    {
+      "id": "station_partnership", "name": "Parceria de estação", "icon": "🛰️", "treatyName": "Parceria de estação",
+      "description": "O parceiro ajuda a montar e abastecer a estação e divide a ciência dela.", "durationWeeks": 520, "allowCompanies": true,
+      "base": 4, "budgetWeight": 0, "cultureWeight": 4, "breakReputation": 8, "multilateral": false
+    },
+    {
       "id": "peaceful_use", "name": "Uso pacífico", "icon": "🕊️", "treatyName": "Pacto de uso pacífico",
       "description": "Compromisso de não militarizar a órbita e a Lua.", "durationWeeks": null, "allowCompanies": false,
       "base": 4, "budgetWeight": 0, "cultureWeight": -10, "breakReputation": 15, "multilateral": true
@@ -297,6 +307,8 @@
       "cost_sharing": ["{a} e {b} vão dividir custos de missões conjuntas ({share} de desconto).", "Orçamento curto aproxima {a} e {b}: custos divididos."],
       "crew_exchange": ["{a} e {b} acertam troca de tripulantes ({seats} vaga(s) por ano).", "Astronautas de {b} poderão voar com {a}, e vice-versa."],
       "tech_transfer": ["{giver} vai transferir tecnologia para {receiver}.", "Acordo técnico: {receiver} recebe know-how de {giver}."],
+      "launch_services": ["Contrato de lançamento: {buyer} compra voos de {seller} ({vehicles}).", "{seller} vai lançar para {buyer}: contrato de três anos."],
+      "station_partnership": ["{a} e {b} assinam parceria na estação {asset}.", "{asset} ganha um parceiro: {a} e {b} vão dividir a estação."],
       "peaceful_use": ["{a} e {b} firmam pacto de uso pacífico do espaço."],
       "lunar_resources": ["{a} e {b} acertam regras para recursos lunares."],
       "orbital_traffic": ["{a} e {b} assinam acordo de tráfego orbital."]

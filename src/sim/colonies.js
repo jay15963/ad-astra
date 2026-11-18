@@ -298,7 +298,11 @@ export function foundCost(state, data, actorId, site) {
   return Math.round(scaled(state, data, actorId, site?.costM) * mult);
 }
 
-/** Why `actorId` cannot found at `siteId` now (pt-BR), or null. Cost/weeks in `out`. */
+/**
+ * Why `actorId` cannot found at `siteId` now (pt-BR), or null. Cost/weeks in `out`. With `out.adopt` (infra.js
+ * adopting a base built module by module, MISSIONS-V2 §3.7) there is no convoy: cost, travel and the player's survey
+ * do not apply (the base itself is the survey).
+ */
 export function foundCheck(state, data, actorId, siteId, out = {}) {
   const C = cfg(data);
   if (!C || !isActive(data)) return 'Esta partida não tem colônias.';
@@ -312,14 +316,82 @@ export function foundCheck(state, data, actorId, siteId, out = {}) {
   if (year < unlockYear(data)) return `Colônias só a partir de ${unlockYear(data)}.`;
   if (!siteOpen(site, year)) return `${site.name} só fica ao alcance a partir de ${site.fromYear}.`;
   if (isStellar(site) && year < C.tuning.ship.minYearInterstellar) return `Naves-semente só a partir de ${C.tuning.ship.minYearInterstellar}.`;
-  if (!siteKnown(state, data, site, actorId, year)) return isStellar(site) ? 'Mande antes uma sonda de reconhecimento para essa estrela.' : 'Local ainda não reconhecido.';
+  const adopt = out.adopt === true;
+  if (!adopt && !siteKnown(state, data, site, actorId, year)) return isStellar(site) ? 'Mande antes uma sonda de reconhecimento para essa estrela.' : 'Local ainda não reconhecido.';
   if (s.list.some((c) => c.siteId === siteId && c.ownerId === actorId && SETTLED.has(c.status)) || s.transit.some((t) => t.siteId === siteId && t.ownerId === actorId)) return 'Você já tem uma colônia ali.';
   if (settledAt(s, siteId) >= C.tuning.caps.perSite) return 'Já há colônias demais nesse local.';
   const cap = actorId === state.playerId ? C.tuning.caps.player : C.tuning.caps.aiPerActor;
   if (ownedBy(s, actorId) >= cap) return `Limite de ${cap} colônias ao mesmo tempo.`;
+  if (adopt) return null;
   if (out.arriveTurn >= finalTurnOf(state)) return 'A nave chegaria depois do fim da campanha.';
   if (!budget.canAfford(state, actorId, out.costM)) return `Caixa insuficiente: a fundação custa ${budget.fmtMoney(out.costM)}.`;
   return null;
+}
+
+/**
+ * A base built module by module becomes a colony (MISSIONS-V2 §3.7, called by src/sim/infra.js): no convoy, the
+ * colony is founded at once with the base's stage, crew and infrastructure levels, and linked to the asset
+ * (colony.assetId ↔ asset.colonyId). info = {siteId, stage, crew, levels: {vida, energia, alimento, moradia}, name,
+ * ownerId}. Returns {ok, colonyId} or {ok: false, error}.
+ */
+export function adoptBase(state, data, assetId, info = {}) {
+  const C = cfg(data);
+  if (!C || !isActive(data)) return { ok: false, error: 'Esta partida não tem colônias.' };
+  const asset = (state.assets?.list || []).find((a) => a.id === assetId) || null;
+  const site = C.siteById[info.siteId] || C.sites.find((x) => x.destination === asset?.site) || null;
+  const ownerId = info.ownerId || asset?.ownerId;
+  if (!site || !ownerId || !owner(state, ownerId)) return { ok: false, error: 'Local desconhecido.' };
+  if (asset?.colonyId) return { ok: true, colonyId: asset.colonyId };
+  const why = foundCheck(state, data, ownerId, site.id, { adopt: true });
+  if (why) return { ok: false, error: why };
+  const T = C.tuning;
+  const s = slice(state);
+  s.seq += 1;
+  const stage = clamp(Math.round(Number(info.stage) || 2), 2, 3);
+  const max = T.infra.max;
+  const lv = info.levels || {};
+  const c = {
+    id: `col_${s.seq}`, name: String(info.name || asset?.name || colonyName(state, data, site, ownerId)).slice(0, 32), siteId: site.id, kind: STAGE_KIND(stage),
+    bodyId: site.mapBody || null, starId: site.starId || null, ownerId, founderId: ownerId, stage, status: 'active',
+    population: Math.max(4, Math.floor(Number(info.crew) || 0)), foundedTurn: state.turn, stageTurn: state.turn,
+    infra: Object.fromEntries(NEEDS.map((k) => [k, clamp(Math.floor(Number(lv[k]) || 0), 0, max)])), shock: {},
+    reserve: T.route.startReserve, route: 1, tax: 'leve', charter: false,
+    opinion: T.opinion.start, welfare: 0, autonomy: 0, needs: {}, pending: [], project: null, done: [], card: null,
+    indep: { resisted: 0, cooldownTurn: null }, govId: null, opBonus: 0, routeMult: 1, exportMult: 1, prestigeYear: 0,
+    assetId: assetId || null,
+  };
+  refresh(data, c);
+  s.list.push(c);
+  s.stats.founded += 1;
+  if (ownerId === state.playerId && s.surveys[site.id] == null) s.surveys[site.id] = state.turn;
+  if (asset) asset.colonyId = c.id;
+  const vars = { owner: ownerName(state, ownerId), site: site.name, place: site.place, ...preps(site), name: c.name };
+  news(state, data, 'founded', vars, { importance: ownerId === state.playerId ? 3 : 1, actors: [ownerId], icon: '🏠' });
+  changeActor(state, ownerId, 'prestige', 2);
+  stageMilestones(state, data, c);
+  updateMaxStage(state);
+  emitSignal(state, 'colony/founded', { colonyId: c.id, siteId: site.id, actorId: ownerId, stage, assetId: assetId || null, adopted: true });
+  return { ok: true, colonyId: c.id };
+}
+
+/** A base module delivered to an adopted base raises one infrastructure need (same effect as invest, no cash). */
+export function addInfra(state, data, colonyId, need, levels = 1) {
+  const C = cfg(data);
+  const c = colonyById(state, colonyId);
+  if (!C || !c || c.status !== 'active' || !NEEDS.includes(need)) return false;
+  c.infra[need] = clamp((c.infra?.[need] || 0) + Math.max(0, Math.round(Number(levels) || 0)), 0, C.tuning.infra.max);
+  refresh(data, c);
+  return true;
+}
+
+/** A shock to one need of a colony (infra.js: the base ran out of supply). */
+export function applyShock(state, data, colonyId, need, delta) {
+  const c = colonyById(state, colonyId);
+  if (!cfg(data) || !c || !NEEDS.includes(need)) return false;
+  c.shock = c.shock || {};
+  c.shock[need] = clamp((c.shock[need] || 0) + (Number(delta) || 0), -80, 40);
+  refresh(data, c);
+  return true;
 }
 
 /** Send the founding convoy (or seed ship). Pays the cost. */

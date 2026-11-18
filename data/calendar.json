@@ -187,7 +187,7 @@
       "partners": [
         "nasa"
       ],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "new_glenn",
       "spacecraftId": "blue_moon_mk1",
@@ -335,7 +335,7 @@
       "owner": "nasa",
       "partners": [],
       "client": "Intuitive Machines",
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_surface",
       "vehicleId": "falcon9",
       "spacecraftId": "nova_c",
@@ -397,7 +397,7 @@
       "owner": "nasa",
       "partners": [],
       "client": "Astrobotic",
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "falconheavy",
       "spacecraftId": "griffin",
@@ -427,7 +427,7 @@
       "partners": [
         "roscosmos"
       ],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "long_march_5",
       "spacecraftId": "change7",
@@ -556,7 +556,7 @@
         "esa"
       ],
       "client": "Firefly",
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_surface",
       "vehicleId": "falcon9",
       "spacecraftId": "blue_ghost",
@@ -676,7 +676,7 @@
       "owner": "nasa",
       "partners": [],
       "client": "Intuitive Machines",
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "falcon9",
       "spacecraftId": "nova_c",
@@ -914,7 +914,7 @@
       "partners": [
         "blueorigin"
       ],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "new_glenn",
       "spacecraftId": "blue_moon_mk1",
@@ -946,7 +946,7 @@
       "partners": [
         "nasa"
       ],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "starship",
       "spacecraftId": "starship_hls",
@@ -1005,7 +1005,7 @@
       "name": "Chandrayaan-4",
       "owner": "isro",
       "partners": [],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_surface",
       "vehicleId": "lvm3",
       "spacecraftId": "chandrayaan4",
@@ -1106,7 +1106,7 @@
       "partners": [
         "nasa"
       ],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "new_glenn",
       "spacecraftId": "blue_moon_mk2",
@@ -1197,7 +1197,7 @@
       "partners": [
         "cnsa"
       ],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "angara_a5",
       "spacecraftId": "luna_lander",
@@ -1229,7 +1229,7 @@
       "partners": [
         "isro"
       ],
-      "type": "lander",
+      "type": "rover", "sub": "medium",
       "destination": "lunar_south_pole",
       "vehicleId": "h3",
       "spacecraftId": "lupex",
@@ -1259,7 +1259,7 @@
       "partners": [
         "roscosmos"
       ],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_south_pole",
       "vehicleId": "long_march_5",
       "spacecraftId": "change8",
@@ -1291,7 +1291,7 @@
       "partners": [
         "nasa"
       ],
-      "type": "lander",
+      "type": "rover", "sub": "medium",
       "destination": "mars_surface",
       "vehicleId": "falconheavy",
       "spacecraftId": "rosalind_franklin",
@@ -1320,7 +1320,7 @@
       "name": "Tianwen-3",
       "owner": "cnsa",
       "partners": [],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "mars_surface",
       "vehicleId": "long_march_5",
       "spacecraftId": "tianwen3",
@@ -1515,7 +1515,7 @@
       "name": "Ensaio lunar Mengzhou-Lanyue",
       "owner": "cnsa",
       "partners": [],
-      "type": "lander",
+      "type": "probe", "sub": "lander",
       "destination": "lunar_surface",
       "vehicleId": "long_march_10",
       "spacecraftId": "lanyue",

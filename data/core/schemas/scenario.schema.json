@@ -135,7 +135,15 @@
       }
     },
     "unlocks": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "fromYear": {
+            "type": "integer"
+          }
+        }
+      }
     },
     "historicalFirsts": {
       "anyOf": [
@@ -146,6 +154,17 @@
           "type": "object"
         }
       ]
+    },
+    "techGating": {
+      "type": "boolean",
+      "description": "chaves da árvore travam o catálogo do jogador (MISSIONS-V2 §0.5)"
+    },
+    "techStart": {
+      "enum": [
+        "historical",
+        "none"
+      ],
+      "description": "historical: o jogo novo concede os nós de liberação anteriores ao ano de início (§5.5)"
     }
   }
 }

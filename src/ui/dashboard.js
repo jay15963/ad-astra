@@ -3,8 +3,9 @@
 import {
   h, raw, iconSVG, chip, bar, trend, countUp, sparkline, sectionTitle, emptyState, safePanel, openModal, icon, linkButton, viewHead,
   fmtMoney, fmtMoneyDelta, fmtIn, fmtMonth, fmtBand, fmtDate, attempt, TYPE_ICONS, TRUTH_LABELS, STATUS_LABELS, FIRST_LABELS,
-  TYPE_LABELS, eraInfo,
+  TYPE_LABELS, eraInfo, typeSubLabel, missionTypeOf,
 } from './components.js';
+import { assetViews, assetsNeedingSupply } from './missions-tab.js';
 import { emblemSVG } from './portrait.js';
 import { listVehicles, listSpacecraft } from '../core/catalog.js';
 import { sortDecisions, decisionRow, listRow, ensurePainelCss } from './decisions.js';
@@ -194,7 +195,8 @@ function usableDestinations(store) {
     if (d.untilYear != null && year > d.untilYear) return false;
     const cap = Math.max(0, ...vs.map((v) => Number(v.capacity?.[d.capacityKey] || 0) * (d.capacityFactor || 1)));
     if (!(cap > 0)) return false;
-    const want = d.kind === 'surface' ? ['lander'] : ['probe', 'satellite'];
+    // MISSIONS-V2 §1.1: a probe on a surface is the landing (spacecraft kind 'lander'); rovers land too
+    const want = d.kind === 'surface' ? ['lander', 'rover'] : ['probe', 'satellite'];
     return scs.some((s) => (s.destinations?.length ? s.destinations.includes(d.id) : want.includes(s.kind)) && (Number(s.massT) || 0) <= cap);
   };
 }
@@ -281,15 +283,23 @@ function decisionQueue(store) {
   const list = sortDecisions(store.state.decisions || []);
   const blocking = list.some((d) => d.blocking);
   const noHw = missionsWithoutVehicle(store.state);
-  const total = list.length + noHw.length;
+  const lowSupply = attempt(() => assetsNeedingSupply(assetViews(store)), []);
+  const total = list.length + noHw.length + lowSupply.length;
   const hwRows = noHw.map((m) => listRow({
     cls: 'falta-veiculo-row', lead: icon('missoes', 18), leadCls: 'lead-accent', title: m.name || 'Missão',
-    sub: `${TYPE_LABELS[m.type] || m.type || ''} · ${store.data?.index?.destinations?.[m.destination]?.name || m.destination || ''}`,
+    sub: `${typeSubLabel(m.type, m.sub) || m.type || ''} · ${store.data?.index?.destinations?.[m.destination]?.name || m.destination || ''}`,
     right: chip('falta o veículo', 'warn'), onClick: () => store.ui?.navigate?.('missoes', `m/${m.id}`),
+  }));
+  // MISSIONS-V2 §11: stations/bases of the player running out of supply (or derelict) ask for a cargo mission
+  const supplyRows = lowSupply.map((a) => listRow({
+    cls: 'infra-alert-row', lead: icon(a.kind === 'base' ? 'base' : 'estacao', 18), leadCls: 'lead-accent', title: a.name,
+    sub: a.status === 'derelict' ? `${a.siteName} · abandonada: precisa de resgate` : `${a.siteName} · suprimentos para ${Math.max(0, a.supplyWeeks)} semana${a.supplyWeeks === 1 ? '' : 's'}`,
+    right: chip(a.status === 'derelict' ? 'abandonada' : 'suprimentos', a.status === 'derelict' ? 'bad' : 'warn'),
+    onClick: () => store.ui?.navigate?.('infra', `a/${a.id}`),
   }));
   return h('section', { class: 'queue pn-block' },
     sectionTitle('Precisa de você', total ? h('span', { class: ['badge', blocking && 'badge-bad'], 'aria-label': `${total} pendentes` }, String(total)) : null),
-    total ? h('div', { class: 'decision-list' }, list.slice(0, 8).map((d) => decisionRow(store, d)), hwRows)
+    total ? h('div', { class: 'decision-list' }, list.slice(0, 8).map((d) => decisionRow(store, d)), hwRows, supplyRows)
       : emptyState('Nada pendente. Avance o tempo ou monte uma missão.', 'caixa'),
     list.length > 8 ? h('p', { class: 'pn-more' }, `+${list.length - 8} na fila`) : null);
 }
@@ -307,7 +317,7 @@ function activeMissions(store, nav) {
       const frac = t && t.arriveTurn > t.departTurn ? Math.max(0, Math.min(1, (st.turn - t.departTurn) / (t.arriveTurn - t.departTurn))) : null;
       const dest = store.data?.index?.destinations?.[m.destination]?.name || m.destination;
       return listRow({
-        lead: TYPE_ICONS[m.type] || '🚀', title: m.name, sub: `${STATUS_LABELS[m.status] || m.status} · ${dest}`,
+        lead: TYPE_ICONS[missionTypeOf(m.type)] || TYPE_ICONS[m.type] || '🚀', title: m.name, sub: `${STATUS_LABELS[m.status] || m.status} · ${dest}`,
         meta: frac != null ? fmtIn(t.arriveTurn, st.turn) : null,
         extra: frac != null ? bar(frac * 100, { key: `transit.${m.id}` }) : null,
         onClick: () => nav('missoes', `m/${m.id}`),
