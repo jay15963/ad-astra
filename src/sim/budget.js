@@ -216,8 +216,14 @@ const PROGRAM_DEFAULTS = {
   reserveShare: 0.08,      // cash below this share of the yearly budget is never used for programs
   maxWeeklyShare: 0.25,    // at most this share of the spare cash goes to programs in one week
 };
+// merged once per data object (read-only: no caller writes into the tuning)
+const TUNING_CACHE = new WeakMap();
+const NO_TUNING = {};
 function programTuning(data) {
-  return { ...PROGRAM_DEFAULTS, ...(data?.actors?.finance?.programs || {}) };
+  const src = data?.actors?.finance?.programs || NO_TUNING;
+  let t = TUNING_CACHE.get(src);
+  if (!t) { t = { ...PROGRAM_DEFAULTS, ...src }; TUNING_CACHE.set(src, t); }
+  return t;
 }
 const costOf = (list, id) => (id && list?.[id]?.costM) || 0;
 
@@ -258,13 +264,23 @@ export function programLoad(state, data, actorId) {
   return { owedNow, upcoming };
 }
 
-function payPrograms(state, data, a) {
+// Long campaigns: what a launched program still owes two years after its flight is written off. Before, a 1957 bill
+// could stay open for centuries, and whether it did depended on the era packs in memory (the item leaves data.index
+// when its pack is unloaded), so a lazy-loading phone and an eager desktop disagreed.
+const WRITE_OFF_WEEKS = 104;
+function writtenOff(state, inst) {
+  if (!(Number.isFinite(state.endTurn) && state.endTurn > 520)) return false;
+  const flew = inst.launchTurn ?? inst.resolvedTurn ?? inst.currentTurn;
+  return Number.isFinite(flew) && state.turn - flew > WRITE_OFF_WEEKS;
+}
+
+function payPrograms(state, data, a, byOwner = null) {
   const tun = programTuning(data);
   const f = fin(state);
   let spare = Math.max(0, (a.cash || 0) - (a.budget || 0) * tun.reserveShare) * tun.maxWeeklyShare;
   const live = new Set();
   let paidNow = 0;
-  for (const inst of state.calendar || []) {
+  for (const inst of (byOwner ? byOwner.get(a.id) || [] : state.calendar || [])) {
     const item = data?.index?.calendar?.[inst.id];
     if (!item || item.owner !== a.id || inst.status === 'player') continue;
     const key = `${inst.id}#${inst.attempts || 0}`;
@@ -274,7 +290,7 @@ function payPrograms(state, data, a) {
     if (inst.status === 'planned') {
       const lead = (inst.currentTurn ?? inst.plannedTurn ?? 0) - (state.turn || 0);
       target = bill * clamp(1 - lead / tun.buildWeeks, 0, 1);
-    } else if (paid != null && paid < bill && inst.status !== 'cancelled') {
+    } else if (paid != null && paid < bill && inst.status !== 'cancelled' && !writtenOff(state, inst)) {
       target = bill; // launched with money still owed: the contractors still get paid
     } else continue;
     live.add(key);
@@ -293,11 +309,11 @@ function payPrograms(state, data, a) {
   return live;
 }
 
-function aiWeek(state, data, a) {
+function aiWeek(state, data, a, byOwner = null) {
   // 1) calendar programs are real bills; 2) the rest of the surplus goes into abstract programs/R&D, keeping the
   // reserve plus the discretionary fund the agency is saving for its own missions (calendar.js rivalOps) and the
   // next quarter of program bills
-  const live = payPrograms(state, data, a);
+  const live = payPrograms(state, data, a, byOwner);
   const tun = programTuning(data);
   const keepFund = Math.min(state.rivalOps?.fund?.[a.id] || 0, (a.budget || 0) * (tun.keepFundShare ?? 0.4));
   const reserve = (a.budget || 0) * 0.2 + keepFund;
@@ -351,12 +367,20 @@ export function tick(state, data, ctx) {
   // year rollover (politics already adjusted actor.budget earlier in this tick)
   if (state.turn > 0 && crossed(state, ctx, WEEKS, 0)) closeYear(state);
   const live = new Set();
+  // calendar instances by AI owner, in calendar order (payPrograms visited the whole calendar once per actor)
+  const byOwner = new Map();
+  for (const inst of state.calendar || []) {
+    const owner = data?.index?.calendar?.[inst.id]?.owner;
+    if (owner == null) continue;
+    const l = byOwner.get(owner);
+    if (l) l.push(inst); else byOwner.set(owner, [inst]);
+  }
   for (const a of Object.values(state.actors || {})) {
     if (!a || !a.id) continue;
     const budget = Math.max(0, a.budget || 0);
     earn(state, a.id, budget / WEEKS, 'grants', a.kind === 'company' ? 'Receita semanal' : 'Verba semanal');
     charge(state, a.id, (budget * clamp(a.fixedCostShare ?? DEFAULT_FIXED_SHARE, 0, 1)) / WEEKS, 'facilities', 'Custos fixos (folha e instalações)');
-    if (a.id !== state.playerId) for (const k of aiWeek(state, data, a)) live.add(k);
+    if (a.id !== state.playerId) for (const k of aiWeek(state, data, a, byOwner)) live.add(k);
   }
   // forget the bills of programs that flew, got cancelled or changed hands (keeps the slice small)
   const f = fin(state);

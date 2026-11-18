@@ -2,7 +2,9 @@
 // balance metrics (missions flown, successes, firsts, rank, cash, deaths, news, decisions) plus rival milestones.
 // Usage: node tools/sim-campaign.mjs [seeds=3] [actor=all] [--verbose] [--quiet]
 import { loadDataNode } from '../src/core/data.js';
-import { newGame, dispatch, query, serialize, deserialize } from '../src/core/engine.js';
+import * as engine from '../src/core/engine.js';
+import { phaseBMoves } from './bot-b.mjs';
+const { newGame, dispatch, query, serialize, deserialize } = engine;
 import { formatTurn } from '../src/core/time.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -214,8 +216,11 @@ function playLaunch(state, stats) {
 export function runCampaign(playerId, seed, { untilTurn = Infinity, onTurn = null } = {}) {
   let state = newGame(data, { seed, playerId });
   const stats = { decisions: 0, kinds: {}, custom: 0, scheduleErrors: {}, interventions: {}, results: {}, news: 0, cashByYear: [], lastNews: null };
+  const mem = {};
   let guard = 0;
   while (!state.gameOver && state.turn < untilTurn && guard++ < 4000) {
+    // Phase B (tools/bot-b.mjs): investor rounds keep autonomy, mandates get their missions, Hangar designs fly
+    phaseBMoves(state, data, engine, { schedule: true, ownMissions: false }, mem);
     for (let pass = 0; pass < 5 && state.decisions.length; pass++) {
       for (const d of state.decisions.slice()) {
         const c = choose(state, d);

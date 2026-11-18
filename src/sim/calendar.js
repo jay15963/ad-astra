@@ -160,7 +160,22 @@ function maxTensionOf(state, actorId) {
 }
 
 /** Sum of tech effects for an actor (player: research.unlocked; rivals: research.rivals[actor]). Mirrors research.techBonus. */
+// Read-only memo while opsOptions scores every destination for one actor (it reads the same reliabilities and tech
+// bonuses once per destination; nothing it calls writes them). null outside that scope.
+let OPS_MEMO = null;
+function memoized(state, kind, key, fn) {
+  if (OPS_MEMO?.state !== state) return fn();
+  const k = `${kind}|${key}`;
+  let v = OPS_MEMO.map.get(k);
+  if (v === undefined) { v = fn(); OPS_MEMO.map.set(k, v); }
+  return v;
+}
+
 export function techBonusFor(state, data, actorId, key) {
+  if (OPS_MEMO?.state === state) return memoized(state, 'tech', `${actorId}|${key}`, () => techBonusRaw(state, data, actorId, key));
+  return techBonusRaw(state, data, actorId, key);
+}
+function techBonusRaw(state, data, actorId, key) {
   const ids = actorId === state?.playerId ? state?.research?.unlocked : state?.research?.rivals?.[actorId];
   if (!Array.isArray(ids)) return 0;
   let s = 0;
@@ -204,6 +219,10 @@ const worse = (a, b) => ((LEVEL_RANK[b?.level] ?? 0) > (LEVEL_RANK[a?.level] ?? 
 
 /** Beta posterior from vehicleStats (seeded with real history) + estimated prior. */
 export function vehicleReliability(state, data, vehicleId) {
+  if (OPS_MEMO?.state === state) return memoized(state, 'veh', vehicleId, () => vehicleReliabilityRaw(state, data, vehicleId));
+  return vehicleReliabilityRaw(state, data, vehicleId);
+}
+function vehicleReliabilityRaw(state, data, vehicleId) {
   const v = vehicleById(data, vehicleId);
   const hf = v?.history?.flights || 0;
   const hx = v?.history?.failures || 0;
@@ -230,6 +249,10 @@ function betaSummary(a, b, extra = {}) {
 
 /** Spacecraft reliability: estimated prior + real history + in-game results (calendar and player missions). */
 export function spacecraftReliability(state, data, spacecraftId) {
+  if (OPS_MEMO?.state === state) return memoized(state, 'sc', spacecraftId, () => spacecraftReliabilityRaw(state, data, spacecraftId));
+  return spacecraftReliabilityRaw(state, data, spacecraftId);
+}
+function spacecraftReliabilityRaw(state, data, spacecraftId) {
   const s = spacecraftById(data, spacecraftId);
   const est = s?.estimatedReliability ?? 0.85;
   const k = 8;
@@ -656,10 +679,19 @@ function opsConfig(state, data, actorId, destId, vehicles, spacecraft) {
   const dest = destinationById(data, destId);
   if (!dest) return null;
   const kinds = dest.kind === 'surface' ? ['lander'] : dest.body === 'earth' ? ['satellite'] : ['probe'];
-  const scs = (spacecraft || availableSpacecraft(state, data, actorId))
-    .filter((s) => s.access === 'generic' && kinds.includes(s.kind) && (!s.destinations?.length || s.destinations.includes(destId)))
-    .sort((a, b) => (a.costM || 0) - (b.costM || 0));
-  const sc = scs[0];
+  let sc;
+  if (spacecraft && OPS_MEMO?.state === state) {
+    // generic craft of these kinds sorted by cost once per opsOptions call; the sort is stable, so the first one that
+    // serves this destination is exactly the head of the old filter-then-sort list
+    const byCost = memoized(state, 'scs', `${actorId}|${kinds[0]}`, () => spacecraft.filter((s) => s.access === 'generic' && kinds.includes(s.kind))
+      .sort((a, b) => (a.costM || 0) - (b.costM || 0)));
+    sc = byCost.find((s) => !s.destinations?.length || s.destinations.includes(destId));
+  } else {
+    const scs = (spacecraft || availableSpacecraft(state, data, actorId))
+      .filter((s) => s.access === 'generic' && kinds.includes(s.kind) && (!s.destinations?.length || s.destinations.includes(destId)))
+      .sort((a, b) => (a.costM || 0) - (b.costM || 0));
+    sc = scs[0];
+  }
   if (!sc) return null;
   let best = null;
   for (const v of vehicles || availableVehicles(state, data, actorId)) {
@@ -735,7 +767,12 @@ export function racePressure(state, data, actorId, tun = opsTuning(data)) {
 }
 
 /** Every target an AI could commit to now, with its expected value (prestige points) and a score. */
-export function opsOptions(state, data, actorId, { react = null, tun = opsTuning(data) } = {}) {
+export function opsOptions(state, data, actorId, opts = {}) {
+  if (OPS_MEMO) return opsOptionsRaw(state, data, actorId, opts);
+  OPS_MEMO = { state, map: new Map() };
+  try { return opsOptionsRaw(state, data, actorId, opts); } finally { OPS_MEMO = null; }
+}
+function opsOptionsRaw(state, data, actorId, { react = null, tun = opsTuning(data) } = {}) {
   const a = state.actors?.[actorId];
   if (!a) return [];
   const ops = opsSlice(state);
@@ -749,10 +786,11 @@ export function opsOptions(state, data, actorId, { react = null, tun = opsTuning
   const vehicles = availableVehicles(state, data, actorId);
   const spacecraft = availableSpacecraft(state, data, actorId); // once per actor, not once per destination
   const own = (state.calendar || []).map((c) => ({ c, item: calendarItem(data, c.id) })).filter((x) => x.item?.owner === actorId);
+  const pendingHere = new Set(ops.pending.filter((p) => p.actorId === actorId).map((p) => p.destination));
   const out = [];
   for (const dest of destinationsOf(data)) {
     if (dest.body === 'earth') continue; // Earth orbit is routine: no prestige worth a program of its own
-    if (ops.pending.some((p) => p.actorId === actorId && p.destination === dest.id)) continue;
+    if (pendingHere.has(dest.id)) continue;
     if ((tries[dest.id] || 0) >= tun.maxOpsPerDest + (goalDests.has(dest.id) ? 1 : 0)) continue; // no endless repeats of one site
     const cfg = opsConfig(state, data, actorId, dest.id, vehicles, spacecraft);
     if (!cfg || cfg.cost > a.budget * tun.maxCostShare) continue;
@@ -909,6 +947,14 @@ function rivalOps(state, data, ctx) {
   opsRace(state, data, ctx, tun);
   if (!crossed(state, ctx, OPS_PERIOD, 2) || state.turn < (tun.startTurn ?? 8)) return;
   const react = ops.react && ops.react.untilTurn > state.turn ? ops.react : null;
+  // one read-only memo for the whole pass: the actors' choices below move cash and the pending list, never the
+  // flight history, vehicle stats or research that the reliabilities and tech bonuses are computed from
+  const outer = OPS_MEMO;
+  if (!outer) OPS_MEMO = { state, map: new Map() };
+  try { rivalOpsPass(state, data, ctx, ops, tun, react); } finally { if (!outer) OPS_MEMO = null; }
+}
+
+function rivalOpsPass(state, data, ctx, ops, tun, react) {
   for (const id of liveActorIds(state, { tier: 'core' }).sort()) { // background (minor) actors fly no discretionary missions
     const a = state.actors[id];
     if (id === state.playerId || !a || !(a.budget > 0)) continue;

@@ -157,6 +157,101 @@ export function fmtMoney(m) {
   return `US$ ${Math.round(v)} mi`;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Phase B peers (EXPANSION.md §5.2, §6, §14 B5). investors.js (B2) and designs.js (B3) import this module for
+// createMandateMission / the test-flight API, so a static import back would be a cycle that breaks while either
+// file is missing. They are bound late instead: `bindPeers({ investors, designs })` (engine.js, after its imports,
+// or the peers themselves). Unbound peers are tolerated: every call below has a fallback or is optional, and the
+// 'mission/resolved' signal carries mandateId/holderId/designId for modules that prefer to listen.
+// ---------------------------------------------------------------------------------------------
+
+const peers = { investors: null, designs: null };
+/** Late binding of the Phase B modules. Pass only the ones that exist; null unbinds (tests). */
+export function bindPeers(p = {}) {
+  for (const k of Object.keys(peers)) if (k in p) peers[k] = p[k] || null;
+  return { ...peers };
+}
+const peerFn = (name, f) => (typeof peers[name]?.[f] === 'function' ? peers[name][f] : null);
+
+// --- player designs (B3, state.designs) as launch vehicles ---------------------------------------
+// A design flies through the same catalog as any rocket: its vehicle view is published into data.index.vehicles
+// (so calendar.capacityTo/vehicleReliability, risk.js and launch.js resolve it without knowing designs exist) and
+// operational designs join the player's vehicle list. Derived from state only: same state → same catalog.
+
+/** state.designs as a list, whatever the container (id map, array, {list}). */
+export function designList(state) {
+  const raw = state?.designs;
+  if (!raw || typeof raw !== 'object') return [];
+  const arr = Array.isArray(raw) ? raw : Array.isArray(raw.list) ? raw.list : Array.isArray(raw.items) ? raw.items
+    : Object.entries(raw).filter(([, d]) => d && typeof d === 'object' && !Array.isArray(d)).map(([id, d]) => (d.id ? d : { ...d, id }));
+  return arr.filter((d) => d && typeof d === 'object' && d.id);
+}
+export const designPhase = (d) => d?.program?.phase || (d?.operational ? 'operational' : null);
+export const isDesignId = (state, id) => !!id && designList(state).some((d) => d.id === id);
+
+/** Vehicle definition of a design (B3's own `asVehicle` first, else built from `derived`), or null. */
+export function designVehicle(state, d) {
+  if (!d) return null;
+  const own = d.asVehicle && typeof d.asVehicle === 'object' ? d.asVehicle : d.kind === 'vehicle' ? d : null;
+  const der = d.derived || {};
+  const capacity = own?.capacity || der.capacity;
+  if (!capacity || typeof capacity !== 'object') return null;
+  // B3's asVehicle is kept whole (launch-render reads its `design` geometry); the flags below gate it here instead of
+  // its `retired` (a design under test flies its own test flights, so it must resolve as an in-service rocket)
+  return {
+    ...(own || {}),
+    id: d.id, name: own?.name || d.name || d.id, operator: own?.operator || d.owner || state?.playerId || null, access: 'own',
+    capacity, costM: Number(own?.costM ?? der.costM) || 0,
+    estimatedReliability: Number.isFinite(own?.estimatedReliability) ? own.estimatedReliability : Number.isFinite(der.reliabilityPrior) ? der.reliabilityPrior : 0.85,
+    reusable: !!(own?.reusable ?? d.reusable), crewRated: !!own?.crewRated, heightM: own?.heightM ?? der.heightM ?? null, diaM: own?.diaM ?? der.diaM ?? null,
+    truthLayer: own?.truthLayer || 'jogador', retired: false, availableFrom: null, availableUntil: null,
+    playerDesign: true, designId: d.id, designPhase: designPhase(d), baseVehicleId: d.baseVehicleId || null,
+  };
+}
+
+/** Successful test flights of a design so far (B3 counts successes in `testOk`, attempts in `testFlights`). */
+export const testsPassed = (d) => Number(d?.program?.testOk ?? d?.program?.testFlights) || 0;
+/** True when designs.js (B3) manages the design (it writes `asVehicle`): its tick then counts our test missions. */
+const managedByB3 = (d) => !!d?.asVehicle;
+
+/** Player-owned designs that resolve to a vehicle: [{design, def}]. */
+function playerDesignVehicles(state) {
+  const pid = state?.playerId;
+  const out = [];
+  for (const d of designList(state)) {
+    if (d.owner && d.owner !== pid) continue;
+    if (d.retired || d.archived) continue;
+    const def = designVehicle(state, d);
+    if (def) out.push({ design: d, def });
+  }
+  return out;
+}
+
+const INJECTED = new WeakMap(); // data.index.vehicles table -> Set of design ids this module put there
+
+/** Publish the player's design vehicles into data.index.vehicles (and drop the ones no longer in state). */
+export function syncDesignCatalog(state, data) {
+  const idx = data?.index;
+  if (!idx || typeof idx !== 'object') return;
+  const list = playerDesignVehicles(state);
+  let mine = idx.vehicles ? INJECTED.get(idx.vehicles) : null;
+  if (!list.length && !mine?.size) return;
+  const table = idx.vehicles || (idx.vehicles = {});
+  if (!mine) INJECTED.set(table, (mine = new Set()));
+  const want = new Set(list.map((x) => x.def.id));
+  for (const id of [...mine]) if (!want.has(id)) { delete table[id]; mine.delete(id); }
+  for (const { def } of list) {
+    if (table[def.id] && !mine.has(def.id)) continue; // a real catalog entry (or B3's own) wins
+    table[def.id] = def;
+    mine.add(def.id);
+  }
+}
+
+/** Operational designs of the player: they join the vehicle list of every mission. */
+function operationalDesigns(state) {
+  return playerDesignVehicles(state).filter((x) => designPhase(x.design) === 'operational').map((x) => x.def);
+}
+
 // single catalog lookup (src/core/catalog.js): Phase B player designs resolve here without touching the callers
 const vehicleDef = (data, id, state) => catalogVehicle(data, id, state);
 const spacecraftDef = (data, id, state) => catalogCraft(data, id, state);
@@ -221,8 +316,10 @@ function availableByDate(state, item) {
 function vehiclesFor(state, data, actorId = state.playerId) {
   const f = fn(calendar, 'availableVehicles');
   const r = f ? f(state, data, actorId) : null;
-  if (Array.isArray(r)) return r;
-  return (data.vehicles?.vehicles || []).filter((v) => availableByDate(state, v));
+  const base = Array.isArray(r) ? r : (data.vehicles?.vehicles || []).filter((v) => availableByDate(state, v));
+  if (actorId !== state.playerId) return base;
+  const own = operationalDesigns(state).filter((v) => !base.some((x) => x.id === v.id));
+  return own.length ? base.concat(own) : base;
 }
 function spacecraftFor(state, data, actorId = state.playerId) {
   const f = fn(calendar, 'availableSpacecraft');
@@ -384,7 +481,7 @@ export function normalizeDraft(d = {}) {
       fuelMargin: clamp(Number.isFinite(cfg.fuelMargin) ? cfg.fuelMargin : 0.1, 0, 0.3),
       payloadT: Number.isFinite(cfg.payloadT) && cfg.payloadT > 0 ? cfg.payloadT : null,
     },
-    source: ['calendar', 'custom', 'contract', 'cert'].includes(d.source) ? d.source : 'custom',
+    source: ['calendar', 'custom', 'contract', 'cert', 'test'].includes(d.source) ? d.source : 'custom',
     calendarId: d.calendarId || null,
     contractId: d.contractId || null,
     clientPayload: !!d.clientPayload,
@@ -395,6 +492,10 @@ export function normalizeDraft(d = {}) {
     milestone: d.milestone || null,
     targetTurn: Number.isFinite(d.targetTurn) ? d.targetTurn : null,
     readyTurn: Number.isFinite(d.readyTurn) ? d.readyTurn : null,
+    // Phase B links (privileged: never from a public draft): investor mandate (B2), design under test (B3)
+    mandateId: d.mandateId || null,
+    holderId: d.holderId || null,
+    testDesignId: d.testDesignId || null,
   };
 }
 
@@ -552,7 +653,12 @@ function validate(state, data, d, opts = {}) {
   if (!d.vehicleId) errors.push('Escolha o veículo lançador.');
   else if (!v) errors.push('Veículo desconhecido.');
   else {
-    if (!vehiclesFor(state, data).some((x) => x.id === v.id)) errors.push(`${v.name} não está disponível para a agência agora.`);
+    // a design in its test campaign flies only its own test flights (the vehicle is the object of that mission)
+    const testing = !!d.testDesignId && d.testDesignId === v.id;
+    if (!testing && !vehiclesFor(state, data).some((x) => x.id === v.id)) {
+      const dz = designList(state).find((x) => x.id === v.id);
+      errors.push(dz && designPhase(dz) !== 'operational' ? `${v.name} ainda não terminou os voos de teste.` : `${v.name} não está disponível para a agência agora.`);
+    }
     if (d.crewed && !crewRatedV(state, data, v)) errors.push(`${v.name} não é certificado para voo tripulado.`);
     if (dest) {
       capacity = effectiveCapacity(state, data, v.id, dest.id, d.config.fuelMargin);
@@ -623,8 +729,11 @@ function validate(state, data, d, opts = {}) {
     warnings.push(`Chega só em ${fmtT(state, arriveLt)}, depois do fim de ${turnToDate(state.endTurn, state.startYear).year}: não pontua na Tabela da Era.`);
   }
   if (d.deadlineTurn != null) {
-    if (lt > d.deadlineTurn) warnings.push(`Depois do prazo do contrato (${fmtT(state, d.deadlineTurn)}): multa e receita menor.`);
-    else warnings.push(`Prazo do contrato: ${fmtT(state, d.deadlineTurn)}.`);
+    // investor mandates (B2) carry a deadline too: missing it costs the holder's mood and its penalty
+    const what = d.mandateId || d.holderId ? 'do mandato' : 'do contrato';
+    const cost2 = d.mandateId || d.holderId ? 'o investidor cobra a multa e perde a confiança' : 'multa e receita menor';
+    if (lt > d.deadlineTurn) warnings.push(`Depois do prazo ${what} (${fmtT(state, d.deadlineTurn)}): ${cost2}.`);
+    else warnings.push(`Prazo ${what}: ${fmtT(state, d.deadlineTurn)}.`);
   }
   return { errors: [...new Set(errors)], warnings: [...new Set(warnings)], payloadT, capacity, seats, cost, window, earliest, launchTurn: lt };
 }
@@ -691,6 +800,7 @@ export function riskModOf(state, m) {
 
 /** Recalculate mission.estimate via risk.missionRisk. Returns the estimate. */
 export function estimateFor(state, data, missionId) {
+  syncDesignCatalog(state, data);
   const m = missionById(state, missionId);
   if (!m) return null;
   m.estimate = estimateOf(riskFor(state, data, { ...m, riskMod: riskModOf(state, m) }, m.launchTurn ?? undefined));
@@ -754,6 +864,7 @@ function hardwareNames(data, d) {
  * Crewed drafts need a crew-rated rocket; the payload is the craft mass (or the client's payload).
  */
 export function costRange(state, data, draftIn = {}) {
+  syncDesignCatalog(state, data);
   const base = normalizeDraft({ ...draftIn, vehicleId: null, spacecraftId: null, secondarySpacecraftId: null });
   if (!base.type || !destDef(data, base.destination)) return { minM: null, maxM: null, options: 0 };
   const own = draftIn.spacecraftId || draftIn.suggestion?.spacecraftId || null;
@@ -860,6 +971,8 @@ function createMission(state, data, draft) {
     readyTurn: d.readyTurn,
     deadlineTurn: d.deadlineTurn,
     milestone: d.milestone,
+    ...(d.mandateId ? { mandateId: d.mandateId, holderId: d.holderId } : {}),
+    ...(d.testDesignId ? { testDesignId: d.testDesignId } : {}),
     clientPayload: d.clientPayload,
     grantM: d.grantM,
     grantShare: d.grantShare,
@@ -954,6 +1067,7 @@ function cancelMission(state, data, m, { reason = 'player', penalty = true } = {
   } else if (m.paid && penalty) changeActor(state, pid, 'support', -2);
   if (m.contractId) defaultContract(state, data, m.contractId, 'cancel');
   if (m.certVehicleId) fn(calendar, 'pauseCert')?.(state, m.certVehicleId, m.id);
+  if (m.mandateId || m.holderId) tellInvestors(state, data, m, { cancelled: true, reason, final: true, mandateId: m.mandateId || null, holderId: m.holderId || null });
   if (reason === 'player') {
     addNews(state, {
       headline: `${actorName(state, pid)} cancela ${m.name}`,
@@ -1007,6 +1121,13 @@ function updateMission(state, data, m, patch = {}) {
   if (m.certVehicleId) {
     if (('vehicleId' in patch && patch.vehicleId && patch.vehicleId !== m.certVehicleId) || patch.crewed || (patch.type && patch.type !== m.type) || (patch.destination && patch.destination !== m.destination)) {
       return { ok: false, error: 'O voo de demonstração da certificação tem foguete, destino e tipo fixos (sem tripulação).' };
+    }
+  }
+  // a builder test flight flies that design with ballast (EXPANSION.md §6): the vehicle is the object of the mission
+  if (m.testDesignId) {
+    if (('vehicleId' in patch && patch.vehicleId !== m.testDesignId) || ('spacecraftId' in patch && patch.spacecraftId) || patch.crewed
+      || (patch.type && patch.type !== m.type) || (patch.destination && patch.destination !== m.destination)) {
+      return { ok: false, error: 'O voo de teste leva lastro no próprio projeto: foguete, destino e tipo são fixos.' };
     }
   }
   const merged = {
@@ -1122,19 +1243,25 @@ function pushCalendarBriefing(state, data, inst, def, reach = null) {
   ];
   if (prereqs.length) lines.push(`Depende de: ${prereqs.map((c) => calDef(data, c.id)?.name || c.id).join(', ')} (ainda não concluída).`);
   if (reach?.lateArrival) lines.push(`Atenção: chega só em ${fmtT(state, reach.arriveTurn)}, depois do fim de ${turnToDate(state.endTurn, state.startYear).year}. Não pontua na Tabela da Era.`);
+  // Phase B (§5.2): under a cap table the program is the anchor holder's mandate, with a deadline
+  const pm = programMandate(state, inst, def);
+  if (pm) {
+    lines.unshift(`Mandato de ${pm.holderName}: prazo ${fmtT(state, pm.deadlineTurn)}.${pm.binding ? ' Com menos de 50% da agência, o conselho não aceita adiar nem cancelar.' : ''}`);
+  }
+  const lockNote = pm?.binding ? 'O conselho de acionistas exige o programa: você tem menos de 50% da agência.' : null;
   pushDecision(state, {
     kind: 'briefing',
-    title: `Briefing: ${def.name}`,
+    title: pm ? `Mandato: ${def.name}` : `Briefing: ${def.name}`,
     body: lines.join('\n'),
     portrait: { actorId: state.playerId },
     urgency: target - state.turn <= 6 ? 3 : 2,
     expiresTurn: Math.max(target, state.turn + 6),
     defaultChoice: 'accept',
-    payload: { kind: 'calendar', calendarId: inst.id, draft },
+    payload: { kind: 'calendar', calendarId: inst.id, draft, ...(pm ? { mandate: pm, holderId: pm.holderId } : {}) },
     choices: [
       { id: 'accept', label: ACCEPT_LABEL, preview: `A missão entra em planejamento e você escolhe o foguete e a nave. Sugestão dos engenheiros: ${hardwareNames(data, draft)}.` },
-      { id: 'delay', label: 'Adiar 3 meses', preview: `−${delaySupport} apoio. Nova data: ${fmtT(state, target + 13)}.` },
-      { id: 'cancel', label: 'Cancelar o programa', preview: `−${cancelSupport} apoio, −5 reputação. Os parceiros não vão esquecer.` },
+      { id: 'delay', label: 'Adiar 3 meses', preview: `−${delaySupport} apoio. Nova data: ${fmtT(state, target + 13)}.${pm ? ` ${pm.holderName} perde a paciência.` : ''}`, ...(lockNote ? { disabled: true, reason: lockNote } : {}) },
+      { id: 'cancel', label: 'Cancelar o programa', preview: `−${cancelSupport} apoio, −5 reputação. Os parceiros não vão esquecer.${pm ? ` ${pm.holderName} vai cobrar no conselho.` : ''}`, ...(lockNote ? { disabled: true, reason: lockNote } : {}) },
     ],
   });
 }
@@ -1191,6 +1318,10 @@ function resolveCalendarBriefing(state, data, dec, choiceId) {
   const def = calDef(data, calendarId);
   const pid = state.playerId;
   if (!inst || inst.status !== 'player') return { ok: true };
+  const pm = dec.payload?.mandate || null;
+  if (pm && (choiceId === 'delay' || choiceId === 'cancel')) {
+    peerFn('investors', 'onMandateDeclined')?.(state, data, { holderId: pm.holderId, calendarId, choice: choiceId, kind: 'program' });
+  }
   if (choiceId === 'delay') {
     const weeks = 13;
     const sup = 2 + 2 * Math.min(inst.revisions || 0, 4);
@@ -1227,6 +1358,12 @@ function resolveCalendarBriefing(state, data, dec, choiceId) {
   }
   const res = createMission(state, data, withoutHardware({ ...d0, readyTurn: programReadyTurn(state, data, inst, def) }, d0.suggestionReason || SUGGEST_PROGRAM));
   if (res.ok) inst.missionId = res.missionId;
+  // the anchor holder's program (§5.2): the mission carries the holder and the deadline shown on the briefing
+  if (res.ok && pm && state.cap) {
+    res.mission.holderId = pm.holderId;
+    res.mission.mandate = { holderId: pm.holderId, holderName: pm.holderName, holderKind: pm.holderKind, emblem: pm.emblem, deadlineTurn: pm.deadlineTurn, kind: 'program', binding: !!pm.binding };
+    res.mission.deadlineTurn = pm.deadlineTurn;
+  }
   return res.ok ? { ...res, openBuilder: res.missionId, step: 2 } : res;
 }
 
@@ -1307,6 +1444,9 @@ function hasPendingOpportunity(state) {
 }
 
 function pushOpportunity(state, data, { sub, title, body, type, destination, grantShare = 0, crewed, declineSupport = 0, urgency = 1, extra = {} }) {
+  // investors hold the agenda (§5.2): no pitch for an own mission the player has no slot for
+  const ag = agendaOf(state, data);
+  if (ag?.enforced && ag.left <= 0) return null;
   const cfg = pickConfig(state, data, { type, destination, crewed: crewed ?? type === 'crewed' });
   if (!cfg) return null;
   const sc = spacecraftDef(data, cfg.spacecraftId);
@@ -1935,6 +2075,7 @@ function headline(state, data, key, vars, rng) {
  * outcome = { level, failureType, causes, headline?, crewLost? }
  */
 export function onLaunchResolved(state, data, missionId, phase = 'ascent', outcome = {}) {
+  syncDesignCatalog(state, data);
   const m = missionById(state, missionId);
   if (!m || m.status === 'done' || m.status === 'cancelled') return null;
   const pid = state.playerId;
@@ -1956,6 +2097,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
     const rf = fn(calendar, 'recordFlight');
     if (rf && m.vehicleId) rf(state, m.vehicleId, success);
     if (m.certVehicleId) fn(calendar, 'certDemoResult')?.(state, data, m.certVehicleId, success, m.id);
+    if (m.vehicleId && isDesignId(state, m.vehicleId)) designFlightResult(state, data, m, success);
     emitSignal(state, 'mission/launched', { missionId: m.id, actorId: pid });
     stat(state, 'launched');
   }
@@ -1976,7 +2118,7 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
     m.transit = { departTurn: state.turn, arriveTurn: state.turn + weeks, events: [] };
     if (level === 'partial') m.riskMod = (m.riskMod || 0) - 0.05; // wrong orbit: less margin at arrival
   } else if (success) {
-    const opsWeeks = m.crewed ? OPS_WEEKS.crewed : OPS_WEEKS[m.type] ?? 2;
+    const opsWeeks = m.testDesignId ? 0 : m.crewed ? OPS_WEEKS.crewed : OPS_WEEKS[m.type] ?? 2; // ballast has no operations
     m.status = opsWeeks > 0 ? 'operations' : 'done';
     if (opsWeeks > 0) m.ops = { startTurn: state.turn, untilTurn: state.turn + opsWeeks, events: [], science: 0 };
   } else {
@@ -2118,7 +2260,11 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
   emitSignal(state, 'mission/resolved', {
     missionId: m.id, calendarId: m.calendarId || null, actorId: pid, destination: m.destination, missionType: m.type, // NOT "type": emitSignal spreads payload over the signal type
     crewed: !!m.crewed, outcome: level, failureType, phase, final,
+    ...(m.mandateId || m.holderId ? { mandateId: m.mandateId || null, holderId: m.holderId || null } : {}),
+    ...(m.vehicleId && isDesignId(state, m.vehicleId) ? { designId: m.vehicleId, test: !!m.testDesignId } : {}),
   });
+  // investors (B2): every final result of a player mission (mandates, programs of the anchor holder, own missions)
+  if (final) tellInvestors(state, data, m, { level, success, phase, final, mandateId: m.mandateId || null, holderId: m.holderId || null, crewLost: deadIds.length });
   return { status: m.status, final, prestige, science, firsts, headlines: m.result.headlines };
 }
 
@@ -2128,9 +2274,16 @@ export function onLaunchResolved(state, data, missionId, phase = 'ascent', outco
 
 /** Everything the 3-step builder needs for a partial draft. Pure; never throws on partial input. */
 export function draftOptions(state, data, draftIn = {}) {
+  syncDesignCatalog(state, data);
   const d = { ...normalizeDraft(draftIn), riskMod: 0 };
   const existing = draftIn.missionId ? missionById(state, draftIn.missionId) : null;
   if (Number.isFinite(existing?.createdTurn)) d.createdTurn = existing.createdTurn;
+  // privileged links come from the mission itself, never from the UI draft
+  if (existing) {
+    d.mandateId = existing.mandateId || null; d.holderId = existing.holderId || null; d.testDesignId = existing.testDesignId || null;
+    if (d.deadlineTurn == null && Number.isFinite(existing.deadlineTurn)) d.deadlineTurn = existing.deadlineTurn;
+    if (existing.clientPayload) d.clientPayload = true;
+  }
   const pid = state.playerId;
   const cash = state.actors?.[pid]?.cash ?? 0;
   const types = TYPES.map((t) => ({ id: t, label: TYPE_LABELS[t], selected: t === d.type }));
@@ -2173,8 +2326,27 @@ export function draftOptions(state, data, draftIn = {}) {
       payloadT: round1(payloadT), capacityShortT, marginFit, crewCert: cs,
       reliability: { mean: rel.mean, low: rel.low, high: rel.high, flights: rel.flights ?? null, band: reliabilityBand(rel) },
       valid: reasons.length === 0 && (!!d.destination || true), reasons, selected: v.id === d.vehicleId,
+      ...(v.playerDesign ? { design: true, designPhase: v.designPhase || 'operational', baseVehicleId: v.baseVehicleId || null } : {}),
     };
   }).sort((a, b) => (b.valid - a.valid) || (a.costM - b.costM));
+  // the player's designs still in the hangar are listed (blocked) so the builder says when they can fly
+  for (const { design: dz, def } of playerDesignVehicles(state)) {
+    const ph = designPhase(dz);
+    if (ph === 'operational' || vehicles.some((x) => x.id === def.id)) continue;
+    const p = dz.program || {};
+    const why = ph === 'testFlights'
+      ? `Em voos de teste (${testsPassed(dz)} de ${p.needFlights || 1}): só voa com lastro até ser aprovado.`
+      : ph === 'work' ? `Em desenvolvimento no Hangar${Number.isFinite(p.readyTurn) ? `: pronto em ${fmtT(state, p.readyTurn)}` : ''}.`
+        : 'Projeto salvo no Hangar: falta desenvolver.';
+    const cap = d.destination ? round1(capacityTo(data, def.id, d.destination)) : 0;
+    vehicles.push({
+      id: def.id, name: def.name, operator: def.operator, operatorName: actorName(state, def.operator), costM: round1(def.costM || 0),
+      capacityT: cap, effectiveCapacityT: cap, crewRated: false, reusable: !!def.reusable, truthLayer: 'projeto',
+      payloadT: round1(payloadT), capacityShortT: 0, marginFit: null, crewCert: null,
+      reliability: { mean: def.estimatedReliability, low: clamp(def.estimatedReliability - 0.15, 0, 1), high: clamp(def.estimatedReliability + 0.05, 0, 1), flights: dz.stats?.flights ?? 0, band: 'experimental' },
+      valid: false, reasons: [why], selected: def.id === d.vehicleId, design: true, designPhase: ph || 'draft', baseVehicleId: def.baseVehicleId,
+    });
+  }
 
   const spacecraft = spacecraftFor(state, data).map((s) => {
     const reasons = [];
@@ -2254,6 +2426,7 @@ export function draftOptions(state, data, draftIn = {}) {
 
 export function init(state, data) {
   state.missions = state.missions || [];
+  syncDesignCatalog(state, data);
   state.contracts = state.contracts || [];
   state.stats = state.stats || {};
   // probes already flying on day one show up in the Missions tab before the first advance (calendar.init ran earlier)
@@ -2263,6 +2436,7 @@ export function init(state, data) {
 export function tick(state, data, ctx) {
   state.missions = state.missions || [];
   state.contracts = state.contracts || [];
+  syncDesignCatalog(state, data);
   contractDeadlines(state, data);
   closeAuctions(state, data);
   adoptTransitPrograms(state, data);
@@ -2270,8 +2444,10 @@ export function tick(state, data, ctx) {
   transitTick(state, data, ctx);
   calendarBriefings(state, data);
   certDemos(state, data);
+  designTestFlights(state, data);
   strandedMissions(state, data);
   if (crossed(state, ctx, 13, 0)) obsoletePrograms(state, data);
+  if (Number.isFinite(state.endTurn) && state.endTurn > 10 * 52 && crossed(state, ctx, 13, 7)) slimResults(state);
   opportunities(state, data, ctx);
   contractOffers(state, data, ctx);
   // keep estimates fresh (research, crew and reliability change over time)
@@ -2393,7 +2569,7 @@ function certifyVehicle(state, data, vehicleId) {
   return { ok: true, vehicleId, costM: chk.resume ? 0 : chk.costM, weeks: chk.weeks, resumed: !!chk.resume };
 }
 
-const PRIVILEGED_DRAFT_KEYS = ['grantM', 'grantShare', 'milestone', 'calendarId', 'contractId', 'deadlineTurn', 'targetTurn', 'readyTurn', 'clientPayload'];
+const PRIVILEGED_DRAFT_KEYS = ['grantM', 'grantShare', 'milestone', 'calendarId', 'contractId', 'deadlineTurn', 'targetTurn', 'readyTurn', 'clientPayload', 'mandateId', 'holderId', 'testDesignId', 'mandate'];
 /** A draft as the player may send it: no grants, no program/contract links, always a custom mission. */
 export function publicDraft(draft) {
   const d = { ...(draft && typeof draft === 'object' ? draft : {}) };
@@ -2407,9 +2583,15 @@ const getM = (state, action) => {
   return m ? { m } : { err: { ok: false, error: 'Missão não encontrada.' } };
 };
 
-export const actions = {
+const actionsRaw = {
   // public entry point: privileged fields (grants, program/contract links, milestones) only come from briefings and contracts
-  'mission/create': (state, data, action) => createMission(state, data, publicDraft(action.draft)),
+  'mission/create': (state, data, action) => {
+    const ag = agendaOf(state, data);
+    if (ag?.enforced && ag.left <= 0) return { ok: false, error: agendaFullText(ag), agenda: ag };
+    return createMission(state, data, publicDraft(action.draft));
+  },
+  // Phase B: open the mission of an investor mandate (B2's state.mandates) from the Missões screen
+  'mission/fromMandate': (state, data, action) => missionFromMandate(state, data, action.mandateId),
   'mission/update': (state, data, action) => {
     const { m, err } = getM(state, action);
     return err || updateMission(state, data, m, action.patch || {});
@@ -2430,10 +2612,12 @@ export const actions = {
   },
 };
 
-export const decisionHandlers = {
+const decisionHandlersRaw = {
   briefing: (state, data, dec, choiceId) => {
     if (dec.payload?.kind === 'calendar') return resolveCalendarBriefing(state, data, dec, choiceId);
     if (choiceId === 'accept' && dec.payload?.draft) {
+      const ag = agendaOf(state, data);
+      if (ag?.enforced && ag.left <= 0) return { ok: false, error: agendaFullText(ag), agenda: ag };
       const res = createMission(state, data, withoutHardware(dec.payload.draft, SUGGEST_CHEAPEST));
       return res.ok ? { ...res, openBuilder: res.missionId, step: 2 } : res;
     }
@@ -2443,6 +2627,11 @@ export const decisionHandlers = {
   'contract/offer': (state, data, dec, choiceId) => resolveContractOffer(state, data, dec, choiceId),
   'mission/issue': () => ({ ok: true }),
 };
+
+// every entry point publishes the player's designs into the catalog first (syncDesignCatalog is a no-op without designs)
+const withCatalog = (table) => Object.fromEntries(Object.entries(table).map(([k, f]) => [k, (state, data, ...a) => { syncDesignCatalog(state, data); return f(state, data, ...a); }]));
+export const actions = withCatalog(actionsRaw);
+export const decisionHandlers = withCatalog(decisionHandlersRaw);
 
 function decorate(state, data, m) {
   const dest = destDef(data, m.destination);
@@ -2458,12 +2647,24 @@ function decorate(state, data, m) {
     contract: m.contractId ? (state.contracts || []).find((c) => c.id === m.contractId) || null : null,
     needsHardware: ['planning', 'scheduled'].includes(m.status) && needsHardware(m),
     suggestionNames: m.suggestion ? { vehicle: vehicleDef(data, m.suggestion.vehicleId)?.name || null, spacecraft: spacecraftDef(data, m.suggestion.spacecraftId)?.name || null } : null,
+    // Phase B: investor badge (holder, deadline, penalty) and builder designs
+    holder: m.holderId || m.mandate ? holderView(state, m.holderId, m.mandate) : null,
+    deadline: Number.isFinite(m.deadlineTurn) && (m.mandateId || m.holderId) ? fmtT(state, m.deadlineTurn) : null,
+    late: Number.isFinite(m.deadlineTurn) && (m.mandateId || m.holderId) && ['planning', 'scheduled'].includes(m.status)
+      && (state.turn > m.deadlineTurn || (m.launchTurn != null && m.launchTurn > m.deadlineTurn)),
+    isDesign: !!m.vehicleId && isDesignId(state, m.vehicleId),
+    testFlight: m.testDesignId ? (testFlightsView(state).find((x) => x.designId === m.testDesignId) || { designId: m.testDesignId }) : null,
   };
 }
 
 const STATUS_ORDER = { launch: 0, arrival: 1, scheduled: 2, transit: 3, operations: 4, planning: 5, done: 6, cancelled: 7 };
 
-export const queries = {
+const queriesRaw = {
+  // Phase B: own-mission slots under investors (null without a cap table), open mandates, test flights, suggestion
+  'missions/agenda': (state, data) => agendaOf(state, data),
+  'missions/mandates': (state, data) => mandatesView(state, data),
+  'missions/testFlights': (state) => testFlightsView(state),
+  'missions/suggest': (state, data, draft) => suggestFor(state, data, draft || {}),
   'missions/list': (state, data) =>
     (state.missions || []).map((m) => decorate(state, data, m)).sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) || (b.createdTurn - a.createdTurn)),
   'missions/get': (state, data, id) => {
@@ -2516,6 +2717,7 @@ export const queries = {
       };
     }),
 };
+export const queries = withCatalog(queriesRaw);
 
 // ---------------------------------------------------------------------------------------------
 // 1950–3000 contract (EXPANSION.md §1.3, §1.5, §5.2, §10)
@@ -2538,6 +2740,23 @@ export function appointments(state) {
 }
 
 const ARCHIVE_AFTER = 5 * 52;
+
+/**
+ * Long campaigns: a result resolved more than a quarter ago keeps its first headline only and no cause list (both
+ * were read on Launch Day; nothing in the sim reads them later). Runs in compact() and every quarter from tick(), so
+ * a save never carries a year of full Launch Day reports.
+ */
+function slimResults(state, list = state.missions) {
+  for (const m of list || []) {
+    const r = m?.result;
+    const end = r?.resolvedTurn ?? m?.createdTurn ?? state.turn;
+    // any phase resolved a quarter ago (a probe in transit keeps its ascent result for years)
+    if (!r || r.slim || !Number.isFinite(end) || state.turn - end <= 13) continue;
+    if (Array.isArray(r.causes)) r.causes = [];
+    if (Array.isArray(r.headlines)) r.headlines = r.headlines.slice(0, 1);
+    r.slim = 1;
+  }
+}
 /**
  * Caps: contracts keep ≤ 40 (resolved ones older than a year go first); missions done/cancelled more than 5 years
  * ago become a stub in state.missionsArchive (≤ 80 B each), stubs older than 50 years fold into per-destination counts.
@@ -2571,15 +2790,7 @@ export function compact(state) {
   if (long) {
     // the engineers' suggestion only matters while the player picks the hardware
     for (const m of keep) if (m.suggestion && m.status !== 'planning' && m.vehicleId) delete m.suggestion;
-    // resolved half a year ago: the cause list and the extra headlines were read on Launch Day
-    for (const m of keep) {
-      const r = m.result;
-      // any phase resolved a quarter ago (a probe in transit keeps its ascent result for years)
-      if (!r || r.slim || !Number.isFinite(r.resolvedTurn ?? endOf(m)) || state.turn - (r.resolvedTurn ?? endOf(m)) <= 13) continue;
-      if (Array.isArray(r.causes)) r.causes = [];
-      if (Array.isArray(r.headlines)) r.headlines = r.headlines.slice(0, 1);
-      r.slim = 1;
-    }
+    slimResults(state, keep);
   }
   if (!stubs.length) return;
   state.missions = keep;
@@ -2614,23 +2825,313 @@ export function onActorGone(state, data, ctx, id) {
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Phase B: investor mandates (B2, EXPANSION.md §5) — the player's side
+// ---------------------------------------------------------------------------------------------
+
+const BINDING_PCT = 50;
+const PROGRAM_DEADLINE_GRACE = 13; // weeks after the program's date (+ its readiness slip) before the holder calls it late
+const holdersOf = (state) => (Array.isArray(state?.cap?.holders) ? state.cap.holders : []);
+const holderById = (state, id) => (id ? holdersOf(state).find((x) => x.id === id) || null : null);
+const playerPctOf = (state) => (Number.isFinite(state?.cap?.playerPct) ? state.cap.playerPct : null);
+
+/** True when the player holds less than 50%: the board's mandates are binding (no decline, no postpone). */
+export function mandatesBinding(state) {
+  const p = playerPctOf(state);
+  return p != null && p < BINDING_PCT;
+}
+
+/**
+ * The holder whose program list the calendar is (§5.2 "story missions become investor missions"): the government
+ * for national agencies, the founders for companies, else the largest holder. null without a cap table.
+ */
+export function anchorHolder(state) {
+  const hs = holdersOf(state).filter((x) => (x.pct || 0) > 0);
+  if (!hs.length) return null;
+  const kind = state.actors?.[state.playerId]?.kind === 'company' ? 'founders' : 'government';
+  return hs.find((x) => x.kind === kind) || hs.find((x) => x.kind === 'government' || x.kind === 'founders')
+    || hs.slice().sort((a, b) => (b.pct || 0) - (a.pct || 0))[0];
+}
+
+/** Small holder view for cards (the ≤ 200 B emblem spec included as is). */
+function holderView(state, id, snap = null) {
+  const x = holderById(state, id);
+  if (!x && !snap) return null;
+  return {
+    id: id || snap?.holderId || null, name: x?.name || snap?.holderName || 'Investidor', kind: x?.kind || snap?.holderKind || null,
+    pct: Number.isFinite(x?.pct) ? x.pct : null, mood: Number.isFinite(x?.mood) ? x.mood : null, emblem: x?.emblem || snap?.emblem || null,
+  };
+}
+
+/**
+ * Mission slots of the year (§5.2): K slots, M of them mandated, K − M (≥ 1) the player's own. `used` counts the
+ * player's own custom missions created this year. null when the agency has no cap table (Corrida Lunar, AI).
+ * Tunables: data.investors.agenda {slotsPerYear, exponent, minOwn} (or at the top level), or investors.agenda().
+ */
+export function agendaOf(state, data) {
+  const playerPct = playerPctOf(state);
+  if (playerPct == null) return null;
+  const t = { ...(data?.investors || {}), ...(data?.investors?.agenda || {}) };
+  let K = Math.max(2, Math.round(Number(t.slotsPerYear ?? t.K) || 6));
+  const exp = Number.isFinite(t.exponent) ? t.exponent : 0.6;
+  const minOwn = Math.max(1, Math.round(Number(t.minOwn) || 1));
+  const s = 1 - clamp(playerPct, 10, 100) / 100;
+  let M = Math.min(K - minOwn, Math.round(K * Math.pow(s, exp)));
+  // investors.js (B2) owns the numbers when bound: K, M, own launches counted so far, autonomy
+  let peerUsed = 0;
+  let autonomous = playerPct >= BINDING_PCT;
+  const peer = peerFn('investors', 'agenda');
+  if (peer) {
+    try {
+      const r = peer(state, data);
+      if (r && Number.isFinite(r.K)) K = Math.max(2, Math.round(r.K));
+      if (r && Number.isFinite(r.M)) M = clamp(Math.round(r.M), 0, K - minOwn);
+      if (r && Number.isFinite(r.ownUsed)) peerUsed = r.ownUsed;
+      if (r && typeof r.autonomous === 'boolean') autonomous = r.autonomous;
+    } catch { /* keep the formula */ }
+  }
+  const own = Math.max(minOwn, K - M);
+  const year = yearAt(state);
+  const created = (state.missions || []).filter((m) => m.source === 'custom' && !m.mandateId && !m.holderId && Number.isFinite(m.createdTurn)
+    && turnToDate(m.createdTurn, state.startYear).year === year && !(m.status === 'cancelled' && !m.paid)).length;
+  const used = Math.max(created, peerUsed);
+  // with autonomy (≥ 50%) the board does not veto own missions (B2 'investors/canFlyOwn'): the agenda only informs
+  return { K, M, own, used, left: Math.max(0, own - used), playerPct, binding: !autonomous, enforced: !autonomous, year };
+}
+
+export function agendaFullText(a) {
+  return `Agenda tomada pelos investidores: as ${a.own} vaga${a.own === 1 ? '' : 's'} de missão própria de ${a.year} já foram usadas. Novas vagas em jan/${a.year + 1}.`;
+}
+
+/** A program briefing under a cap table: the anchor holder's mandate, with its deadline (real date + slip). */
+function programMandate(state, inst, def) {
+  const hold = anchorHolder(state);
+  if (!hold) return null;
+  const target = inst.currentTurn ?? inst.plannedTurn ?? state.turn;
+  const deadlineTurn = target + programSlipWeeks(state, inst, def) + PROGRAM_DEADLINE_GRACE;
+  return { holderId: hold.id, holderName: hold.name, holderKind: hold.kind || null, emblem: hold.emblem || null, deadlineTurn, kind: 'program', binding: mandatesBinding(state) };
+}
+
+/**
+ * Phase B: a mandate closed without being flown (deadline missed, declined). Its missions still in planning and
+ * never paid are closed with it (cancelled, no refund, no penalty, no callback: investors.js already settled the
+ * mandate), so a long campaign does not pile up orphan drafts. Story items (calendarId) stay with the calendar.
+ * Returns the number of missions closed.
+ */
+export function closeMandateMissions(state, mandateId) {
+  let n = 0;
+  for (const m of state.missions || []) {
+    if (m.mandateId !== mandateId || m.status !== 'planning' || m.paid || m.attempts > 0 || m.calendarId) continue;
+    m.status = 'cancelled';
+    m.result = { outcome: null, failureType: null, causes: [], phase: null, launchedTurn: null, resolvedTurn: state.turn, prestige: 0, science: 0, headlines: [] };
+    state.decisions = state.decisions.filter((x) => !(x.payload?.missionId === m.id && x.kind === 'launch/ready'));
+    n++;
+  }
+  return n;
+}
+
 /**
  * Phase B (investors, EXPANSION.md §5.2): a mandate of a holder becomes a player mission in planning, without
- * hardware (item 9: the player picks it), with the mandate's deadline. Reserved signature; usable already.
- * mandate: { id, holderId, title, type, destination, deadlineTurn, rewardM?, crewed? }
+ * hardware (item 9: the player picks it), with the mandate's deadline. Idempotent per mandate id (an open mission
+ * of the same mandate is returned). A mandate tied to a calendar program (`calendarId`) adopts that program's
+ * mission or is created as the program itself (type, destination and milestone locked).
+ * mandate: { id, holderId, title, type, destination, count?, deadlineTurn, rewardM?, penalty?, crewed?, calendarId? }
+ * → { ok, missionId, mission, openBuilder, step: 2 } | { ok: false, error }
  */
 export function createMandateMission(state, data, mandate) {
+  syncDesignCatalog(state, data);
+  state.missions = state.missions || [];
+  const mid = mandate?.id ?? null;
+  const openOf = (pred) => state.missions.find((m) => pred(m) && !['done', 'cancelled'].includes(m.status)) || null;
+  const already = mid ? openOf((m) => m.mandateId === mid) : null;
+  if (already) return { ok: true, missionId: already.id, mission: already, existing: true };
+  const hold = holderById(state, mandate?.holderId);
+  const snap = {
+    holderId: mandate?.holderId ?? null, holderName: hold?.name || mandate?.holderName || null, holderKind: hold?.kind || null,
+    emblem: hold?.emblem || null, title: mandate?.title ? String(mandate.title).slice(0, 60) : null,
+    deadlineTurn: Number.isFinite(mandate?.deadlineTurn) ? mandate.deadlineTurn : null,
+    rewardM: Number.isFinite(mandate?.rewardM) ? mandate.rewardM : null, penalty: mandate?.penalty && typeof mandate.penalty === 'object' ? mandate.penalty : null,
+    count: Number.isFinite(mandate?.count) ? mandate.count : 1, kind: mandate?.calendarId ? 'program' : 'mandate', binding: mandatesBinding(state),
+  };
+  const tag = (m) => {
+    m.mandateId = mid; m.holderId = snap.holderId; m.mandate = snap;
+    if (snap.deadlineTurn != null) m.deadlineTurn = snap.deadlineTurn;
+  };
+  // program mandate: the calendar item is the mission
+  if (mandate?.calendarId) {
+    const prog = openOf((m) => m.calendarId === mandate.calendarId);
+    if (prog) { tag(prog); return { ok: true, missionId: prog.id, mission: prog, adopted: true }; }
+    const inst = (state.calendar || []).find((c) => c.id === mandate.calendarId);
+    const def = calDef(data, mandate.calendarId);
+    if (inst && def && inst.status === 'player') {
+      state.decisions = state.decisions.filter((x) => !(x.kind === 'briefing' && x.payload?.calendarId === inst.id));
+      const d0 = calendarDraft(state, data, inst, def);
+      const res = createMission(state, data, withoutHardware({ ...d0, readyTurn: programReadyTurn(state, data, inst, def) }, d0.suggestionReason || SUGGEST_PROGRAM));
+      if (!res.ok) return res;
+      inst.missionId = res.missionId;
+      tag(res.mission);
+      return { ...res, openBuilder: res.missionId, step: 2 };
+    }
+  }
   if (!mandate?.type || !mandate?.destination) return { ok: false, error: 'Mandato sem tipo ou destino.' };
+  if (!TYPES.includes(mandate.type)) return { ok: false, error: 'Tipo de missão inválido.' };
+  if (!destDef(data, mandate.destination)) return { ok: false, error: 'Destino desconhecido.' };
   const crewed = mandate.crewed ?? mandate.type === 'crewed';
   const cfg = pickConfig(state, data, { type: mandate.type, destination: mandate.destination, crewed });
   const sc = spacecraftDef(data, cfg?.spacecraftId);
+  const done = mid ? state.missions.filter((m) => m.mandateId === mid && m.status !== 'cancelled').length : 0;
+  const title = snap.title || null;
   const draft = {
-    name: mandate.title ? String(mandate.title).slice(0, 60) : undefined, source: 'custom', type: mandate.type, destination: mandate.destination,
+    name: title ? `${title}${snap.count > 1 ? ` ${done + 1}/${snap.count}` : ''}`.slice(0, 60) : undefined,
+    source: 'custom', type: mandate.type, destination: mandate.destination,
     vehicleId: cfg?.vehicleId || null, spacecraftId: cfg?.spacecraftId || null, crewed,
     crew: autoCrew(state, data, crewed ? sc?.crew || 0 : 0), config: { strategy: 'balanced', fuelMargin: 0.1 },
-    deadlineTurn: Number.isFinite(mandate.deadlineTurn) ? mandate.deadlineTurn : null,
+    deadlineTurn: snap.deadlineTurn, mandateId: mid, holderId: snap.holderId,
   };
   const res = createMission(state, data, withoutHardware(draft, SUGGEST_CHEAPEST));
-  if (res.ok) res.mission.mandateId = mandate.id ?? null;
-  return res.ok ? { ...res, openBuilder: res.missionId, step: 2 } : res;
+  if (!res.ok) return res;
+  tag(res.mission);
+  return { ...res, openBuilder: res.missionId, step: 2 };
+}
+
+/** Player action: open the mission of an open mandate that has none yet (state.mandates belongs to investors.js). */
+function missionFromMandate(state, data, mandateId) {
+  const list = Array.isArray(state.mandates) ? state.mandates : [];
+  const md = list.find((x) => x.id === mandateId);
+  if (!md) return { ok: false, error: 'Mandato não encontrado.' };
+  if (!['open', 'flying'].includes(md.status ?? 'open')) return { ok: false, error: 'Este mandato já foi encerrado.' };
+  const delivered = (state.missions || []).filter((m) => m.mandateId === md.id && m.status === 'done' && ['total', 'partial'].includes(m.result?.outcome)).length;
+  const open = (state.missions || []).some((m) => m.mandateId === md.id && !['done', 'cancelled'].includes(m.status));
+  if (!open && delivered >= Math.max(1, md.count || 1)) return { ok: false, error: 'Mandato cumprido: o investidor confirma a entrega no próximo conselho.' };
+  const res = createMandateMission(state, data, md);
+  if (res.ok && !res.existing) {
+    const link = peerFn('investors', 'linkMandateMission');
+    if (link) link(state, data, md.id, res.missionId);
+    else if (Array.isArray(md.missionIds) && !md.missionIds.includes(res.missionId)) md.missionIds.push(res.missionId);
+  }
+  return res;
+}
+
+/** Final result (or cancellation) of a player mission, told to investors.js (B2). One call per resolution. */
+function tellInvestors(state, data, m, info) {
+  if (!peers.investors) return;
+  if (info.cancelled) {
+    const c = peerFn('investors', 'onMissionCancelled');
+    if (c) { c(state, data, m, info); return; }
+  }
+  peerFn('investors', 'onMissionResolved')?.(state, data, m, info);
+}
+
+/** Open mandates (investors.js slice) with their missions, for the Missões screen. */
+function mandatesView(state, data) {
+  const list = Array.isArray(state.mandates) ? state.mandates : [];
+  return list.filter((md) => ['open', 'flying'].includes(md.status ?? 'open')).map((md) => {
+    const ms = (state.missions || []).filter((m) => m.mandateId === md.id);
+    const open = ms.find((m) => !['done', 'cancelled'].includes(m.status)) || null;
+    const dest = destDef(data, md.destination);
+    return {
+      id: md.id, title: md.title || `${TYPE_LABELS[md.type] || 'Missão'} ${dest?.name || md.destination || ''}`.trim(), type: md.type || null,
+      destination: md.destination || null, destinationName: dest?.name || md.destination || null, count: md.count || 1,
+      delivered: ms.filter((m) => m.status === 'done' && ['total', 'partial'].includes(m.result?.outcome)).length,
+      fulfilled: !open && ms.filter((m) => m.status === 'done' && ['total', 'partial'].includes(m.result?.outcome)).length >= Math.max(1, md.count || 1),
+      deadlineTurn: Number.isFinite(md.deadlineTurn) ? md.deadlineTurn : null, deadline: Number.isFinite(md.deadlineTurn) ? fmtT(state, md.deadlineTurn) : null,
+      late: Number.isFinite(md.deadlineTurn) && state.turn > md.deadlineTurn, rewardM: md.rewardM ?? null, penalty: md.penalty || null,
+      holder: holderView(state, md.holderId, { holderName: md.holderName }), missionId: open?.id || null, missionStatus: open?.status || null,
+      binding: mandatesBinding(state), status: md.status ?? 'open',
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Phase B: builder test flights (B3, EXPANSION.md §6) — missions source 'test', design locked, ballast payload
+// ---------------------------------------------------------------------------------------------
+
+const TEST_RETRY_WEEKS = 13; // a cancelled test flight is offered again after a quarter
+
+function testDestination(state, data, def) {
+  for (const id of ['leo', 'sso', 'gto']) {
+    const dest = destDef(data, id);
+    if (dest && destOpenNow(state, dest) && capacityTo(data, def.id, id) > 0) return id;
+  }
+  return null;
+}
+
+/** Designs in their test campaign get one test-flight mission at a time (the player schedules it). */
+function designTestFlights(state, data) {
+  for (const { design: dz, def } of playerDesignVehicles(state)) {
+    if (designPhase(dz) !== 'testFlights') continue;
+    const p = dz.program || {};
+    const need = Math.max(1, p.needFlights || 1);
+    if (testsPassed(dz) >= need) continue;
+    if (p.nextTestTurn != null) continue; // designs.js booked an abstract test flight (Hangar): wait for it
+    const mine = state.missions.filter((m) => m.testDesignId === dz.id || (m.source === 'test' && m.designId === dz.id));
+    if (mine.some((m) => ['planning', 'scheduled', 'launch'].includes(m.status))) continue;
+    const lastCancel = Math.max(-Infinity, ...mine.filter((m) => m.status === 'cancelled').map((m) => m.result?.resolvedTurn ?? -Infinity));
+    if (state.turn - lastCancel < TEST_RETRY_WEEKS) continue;
+    const dest = testDestination(state, data, def);
+    if (!dest) continue;
+    const capT = capacityTo(data, def.id, dest) * (1 + techBonus(state, 'payload')) * 0.9;
+    const ballast = round1(clamp(capT * 0.5, 0.1, 60));
+    const n = mine.filter((m) => m.status !== 'cancelled').length + 1;
+    const res = createMission(state, data, {
+      name: `Voo de teste ${n}: ${def.name}`.slice(0, 60), source: 'test', type: 'cargo', destination: dest,
+      vehicleId: def.id, spacecraftId: null, clientPayload: true, crewed: false,
+      config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: ballast }, crew: autoCrew(state, data, 0), testDesignId: dz.id,
+    });
+    if (!res.ok) continue;
+    res.mission.estimate = estimateOf(riskFor(state, data, res.mission));
+    peerFn('designs', 'linkTestFlight')?.(state, data, dz.id, res.missionId);
+    issueCard(state, `${def.name}: voo de teste ${Math.min(n, need)} de ${need}`,
+      `O projeto saiu do Hangar. Agende "${res.mission.name}" em Missões › Programa: o foguete leva ${String(ballast).replace('.', ',')} t de lastro até ${destDef(data, dest)?.name || dest}. Com ${need} voo${need === 1 ? '' : 's'} de teste bem-sucedido${need === 1 ? '' : 's'}, ele fica liberado para qualquer missão.`);
+  }
+}
+
+/** A design flew (test or not): designs.js (B3) when bound, else the design's own counters (contract fields). */
+function designFlightResult(state, data, m, success) {
+  const dz = designList(state).find((x) => x.id === m.vehicleId);
+  if (!dz) return;
+  const isTest = m.testDesignId === dz.id;
+  if (peers.designs) {
+    if (isTest) peerFn('designs', 'onTestFlight')?.(state, data, dz.id, success, m.id);
+    else peerFn('designs', 'onDesignFlight')?.(state, data, dz.id, success, m.id);
+    return;
+  }
+  // designs.js present but not bound: it reads the 'mission/resolved' signal (source 'test') and the flight record
+  if (managedByB3(dz)) return;
+  dz.stats = dz.stats && typeof dz.stats === 'object' ? dz.stats : { flights: 0, failures: 0 };
+  dz.stats.flights = (dz.stats.flights || 0) + 1;
+  if (!success) dz.stats.failures = (dz.stats.failures || 0) + 1;
+  const p = dz.program;
+  if (!isTest || !p || designPhase(dz) !== 'testFlights') return;
+  if (success) p.testFlights = (p.testFlights || 0) + 1;
+  const need = Math.max(1, p.needFlights || 1);
+  if ((p.testFlights || 0) >= need) {
+    p.phase = 'operational';
+    p.operationalTurn = state.turn;
+    issueCard(state, `${dz.name || 'Projeto'} aprovado`, `Os voos de teste convenceram os engenheiros: o ${dz.name || 'foguete'} agora aparece na escolha de veículo de qualquer missão.`);
+    addNews(state, { headline: `${actorName(state, state.playerId)} aprova o ${dz.name || 'novo foguete'} para voo operacional`, tags: ['mission', 'design'], actors: [state.playerId], importance: 2 });
+  } else if (!success) {
+    issueCard(state, `${dz.name || 'Projeto'}: voo de teste perdido`, 'A falha não conta para a aprovação. Outro voo de teste entra no programa.');
+  }
+}
+
+/** Test flights of the player's designs (UI: Hangar and Missões). */
+function testFlightsView(state) {
+  return playerDesignVehicles(state).filter(({ design }) => designPhase(design) === 'testFlights').map(({ design: dz, def }) => {
+    const m = (state.missions || []).find((x) => x.testDesignId === dz.id && !['done', 'cancelled'].includes(x.status)) || null;
+    return { designId: dz.id, name: def.name, flights: testsPassed(dz), need: Math.max(1, dz.program?.needFlights || 1), missionId: m?.id || null, status: m?.status || null };
+  });
+}
+
+/** Engineers' pick for a draft (shown, never preselected — EXPANSION.md §7.6). */
+function suggestFor(state, data, draftIn = {}) {
+  const d = normalizeDraft(draftIn);
+  if (!d.type || !d.destination) return null;
+  const cfg = pickConfig(state, data, { type: d.type, destination: d.destination, crewed: d.crewed });
+  if (!cfg) return null;
+  return {
+    vehicleId: cfg.vehicleId, spacecraftId: cfg.spacecraftId, reason: SUGGEST_CHEAPEST,
+    vehicleName: vehicleDef(data, cfg.vehicleId)?.name || cfg.vehicleId, spacecraftName: spacecraftDef(data, cfg.spacecraftId)?.name || null,
+    costM: round1(cfg.cost),
+  };
 }

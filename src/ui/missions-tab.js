@@ -5,6 +5,7 @@ import {
   TYPE_LABELS, TYPE_ICONS, STATUS_LABELS, OUTCOME_TEXT, STRATEGY_LABELS, ROLE_LABELS, TRUTH_LABELS,
 } from './components.js';
 import { portraitSVG, emblemSVG } from './portrait.js';
+import * as portraitNs from './portrait.js';
 import { decisionRow, sortDecisions } from './decisions.js';
 
 // Missões styles (docs/DESIGN.md §5, Builder "missões"): one stylesheet linked once, after styles.css so it wins
@@ -24,6 +25,96 @@ ensureCss();
 /** Inline note (CSmanager .aviso): tinted box with a stroke icon. kind: '' (neutral) | 'warn' | 'bad' | 'ok'. */
 function note(text, kind = 'warn', ic = 'alerta') {
   return h('div', { class: ['aviso', 'ms-note', kind], role: kind === 'bad' ? 'status' : null }, icon(ic, 14, 'ms-note-ic'), h('span', null, text));
+}
+
+// ------------------------------------------------------------------ Phase B: investors and designs (B5)
+
+const HOLDER_TINT = { government: '#28628f', founders: '#2f7f6c', fund: '#5e4589', corporation: '#8a5a1f', consortium: '#6b3f6f', colony: '#3f6b5a' };
+// portrait.emblemSVG takes a designed spec ({shape, field…}) once B1's emblem.js lands; the v0.6 one only a label
+const specEmblems = (() => { try { return !/OBJECT/.test(String(portraitNs.emblemLabel?.({ emblem: {} }) ?? '')); } catch { return false; } })();
+
+/** Small emblem of an investor (its designed spec when the emblem module supports it, else a lettered roundel). */
+export function holderEmblemSVG(holder, size = 18) {
+  if (!holder) return '';
+  const spec = holder.emblem && typeof holder.emblem === 'object' ? holder.emblem : null;
+  const pseudo = { id: holder.id || 'holder', name: holder.name || 'Investidor', color: spec?.field || HOLDER_TINT[holder.kind] || '#5e4589' };
+  if (spec && specEmblems) pseudo.emblem = spec;
+  else if (typeof holder.emblem === 'string') pseudo.emblem = holder.emblem;
+  try { return emblemSVG(pseudo, { size }); } catch { return ''; }
+}
+
+/** "Governo 40%" style label for a holder. */
+export function holderLabel(holder) {
+  if (!holder) return '';
+  return `${holder.name || 'Investidor'}${Number.isFinite(holder.pct) ? ` ${Math.round(holder.pct)}%` : ''}`;
+}
+
+/** Investor badge (violet chip with the holder's emblem): mandates and programs of the anchor holder. */
+function holderChip(holder) {
+  if (!holder) return null;
+  return h('span', { class: 'chip chip-investor', title: `Mandato de ${holder.name}` }, raw(holderEmblemSVG(holder, 16), 'ms-holder-em'), h('span', null, holder.name || 'Investidor'));
+}
+
+/** Penalty of a missed mandate in words (contract §5.1 penalty {mood, cashM?, pct?}). */
+export function penaltyText(p, binding = false) {
+  const parts = [`−${Math.abs(Number(p?.mood) || 25)} de humor do investidor`];
+  if (Number(p?.cashM) > 0) parts.push(`multa de ${fmtMoney(p.cashM)}`);
+  if (Number(p?.pct) > 0) parts.push(`${p.pct}% a mais da agência para ele`);
+  return `${parts.join(', ')}${binding ? '. Abaixo de 50%, humor médio baixo em dois conselhos seguidos derruba a diretoria' : ''}.`;
+}
+
+/** The sim's agenda of own-mission slots (null without a cap table). */
+function agendaOf(store) {
+  const a = store.tryQuery('missions/agenda', null);
+  return a && Number.isFinite(a.own) ? a : null;
+}
+
+/** "Agenda de 1962": own slots left vs the investors' share (EXPANSION.md §5.2). */
+function agendaStrip(store, a) {
+  if (!a) return null;
+  const full = a.left <= 0;
+  return h('div', { class: ['ms-agenda', full && 'full'], role: 'group', 'aria-label': `Agenda de ${a.year}` },
+    h('div', { class: 'ms-agenda-row' },
+      h('span', { class: 'ms-eyebrow' }, `Agenda de ${a.year}`),
+      h('span', { class: 'ms-agenda-pct tiny' }, `Você tem ${Math.round(a.playerPct)}%${a.binding ? ' · mandatos obrigatórios' : ' · autonomia'}`)),
+    h('div', { class: 'ms-slots', 'aria-hidden': 'true' },
+      ...Array.from({ length: a.own }, (_, i) => h('span', { class: ['ms-slot', 'own', i < a.used && 'used'] })),
+      ...Array.from({ length: a.M }, () => h('span', { class: 'ms-slot inv' }))),
+    h('div', { class: 'tiny muted' }, full && !a.enforced
+      ? `Cota própria de ${a.year} usada. Com autonomia o conselho não veta, mas os investidores esperam os mandatos deles.`
+      : full
+      ? `Sem vaga para missão própria até jan/${a.year + 1}. Os outros ${a.M} lugares são dos investidores.`
+      : `${a.left} de ${a.own} vaga${a.own === 1 ? '' : 's'} própria${a.own === 1 ? '' : 's'} livre${a.left === 1 ? '' : 's'} · ${a.M} para mandatos dos investidores.`));
+}
+
+/** Open mandates of the investors, with or without a mission yet. */
+function mandatesSection(store) {
+  const list = store.tryQuery('missions/mandates', null);
+  if (!Array.isArray(list) || !list.length) return null;
+  const st = store.state;
+  return h('div', null,
+    sectionTitle('Mandatos dos investidores', h('span', { class: 'ms-count' }, String(list.length))),
+    h('div', { class: 'mission-list ms-mandates' }, list.map((md) => {
+      const m = md.missionId ? (st.missions || []).find((x) => x.id === md.missionId) : null;
+      const open = () => {
+        if (m) { if (needsHardware(m)) store.ui?.navigate?.('missoes', `m/${m.id}`); else openMission(store, m.id); return; }
+        if (md.fulfilled) { toast('Mandato cumprido: o investidor confirma a entrega no próximo conselho.', 'good'); return; }
+        const r = store.dispatch({ type: 'mission/fromMandate', mandateId: md.id });
+        if (!r?.ok) { toast(r?.error || 'Não foi possível abrir o mandato.', 'bad'); return; }
+        toast('Missão do mandato criada. Escolha o foguete e a nave.', 'good');
+        store.ui?.navigate?.('missoes', `m/${r.missionId}`);
+      };
+      return card({
+        cls: ['mission-card', 'ms-mandate', md.late && 'late'].filter(Boolean).join(' '), onClick: open,
+        icon: raw(holderEmblemSVG(md.holder, 36), 'ms-holder-dot'), title: md.title,
+        subtitle: `${holderLabel(md.holder)} · ${md.destinationName || '—'}${md.count > 1 ? ` · ${md.delivered}/${md.count} entregues` : ''}`,
+      },
+      h('div', { class: 'chips' },
+        md.deadline ? chip(`prazo ${md.deadline}`, md.late ? 'bad' : 'warn', { class: 'ms-date' }) : null,
+        md.rewardM ? chip(`+${fmtMoney(md.rewardM)} na entrega`, 'good') : null,
+        m ? (needsHardware(m) ? chip('falta o veículo', 'warn', { class: 'falta-veiculo' }) : chip(STATUS_LABELS[m.status] || m.status, ''))
+          : md.fulfilled ? chip('entregue', 'good') : chip('toque para montar a missão', 'accent')));
+    })));
 }
 
 /** Leading 36px circle with a type emoji (emoji allowed inside content, DESIGN §2). */
@@ -136,7 +227,7 @@ export function render(container, store) {
   // item 9: an accepted mission without a rocket opens on its vehicle step (#missoes/m/<id>); 'm/<id>/veiculo'
   // is the same step for a mission that already has one (Trocar o veículo)
   const routeMission = sub.startsWith('m/') ? (st.missions || []).find((x) => x.id === sub.slice(2).split('/')[0]) : null;
-  const hwMission = routeMission && (needsHardware(routeMission) || (sub.endsWith('/veiculo') && routeMission.status === 'planning' && routeMission.source !== 'cert')) ? routeMission : null;
+  const hwMission = routeMission && (needsHardware(routeMission) || (sub.endsWith('/veiculo') && routeMission.status === 'planning' && !lockedVehicle(routeMission))) ? routeMission : null;
   if (hwMission) {
     ui.openedRoute = sub;
     root.appendChild(safePanel(() => hardwareStep(store, hwMission, rerender), 'A escolha do veículo não pôde ser exibida.'));
@@ -159,12 +250,33 @@ export function render(container, store) {
 
 /** The mission still needs the player's rocket/craft choice (planning, no vehicle, not a certification flight). */
 export function needsHardware(m) {
-  return m && m.status === 'planning' && !m.vehicleId && m.source !== 'cert' ? m : null;
+  return m && m.status === 'planning' && !m.vehicleId && m.source !== 'cert' && m.source !== 'test' ? m : null;
+}
+
+/** The vehicle is the object of the flight (crew-certification demo, builder test flight): it cannot be swapped. */
+export function lockedVehicle(m) {
+  return !!m && (m.source === 'cert' || m.source === 'test' || !!m.certVehicleId || !!m.testDesignId);
 }
 
 /** Choice -> mission/update payload (only the hardware fields; the sim recomputes cost, estimate and fuel fit). */
 export function hardwareUpdate(missionId, pick) {
   return { type: 'mission/update', missionId, patch: { vehicleId: pick.vehicleId || null, spacecraftId: pick.spacecraftId || null, secondarySpacecraftId: pick.secondarySpacecraftId || null } };
+}
+
+/** Holder + deadline under the vehicle step's title (investor mandates and anchor-holder programs). */
+function hwHolderLine(store, m) {
+  const hd = store.tryQuery('missions/get', null, m.id)?.holder || null;
+  if (!hd) return null;
+  const st = store.state;
+  return h('div', { class: 'chips hw-holder' }, holderChip(hd),
+    Number.isFinite(m.deadlineTurn) ? chip(`prazo ${fmtMonth(m.deadlineTurn, st.startYear)}`, st.turn > m.deadlineTurn ? 'bad' : 'warn', { class: 'ms-date' }) : null);
+}
+
+/** "Sugestão dos engenheiros: X + Y, o mais barato que leva a carga." with a one-tap "Usar a sugestão". */
+function suggestionNote(sug, sugName, use) {
+  return h('div', { class: 'aviso ms-note sugestao' }, icon('info', 14, 'ms-note-ic'),
+    h('span', null, h('b', null, 'Sugestão dos engenheiros: '), `${sugName}${SUG_REASON[sug.reason] ? `, ${SUG_REASON[sug.reason]}` : sug.reason ? ` (${sug.reason})` : ''}.`),
+    button('Usar a sugestão', use, { small: true, kind: 'ghost' }));
 }
 
 const SUG_REASON = { 'Plano do programa': 'o hardware do plano do programa', 'Mais barato que leva a carga': 'o mais barato que leva a carga' };
@@ -202,10 +314,9 @@ function hardwareStep(store, m, rerender) {
     h('section', { class: 'card hw-head' },
       h('div', { class: 'card-head' }, h('span', { class: 'card-icon', 'aria-hidden': 'true' }, typeDot(m.type)),
         h('div', { class: 'card-titles' }, h('div', { class: 'card-title' }, m.name || 'Missão'), h('div', { class: 'card-sub' }, `${TYPE_LABELS[m.type] || m.type || ''} · ${dest}`))),
-      h('p', { class: 'small muted hw-lead' }, m.source === 'calendar' ? 'Tipo, destino e tripulação vêm do programa. O foguete e a nave são escolha sua.' : 'Missão aceita. Falta escolher o foguete e a nave.')),
-    sug && sugName ? h('div', { class: 'aviso ms-note sugestao' }, icon('info', 14, 'ms-note-ic'),
-      h('span', null, h('b', null, 'Sugestão dos engenheiros: '), `${sugName}${SUG_REASON[sug.reason] ? `, ${SUG_REASON[sug.reason]}` : sug.reason ? ` (${sug.reason})` : ''}.`),
-      button('Usar a sugestão', () => set({ vehicleId: sug.vehicleId || null, spacecraftId: sug.spacecraftId || null, secondarySpacecraftId: sug.secondarySpacecraftId || null }), { small: true, kind: 'ghost' })) : null,
+      h('p', { class: 'small muted hw-lead' }, m.source === 'calendar' ? 'Tipo, destino e tripulação vêm do programa. O foguete e a nave são escolha sua.' : m.mandateId ? 'Mandato do investidor: tipo e destino são dele. O foguete e a nave são escolha sua.' : 'Missão aceita. Falta escolher o foguete e a nave.'),
+      hwHolderLine(store, m)),
+    sug && sugName ? suggestionNote(sug, sugName, () => set({ vehicleId: sug.vehicleId || null, spacecraftId: sug.spacecraftId || null, secondarySpacecraftId: sug.secondarySpacecraftId || null })) : null,
     hardwareSections(store, d, opts, set, sug),
     pick.vehicleId && opts.estimate ? h('div', null, sectionTitle('Chance estimada'), chanceGauge(opts.estimate, { invalid: opts.valid === false })) : null,
     pick.vehicleId && opts.cost != null ? h('div', { class: 'kv' }, kv('Custo com esta escolha', fmtMoney(opts.cost))) : null,
@@ -231,9 +342,13 @@ function listView(store, go) {
   const missions = Array.isArray(q) ? q : (st.missions || []);
   const related = sortDecisions((st.decisions || []).filter((d) => /^(launch|briefing|mission)/.test(String(d.kind))));
   const out = h('div');
+  const ag = agendaOf(store);
+  if (ag) out.append(agendaStrip(store, ag));
   if (related.length) {
     out.append(sectionTitle('Aguardando você'), h('div', { class: 'decision-list' }, related.map((d) => decisionRow(store, d))));
   }
+  const mds = mandatesSection(store);
+  if (mds) out.append(mds);
   if (!missions.length) {
     out.append(h('div', { class: 'ms-empty' }, emptyState('Nenhuma missão no programa ainda. Briefings do calendário e contratos chegam com o tempo — ou monte a sua.', 'missoes')),
       button('Montar uma missão', () => go('nova'), { kind: 'primary', icon: 'mais', big: true, cls: 'ms-wide' }));
@@ -284,7 +399,11 @@ function missionCard(store, m) {
     m.launchTurn != null && !m.result ? chip(`${fmtMonth(m.launchTurn, st.startYear)} · ${fmtIn(m.launchTurn, st.turn)}`, '', { class: 'ms-date' }) : null,
     m.estimate && !m.result ? chip(`Chance ${fmtBand(m.estimate.low, m.estimate.high)}`, '') : null,
     !m.result && crewRiskOf(m.estimate) != null ? chip(crewRiskText(crewRiskOf(m.estimate)), crewRiskOf(m.estimate) >= CREW_RISK_HIGH ? 'bad' : '', { class: 'ms-crewrisk-chip' }) : null,
-    m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : m.source === 'cert' ? chip('certificação', 'muted') : null,
+    m.holder ? holderChip(m.holder) : null,
+    m.deadline && !m.result ? chip(`prazo ${m.deadline}`, m.late ? 'bad' : 'warn', { class: 'ms-date ms-deadline' }) : null,
+    m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : m.source === 'cert' ? chip('certificação', 'muted')
+      : m.source === 'test' ? chip(m.testFlight?.need ? `voo de teste ${Math.min(m.testFlight.flights + 1, m.testFlight.need)}/${m.testFlight.need}` : 'voo de teste', 'info') : null,
+    m.isDesign && m.source !== 'test' ? chip('projeto próprio', 'muted') : null,
     needsHardware(m) ? chip('falta o veículo', 'warn', { class: 'falta-veiculo' }) : null,
     m.paid === false && m.status === 'planning' ? chip('não paga', 'muted') : null,
     m.stranded && m.status === 'planning' ? chip('sem data antes do fim', 'bad') : null,
@@ -326,7 +445,7 @@ export function openMission(store, missionId) {
             if (r?.ok) { toast(`Agendada para ${fmtDate(o.turn, st.startYear)}.`, 'good'); close(); } else toast(scheduleErrorText(r), 'bad', 5000);
           },
         }))) : note(noSlotText(store, m, null), 'warn'),
-        m.source !== 'cert' ? button('Trocar o veículo', () => {
+        !lockedVehicle(m) ? button('Trocar o veículo', () => {
           close({ fromHistory: true });
           ui.hw = { missionId: m.id, vehicleId: m.vehicleId, spacecraftId: m.spacecraftId || null, secondarySpacecraftId: m.secondarySpacecraftId || null };
           store.ui?.navigate?.('missoes', `m/${m.id}/veiculo`);
@@ -350,12 +469,15 @@ export function openMission(store, missionId) {
           m.cost != null ? chip(fmtMoney(m.cost), '', { class: 'ms-date' }) : null)),
       m.source === 'calendar' ? h('p', { class: 'tiny muted' }, 'Programa do calendário real: destino, tipo e tripulação já estão definidos.') : null,
       m.source === 'cert' ? h('p', { class: 'tiny muted' }, 'Voo de demonstração sem tripulação: se chegar à órbita, o foguete fica certificado para levar gente.') : null,
+      m.source === 'test' ? h('p', { class: 'tiny muted' }, `Voo de teste com lastro do seu projeto${m.testFlight?.need ? ` (${m.testFlight.flights} de ${m.testFlight.need} aprovados)` : ''}. Sucesso conta para liberar o foguete; o veículo não pode ser trocado.`) : null,
+      m.holder ? mandateBlock(store, m) : null,
       calText ? h('p', { class: 'tiny muted' }, calText) : null,
       h('div', { class: 'kv' },
         kv('Destino', dest?.name || m.destination || '—'),
         Number.isFinite(m.readyTurn) && m.readyTurn > st.turn ? kv('Hardware pronto', `${fmtDate(m.readyTurn, st.startYear)} (${fmtIn(m.readyTurn, st.turn)})`) : null,
         kv('Veículo', vehicleLabel(m, idx) || '—'),
-        kv('Espaçonave', sc?.name || m.spacecraftId || '—'),
+        kv('Espaçonave', sc?.name || m.spacecraftId || (m.clientPayload
+          ? (m.source === 'test' || m.source === 'cert' ? `Lastro de ${String(m.config?.payloadT ?? '?').replace('.', ',')} t` : 'Carga do cliente') : '—')),
         m.secondarySpacecraftId ? kv('Módulo de apoio', idx.spacecraft?.[m.secondarySpacecraftId]?.name || m.secondarySpacecraftId) : null,
         kv('Estratégia', STRATEGY_LABELS[m.config?.strategy] || '—'),
         kv('Margem de combustível', m.config?.fuelMargin != null ? fmtPct(m.config.fuelMargin) : '—', m.config?.fuelMargin != null)),
@@ -365,6 +487,25 @@ export function openMission(store, missionId) {
       m.transit?.events?.length ? h('div', null, sectionTitle('Diário de bordo'), h('ul', { class: 'log-list ms-log' }, m.transit.events.map((e) => logLine(e, idx, st, m.name)).filter(Boolean).map((t) => h('li', null, t)))) : null,
       actions.childElementCount ? actions : null);
   }, { title: m.name || 'Missão', cls: 'ms-sheet' });
+}
+
+/** Investor block of the mission sheet: holder, stake, deadline, reward and what a miss costs. */
+function mandateBlock(store, m) {
+  const st = store.state;
+  const md = m.mandate || {};
+  const hd = m.holder;
+  const program = md.kind === 'program' || (!!m.calendarId && !m.mandateId);
+  return h('div', { class: ['ms-mandate-block', m.late && 'late'] },
+    h('div', { class: 'ms-mandate-head' }, raw(holderEmblemSVG(hd, 32), 'ms-holder-em'),
+      h('div', { class: 'ms-mandate-titles' },
+        h('div', { class: 'ms-eyebrow' }, program ? 'Programa do acionista' : 'Mandato do investidor'),
+        h('div', { class: 'ms-mandate-name' }, holderLabel(hd)))),
+    h('div', { class: 'kv' },
+      m.deadline ? kv('Prazo', `${m.deadline}${Number.isFinite(m.deadlineTurn) ? ` (${m.deadlineTurn >= st.turn ? fmtIn(m.deadlineTurn, st.turn) : 'vencido'})` : ''}`) : null,
+      Number.isFinite(md.rewardM) && md.rewardM > 0 ? kv('Na entrega', `+${fmtMoney(md.rewardM)}`, true) : null,
+      Number.isFinite(hd?.mood) ? kv('Humor do investidor', `${Math.round(hd.mood)}/100`, true) : null),
+    h('p', { class: 'tiny muted' }, `Se perder o prazo: ${penaltyText(md.penalty, !!md.binding)}`),
+    m.late ? note('O lançamento marcado passa do prazo do mandato.', 'bad', 'alerta') : null);
 }
 
 function resultReport(store, m) {
@@ -579,7 +720,9 @@ function builder(store, rerender) {
     ui.step > 1 ? button('Voltar', () => goStep(ui.step - 1), { icon: 'voltar', big: true }) : button('Limpar', () => { ui.draft = newDraft(); ui.noFd = false; ui.noCraft = false; goStep(1); }, { big: true }),
     ui.step < 3 ? button('Próximo', () => goStep(ui.step + 1), { kind: 'primary', big: true, disabled: !canGo(ui.step + 1, d, blockers) }) : null);
 
+  const ag = agendaOf(store);
   return h('div', { class: 'builder' },
+    ag && !d.contractId ? agendaStrip(store, ag) : null,
     d.contractId ? h('div', { class: 'contract-banner' }, icon('transferir', 16, 'ms-note-ic'), h('span', null, 'Missão para contrato'), button('Remover', () => set({ contractId: null, source: 'custom' }), { kind: 'ghost', small: true })) : null,
     stepper, body, nav);
 }
@@ -688,8 +831,13 @@ function step2(store, d, opts, set) {
   const crewed = d.type === 'crewed' || (idx.spacecraft?.[d.spacecraftId]?.crew > 0);
   const setCrew = (patch) => set({ crew: { ...d.crew, ...patch } });
 
+  // the engineers' pick for this target (item 9): highlighted and offered, never preselected
+  const sug = d.suggestion || (d.type && d.destination ? store.tryQuery('missions/suggest', null, d) : null);
+  const sugName = sug ? [sug.vehicleName || idx.vehicles?.[sug.vehicleId]?.name || sug.vehicleId, sug.spacecraftId ? (sug.spacecraftName || idx.spacecraft?.[sug.spacecraftId]?.name || sug.spacecraftId) : null].filter(Boolean).join(' + ') : null;
+  const tookSug = !!sug && d.vehicleId === sug.vehicleId && (d.spacecraftId || null) === (sug.spacecraftId || null);
   return h('div', null,
-    hardwareSections(store, d, opts, set, d.suggestion || null, vehicles),
+    sug && sugName && !tookSug ? suggestionNote(sug, sugName, () => set({ vehicleId: sug.vehicleId || null, spacecraftId: sug.spacecraftId || null, secondarySpacecraftId: null })) : null,
+    hardwareSections(store, d, opts, set, sug, vehicles),
 
     sectionTitle('Sala de controle'),
     pickPerson(store, 'Diretor(a) de voo', fds, d.crew.flightDirector, (id) => { ui.noFd = !id; setCrew({ flightDirector: id }); }),
@@ -737,7 +885,7 @@ function hardwareSections(store, d, opts, set, sug = null, sorted = null) {
       },
       raw(emblemSVG(op, { size: 30 }), 'veh-emblem'),
       h('div', { class: 'veh-text' },
-        h('div', { class: 'veh-name' }, v.name || v.id, sug?.vehicleId === v.id ? sugTag() : null),
+        h('div', { class: 'veh-name' }, v.name || v.id, sug?.vehicleId === v.id ? sugTag() : null, v.design ? h('span', { class: ['design-tag', v.designPhase !== 'operational' && 'testing'] }, v.designPhase === 'operational' ? 'seu projeto' : v.designPhase === 'testFlights' ? 'em teste' : 'no hangar') : null),
         h('div', { class: 'tiny muted' }, [
           v.costM != null ? fmtMoney(v.costM) : null,
           cap != null && d.destination ? `${String(cap).replace('.', ',')} t até o alvo` : null,
@@ -747,7 +895,7 @@ function hardwareSections(store, d, opts, set, sug = null, sorted = null) {
         !v.ok && v.reason ? h('div', { class: 'tiny ms-reason' }, v.reason) : null),
       h('span', { class: 'veh-chips' },
         rel?.low != null ? chip(fmtBand(rel.low, rel.high), 'info') : v.estimatedReliability ? chip(`~${fmtPct(v.estimatedReliability)}`, 'muted') : null,
-        v.truthLayer && v.truthLayer !== 'fato' ? chip(TRUTH_LABELS[v.truthLayer] || v.truthLayer, 'muted') : null));
+        v.truthLayer && v.truthLayer !== 'fato' && !v.design && TRUTH_LABELS[v.truthLayer] ? chip(TRUTH_LABELS[v.truthLayer], 'muted') : null));
       const help = !v.ok ? vehicleHelp(store, v, d, () => set({}), set) : null;
       return help ? h('div', { class: 'veh-wrap' }, cardEl, help) : cardEl;
     })) : emptyState('Nenhum veículo disponível para este alvo agora.', 'alerta'),
@@ -1099,7 +1247,11 @@ function step3(store, d, optsBase, rerender) {
   const autoName = autoNameOf(store, d, opts);
   const nameInput = h('input', { class: 'input', value: ui.name || '', placeholder: `${autoName} (nome automático)`, maxlength: '40', 'aria-label': 'Nome da missão', oninput: (e) => { ui.name = e.target.value; } });
   const cantPay = opts.cost != null && me && !(me.cash >= opts.cost);
-  const errors = dedupeMessages([...opts.errors, ...(cantPay ? ['Caixa insuficiente para pagar a missão agora.'] : [])]);
+  // investors hold the agenda (EXPANSION.md §5.2): no own slot left this year means no new own mission
+  const ag = agendaOf(store);
+  const noSlot = !!ag?.enforced && ag.left <= 0 && !d.contractId;
+  const errors = dedupeMessages([...opts.errors, ...(cantPay ? ['Caixa insuficiente para pagar a missão agora.'] : []),
+    ...(noSlot ? [`Agenda tomada pelos investidores: as ${ag.own} vaga${ag.own === 1 ? '' : 's'} de missão própria de ${ag.year} já foram usadas.`] : [])]);
   if (!dates.length) errors.push(noSlotText(store, d, optsBase));
   const arr = ui.launchTurn != null && dest?.transitWeeks ? arrivalOf(dest, ui.launchTurn, st.endTurn) : null;
   const lateNote = arr?.late ? `A nave chega em ${fmtMonth(arr.arriveTurn, st.startYear)}, depois do fim da campanha (${st.startYear + Math.floor(st.endTurn / 52)}): o lançamento conta, mas a chegada e a ciência dela ficam fora do jogo.` : null;
@@ -1150,7 +1302,7 @@ function step3(store, d, optsBase, rerender) {
     dates.length ? h('div', { class: 'chips wrap ms-pills' }, dates.map((o) => chip(o.label, '', { class: ui.launchTurn === o.turn ? 'active' : null, 'aria-pressed': ui.launchTurn === o.turn ? 'true' : 'false', onclick: () => { ui.launchTurn = o.turn; rerender(); } }))) : null,
     h('div', { class: 'btn-col ms-final' },
       button('Criar e agendar lançamento', () => create(true), { kind: 'primary', icon: 'missoes', big: true, disabled: !opts.valid || errors.length > 0 || ui.launchTurn == null }),
-      button('Salvar em planejamento', () => create(false), { big: true, disabled: !d.type })));
+      button('Salvar em planejamento', () => create(false), { big: true, disabled: !d.type || noSlot })));
 }
 
 // ------------------------------------------------------------------ contracts

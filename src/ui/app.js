@@ -7,6 +7,7 @@ import * as time from '../core/time.js';
 import { createStore } from './store.js';
 import { h, raw, button, toast, fallbackPanel, closeAllModals, fmtDate, fmtMonth, chip, openModal, fmtBand, esc, iconSVG, cleanFlags, eraInfo, passedText } from './components.js';
 import { emblemSVG } from './portrait.js';
+import { useEmblemData } from './emblem.js';
 import { applySettings, render as renderSettings, APP_VERSION, BUILD_DATE } from './settings.js';
 import { renderTitle, renderGameOver } from './newgame.js';
 import { openDecision, sortDecisions, closeDecision } from './decisions.js';
@@ -69,8 +70,11 @@ async function boot() {
   store = createStore(data, {
     reader: browserReader(),
     // campaign vs Corrida Lunar: the loader merges the packs the scenario needs (data.js, §4)
-    loadScenario: (scenarioId) => loadData(browserReader(), { scenarioId }),
+    loadScenario: (scenarioId) => loadData(browserReader(), { scenarioId }).then((d) => { useEmblemData(d); return d; }),
   });
+  // emblem specs (data/core/emblems.json, emblem-parts.json) come with the core pack: register them before the first paint
+  useEmblemData(data);
+  window.addEventListener('adastra:emblems', () => { if (store?.state) renderAll(); });
   syncEra();
   applySettings(store.settings);
   store.ui = {
@@ -340,7 +344,7 @@ function renderHeader() {
   const me = st.actors?.[st.playerId] || { id: st.playerId, short: String(st.playerId || '').toUpperCase() };
   const el = ui.shell.header;
   const desc = screenById(ui.route.tab);
-  const title = desc?.title || 'Painel';
+  const title = desc?.short || desc?.title || 'Painel'; // short: the top bar's compact name (320px)
   const date = dateText(st);
   const needs = Object.entries(screenBadges()).some(([id, b]) => b && screenById(id)?.nav === 'drawer');
   // skip rebuilding the emblem SVG on every action: only route, agency, date or the menu dot change the header

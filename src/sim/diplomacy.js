@@ -44,16 +44,29 @@ const sortedIdsRaw = (state) => liveActorIds(state, { tier: 'core' }).filter((id
 let SCOPE = null;
 const sortedIds = (state) => (SCOPE?.state === state ? SCOPE.ids : sortedIdsRaw(state));
 const yearOf = (state, turn = state.turn) => yearAt(state, turn);
-const round = (v, d = 1) => Math.round(v * 10 ** d) / 10 ** d;
+// d = 1 is the hot path (every utility factor): 10 ** 1 === 10 exactly, so the result is bit-identical
+const round = (v, d = 1) => (d === 1 ? Math.round(v * 10) / 10 : Math.round(v * 10 ** d) / 10 ** d);
 const pct = (f) => `${Math.round(f * 100)}%`;
 
+// first entry by id of a data list (same answer as list.find), indexed once per list
+const BY_ID = new WeakMap();
+function firstById(list, id) {
+  let m = BY_ID.get(list);
+  if (!m) {
+    m = new Map();
+    for (const x of list) if (x && !m.has(x.id)) m.set(x.id, x);
+    BY_ID.set(list, m);
+  }
+  return m.get(id);
+}
+const NO_LIST = [];
 function typeDef(data, type) {
-  return (A(data).proposalTypes || []).find((t) => t.id === type)
+  return firstById(A(data).proposalTypes || NO_LIST, type)
     || { id: type, name: type, treatyName: type, durationWeeks: 104, base: 0, budgetWeight: 0, cultureWeight: 0, breakReputation: 6, allowCompanies: true };
 }
 const typeName = (data, type) => typeDef(data, type).name || type;
 function programDef(data, id) {
-  return (A(data).programs || []).find((p) => p.id === id) || (id ? { id, name: id, milestone: null, appeal: 0 } : null);
+  return firstById(A(data).programs || NO_LIST, id) || (id ? { id, name: id, milestone: null, appeal: 0 } : null);
 }
 const milestoneLabel = (data, id) => {
   if (!id) return '';
@@ -101,6 +114,14 @@ export function bumpRelation(state, a, b, delta) {
 
 /** Bloc object of an actor, or null. */
 export function blocOf(state, actorId) {
+  if (SCOPE?.state === state) {
+    // first bloc listing the actor, as below, indexed once per scope (blocs do not change while a scope is open)
+    if (!SCOPE.blocOf) {
+      SCOPE.blocOf = new Map();
+      for (const b of Object.values(state.blocs || {})) for (const m of b.members || []) if (!SCOPE.blocOf.has(m)) SCOPE.blocOf.set(m, b);
+    }
+    return SCOPE.blocOf.get(actorId) || null;
+  }
   for (const b of Object.values(state.blocs || {})) if (b.members?.includes(actorId)) return b;
   return null;
 }
@@ -109,8 +130,9 @@ const activeTreatiesRaw = (state) => (state.treaties || []).filter((t) => t.stat
 const activeTreaties = (state) => (SCOPE?.state === state ? SCOPE.active : activeTreatiesRaw(state));
 function treatiesBetween(state, a, b, type) {
   if (SCOPE?.state === state) {
-    const list = SCOPE.byPair.get(relKey(a, b)) || [];
-    return type ? list.filter((t) => t.type === type) : list.slice();
+    // callers only read the list (never push/splice it): no copy
+    const list = SCOPE.byPair.get(relKey(a, b)) || NO_LIST;
+    return type ? (list.length ? list.filter((t) => t.type === type) : NO_LIST) : list;
   }
   return activeTreaties(state).filter((t) => t.parties.includes(a) && t.parties.includes(b) && (!type || t.type === type));
 }
@@ -125,7 +147,7 @@ function openScope(state, data) {
       if (l) l.push(t); else byPair.set(k, [t]);
     }
   }
-  SCOPE = { state, data, ids: sortedIdsRaw(state), active, byPair, goals: new Map(), views: new Map(), rivals: new Map() };
+  SCOPE = { state, data, ids: sortedIdsRaw(state), active, byPair, goals: new Map(), views: new Map(), rivals: new Map(), rows: new Map(), loads: new Map(), goalSets: new Map(), blocOf: null };
 }
 
 /** True when a and b share an active treaty/partnership (the universal peaceful-use baseline does not count). */
@@ -159,7 +181,11 @@ const goalsOf = (state, id) => {
   return g;
 };
 function sharedOpenGoals(state, a, b) {
-  const gb = new Set(goalsOf(state, b));
+  let gb;
+  if (SCOPE?.state === state && SCOPE.data === DATA_REF.data) {
+    gb = SCOPE.goalSets.get(b);
+    if (!gb) { gb = new Set(goalsOf(state, b)); SCOPE.goalSets.set(b, gb); }
+  } else gb = new Set(goalsOf(state, b));
   return goalsOf(state, a).filter((g) => gb.has(g) && !state.firsts?.[g]);
 }
 
@@ -178,9 +204,11 @@ export function budgetPressure(state, id) {
 
 function view(state, a, b) {
   if (SCOPE?.state === state) {
-    const k = `${a}>${b}`;
-    let v = SCOPE.views.get(k);
-    if (!v) { v = viewRaw(state, a, b); SCOPE.views.set(k, v); }
+    // ordered pair a → b, two-level map (no key string built per call)
+    let row = SCOPE.views.get(a);
+    if (!row) { row = new Map(); SCOPE.views.set(a, row); }
+    let v = row.get(b);
+    if (!v) { v = viewRaw(state, a, b); row.set(b, v); }
     return v;
   }
   return viewRaw(state, a, b);
@@ -199,7 +227,15 @@ function viewRaw(state, a, b) {
     bilateral: bil, multilateral: multi,
   };
 }
-const bilateralLoad = (state, id) =>
+const bilateralLoad = (state, id) => {
+  if (SCOPE?.state === state) {
+    let n = SCOPE.loads.get(id);
+    if (n == null) { n = bilateralLoadRaw(state, id); SCOPE.loads.set(id, n); }
+    return n;
+  }
+  return bilateralLoadRaw(state, id);
+};
+const bilateralLoadRaw = (state, id) =>
   activeTreaties(state).filter((t) => t.parties.includes(id) && !t.terms?.multilateral && t.type !== 'peaceful_use').length;
 
 /** Strongest rival both actors share (min of the two rivalries), 0..100. */
@@ -212,7 +248,30 @@ function commonRival(state, a, b) {
   }
   return commonRivalRaw(state, a, b);
 }
+// rivalry of `a` with every scope id, in SCOPE.ids order (relations are read-only while a scope is open)
+function rivalryRow(state, a) {
+  let row = SCOPE.rows.get(a);
+  if (!row) {
+    const R = state.relations || {};
+    const ids = SCOPE.ids;
+    row = new Array(ids.length);
+    for (let i = 0; i < ids.length; i++) row[i] = (R[relKey(a, ids[i])] || DEFAULT_REL).rivalry;
+    SCOPE.rows.set(a, row);
+  }
+  return row;
+}
 function commonRivalRaw(state, a, b) {
+  if (SCOPE?.state === state) {
+    // same scan as below, over cached rows (same order, same Math.max/Math.min sequence)
+    const ids = SCOPE.ids, ra = rivalryRow(state, a), rb = rivalryRow(state, b);
+    let best = 0;
+    for (let i = 0; i < ids.length; i++) {
+      const c = ids[i];
+      if (c === a || c === b) continue;
+      best = Math.max(best, Math.min(ra[i], rb[i]));
+    }
+    return best;
+  }
   let best = 0;
   const R = state.relations || {};
   for (const c of sortedIds(state)) {
@@ -240,9 +299,12 @@ const remembers = (state, id, kind, key, weeks) => {
 
 // ---------------------------------------------------------------- utility model
 
+// labels and raw values are kept; the readable {label, delta} list is built only when someone reads the reasons
+// (most candidate deals of an AI evaluation are scored and dropped)
 class Factors {
-  constructor() { this.list = []; this.u = 0; }
-  add(label, v) { if (!v) return this; this.u += v; this.list.push({ label, delta: round(v) }); return this; }
+  constructor() { this.labels = []; this.vals = []; this.u = 0; }
+  add(label, v) { if (!v) return this; this.u += v; this.labels.push(label); this.vals.push(v); return this; }
+  get list() { return this.labels.map((label, i) => ({ label, delta: round(this.vals[i]) })); }
   top(n = 2, sign = 1) {
     return this.list.filter((f) => f.delta * sign > 0).sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta)).slice(0, n).map((f) => f.label);
   }
@@ -522,7 +584,9 @@ export function tick(state, data, ctx) {
   expireTreaties(state, data, ctx.rng('expire'));
   if (crossed(state, ctx, 4, 0)) {
     treatyUpkeep(state, data, ctx.rng('upkeep'));
-    incidents(state, data, ctx.rng('incidents'));
+    // read-only memo for the views (each pair's own view is read before its own relation moves, as in drift)
+    openScope(state, data);
+    try { incidents(state, data, ctx.rng('incidents')); } finally { SCOPE = null; }
   }
   if (crossed(state, ctx, 13, 0)) techTransfers(state, data);
   resolveDueProposals(state, data, ctx);

@@ -4,8 +4,25 @@
 export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** Stable key for an unordered actor pair: relKey('nasa','cnsa') === relKey('cnsa','nasa'). */
+// Memoized (the sims build hundreds of thousands of pair keys per campaign year): the same string comes back for
+// the same ids, so the property lookup that follows hits an already-hashed key. Only string ids are memoized
+// (a few hundred actors and nations at most, so the table stays small).
+const REL_KEYS = new Map();
 export function relKey(a, b) {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
+  if (typeof a !== 'string' || typeof b !== 'string') return a < b ? `${a}|${b}` : `${b}|${a}`;
+  let row = REL_KEYS.get(a);
+  if (row === undefined) {
+    if (REL_KEYS.size > 4000) REL_KEYS.clear(); // safety valve: never grows without bound
+    row = new Map();
+    REL_KEYS.set(a, row);
+  }
+  let k = row.get(b);
+  if (k === undefined) {
+    if (row.size > 4000) row.clear();
+    k = a < b ? `${a}|${b}` : `${b}|${a}`;
+    row.set(b, k);
+  }
+  return k;
 }
 
 /** Monotonic id generator stored in state (deterministic, serializable). */

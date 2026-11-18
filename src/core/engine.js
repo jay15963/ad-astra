@@ -8,7 +8,8 @@ import { removeDecision, log, pushDecision, addNews, compactAnnals, every } from
 import {
   turnToDate, dateToTurn, yearOf, eraAt, eraById, bandAt, gridNext, nextEraTurn, stepLabel, WEEKS_PER_YEAR,
 } from './time.js';
-import { migrate, SAVE_VERSION as MIGRATE_VERSION } from './migrate.js';
+import { migrate, targetVersion } from './migrate.js';
+import { packState } from './savepack.js';
 
 import * as economyPolitics from '../sim/politics.js';
 import * as diplomacy from '../sim/diplomacy.js';
@@ -19,6 +20,9 @@ import * as crew from '../sim/crew.js';
 import * as missions from '../sim/missions.js';
 import * as launch from '../sim/launch.js';
 import * as narrative from '../sim/narrative.js';
+import * as designs from '../sim/designs.js';
+import * as investors from '../sim/investors.js';
+import * as explore from '../sim/explore.js';
 
 // The lifecycle module (A2) is optional while it is being built: a missing file leaves the registry as in v0.5.
 // Any other failure (syntax error inside the module) is re-thrown so it is never hidden.
@@ -42,12 +46,17 @@ export const MODULES = [
   ['budget', budget],
   ['research', research],
   ['crew', crew],
+  ['designs', designs],     // Phase B §6: Hangar designs (asVehicle before missions read the vehicle list)
   ['missions', missions],
+  ['investors', investors], // Phase B §5: cap table, rounds and mandates (after missions: reads their results)
   ['launch', launch],
+  ['explore', explore],     // Phase B §8: fog of war of the space map (ids only)
   ['narrative', narrative],
 ];
 
-export const SAVE_VERSION = MIGRATE_VERSION;
+// the newest version this build writes: v2 plus every migration registered by the modules imported above
+// (investors.js registers v2 → v3), so a new game is stamped with the same version a migrated save reaches
+export const SAVE_VERSION = targetVersion();
 
 /** Long-press "Próximo evento": at most this many turns, or 26 weeks, whichever is longer (UI reads it). */
 export const RUN_MAX_STEPS = 12;
@@ -175,17 +184,20 @@ function makeCtx(state, data, moduleName, extra = {}) {
   const clock = state.clock;
   const dt = extra.dt ?? clock?.stepWeeks ?? 1;
   const prevTurn = extra.prevTurn ?? state.turn;
+  const turn = state.turn;
+  // date and hooks are built on first use (a 52-week step makes ~500 contexts and most modules read neither)
+  let date, hooks;
   return {
     data,
     /** rng that depends only on (seed, turn, module, label) */
     rng: (label = '') => rngFor(state.seed, state.turn, moduleName, label),
-    date: turnToDate(state.turn, state.startYear),
+    get date() { return date || (date = turnToDate(turn, state.startYear)); },
     dt,
     prevTurn,
-    turn: state.turn,
+    turn,
     eraId: clock?.eraId ?? null,
-    year: yearOf(state, state.turn),
-    hooks: makeHooks(state, data),
+    year: yearOf(state, turn),
+    get hooks() { return hooks || (hooks = makeHooks(state, data)); },
   };
 }
 
@@ -266,15 +278,21 @@ function tickModule(state, data, name, mod, prevTurn, dt) {
     return;
   }
   const saved = state.turn;
+  const signals = state.signals;
   try {
     for (let sub = prevTurn; sub < prevTurn + dt; sub += max) {
       const sdt = Math.min(max, prevTurn + dt - sub);
       state.turn = sub;
       mod.tick(state, data, makeCtx(state, data, name, { prevTurn: sub, dt: sdt }));
       if (state.gameOver) break;
+      // the step's signals are delivered once, in the first substep: before this, a 52-week step made every
+      // substepped module handle each signal 52 times (diplomacy re-ran its AI evaluation every week for each
+      // tension change, research paid tech transfers 52 times, politics scored a mission 52 times…)
+      state.signals = [];
     }
   } finally {
     state.turn = saved;
+    state.signals = signals;
   }
 }
 
@@ -546,6 +564,7 @@ export function resolveDecision(state, data, decisionId, choiceId, opts = {}) {
     const to = d.payload?.to ?? state.clock?.pendingEra?.to;
     if (!eraPackLoaded(data, to)) return { ok: false, needsData: to, error: 'Carregando a próxima era…' };
   }
+  const at = state.decisions.indexOf(d);
   removeDecision(state, decisionId);
   const found = decisionHandler(d.kind);
   if (!found) {
@@ -553,6 +572,8 @@ export function resolveDecision(state, data, decisionId, choiceId, opts = {}) {
     return { ok: true };
   }
   const res = found.h(state, data, d, choiceId, { ...makeCtx(state, data, found.name), ...opts }) || {};
+  // a refused choice (e.g. "Aceitar" with the investors' agenda full) keeps the card, so another choice can be made
+  if (res.ok === false && !opts.expired && !state.decisions.includes(d)) state.decisions.splice(Math.min(at, state.decisions.length), 0, d);
   return { ok: true, ...res };
 }
 
@@ -608,8 +629,9 @@ export function query(state, data, name, ...args) {
   throw new Error(`consulta desconhecida: ${name}`);
 }
 
+/** JSON text of a save. Long campaigns use the lossless compact encoding of src/core/savepack.js. */
 export function serialize(state) {
-  return JSON.stringify(state);
+  return JSON.stringify(packState(state));
 }
 
 /** Parse + migrate a save. Throws SaveError {code: 'newer'|'unreadable'|'scenario', message (pt-BR)}. */

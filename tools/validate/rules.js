@@ -359,7 +359,8 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
   }
 
   // ---------------------------------------------------------------- texts (pt-BR checks)
-  const legacyPh = placeholdersIn(Object.values(packs['legacy-e4'] || {}));
+  // + placeholders filled by Phase B modules ({pais}: investors.js anchor/archetype names)
+  const legacyPh = new Set([...placeholdersIn(Object.values(packs['legacy-e4'] || {})), 'pais']);
   for (const p of packDefs) {
     for (const [file, json] of Object.entries(packs[p.id] || {})) {
       const walk = (o, path) => {

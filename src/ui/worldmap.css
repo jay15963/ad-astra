@@ -145,3 +145,32 @@ body.reduce-motion .wm-chev, body.reduce-motion .wm-btn { transition: none; }
 @media (max-width: 360px) {
   .wm-head { gap: 8px; padding-left: 12px; }
 }
+
+/* ---------- épocas 1950–3000 (data/world-eras.json) ---------- */
+/* date + era chip, always on (amber only while looking at the past: "you are not seeing today") */
+.wm-era { pointer-events: auto; max-width: calc(100% - 20px); }
+.wm-era:not(.is-past) { border-color: var(--line-strong, #2a2a33); padding-right: 12px; }
+.wm-era:not(.is-past)::before { background: var(--text-3, #626270); }
+.wm-era-when { font-family: var(--mono, monospace); font-variant-numeric: tabular-nums; color: var(--text, #ecedf0); }
+.wm-era-name { color: var(--text-2, #9b9ba6); }
+.wm-era-tag {
+  margin-left: 2px; padding: 0 6px; border-radius: var(--r-sm, 4px); border: 1px solid var(--info-line, #7aa2c440);
+  color: var(--info, #7aa2c4); font-size: var(--t9, 10px); letter-spacing: .06em; text-transform: uppercase; line-height: 16px;
+}
+.wm-era-notes { margin: 6px 0; display: grid; gap: 2px; }
+.wm-era-notes p { margin: 0; color: var(--text-2, #9b9ba6); }
+
+/* era bloc swatches: inline colour + the same white pattern the canvas draws (colour is never the only cue) */
+.wm-swatch.pat-stripes { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.34) 0 1.4px, transparent 1.4px 5px); }
+.wm-swatch.pat-dots { background-image: radial-gradient(circle, rgba(255,255,255,.45) 1.1px, transparent 1.5px); background-size: 5px 5px; }
+.wm-swatch.pat-cross { background-image: linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px); background-size: 5px 5px; }
+.wm-swatch.pat-grid { background-image: linear-gradient(rgba(255,255,255,.26) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.26) 1px, transparent 1px); background-size: 4px 4px; }
+.wm-swatch.pat-rings { background-image: radial-gradient(circle, transparent 1.2px, rgba(255,255,255,.4) 1.4px, transparent 2.2px); background-size: 6px 6px; }
+.wm-swatch.pat-dash { background-image: linear-gradient(90deg, rgba(255,255,255,.4) 0 3px, transparent 3px 6px); background-size: 6px 4px; }
+.wm-swatch.pat-colony { opacity: .8; background-image: repeating-linear-gradient(135deg, rgba(8,12,24,.75) 0 1.4px, transparent 1.4px 3px); }
+.wm-swatch.wm-split { background: linear-gradient(90deg, #2f80c4 50%, #c9632c 50%); border: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+.wm-swatch.sm { width: 14px; height: 10px; }
+
+/* era milestones on the timeline: a short neutral bar under the track (sim events sit on top of it) */
+.wm-tick.k-era { top: 12px; height: 6px; width: 2px; margin-left: -1px; background: var(--text-2, #9b9ba6); opacity: .7; }
+.wm-tl-ends { display: flex; justify-content: space-between; margin: -4px 50px 0; font-family: var(--mono, monospace); font-size: var(--t9, 10px); color: var(--text-3, #626270); font-variant-numeric: tabular-nums; }

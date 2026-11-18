@@ -1,0 +1,183 @@
+{
+  "_doc": "Investidores, participação e mandatos (docs/EXPANSION.md §5.1–5.2). Dono: B2 (src/sim/investors.js). 'investors' = arquétipos de investidor (lista com id; pacotes de era podem acrescentar em data/eras/eN/investors.json). 'profiles' = modelos de mandato por perfil (objeto por id, mescla profunda). Valores em US$ milhões; 'reward' e 'cash' são frações do orçamento anual do jogador. Números de 'tuning' são vinculantes (§5.2).",
+  "tuning": {
+    "investorCap": 90,
+    "autonomyPct": 50,
+    "exponent": 0.6,
+    "minOwn": 1,
+    "minSlots": 2,
+    "maxSlots": 12,
+    "slotsByEra": { "e1": 3, "e2": 4, "e3": 5, "e4": 6, "e5": 6, "e6": 6, "e7": 6 },
+    "round": { "weeks": 52, "minSteps": 5, "phase": 26, "expiryWeeks": 8, "minOffers": 1, "maxOffers": 3 },
+    "buybackPremium": 1.15,
+    "termBuybackPremium": 1.0,
+    "mood": {
+      "start": 60, "decline": -15, "postpone": -15, "missed": -25, "missedAutonomous": -15, "delivered": 10,
+      "deliveredOthers": 2, "flightFailed": -8, "veto": -8, "drift": 0.15, "boardRemoval": 20, "boardRounds": 2,
+      "dividendPerValuationShare": 400, "dividendMax": 20
+    },
+    "mandate": {
+      "expiryWeeks": 8, "minDeadlineSteps": 3, "calendarGraceWeeks": 13, "calendarHorizonWeeks": 104,
+      "maxOpenPerHolder": 2, "keepResolved": 24
+    },
+    "valuation": {
+      "budget": 2.0, "prestige": 3.0, "reputation": 4.0, "fleet": 25, "cash": 0.5, "floorShareOfBudget": 1.0,
+      "trackStep": 0.04, "trackMin": 0.7, "trackMax": 1.4
+    },
+    "historyCap": 60,
+    "starting": {
+      "agency": { "kind": "government", "pct": 40 },
+      "company": { "kind": "founders", "pct": 30 },
+      "founded": null
+    }
+  },
+  "anchors": {
+    "government": {
+      "name": "Governo ({pais})", "short": "GOV", "profile": "estado",
+      "emblem": { "shape": "shield", "division": "band", "glyph": "star", "stars": 0, "field2": "#e8e4d8", "glyphColor": "#f4f1e8" }
+    },
+    "founders": {
+      "name": "Fundadores e primeiros sócios", "short": "FUND", "profile": "fundadores",
+      "emblem": { "shape": "hex", "division": "none", "glyph": "rocket", "stars": 0, "field": "#3b4252", "glyphColor": "#e3b341" }
+    }
+  },
+  "profiles": {
+    "estado": {
+      "label": "Programa do governo",
+      "templates": [
+        { "id": "gov_sat", "title": "Satélite científico nacional", "type": "satellite", "destinations": ["leo"], "years": 2, "reward": 0.06 },
+        { "id": "gov_lunar_probe", "title": "Sonda lunar do governo", "type": "probe", "destinations": ["lunar_orbit", "lunar_surface"], "years": 3, "reward": 0.1, "fromYear": 1959 },
+        { "id": "gov_crewed", "title": "Voo tripulado de prestígio", "type": "crewed", "destinations": ["leo"], "years": 3, "reward": 0.14, "fromYear": 1961 },
+        { "id": "gov_planet", "title": "Sonda planetária nacional", "type": "probe", "destinations": ["venus_flyby", "mars_orbit", "mars_surface"], "years": 3, "reward": 0.12, "fromYear": 1962 }
+      ]
+    },
+    "fundadores": {
+      "label": "Plano de negócios dos fundadores",
+      "templates": [
+        { "id": "fd_comsat", "title": "Lançar satélite de cliente", "type": "satellite", "destinations": ["gto", "leo"], "years": 2, "reward": 0.08 },
+        { "id": "fd_cargo", "title": "Contrato de carga orbital", "type": "cargo", "destinations": ["leo"], "years": 2, "reward": 0.1, "fromYear": 1985 }
+      ]
+    },
+    "defesa": {
+      "label": "Reconhecimento e defesa",
+      "templates": [
+        { "id": "def_recon", "title": "Satélite de reconhecimento", "type": "satellite", "destinations": ["sso", "leo"], "years": 1, "reward": 0.08 },
+        { "id": "def_early", "title": "Alerta antecipado em órbita alta", "type": "satellite", "destinations": ["gto"], "years": 2, "reward": 0.1, "fromYear": 1965 }
+      ]
+    },
+    "comunicacoes": {
+      "label": "Telecomunicações",
+      "templates": [
+        { "id": "com_geo", "title": "Satélite de comunicações geoestacionário", "type": "satellite", "destinations": ["gto"], "years": 2, "reward": 0.1, "fromYear": 1963 },
+        { "id": "com_leo", "title": "Satélite de retransmissão", "type": "satellite", "destinations": ["leo", "sso"], "years": 1, "reward": 0.06 }
+      ]
+    },
+    "ciencia": {
+      "label": "Ciência e exploração",
+      "templates": [
+        { "id": "sci_orbit", "title": "Observatório em órbita", "type": "satellite", "destinations": ["sso", "leo"], "years": 2, "reward": 0.07 },
+        { "id": "sci_moon", "title": "Sonda à Lua", "type": "probe", "destinations": ["lunar_orbit", "lunar_surface"], "years": 3, "reward": 0.1, "fromYear": 1959 },
+        { "id": "sci_planet", "title": "Sonda aos planetas", "type": "probe", "destinations": ["mars_orbit", "venus_orbit", "jupiter", "saturn_orbit"], "years": 4, "reward": 0.14, "fromYear": 1965 }
+      ]
+    },
+    "retorno": {
+      "label": "Retorno rápido do capital",
+      "templates": [
+        { "id": "ret_launch", "title": "Lançamento comercial pago", "type": "satellite", "destinations": ["leo", "gto", "sso"], "years": 1, "reward": 0.08 },
+        { "id": "ret_cargo", "title": "Frete orbital para cliente", "type": "cargo", "destinations": ["leo", "iss"], "years": 1, "reward": 0.1, "fromYear": 2000 }
+      ]
+    },
+    "mineracao": {
+      "label": "Mineração espacial",
+      "templates": [
+        { "id": "min_moon", "title": "Prospecção de gelo lunar", "type": "lander", "destinations": ["lunar_south_pole", "lunar_surface"], "years": 3, "reward": 0.14 },
+        { "id": "min_asteroid", "title": "Amostra de asteroide", "type": "probe", "destinations": ["neo_sample_return", "neo_asteroid", "psyche"], "years": 4, "reward": 0.16 }
+      ]
+    },
+    "turismo": {
+      "label": "Turismo espacial",
+      "templates": [
+        { "id": "tur_orbit", "title": "Voo turístico em órbita", "type": "crewed", "destinations": ["leo"], "years": 2, "reward": 0.14 },
+        { "id": "tur_moon", "title": "Volta turística à Lua", "type": "crewed", "destinations": ["cislunar", "lunar_orbit"], "years": 3, "reward": 0.2 }
+      ]
+    },
+    "colonia": {
+      "label": "Abastecer a colônia",
+      "templates": [
+        { "id": "col_cargo_moon", "title": "Suprimentos para a base lunar", "type": "cargo", "destinations": ["lunar_surface", "lunar_south_pole"], "years": 2, "reward": 0.12 },
+        { "id": "col_cargo_mars", "title": "Suprimentos para Marte", "type": "cargo", "destinations": ["mars_surface", "mars_orbit"], "years": 3, "reward": 0.16 },
+        { "id": "col_crew_mars", "title": "Rotação de colonos", "type": "crewed", "destinations": ["mars_surface", "lunar_surface"], "years": 3, "reward": 0.2 }
+      ]
+    },
+    "consorcio": {
+      "label": "Rotas do consórcio",
+      "templates": [
+        { "id": "cons_outer", "title": "Sonda às luas exteriores", "type": "probe", "destinations": ["europa_flyby", "ganymede_orbit", "titan", "enceladus_flyby"], "years": 4, "reward": 0.16 },
+        { "id": "cons_station", "title": "Módulo de estação do consórcio", "type": "station", "destinations": ["lunar_orbit", "leo", "mars_orbit"], "years": 3, "reward": 0.16 },
+        { "id": "cons_far", "title": "Sonda aos confins do sistema", "type": "probe", "destinations": ["kuiper", "pluto_flyby", "neptune_flyby", "uranus_orbit"], "years": 5, "reward": 0.2 }
+      ]
+    }
+  },
+  "investors": [
+    {
+      "id": "min_defesa", "kind": "government", "eras": ["e1", "e2"], "weight": 3, "playerKinds": ["agency"],
+      "names": ["Ministério da Defesa", "Comando da Aeronáutica", "Estado-Maior Conjunto"], "profile": "defesa",
+      "pct": [5, 15], "premium": 1.0, "termYears": 6,
+      "emblem": { "shape": "shield", "division": "chevron", "glyph": "star", "fields": ["#4b5d3a", "#5a4a3a", "#3a4b5d"], "glyphColor": "#e8e4d8" }
+    },
+    {
+      "id": "min_comunicacoes", "kind": "government", "eras": ["e1", "e2"], "weight": 2, "playerKinds": ["agency"],
+      "names": ["Ministério das Comunicações", "Correios e Telégrafos", "Companhia Nacional de Telecomunicações"], "profile": "comunicacoes",
+      "pct": [3, 10], "premium": 1.0, "termYears": 5,
+      "emblem": { "shape": "roundel", "division": "half", "glyph": "orbit", "fields": ["#2f5d7c", "#7c2f3b"], "glyphColor": "#f4f1e8" }
+    },
+    {
+      "id": "academia", "kind": "government", "eras": ["e1", "e2", "e3"], "weight": 2,
+      "names": ["Academia de Ciências", "Conselho Nacional de Pesquisa", "Instituto de Física Aplicada"], "profile": "ciencia",
+      "pct": [2, 8], "premium": 0.9, "termYears": 8,
+      "emblem": { "shape": "roundel", "division": "none", "glyph": "atom", "fields": ["#3d3a6b", "#2b4a5e"], "glyphColor": "#e3d9a8", "ring": true }
+    },
+    {
+      "id": "fundo_vc", "kind": "fund", "eras": ["e3", "e4", "e5"], "weight": 3,
+      "names": ["Horizonte Capital", "Atlas Ventures", "Fundo Órbita Alta", "Perigeu Investimentos"], "profile": "retorno",
+      "pct": [5, 20], "premium": 1.1, "termYears": 5,
+      "emblem": { "shape": "wordmark", "division": "none", "glyph": "comet", "fields": ["#1f2a44", "#2a1f44", "#14363a"], "glyphColor": "#e3b341" }
+    },
+    {
+      "id": "telecom", "kind": "corporation", "eras": ["e3", "e4", "e5"], "weight": 3,
+      "names": ["Telecom Orbital S.A.", "Rede Estelar", "Conecta Sat"], "profile": "comunicacoes",
+      "pct": [5, 15], "premium": 1.05, "termYears": 6,
+      "emblem": { "shape": "hex", "division": "band", "glyph": "globe", "fields": ["#0f4c5c", "#5c0f3d", "#0f5c2e"], "glyphColor": "#f4f1e8" }
+    },
+    {
+      "id": "defesa_priv", "kind": "corporation", "eras": ["e3", "e4"], "weight": 2,
+      "names": ["Grupo Aeroespacial Meridiano", "Vanguarda Defesa", "Sentinela Sistemas"], "profile": "defesa",
+      "pct": [5, 15], "premium": 1.0, "termYears": 6,
+      "emblem": { "shape": "chevron", "division": "none", "glyph": "star", "fields": ["#3a3a3a", "#4a3020"], "glyphColor": "#d0d4dc" }
+    },
+    {
+      "id": "mineradora", "kind": "corporation", "eras": ["e4", "e5", "e6"], "weight": 3,
+      "names": ["Consórcio Mineração Selene", "Regolito Recursos", "Cinturão Mineral"], "profile": "mineracao",
+      "pct": [8, 25], "premium": 1.05, "termYears": 8,
+      "emblem": { "shape": "hex", "division": "quarter", "glyph": "planet", "fields": ["#5c4a1f", "#4a2f1f"], "glyphColor": "#f0d890" }
+    },
+    {
+      "id": "turismo", "kind": "corporation", "eras": ["e4", "e5", "e6"], "weight": 2,
+      "names": ["Turismo Orbital Aurora", "Viagens Zênite", "Mirante Lunar"], "profile": "turismo",
+      "pct": [5, 20], "premium": 1.1, "termYears": 5,
+      "emblem": { "shape": "wing", "division": "half", "glyph": "capsule", "fields": ["#5c1f4a", "#1f4a5c"], "glyphColor": "#ffe7c2" }
+    },
+    {
+      "id": "colonia", "kind": "colony", "eras": ["e5", "e6", "e7"], "weight": 3,
+      "names": ["Governo Colonial de Marte", "Assembleia de Shackleton", "Comuna de Ceres"], "profile": "colonia",
+      "pct": [10, 30], "premium": 1.0, "termYears": 10,
+      "emblem": { "shape": "roundel", "division": "band", "glyph": "planet", "fields": ["#7a3b22", "#2f4f6b"], "glyphColor": "#f4f1e8", "ring": true }
+    },
+    {
+      "id": "consorcio", "kind": "consortium", "eras": ["e5", "e6", "e7"], "weight": 3,
+      "names": ["Consórcio do Cinturão", "Liga das Estações", "Consórcio Heliopausa", "Fundação Arca Estelar"], "profile": "consorcio",
+      "pct": [10, 30], "premium": 1.05, "termYears": 10,
+      "emblem": { "shape": "star", "division": "none", "glyph": "orbit", "fields": ["#24324f", "#3b244f", "#244f43"], "glyphColor": "#cfe3ff" }
+    }
+  ]
+}

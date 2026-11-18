@@ -160,9 +160,123 @@ const FAMILY_GUESS = (v) => {
   return null;
 };
 
+// ------------------------------------------------------------------ design adapter (Hangar rockets, EXPANSION.md §6)
+// A player design (src/sim/designs.js) reaches the painter as a vehicle whose `design.geometry` lists stages,
+// boosters and fairing in real metres. designArt() turns that into the same art shape vehicle-art.json uses, so
+// custom rockets fly in the launch scene and show in the Hangar preview. The launch scene only passes ids: the
+// resolver (default: the live store at globalThis.adastra) finds the design's asVehicle by id.
+
+const PAINT_MAT = { white: 'white_paint', grey: 'grey_paint', green: 'soyuz_green', steel: 'stainless', black: 'carbon_black', foam: 'orange_foam' };
+const PLUME_PROP = { kerolox: 'kerolox', alcolox: 'kerolox', hydrolox: 'hydrolox', methalox: 'methalox', hypergolic: 'hypergolic', solid: 'solid', nuclear: 'hydrolox', fusion: 'hydrolox' };
+const DARK_MATS = new Set(['carbon_black', 'orange_foam', 'soyuz_green']);
+
+let designResolver = (id) => {
+  try { return globalThis.adastra?.state?.designs?.[id]?.asVehicle || null; } catch { return null; }
+};
+
+/** Replace how ids of player designs are resolved (tests, Hangar). fn(id) -> vehicle with design.geometry | null. */
+export function setDesignResolver(fn) {
+  designResolver = typeof fn === 'function' ? fn : () => null;
+  STACKS.clear();
+}
+
+const geometryOf = (v) => (v?.design?.geometry?.stages?.length ? v.design.geometry : null);
+
+/** Design vehicle for an id/data pair (vehicleData wins), or null. */
+function designFor(vehicleId, vehicleData) {
+  if (geometryOf(vehicleData)) return vehicleData;
+  if (!vehicleId || ART?.vehicles?.[vehicleId]) return null;
+  const v = designResolver(vehicleId);
+  return geometryOf(v) ? v : null;
+}
+
+function engineArt(e, prop, { vac = false, hidden = false } = {}) {
+  const ch = Math.max(1, num(e?.chambers, 1));
+  const n = Math.max(1, Math.min(40, Math.round(num(e?.n, 1) * (ch > 1 ? Math.min(ch, 4) : 1))));
+  const bellD = num(e?.bellD, 1) / (ch > 1 ? Math.sqrt(Math.min(ch, 4)) : 1);
+  return {
+    n, prop: PLUME_PROP[prop] || 'kerolox', bellD: Math.max(0.2, bellD), bellLen: Math.max(0.3, num(e?.bellLen, 1.5) * (ch > 1 ? 0.8 : 1)),
+    layout: n === 1 ? 'single' : n === 2 ? 'pair' : n === 9 ? 'octaweb' : 'cluster', ...(vac ? { vac: true } : {}), ...(hidden ? { hidden: true } : {}),
+  };
+}
+
+/** Art (vehicle-art.json shape) built from a design's geometry. Pure; never null for a design with stages. */
+export function designArt(vehicle) {
+  const g = geometryOf(vehicle);
+  if (!g) return ART?.families?.generic || BUILTIN_GENERIC;
+  const base = vehicle?.design?.baseVehicleId ? ART?.vehicles?.[vehicle.design.baseVehicleId] : null;
+  if (vehicle?.design?.unmodified && base) return base;
+  const mat = PAINT_MAT[g.paint] || base?.parts?.[0]?.mat || 'white_paint';
+  const ink = DARK_MATS.has(mat) || mat === 'stainless' ? '#e8e8e8' : '#1b1d21';
+  const st = g.stages;
+  const parts = [];
+  const bell0 = num(st[0]?.engines?.bellLen, 1.5);
+  let y = Math.max(0.8, bell0 * 0.8);
+  const label = String(vehicle?.provider || vehicle?.name || '').toUpperCase().replace(/[^A-Z0-9À-Ú ]/g, '').trim().slice(0, 10);
+  st.forEach((s, i) => {
+    const d = num(s.d, 3);
+    const len = Math.max(1.5, num(s.len, 10));
+    const next = st[i + 1];
+    const last = i === st.length - 1;
+    const segs = [];
+    const keptNose = last && g.fairing?.kept;
+    if (next && Math.abs(num(next.d, d) - d) > 0.05) {
+      const tl = Math.min(len * 0.3, Math.max(1, Math.abs(num(next.d, d) - d) * 1.2));
+      segs.push({ len: len - tl, d }, { len: tl, d, dTop: num(next.d, d) });
+    } else if (keptNose) {
+      const nl = Math.min(num(g.fairing.len, 12), len * 0.6);
+      segs.push({ len, d }, { len: nl, d, nose: 'ogive', noseFrac: 0.6 });
+    } else segs.push({ len, d });
+    const p = {
+      id: i === 0 ? 's1' : `s${i + 1}`, role: i === 0 ? 'stage' : 'upper', y, len: segs.reduce((a, x) => a + x.len, 0), d, mat: s.module && i > 0 && s.prop === 'hydrolox' ? 'white_paint' : mat,
+      segs, engines: engineArt(s.engines, s.prop, { vac: i > 0, hidden: i > 0 && !keptNose && !s.module }),
+      frost: s.prop === 'hydrolox' || s.prop === 'kerolox' || s.prop === 'methalox' ? 0.45 : 0,
+    };
+    if (i === 0 && s.reuse) { p.legs = 4; p.legLen = Math.min(9, len * 0.2); p.gridFins = true; p.gridFinFromTop = 0.9; }
+    if (i === 0 && label && len > 14 && d >= 1.5) p.marks = [{ type: 'text', y: len * 0.18, h: Math.min(len * 0.45, 18), text: label, vertical: true, color: ink, size: Math.min(1.8, d * 0.45), s: -0.08, spacing: 0.22 }];
+    parts.push(p);
+    y += p.len + (i < st.length - 1 ? 0.2 : 0);
+  });
+  const top = y;
+  const b = g.boosters;
+  if (b && b.n > 0) {
+    const core = parts[0];
+    const bd = num(b.d, 1.5);
+    const bl = Math.min(num(b.len, 15), core.len * 1.05);
+    const nose = Math.min(bl * 0.18, bd * 1.6);
+    const bx = core.d / 2 + bd / 2 + 0.06;
+    const bm = b.prop === 'solid' ? (mat === 'orange_foam' ? 'white_paint' : mat) : mat;
+    const mk = (id, x, depth) => ({
+      id, role: 'booster', x, y: core.y, len: bl, d: bd, mat: bm, sep: 'boosterSep', ...(depth ? { depth } : {}),
+      segs: [{ len: bl - nose, d: bd }, { len: nose, d: bd, dTop: bd * 0.12, nose: 'cone' }],
+      engines: engineArt(b.engines, b.prop), ...(b.reuse ? { legs: 4, legLen: Math.min(7, bl * 0.18) } : {}),
+    });
+    parts.push(mk('bL', -bx, 0), mk('bR', bx, 0));
+    if (b.n >= 4) parts.push(mk('bF', 0, 1));
+  }
+  const art = {
+    name: vehicle?.name || 'Projeto', family: 'design', site: base?.site || null, tower: base?.tower || 'umbilical',
+    reuse: st[0]?.reuse ? 'droneship' : null, heightM: top + (g.fairing && !g.fairing.kept ? num(g.fairing.len, 5) : 0),
+    diameterM: Math.max(...parts.map((p) => Math.abs(p.x || 0) * 2 + p.d)), payloadTop: top, crewTop: g.fairing?.kept ? 'integrated' : 'craft', parts,
+  };
+  if (g.fairing && !g.fairing.kept) {
+    const fd = Math.max(num(g.fairing.d, 3), num(st[st.length - 1]?.d, 3) * 0.9);
+    art.fairing = { id: 'fairing', role: 'fairing', y: top, len: num(g.fairing.len, 5), d: fd, mat: mat === 'stainless' ? 'white_paint' : mat, nose: 'ogive', sep: 'fairing' };
+  }
+  return art;
+}
+
+/** Cache key part for a design (geometry changes while the player edits in the Hangar). */
+function designKey(v) {
+  const g = geometryOf(v);
+  return g ? `g${hash(JSON.stringify(g) + (v.name || '') + (v.design?.unmodified ? 'u' : ''))}` : '';
+}
+
 /** Art for a launcher (never null). */
 export function vehicleArt(vehicleId, vehicleData) {
   const V = ART?.vehicles || {};
+  const dsg = designFor(vehicleId, vehicleData);
+  if (dsg) return designArt(dsg);
   if (V[vehicleId]) return V[vehicleId];
   const guess = FAMILY_GUESS(vehicleData || { id: vehicleId });
   if (guess && V[guess]) return V[guess];
@@ -194,7 +308,8 @@ const STAGE_ROLES = new Set(['stage', 'booster', 'nose']);
 
 /** Full launch stack: vehicle parts + payload on top. Cached per (vehicle, craft, crewed). */
 export function resolveStack(vehicleId, craftId, { crewed = false, vehicleData, craftData } = {}) {
-  const key = `${vehicleId}|${craftId}|${crewed ? 1 : 0}|${ART ? 1 : 0}`;
+  const artKey = designKey(designFor(vehicleId, vehicleData));
+  const key = `${vehicleId}|${craftId}|${crewed ? 1 : 0}|${ART ? 1 : 0}|${artKey}`;
   const hit = STACKS.get(key);
   if (hit) return hit;
   const art = vehicleArt(vehicleId, vehicleData);
@@ -216,7 +331,7 @@ export function resolveStack(vehicleId, craftId, { crewed = false, vehicleData, 
   const heightM = Math.max(0, ...parts.map((p) => (p.y || 0) + (p.len || 0)));
   const maxWidthM = Math.max(1, ...parts.map((p) => Math.abs(p.x || 0) * 2 + Math.max(p.d || 1, ...(p.segs || []).map((s) => num(s.d, 0)))));
   const stack = {
-    id: key, vehicleId, craftId, heightM, maxWidthM, parts, art, craft, payload,
+    id: key, vehicleId, craftId, heightM, maxWidthM, parts, art, craft, payload, artKey,
     hasBoosters: parts.some((p) => p.sep === 'boosterSep'),
     hasLES: parts.some((p) => p.role === 'les'),
     site: art.site || null, tower: art.tower || 'umbilical', reuse: art.reuse || null,
@@ -968,7 +1083,8 @@ function partBody(stack, p) {
   let b = BODYC.get(p);
   if (b) return b;
   const baseId = String(p.id || 'part').replace(/:[LR]$/, '');
-  const owner = p.payload ? `c:${stack?.craftId || ''}` : `v:${stack?.vehicleId || ''}`;
+  // a design's geometry changes under the same id while the player edits it: its sprites are keyed by the geometry too
+  const owner = p.payload ? `c:${stack?.craftId || ''}` : `v:${stack?.vehicleId || ''}${stack?.artKey ? `#${stack.artKey}` : ''}`;
   b = {
     id: `${owner}|${baseId}|${p.role}`,
     segs: lesSegs(p) || p.segs, len: p.len, d: p.d, dTop: p.dTop, nose: p.nose, mat: p.mat, tint: p.tint, noseFrac: p.noseFrac, tipD: p.tipD, role: p.role,

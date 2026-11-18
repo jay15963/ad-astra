@@ -30,7 +30,7 @@ function rejects(fn, code) {
 
 test('binding pt-BR messages', () => {
   assert.deepEqual(SAVE_ERROR_MESSAGES, MSG);
-  assert.equal(SAVE_VERSION, 2);
+  assert.equal(SAVE_VERSION, 3); // v2 + the v2 → v3 migration registered by investors.js (Phase B)
 });
 
 test('v1 fixture (Corrida Lunar, week 120, mission in transit) migrates to v2', () => {
@@ -38,7 +38,7 @@ test('v1 fixture (Corrida Lunar, week 120, mission in transit) migrates to v2', 
   assert.equal(raw.version, 1);
   assert.ok(raw.missions.some((m) => m.status === 'transit'), 'fixture tem missão em trânsito');
   const s = deserialize(v1Text, data);
-  assert.equal(s.version, 2);
+  assert.equal(s.version, 3); // v1 → v2 → v3 (investors.js registers v2 → v3 through the engine)
   assert.equal(s.scenarioId, 'lunar_race');
   assert.equal(s.turn, raw.turn);
   assert.deepEqual(s.clock, {
@@ -123,19 +123,21 @@ test('v2 saves load unchanged; string input is never mutated, object input is mi
   assert.equal(serialize(deserialize(text, data)), text);
   const obj = JSON.parse(v1Text);
   const out = migrate(obj, data);
-  assert.equal(out.version, 2);
+  assert.equal(out.version, 3);
 });
 
-test('later phases can register v2 → v3 without editing the table', () => {
-  assert.equal(targetVersion(), 2);
-  registerMigration(2, (s) => { s.cap = { player: 100 }; return s; });
+test('later phases register migrations without editing the table (v2 → v3 by investors.js; a test v3 → v4)', () => {
+  assert.equal(targetVersion(), 3);
+  assert.equal(typeof MIGRATIONS[2], 'function', 'v2 → v3 registered on import of investors.js');
+  registerMigration(3, (s) => { s.extra = { ok: true }; return s; });
   try {
-    assert.equal(targetVersion(), 3);
+    assert.equal(targetVersion(), 4);
     const s = migrate(v1Text, data);
-    assert.equal(s.version, 3);
-    assert.deepEqual(s.cap, { player: 100 });
+    assert.equal(s.version, 4);
+    assert.equal(s.cap, null);
+    assert.deepEqual(s.extra, { ok: true });
   } finally {
-    delete MIGRATIONS[2];
+    delete MIGRATIONS[3];
   }
-  assert.equal(targetVersion(), 2);
+  assert.equal(targetVersion(), 3);
 });

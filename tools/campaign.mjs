@@ -1,6 +1,10 @@
 // Headless campaign 1950 → 3000 (EXPANSION.md §13.10).
-// Usage: node tools/campaign.mjs [seeds=1] [--fast] [--from e1|<year>] [--to e7] [--actor nasa] [--quiet]
+// Usage: node tools/campaign.mjs [seeds=1] [--fast] [--from e1|<year>] [--to e7] [--actor nasa] [--found] [--min-pct 50] [--quiet]
 //   --fast   the bot only resolves cards and plays launches (no own missions): measures the engine and the world
+//   --found  the bot founds its own agency at turn 0 (agency/found, Phase B) instead of directing --actor
+//   --min-pct  stake the bot keeps in investor rounds (Phase B; default 50 = autonomy)
+// The bot is tools/bot-b.mjs (Phase B moves: investor rounds, mandates, Hangar designs and test flights) over the
+// shared golden bot; without investors.js/designs.js it plays exactly like the golden bot.
 //   --from   start at an era's first year (or a given year) with a scenario built from data (no simulated past)
 //   --to     stop when the game enters the era after this one
 // Per era it prints: turns, ms/turn, save KB, live core/minor actors, births/merges/dissolutions, stops per turn.
@@ -12,7 +16,7 @@ import { loadDataNode } from '../src/core/data.js';
 import * as engine from '../src/core/engine.js';
 import { eraAt, eraById, formatTurnEra, yearOf } from '../src/core/time.js';
 import { NEWS_CAP, LOG_CAP } from '../src/core/helpers.js';
-import { botStep } from './golden.mjs';
+import { phaseBStep, phaseBStats, foundAgency } from './bot-b.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -54,9 +58,15 @@ function hasNaN(state) {
  * Play one campaign. Returns {state, eras: [{eraId, turns, ms, saveKB, core, minor, stops, births, merges, gone}],
  * ending, totalMs, errors}.
  */
-export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null } = {}) {
+export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null, found = false, minPct = 50 } = {}) {
   const errors = [];
   let state = engine.newGame(data, { seed, playerId });
+  let founded = null;
+  if (found) {
+    founded = foundAgency(state, data, engine, { seed });
+    if (!founded) errors.push('aviso: agency/found indisponível ou recusado; seguindo com o ator escolhido');
+  }
+  const botMem = {};
   const eras = [];
   let cur = null;
   const openEra = () => {
@@ -98,7 +108,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
       openEra();
     }
     try {
-      botStep(state, data, engine, { schedule: !fast });
+      phaseBStep(state, data, engine, { schedule: !fast, minPct }, botMem);
     } catch (e) {
       errors.push(`bot t${state.turn}: ${e.message}`);
       break;
@@ -127,7 +137,9 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
   if (cur) closeEra();
   const errs = state.log.filter((l) => l.includes('erro'));
   if (errs.length) errors.push(`erros no log: ${errs.slice(0, 3).join(' | ')}`);
-  return { state, eras, ending: state.gameOver?.ending ?? null, reason: state.gameOver?.reason ?? null, totalMs: Date.now() - t0, errors };
+  // founding refused is a note, not a failure (Phase B may not be integrated yet)
+  const hard = errors.filter((e) => !e.startsWith('aviso:'));
+  return { state, eras, ending: state.gameOver?.ending ?? null, reason: state.gameOver?.reason ?? null, totalMs: Date.now() - t0, errors: hard, notes: errors.filter((e) => e.startsWith('aviso:')), founded, phaseB: phaseBStats(state) };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -144,11 +156,13 @@ if (isMain) {
   data = dataStartingAt(data, from);
   const toEra = opt('--to');
   const playerId = opt('--actor') || 'nasa';
+  const found = flag('--found');
+  const minPct = Number(opt('--min-pct') ?? 50);
   let failures = 0;
   for (let s = 1; s <= nSeeds; s++) {
     const seed = s * 7919;
     const res = runCampaign(data, {
-      seed, playerId, fast, toEra,
+      seed, playerId, fast, toEra, found, minPct,
       onEra: quiet ? null : (e, st) => console.log(
         `  ${e.eraId} até ${e.endYear}: ${e.turns} turnos, ${(e.ms / Math.max(1, e.turns)).toFixed(1)} ms/turno, save ${e.saveKB} KB, ` +
         `atores ${e.core} núcleo/${e.minor} menores, nasc ${e.births} ev ${e.events} fim ${e.gone}, paradas/turno ${(e.stops / Math.max(1, e.turns)).toFixed(2)}` +
@@ -162,6 +176,10 @@ if (isMain) {
     console.log(`${ok ? 'ok' : 'FALHA'} ${playerId} seed=${seed} ${res.totalMs} ms, fim=${res.reason ?? '-'}${res.ending ? `/${res.ending}` : ''} ` +
       `em ${formatTurnEra(st.turn, st.startYear, st.clock?.stepWeeks ?? 1)} (turno ${st.turn}, era ${eraAt(data, yearOf(st))?.id})` +
       (res.errors.length ? `\n  ${res.errors.slice(0, 5).join('\n  ')}` : ''));
+    const b = res.phaseB;
+    if (!quiet) console.log(`  fase B: ${res.founded ? `agência fundada ${res.founded}, ` : ''}${b.playerPct != null ? `fatia ${Math.round(b.playerPct)}% (${b.holders} acionistas), ` : 'sem acionistas, '}` +
+      `mandatos ${b.mandates} (${b.mandateMissions} missões, ${b.programMandates} programas), projetos ${b.designs} (${b.operational} operacionais), voos de teste ${b.testFlights}, voos em projeto próprio ${b.designFlights}` +
+      (res.notes.length ? `\n  ${res.notes.join('\n  ')}` : ''));
   }
   process.exitCode = failures ? 1 : 0;
 }

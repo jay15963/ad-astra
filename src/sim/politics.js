@@ -128,7 +128,19 @@ function lineageNationAt(state, data, actorId, turn = state.turn) {
   return hit;
 }
 const nationName = (data, id) => nationDef(data, id)?.name || id;
-const factionDef = (nd, fid) => nd?.factions?.find((f) => f.id === fid) || nd?.factions?.[0] || null;
+// first faction by id (same as factions.find), indexed once per data list
+const FACTION_IDX = new WeakMap();
+const factionDef = (nd, fid) => {
+  const list = nd?.factions;
+  if (!list) return null;
+  let m = FACTION_IDX.get(list);
+  if (!m) {
+    m = new Map();
+    for (const f of list) if (!m.has(f.id)) m.set(f.id, f);
+    FACTION_IDX.set(list, m);
+  }
+  return m.get(fid) || list[0] || null;
+};
 const priorityLabel = (data, pid) => PD(data).priorities?.[pid]?.label || pid || '';
 const levelLabel = (level) => PD().levels?.[level]?.label || LEVEL_LABELS[clamp(level | 0, 0, 4)];
 export { levelLabel };
@@ -332,12 +344,13 @@ export function init(state, data, ctx) {
     if (!w.nations[p.a] || !w.nations[p.b] || p.a === p.b) continue;
     const lvl = Array.isArray(p.initial) ? rng.int(p.initial[0], p.initial[1]) : (p.initial ?? 0);
     w.pairs[relKey(p.a, p.b)] = { a: p.a, b: p.b, level: clamp(lvl, 0, 4), pressure: r3(rng.range(-0.2, 0.2)), sinceTurn: 0, peak: lvl, changes: 0 };
+    PAIRS_VER++;
   }
   // ensure every nation pair exists (pairs missing from data get baseline 0)
   const ids = Object.keys(w.nations);
   for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
     const k = relKey(ids[i], ids[j]);
-    if (!w.pairs[k]) w.pairs[k] = { a: ids[i], b: ids[j], level: 0, pressure: 0, sinceTurn: 0, peak: 0, changes: 0 };
+    if (!w.pairs[k]) { w.pairs[k] = { a: ids[i], b: ids[j], level: 0, pressure: 0, sinceTurn: 0, peak: 0, changes: 0 }; PAIRS_VER++; }
   }
   // election schedule
   for (const e of pd.elections || []) {
@@ -458,6 +471,22 @@ export function nudgeTension(state, a, b, delta, reason = 'externo', data = null
   return setTension(state, a, b, tensionBetween(state, a, b) + Math.round(delta), reason, data);
 }
 
+// Pair list in insertion order (what for-in / Object.entries give), rebuilt only when this module adds or deletes a
+// pair (PAIRS_VER) or another world object is in play (a loaded save). Walking 600 dictionary keys every week was a
+// top cost of the late campaign.
+let PAIRS_VER = 0;
+const PAIRS_CACHE = { pairs: null, ver: -1, keys: [], objs: [] };
+function pairList(w) {
+  const pairs = w.pairs;
+  if (PAIRS_CACHE.pairs !== pairs || PAIRS_CACHE.ver !== PAIRS_VER) {
+    PAIRS_CACHE.pairs = pairs;
+    PAIRS_CACHE.ver = PAIRS_VER;
+    PAIRS_CACHE.keys = Object.keys(pairs);
+    PAIRS_CACHE.objs = PAIRS_CACHE.keys.map((k) => pairs[k]);
+  }
+  return PAIRS_CACHE;
+}
+
 function syncPair(state, pk, byNation = null) {
   const p = state.world.pairs[pk];
   if (!p) return;
@@ -474,42 +503,52 @@ function syncPair(state, pk, byNation = null) {
  */
 // nation pairs with actors on both sides (the only ones reconcileExternal can touch), memoized on the actor→nation
 // map and the pair count: 630 pairs in a late campaign, most of them between nations with no agency
-const LIVE_PAIRS = { sig: null, list: [] };
-function livePairs(state, byNation) {
+const LIVE_PAIRS = { sig: null, pairs: null, ver: -1, list: [], keys: new Map() };
+function livePairs(state) {
   const an = state.world?.actorNation || {};
   const pairs = state.world.pairs;
-  let sig = String(Object.keys(pairs).length);
+  const PL = pairList(state.world);
+  let sig = String(PL.keys.length);
   for (const k in an) sig += `|${k}:${an[k]}`;
-  if (LIVE_PAIRS.sig !== sig || LIVE_PAIRS.pairs !== pairs) {
+  if (LIVE_PAIRS.sig !== sig || LIVE_PAIRS.pairs !== pairs || LIVE_PAIRS.ver !== PL.ver) {
+    const byNation = nationActorsMap(state);
     LIVE_PAIRS.sig = sig;
     LIVE_PAIRS.pairs = pairs;
-    LIVE_PAIRS.list = Object.keys(pairs).filter((pk) => (byNation[pairs[pk].a] || []).length && (byNation[pairs[pk].b] || []).length);
+    LIVE_PAIRS.ver = PL.ver;
+    LIVE_PAIRS.list = PL.keys.filter((pk) => (byNation[pairs[pk].a] || []).length && (byNation[pairs[pk].b] || []).length);
+    // actor-pair keys of each live nation pair, in the order the nested actor loops visit them
+    LIVE_PAIRS.keys = new Map();
+    for (const pk of LIVE_PAIRS.list) {
+      const ks = [];
+      for (const x of byNation[pairs[pk].a] || []) for (const y of byNation[pairs[pk].b] || []) ks.push(relKey(x, y));
+      LIVE_PAIRS.keys.set(pk, ks);
+    }
   }
-  return LIVE_PAIRS.list;
+  return LIVE_PAIRS;
 }
 
 function reconcileExternal(state, data) {
   const M = PD(data).tensionModel || {};
-  const byNation = nationActorsMap(state);
-  for (const pk of livePairs(state, byNation)) {
+  const live = livePairs(state);
+  const T = state.tension;
+  for (const pk of live.list) {
     const p = state.world.pairs[pk];
     if (!p) continue;
+    const ks = live.keys.get(pk);
     let ext = null;
     let dirty = false;
-    for (const x of byNation[p.a] || []) {
-      for (const y of byNation[p.b] || []) {
-        const v = state.tension[relKey(x, y)];
-        if (v !== p.level) dirty = true;
-        if (typeof v === 'number' && Math.round(v) !== p.level) { ext = clamp(Math.round(v), 0, 4); break; }
-      }
-      if (ext != null) break;
+    for (let i = 0; i < ks.length; i++) {
+      const v = T[ks[i]];
+      if (v !== p.level) dirty = true;
+      if (typeof v === 'number' && Math.round(v) !== p.level) { ext = clamp(Math.round(v), 0, 4); break; }
     }
-    if (ext == null) { if (dirty) syncPair(state, pk, byNation); continue; } // all in step: nothing to write
+    // in step: nothing to write (the same writes, in the same order, as syncPair over the actor lists)
+    if (ext == null) { if (dirty) for (const k of ks) if (T[k] !== p.level) T[k] = p.level; continue; }
     const delta = ext - p.level;
     if (Math.abs(delta) >= 2) applyLevel(state, data, pk, ext, 'externo');
     else {
       p.pressure = r3(p.pressure + delta * (M.externalImpulse ?? 0.45));
-      syncPair(state, pk, byNation);
+      for (const k of ks) if (T[k] !== p.level) T[k] = p.level;
       log(state, `politics: incidente externo em ${pk} vira pressão (${p.pressure})`);
     }
   }
@@ -669,8 +708,8 @@ function exitLevel(state, data, pk, L) {
 function updateGlobalTension(state) {
   // the three highest levels in one pass (same result as sorting every pair each week)
   let t0 = -Infinity, t1 = -Infinity, t2 = -Infinity, n = 0;
-  for (const k in state.world.pairs) {
-    const x = state.world.pairs[k].level;
+  for (const pr of pairList(state.world).objs) {
+    const x = pr.level;
     n++;
     if (x > t0) { t2 = t1; t1 = t0; t0 = x; } else if (x > t1) { t2 = t1; t1 = x; } else if (x > t2) t2 = x;
   }
@@ -682,6 +721,7 @@ function updateGlobalTension(state) {
 
 // ---------------------------------------------------------------- monthly dynamics
 
+const EMPTY_DEF = Object.freeze({});
 function tensionDynamics(state, data, rng) {
   const pd = PD(data);
   const M = pd.tensionModel || {};
@@ -701,23 +741,41 @@ function tensionDynamics(state, data, rng) {
   // lead agency per nation, once per month (the actors do not change inside this loop)
   const leads = new Map();
   const lead = (nid) => { let x = leads.get(nid); if (x === undefined) { x = leadActor(state, data, nid); leads.set(nid, x); } return x; };
-  for (const [pk, p] of Object.entries(w.pairs)) {
-    const def = pairDef(data, pk) || {};
-    const na = nationDef(data, p.a);
-    const nb = nationDef(data, p.b);
+  // per nation, once per month (nothing in this loop changes governments or crises): the government's hawkishness
+  // and the instability added by an economic crisis (null = none)
+  const hawks = new Map();
+  const hawk = (nid) => {
+    let h = hawks.get(nid);
+    if (h === undefined) { h = factionDef(nationDef(data, nid), w.nations[nid]?.government.exec)?.hawk ?? 0.5; hawks.set(nid, h); }
+    return h;
+  };
+  const instab = new Map();
+  const instability = (nid) => {
+    let v = instab.get(nid);
+    if (v === undefined) {
+      const c = w.nations[nid]?.econ.crisis;
+      v = c ? pd.crises?.[c.type]?.instability ?? 0.05 : null;
+      instab.set(nid, v);
+    }
+    return v;
+  };
+  const PL = pairList(w);
+  for (let pi = 0; pi < PL.keys.length; pi++) {
+    const pk = PL.keys[pi], p = PL.objs[pi];
+    const def = pairDef(data, pk) || EMPTY_DEF;
     let drive = ((def.baseline ?? 0.2) - p.level) * (M.meanReversion ?? 0.12);
     // diplomacy relations between lead agencies (if diplomacy runs)
     const rel = state.relations?.[relKey(lead(p.a), lead(p.b))];
     if (rel) drive += (((rel.rivalry ?? 30) - 40) / 100) * (M.rivalryFactor ?? 0.08) - ((rel.trust ?? 0) / 100) * (M.trustFactor ?? 0.05);
     // hawkish governments push up
-    const ha = factionDef(na, w.nations[p.a]?.government.exec)?.hawk ?? 0.5;
-    const hb = factionDef(nb, w.nations[p.b]?.government.exec)?.hawk ?? 0.5;
+    const ha = hawk(p.a);
+    const hb = hawk(p.b);
     drive += (ha + hb - 1) * (M.hawkFactor ?? 0.08) * (p.level > 0 || def.baseline > 0.5 ? 1 : 0.3);
     // economic instability breeds friction
-    for (const nid of [p.a, p.b]) {
-      const c = w.nations[nid]?.econ.crisis;
-      if (c) drive += pd.crises?.[c.type]?.instability ?? 0.05;
-    }
+    const ia = instability(p.a);
+    if (ia !== null) drive += ia;
+    const ib = instability(p.b);
+    if (ib !== null) drive += ib;
     // bilateral peaceful treaties dampen
     const la = lead(p.a);
     const lb = lead(p.b);
@@ -830,12 +888,11 @@ function pairCandidates(state, data, def) {
   const w = state.world;
   const lo = def.minLevel ?? 0, hi = def.maxLevel ?? 4, bias = def.levelBias ?? 0.4;
   const out = [];
-  const add = (a, b) => {
-    const p = w.pairs[relKey(a, b)];
+  const add = (a, b, p = w.pairs[relKey(a, b)]) => {
     if (p.level >= lo && p.level <= hi) out.push({ a, b, p, weight: 1 + p.level * bias + Math.max(0, p.pressure) * 0.5 });
   };
   // one pass (a late campaign has 600+ pairs and this runs for every eligible event each month)
-  if (def.pairs === 'any' || !def.pairs) for (const k in w.pairs) add(w.pairs[k].a, w.pairs[k].b);
+  if (def.pairs === 'any' || !def.pairs) for (const pr of pairList(w).objs) add(pr.a, pr.b, pr); // every pair is stored under relKey(a, b)
   else for (const [a, b] of def.pairs) if (w.pairs[relKey(a, b)]) add(a, b);
   return out;
 }
@@ -2348,6 +2405,7 @@ export function ensureNation(state, data, nationId, ctx) {
       const p = (PD(data).pairs || []).find((x) => relKey(x.a, x.b) === k);
       const lvl = Array.isArray(p?.initial) ? p.initial[0] : (p?.initial ?? 0);
       w.pairs[k] = { a: nationId < other ? nationId : other, b: nationId < other ? other : nationId, level: clamp(lvl, 0, 4), pressure: 0, sinceTurn: state.turn, peak: lvl, changes: 0 };
+      PAIRS_VER++;
       syncPair(state, k);
     }
   }
@@ -2371,7 +2429,7 @@ export function retireNation(state, data, nationId, { into = null } = {}, ctx) {
   const succ = Array.isArray(into) ? into[0] : into;
   if (succ && !w.nations[succ]) ensureNation(state, data, succ, ctx);
   delete w.nations[nationId];
-  for (const k of Object.keys(w.pairs)) if (w.pairs[k].a === nationId || w.pairs[k].b === nationId) delete w.pairs[k];
+  for (const k of Object.keys(w.pairs)) if (w.pairs[k].a === nationId || w.pairs[k].b === nationId) { delete w.pairs[k]; PAIRS_VER++; }
   w.elections = (w.elections || []).filter((e) => e.nation !== nationId || e.done);
   for (const [id, n] of Object.entries(w.actorNation || {})) {
     if (n !== nationId) continue;

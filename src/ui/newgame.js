@@ -2,6 +2,7 @@
 import { h, raw, chip, flagPrefix, button, icon, fmtMoney, fmtDate, sectionTitle, confirmDialog, attempt, safePanel, toast, FIRST_LABELS } from './components.js';
 import { playableAtStart } from './store.js';
 import { emblemSVG } from './portrait.js';
+import { useEmblemData, emblemSVG as drawEmblem, specFromSeed } from './emblem.js';
 import { APP_VERSION } from './settings.js';
 
 // Title poster: rocket + moon over a sunburst, in the sober palette (DESIGN §2): navy/graphite rays, a pale
@@ -65,6 +66,18 @@ export function titleModes(list) {
   return { campaign, scenarios };
 }
 
+/** The founding entry is styled by css/found.css (linked once). */
+function ensureFoundCss() {
+  try {
+    if (typeof document === 'undefined' || document.querySelector('link[data-found-css]')) return;
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = new URL('./css/found.css', import.meta.url).href;
+    l.dataset.foundCss = '1';
+    document.head.appendChild(l);
+  } catch { /* Node */ }
+}
+
 /** Save the raw text of a rejected save as a local file (no network: a Blob link). */
 function downloadText(name, text) {
   try {
@@ -83,6 +96,8 @@ function downloadText(name, text) {
  */
 export function renderTitle(root, store, { onStart, onSettings } = {}) {
   root.innerHTML = '';
+  useEmblemData(store.data);
+  ensureFoundCss();
   const redraw = () => renderTitle(root, store, { onStart, onSettings });
   const info = store.saveInfo();
   const { campaign, scenarios } = titleModes(store.scenarios?.() || []);
@@ -101,8 +116,20 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
     }
   };
 
+  // founding branch (EXPANSION.md §5.3): the wizard takes the whole title page; cancel comes back here
+  const openFounding = async () => {
+    try {
+      const m = await import('./found-agency.js');
+      m.renderFoundWizard(root, store, { seed: Number(seedInput.value) || randomSeed(), onDone: () => onStart?.(), onCancel: () => { redraw(); } });
+    } catch (e) {
+      console.error(e);
+      toast('Não foi possível abrir a fundação de agência.', 'bad');
+    }
+  };
+
   const fillPicker = () => {
     const data = store.data;
+    useEmblemData(data);
     const playable = playableAtStart(data);
     const year = data?.scenario?.start?.year ?? data?.scenario?.startYear;
     picker.innerHTML = '';
@@ -113,6 +140,7 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
         : 'Cada ator tem verba, aliados e rivais próprios. O mundo reage diferente a cada campanha.'),
       playable.length ? h('div', { class: 'list actor-list' }, playable.map((a) => actorRow(store, a, () => startGame(a.id))))
         : h('div', { class: 'aviso warn' }, 'Nenhuma agência jogável nesta data.'),
+      foundEntry(store, () => openFounding()),
       h('details', { class: 'advanced' },
         h('summary', null, icon('avancar', 16), 'Opções avançadas'),
         h('label', { class: 'field' }, h('span', null, 'Semente do mundo (mesma semente, mesmo mundo)'), seedInput)));
@@ -200,6 +228,21 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
     onSettings ? h('div', { class: 'btn-col title-actions' }, button('Ajustes', onSettings, { icon: 'ajustes', big: true })) : null,
     h('footer', { class: 'title-foot' }, `v${APP_VERSION} · passado fiel até hoje; o futuro é simulação`));
   root.appendChild(h('div', { class: 'title-page' }, screen));
+}
+
+/** "Fundar a sua" entry under the agency list, when the scenario allows founding (scenario.playable.found). */
+function foundEntry(store, onOpen) {
+  const sc = store.data?.scenario || {};
+  if (!(sc.playable?.found ?? false)) return null;
+  const year = sc.start?.year ?? sc.startYear;
+  return h('div', { class: 'fa-entry-wrap' },
+    sectionTitle('Ou comece do zero'),
+    h('button', { class: 'fa-entry', type: 'button', onclick: onOpen },
+      raw(drawEmblem(specFromSeed('found-entry', { kind: 'agency', label: 'NOVA' }), { size: 40, detail: 1 }), 'fa-entry-em'),
+      h('div', { class: 'list-text' },
+        h('div', { class: 'list-title' }, 'Fundar a sua agência'),
+        h('div', { class: 'list-sub' }, `Escolha o país, a sede e desenhe o logo. Começa pequena${year ? ` em ${year}` : ''}, 100% sua.`)),
+      icon('avancar', 16, 'list-chev')));
 }
 
 /** One agency row of the picker. */

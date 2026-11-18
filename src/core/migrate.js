@@ -2,6 +2,8 @@
 // v1 (v0.5, all Corrida Lunar) → v2 (clock, eras, lifecycle, annals). Later phases add entries to MIGRATIONS
 // (Phase B: v2 → v3 in src/core/migrations/v3.js, registered with registerMigration).
 
+import { unpackState } from './savepack.js';
+
 export const SAVE_VERSION = 2;
 
 /** Player-facing rejection texts (pt-BR, binding wording). */
@@ -87,6 +89,8 @@ export function migrate(raw, data) {
     try { s = JSON.parse(raw); } catch (e) { throw new SaveError('unreadable', `JSON: ${e.message}`); }
   } else s = raw;
   if (!isObj(s)) throw new SaveError('unreadable', 'não é um objeto');
+  // compact encoding of long-campaign saves (src/core/savepack.js): back to the plain state first
+  try { unpackState(s); } catch (e) { throw new SaveError('unreadable', `pacote: ${e.message}`); }
   const v = Number(s.version);
   if (!Number.isInteger(v) || v < 1) throw new SaveError('unreadable', `versão ${s.version}`);
   const target = targetVersion();

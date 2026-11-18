@@ -1,6 +1,12 @@
 # PROGRESS — Ad Astra (web)
 
 ## Estado (nov/2026)
+- **Versão 0.7.0 — Fase B: o jogador e suas ferramentas.** Fundar a própria agência (tipo, país, sede no mapa, nome e logo
+  editável), emblemas novos para todas as agências, investidores e participação (mandatos no lugar das missões de programa,
+  rodadas anuais, autonomia com ≥ 50%, conselho que demite), Hangar (licenciar e editar um foguete existente ou montar do zero,
+  desenvolvimento e voos de teste), mapa-múndi por época (Guerra Fria, URSS, colônias) e mapa espacial até o setor estelar e a
+  galáxia com névoa de guerra. Telas novas: Conselho, Identidade e logo, Hangar, Finanças, Calendário de lançamentos, Anais.
+  Detalhes em "v0.7.0" abaixo.
 - **Versão 0.6.0 — Fase A da expansão 1950–3000** (alicerce; contrato em `docs/EXPANSION.md`). Nova **Campanha 1950 → jan/3000**
   jogável de ponta a ponta (7 eras, passo de tempo que cresce de 1 semana a 1 ano, agências que nascem, mudam de nome, se fundem
   e acabam com a história real até 2030 e por geração depois, cartão final em 3000 com Contato · Silêncio · Herança). A
@@ -172,6 +178,63 @@ Métricas finais:
 - Certificação: SpaceX jogadora tem a Starship certificada pelo calendário ~turno 96–105; New Glenn (Blue Origin) certificada nas
   campanhas de teste da SpaceX; com a NASA jogadora a Starship pode não ser certificada (demo do HLS atrasa/falha).
 
+## v0.7.0 — Fase B: o jogador e suas ferramentas (nov/2026)
+- **Fundar agência** (B1): cartão "Fundar a sua agência" na escolha da Campanha → assistente de 4 passos (tipo · país e sede
+  no mapa, com cidades sugeridas e bases de lançamento · nome, sigla e logo · resumo com números e dificuldade). 93 cidades
+  em 37 nações (`data/core/hq-sites.json`); empresa privada só a partir de 1980; só nações vivas em 1950 (URSS sim, Rússia não).
+  `agency/found` no sim (antes do primeiro passo), `agency/emblem` para trocar o logo depois (tela Identidade).
+- **Emblemas** (B1, `src/ui/emblem.js`): 7 formas, 5 padrões, 11 símbolos, estrelas, órbitas, anel com texto ou fita com lema;
+  44 identidades originais para as 33 linhagens reais (nenhum logo oficial copiado); procedural por id para as geradas.
+- **Investidores** (B2, `src/sim/investors.js`): até 90% com investidores; ≥ 50% = autonomia; abaixo disso mandatos
+  obrigatórios, poucas vagas próprias (K = 6: 100% → 6 próprias, 50% → 2, 10% → 1) e o conselho pode demitir. Missões de
+  programa viram mandatos do governo (agências nacionais) ou dos fundadores (empresas). Save v2 → v3.
+- **Hangar** (B3, `src/sim/designs.js`, `data/core/parts.json`): licença de foguete do catálogo ou rascunho de modelo (1, 2, 3
+  estágios, núcleo e propulsores, reutilizável); motores reais com empuxo/Isp/massa; capacidade por Tsiolkovsky (foguetes do
+  catálogo batem com a LEO real em ±10%); desenvolvimento pago por semana, voos de teste com lastro, depois qualquer missão.
+- **Mapas** (B4): mapa-múndi com épocas datadas (OTAN, Pacto de Varsóvia, URSS sem fronteiras internas, colônias hachuradas,
+  linha do tempo 1950→hoje) e sedes das agências fundadas; mapa espacial com Setor estelar (2200+, 56 estrelas até 41 a.l.) e
+  Galáxia (2600+), névoa de guerra (`state.explored`) e marcadores de colônia.
+- **Missões** (B5): mandato com selo do acionista, prazo e penalidade; agenda do ano na aba Programa; projetos do Hangar como
+  veículos; voos de teste no programa.
+- **Telas** (B6): Conselho, Identidade e logo, Finanças, Calendário de lançamentos, Anais (kit comum `screen-kit.js`).
+- **Desempenho**: sinais entregues só no 1º sub-passo (antes cada módulo tratava o mesmo sinal até 52 vezes por passo) e caches
+  na diplomacia: campanha completa de ~102 s para ~57 s (antes dos sistemas novos entrarem no jogo) e maior save de 392 → 282 KB.
+- **Integração final** (esta versão):
+  - `investors` e `parts` entraram no pacote `core` de `data/packs.json` (sem isso Conselho e Hangar ficavam inertes no jogo
+    real; só os testes carregavam os arquivos). Validador aceita o marcador `{pais}` dos nomes de investidor.
+  - Veto do conselho contava contratos pagos como "voos próprios" (NASA demitida em 2010 na semente 7919): agora só missões
+    `custom` contam, igual à agenda de `missions.js`.
+  - Mandato vencido deixava a missão em planejamento para sempre (155 rascunhos órfãos em 2200, save 430 KB): fecha com o
+    mandato (`missions.closeMandateMissions`).
+  - Decisão com escolha recusada (ex.: "Aceitar" com a agenda cheia) sumia da fila: agora o cartão volta. O bot de
+    `tools/golden.mjs` tenta a próxima escolha; o bot da Fase B recompra de qualquer acionista que não seja o âncora.
+  - `app.js` registra os emblemas no boot (`useEmblemData`) e redesenha quando chegam; `sw.js` precacheia `world-eras` e
+    `core/stars`; versão 0.7.0 (package.json, `APP_VERSION`, `SW_VERSION`, `BUILD 2026.11.18-2`).
+  - Testes `missions-phaseb` "fallback sem designs.js" passam a rodar sem `data.parts` (com o catálogo carregado o designs.js
+    assume os voos de teste, como deve).
+- **Medições (integração, 18/nov/2026)**: `npm test` → **554/554**; `node tools/validate-data.mjs` → "Dados válidos" (623
+  entidades em 9 pacotes, ≈ 771 KB de partida); `node tools/smoke.mjs 2` → 10/10 ok (`--found` ok); `node tools/campaign.mjs 1
+  --found --to e2` → fundada a 100%, sem erros; `full-campaign 7919 --compare-eager --to e4` → saves idênticos.
+  `node tools/full-campaign.mjs` (pacotes sob demanda, bot da Fase B):
+
+  | Era | 7919 nasa | 15838 nasa |
+  |---|---|---|
+  | e1 1950–1976 | 545 t · 3,4 ms/t · 92 KB | 545 t · 3,8 ms/t · 94 KB |
+  | e2 1976–2000 | 312 t · 6,3 ms/t · 126 KB | 312 t · 7,5 ms/t · 127 KB |
+  | e3 2000–2026 | 669 t · 4,9 ms/t · 225 KB | 669 t · 4,4 ms/t · 232 KB |
+  | e4 2026–2051 | 859 t · 3,5 ms/t · 306 KB | 896 t · 3,0 ms/t · 302 KB |
+  | e5 2051–2200 | 1.961 t · 6,1 ms/t · 322 KB | 2.587 t · 4,6 ms/t · 332 KB |
+  | e6 2200–2600 | 4.184 t · 6,4 ms/t · 324 KB | (até 2397) 1.596 t · 7,9 ms/t · 334 KB |
+  | e7 2600–3000 | (até 2941) 2.555 t · 7,8 ms/t · 321 KB | — |
+  | **Total** | 11.085 t · 121 s · fim **conselho** em 2941 | 6.605 t · 61 s · fim **conselho** em 2397 |
+
+  (KB = maior save numa virada de ano na era; teto 400 KB respeitado.) As duas terminam sem erro, mas o conselho demite o bot:
+  ver Pendências 1.
+- **Telas conferidas** (Chrome headless 390×844, `tools/_scratch/ref/faseB-final-*.png`): fundação (entrada, 4 passos, editor
+  de logo), Painel e gaveta da agência fundada, Conselho e mandatos, missão com mandato, Programa, Hangar e editor, mundo 2026
+  e 1962 (com legenda), mapa espacial no Setor (2300) e no Sistema Solar, galeria de emblemas. Sem estouro horizontal, sem
+  "undefined/NaN", sem erros de console.
+
 ## v0.6.0 — Fase A: alicerce da expansão 1950–3000 (nov/2026)
 - **Tempo e eras**: `data/core/eras.json` (7 eras, 9 faixas de passo). Cada toque no disco avança um passo (+1 sem … +1 ano),
   encurtado no próximo compromisso do jogador ("até o lançamento"), na troca de era ou no fim. Chip de data por faixa
@@ -221,12 +284,11 @@ Métricas finais:
 ## Roteiro (expansão 1950–3000 em 4 fases; contrato em docs/EXPANSION.md)
 - **Fase A — alicerce: FEITA (v0.6.0).** Motor de tempo/eras 1950–3000, cenários, ciclo de vida dinâmico das agências, simulação
   independente da era, pipeline de dados por era, shell com gaveta ☰ e registro de telas, escolha do veículo pelo jogador (item 9).
-- **Fase B — o jogador e suas ferramentas (próxima).** Criar agência do zero (sede, país, logo personalizado; `agency/found`) e
-  logos melhores para todas as agências; investidores e participação (`state.cap`: até 90% com investidores, autonomia com
-  ≥ 50%, missões de programa viram missões de investidor, mais mandatos quanto menor a fatia do jogador; tela Conselho; migração
-  v2 → v3); construtor de foguetes (comprar e editar ou montar do zero a partir dos existentes; tela Hangar; voos de teste);
-  mapas mundial e espacial melhorados; telas Identidade, Finanças e Calendário de lançamentos completas.
-- **Fase C — conteúdo das 7 eras e o final de 3000.** Vocabulário congelado; por era: atores e eventos de ciclo de vida com fonte,
+- **Fase B — o jogador e suas ferramentas: FEITA (v0.7.0).** Fundar agência (sede, país, logo editável) e emblemas novos para
+  todas; investidores e participação (`state.cap`, mandatos, rodadas, conselho; save v3); Hangar (licença ou do zero, voos de
+  teste); mapa-múndi por época e mapa espacial até setor/galáxia com névoa; telas Conselho, Identidade, Hangar, Finanças,
+  Calendário de lançamentos e Anais.
+- **Fase C — conteúdo das 7 eras e o final de 3000 (próxima).** Vocabulário congelado; por era: atores e eventos de ciclo de vida com fonte,
   foguetes/naves com `design`, destinos, calendário, tech tier, ≥ 120 eventos, tom das notícias, investidores, tripulação,
   snapshot e um cenário curto; separar `legacy-e4` em `core/` + `eras/e4/`; geradores para e5+; o mistério do Eco e "O Grande
   Silêncio" com os 3 finais; colônias; Anais.
@@ -242,8 +304,26 @@ Métricas finais:
   aprovado, Supabase (login, saves na nuvem, ligas semanais).
 - Depois do turno 10 o corte vertical "Corrida Lunar" fecha; as outras eras do GDD entram como expansões de conteúdo.
 
-## Pendências (por prioridade, atualizado na v0.6.0)
-Da Fase A:
+## Pendências (por prioridade, atualizado na v0.7.0)
+Da Fase B:
+1. **O conselho demite o bot nas campanhas longas** (7919 em 2941, 15838 em 2397): o bot vende abaixo de 50% quando o caixa
+   aperta, as penalidades de mandato perdido passam ações para o governo (15838 terminou com 10%) e muitos mandatos vencem
+   sem voo (o bot não agenda quando o caixa ficaria abaixo de US$ 150 mi, e alguns destinos de mandato ficam fora do alcance
+   do hardware da época). Decidir na Fase D se é o bot ou o equilíbrio (penalidade em ações, frequência de mandatos de
+   programa em e5+, prazo mínimo); um jogador humano tem a recompra e a autonomia.
+2. **Bot sem recompra por décadas**: com caixa de US$ 14 bi desde 1965 a NASA do bot só recomprou ações em ~2003 (agora
+   recompra de qualquer acionista não-âncora; conferir `mem.noBuyback` e o preço pelo valor da agência).
+3. **Hangar só a partir de 1957** (`unlocks.builder`) e o Conselho aparece depois do primeiro passo (a tabela de acionistas
+   nasce no tick): a gaveta de uma agência recém-fundada em jan/1950 não mostra os dois. Conferir se é o esperado.
+4. **Nomes repetidos de agências geradas**: em 2300 aparecem três "Tycho …" diferentes com a mesma sigla; o gerador
+   (`actor-gen.json`) deve evitar siglas iguais entre agências vivas.
+5. **Velocidade**: com os sistemas novos a campanha completa voltou a ~120 s na semente 7919 (meta ≤ 60 s); o custo por turno
+   está estável (3–8 ms), o tempo cresce com o número de turnos jogados.
+6. Não verificado em celular real: assistente de fundação (mapa por toque), editor de logo em folha e Hangar em 320 px numa
+   partida longa (os builders conferiram 320×640 nas próprias telas).
+
+Da Fase A (itens 1, 2 e 7 resolvidos na Fase B: velocidade, saves com folga, esboços de Conselho/Identidade/Hangar e
+`agency/found` substituídos):
 1. **Velocidade da campanha longa**: `tools/campaign.mjs 1 --fast` leva ~95 s e `full-campaign` ~97–105 s (meta ≤ 60 s). O custo por
    turno cresce com o tempo (1,4 ms em e1 → ~80 ms em e7) mesmo com menos atores vivos em e7: algo acumula (histórico, listas do
    catálogo ou a IA de diplomacia). Medir por módulo na Fase D (ou antes, se e5+ ficarem lentos no celular).

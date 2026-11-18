@@ -8,7 +8,8 @@
 //   load() -> Promise<{render}>       (lazy module),
 //   go: 'tab/sub'                      (optional: a drawer shortcut into a sub-view of another screen),
 //   action: 'title'                    (optional: a drawer item that runs a shell action instead of a screen),
-//   soon: 'B' | 'C'                    (optional: the phase that delivers it; the stub says "em breve") }
+//   soon: 'B' | 'C'                    (optional: the phase that delivers it; the stub says "em breve"),
+//   short: 'Calendário'                (optional: compact name for the top bar when title is long) }
 // DOM-free: tests import it in Node.
 
 /** Drawer groups, in order (pt-BR labels shown as eyebrows). */
@@ -120,6 +121,21 @@ export function missionsNeedingVehicle(st) {
 }
 const decisionsOf = (st, re) => (st?.decisions || []).filter((d) => re.test(String(d.kind || '')));
 const views = () => import('./screen-views.js');
+/** Lazy screen of a parallel Phase B builder: its module, or the "em breve" stub while the file is not there yet. */
+const orStub = (load) => () => load().then((m) => (typeof (m?.render || m?.default) === 'function' ? m : null)).catch(() => null).then((m) => m || views().then((v) => v.stub));
+const yearNow = (st) => (st?.startYear ?? 0) + Math.floor((st?.turn ?? 0) / 52);
+/** A scenario unlock (data/scenarios/*.json "unlocks": {builder: {fromYear}}) is open in this year; no entry = open. */
+export function unlocked(st, data, key) {
+  const u = data?.scenario?.unlocks?.[key];
+  return !u || !Number.isFinite(Number(u.fromYear)) || st == null || yearNow(st) >= Number(u.fromYear);
+}
+/** Investor mandates (Phase B, state.mandates) still open whose deadline is within a year. */
+export function mandatesDueSoon(st) {
+  const now = st?.turn ?? 0;
+  return (Array.isArray(st?.mandates) ? st.mandates : []).filter((m) => m && m.status === 'open' && Number.isFinite(m.deadlineTurn) && m.deadlineTurn >= now && m.deadlineTurn - now <= 52);
+}
+/** Rocket designs of the player waiting for their test flights (Phase B builder, state.designs). */
+const designsInTest = (st) => (Array.isArray(st?.designs) ? st.designs : Object.values(st?.designs || {})).filter((d) => d && (!d.owner || d.owner === st.playerId) && d.program?.phase === 'testFlights');
 
 // ------------------------------------------------------------------ the registry (one line each)
 
@@ -129,13 +145,13 @@ registerScreen({ id: 'mapa', title: 'Mapa espacial', icon: 'mapa', nav: 'bottom'
 registerScreen({ id: 'mundo', title: 'Mundo', icon: 'mundo', nav: 'bottom', order: 40, load: () => import('./world-tab.js') });
 
 registerScreen({ id: 'equipe', title: 'Equipe', icon: 'equipe', group: 'agencia', order: 10, load: () => import('./crew-view.js') });
-registerScreen({ id: 'conselho', title: 'Conselho e investidores', icon: 'acoes', group: 'agencia', order: 20, soon: 'B', load: () => views().then((m) => m.stub) });
-registerScreen({ id: 'identidade', title: 'Identidade e logo', icon: 'editar', group: 'agencia', order: 30, soon: 'B', load: () => views().then((m) => m.stub) });
-registerScreen({ id: 'financas', title: 'Finanças', icon: 'caixa', group: 'agencia', order: 40, load: () => views().then((m) => m.financas) });
+registerScreen({ id: 'conselho', title: 'Conselho e investidores', icon: 'acoes', group: 'agencia', order: 20, available: (st) => !!st?.cap, load: orStub(() => import('./board.js')), badge: (st) => decisionsOf(st, /^(investors|mandate)/).length || (mandatesDueSoon(st).length ? true : 0) });
+registerScreen({ id: 'identidade', title: 'Identidade e logo', icon: 'editar', group: 'agencia', order: 30, load: () => import('./identidade.js') });
+registerScreen({ id: 'financas', title: 'Finanças', icon: 'caixa', group: 'agencia', order: 40, load: () => import('./financas.js'), badge: (st) => ((st?.actors?.[st.playerId]?.cash ?? 0) < 0 ? true : 0) });
 
 registerScreen({ id: 'pesquisa', title: 'Pesquisa', icon: 'pesquisa', group: 'operacoes', order: 10, load: () => import('./research-tab.js') });
-registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', group: 'operacoes', order: 20, soon: 'B', load: () => views().then((m) => m.stub) });
-registerScreen({ id: 'lancamentos', title: 'Calendário de lançamentos', icon: 'calendario', group: 'operacoes', order: 30, load: () => views().then((m) => m.lancamentos) });
+registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', group: 'operacoes', order: 20, available: (st, data) => unlocked(st, data, 'builder'), load: orStub(() => import('./hangar.js')), badge: (st) => (designsInTest(st).length ? true : 0) });
+registerScreen({ id: 'lancamentos', title: 'Calendário de lançamentos', short: 'Calendário', icon: 'calendario', group: 'operacoes', order: 30, load: () => import('./lancamentos.js'), badge: (st) => mandatesDueSoon(st).length });
 registerScreen({ id: 'veiculo', title: 'Falta o veículo', icon: 'alerta', group: 'operacoes', order: 5, go: 'missoes/lista', available: (st) => missionsNeedingVehicle(st).length > 0, badge: (st) => missionsNeedingVehicle(st).length });
 
 registerScreen({ id: 'colonias', title: 'Colônias', icon: 'alvo', group: 'universo', order: 10, soon: 'C', available: (st) => !!st?.colonies, load: () => views().then((m) => m.stub) });
@@ -144,7 +160,7 @@ registerScreen({ id: 'noticias', title: 'Notícias', icon: 'noticia', group: 'mu
 registerScreen({ id: 'diplomacia', title: 'Rivais e diplomacia', icon: 'transferir', group: 'mundo', order: 20, go: 'mundo/atores', badge: (st) => decisionsOf(st, /^(diplomacy|politics)/).length });
 registerScreen({ id: 'tabela', title: 'Tabela da Era', icon: 'ranking', group: 'mundo', order: 30, go: 'mundo/tabela' });
 
-registerScreen({ id: 'anais', title: 'Anais', icon: 'livro', group: 'arquivo', order: 10, soon: 'C', load: () => views().then((m) => m.anais) });
+registerScreen({ id: 'anais', title: 'Anais', icon: 'livro', group: 'arquivo', order: 10, load: () => import('./anais.js') });
 registerScreen({ id: 'memorial', title: 'Memorial', icon: 'vela', group: 'arquivo', order: 20, go: 'equipe/memorial' });
 registerScreen({ id: 'album', title: 'Álbum', icon: 'estrela', group: 'arquivo', order: 30, go: 'equipe/album' });
 registerScreen({ id: 'eco', title: 'Arquivo do Eco', icon: 'eco', group: 'arquivo', order: 40, soon: 'C', available: (st) => (st?.eco?.pieces || []).length > 0, load: () => views().then((m) => m.stub) });

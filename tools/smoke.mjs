@@ -1,14 +1,22 @@
 // Headless smoke test: plays full campaigns with a naive bot and checks invariants.
-// Usage: node tools/smoke.mjs [seeds=5] [actor=all]
+// Usage: node tools/smoke.mjs [seeds=5] [actor=all] [--found]
+//   --found  also found an agency at turn 0 (Phase B agency/found) on each run
+// Phase B moves (investor rounds, mandates, Hangar designs, test flights) come from tools/bot-b.mjs (investors.js and
+// designs.js are in the engine registry; the Corrida Lunar has no investors, so there the rounds are no-ops).
 import { loadDataNode } from '../src/core/data.js';
-import { newGame, dispatch, query, isBlocked, serialize, deserialize } from '../src/core/engine.js';
+import * as engine from '../src/core/engine.js';
+import { phaseBMoves, foundAgency } from './bot-b.mjs';
+const { newGame, dispatch, query, isBlocked, serialize, deserialize } = engine;
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const data = await loadDataNode(root);
-const nSeeds = Number(process.argv[2] || 5);
-const actorArg = process.argv[3] || 'all';
+const argv = process.argv.slice(2);
+const FOUND = argv.includes('--found');
+const pos = argv.filter((a) => !a.startsWith('--'));
+const nSeeds = Number(pos[0] || 5);
+const actorArg = pos[1] || 'all';
 const actors = actorArg === 'all' ? data.scenario.playableActors : [actorArg];
 
 let failures = 0;
@@ -17,8 +25,12 @@ for (const playerId of actors) {
     const seed = s * 7919;
     try {
       let state = newGame(data, { seed, playerId });
+      if (FOUND && !foundAgency(state, data, engine, { seed })) console.log(`  (agency/found indisponível: ${playerId} seed=${seed} segue com o ator)`);
+      const mem = {};
       let guard = 0;
       while (!state.gameOver && guard++ < 5000) {
+        // Phase B: investor rounds (keep autonomy), mandates, designs (tools/bot-b.mjs)
+        phaseBMoves(state, data, engine, { schedule: true, ownMissions: false }, mem);
         // resolve all decisions with the first enabled choice
         for (const d of state.decisions.slice()) {
           const c = d.choices?.find((x) => !x.disabled) || d.choices?.[0];
@@ -66,7 +78,7 @@ for (const playerId of actors) {
       if (!state.gameOver) throw new Error(`no game over after ${guard} iterations (turn ${state.turn})`);
       const errs = state.log.filter((l) => l.includes('erro'));
       if (errs.length) throw new Error(`errors logged: ${errs.slice(0, 3).join(' | ')}`);
-      const p = state.actors[playerId];
+      const p = state.actors[state.playerId];
       console.log(`ok ${playerId} seed=${seed} turn=${state.turn} news=${state.news.length} missions=${state.missions.length} cash=${p?.cash?.toFixed?.(0)} prestige=${Math.round(p?.prestige ?? 0)} fim=${state.gameOver?.reason}`);
     } catch (e) {
       failures++;

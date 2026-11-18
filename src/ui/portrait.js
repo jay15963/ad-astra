@@ -3,6 +3,7 @@
 // portrait = { skin 0..5, hair 0..9, hairColor 0..5, eyes 0..4, brows 0..3, mouth 0..4, accessory 0..5, suit 0..3, bg 0..5 }
 
 import { hash32 } from '../core/rng.js';
+import { emblemSVG as drawEmblem, specForActor, labelFor, inkFor as emblemInk } from './emblem.js';
 
 const SKIN = ['#f6d7b8', '#ebbd96', '#cf9469', '#a9703f', '#7d4c2a', '#56321d'];
 const HAIR = ['#1f1b22', '#4b2d1b', '#8a5a2b', '#d6aa5c', '#b2462a', '#a9adb3'];
@@ -175,50 +176,25 @@ export function portraitSVG(portrait, { size = 64, mood = 'neutral', title } = {
     + '</g></svg>';
 }
 
-const LIGHT_INK = '#f7f1e3';
-const DARK_INK = '#14202e';
-
-/** WCAG relative luminance of a #rgb / #rrggbb colour. */
-function luminance(hex) {
-  let x = String(hex).replace('#', '');
-  if (x.length === 3 || x.length === 4) x = x.slice(0, 3).split('').map((c) => c + c).join('');
-  const ch = [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
-}
-const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
+// ------------------------------------------------------------------ agency emblems (src/ui/emblem.js)
+// Kept here as thin wrappers so every existing caller (header, Tabela, lists, decisions, map HQs, briefings) gets the
+// layered emblems of docs/EXPANSION.md §5.4 without changing its import.
 
 /** Ink for text/lines on a fill: whichever of light or dark reads better (SpaceX's #E8E8E8 needs dark ink). */
-export function inkFor(fill) {
-  try { return contrast(fill, DARK_INK) > contrast(fill, LIGHT_INK) ? DARK_INK : LIGHT_INK; } catch { return LIGHT_INK; }
-}
+export const inkFor = emblemInk;
 
 /**
  * Up to 6 letters for the emblem: an explicit actor.emblem, the short name when it fits, otherwise a word-aware
  * abbreviation ("Blue Origin" -> "BLUE", "Roscosmos" -> "ROSC") instead of a hard cut ("BLUE O", "ROSCOS").
  */
-export function emblemLabel(actor) {
-  if (actor?.emblem) return String(actor.emblem).toUpperCase().slice(0, 6);
-  const base = String(actor?.short || actor?.name || actor?.id || '?').replace(/\(.*?\)/g, '').trim() || '?';
-  const up = base.toUpperCase();
-  if (up.length <= 6) return up;
-  const words = up.split(/[\s\-]+/).filter(Boolean);
-  if (words.length > 1) return words[0].length <= 6 ? words[0] : words.map((w) => w[0]).join('').slice(0, 6);
-  return up.slice(0, 4);
-}
+export const emblemLabel = labelFor;
 
-/** Round emblem for an actor (agency/company) used as "portrait" on actor cards. */
-export function emblemSVG(actor, { size = 48 } = {}) {
-  const color = /^#[0-9a-f]{3,8}$/i.test(actor?.color || '') ? actor.color : '#28628f';
-  const ink = inkFor(color);
-  const label = emblemLabel(actor).replace(/[<&>"]/g, '');
-  const fs = label.length <= 3 ? 26 : label.length <= 4 ? 21 : label.length <= 5 ? 17 : 14;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}" role="img" class="emblem">`
-    + `<circle cx="50" cy="50" r="48" fill="${color}"${ink === DARK_INK ? ` stroke="${DARK_INK}" stroke-opacity=".35" stroke-width="2"` : ''}/>`
-    + `<circle cx="50" cy="50" r="41" fill="none" stroke="${ink}" stroke-width="2.5" opacity=".85"/>`
-    + `<ellipse cx="50" cy="50" rx="46" ry="15" fill="none" stroke="${ink}" stroke-width="2" opacity=".45" transform="rotate(-24 50 50)"/>`
-    + `<circle cx="84" cy="34" r="4" fill="${ink}"/>`
-    + `<text x="50" y="${50 + fs * 0.36}" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-weight="800" font-size="${fs}" fill="${ink}" letter-spacing="1">${label}</text>`
-    + '</svg>';
+/**
+ * Emblem of an actor-like object ({id, short, name, color, kind, emblem, lineage, identityIdx}): its own spec, the
+ * designed spec of its lineage identity (data/core/emblems.json) or a procedural one seeded by its id.
+ */
+export function emblemSVG(actor, { size = 48, title, detail } = {}) {
+  return drawEmblem(specForActor(actor), { size, title, detail });
 }
 
 /** Generic icon-portrait for decision cards without a person/actor. kind: decision kind prefix. */

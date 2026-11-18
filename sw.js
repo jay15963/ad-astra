@@ -6,7 +6,7 @@
 // dynamic imports, found by following the import statements — the game data and the icons), so the app
 // opens offline from the second visit on, including screens never opened online (Mapa, Dia de Lançamento).
 // Keep SW_VERSION equal to APP_VERSION in src/ui/settings.js (tests/sw.test.mjs checks it).
-const SW_VERSION = '0.6.0';
+const SW_VERSION = '0.7.0';
 const CACHE = `adastra-${SW_VERSION}`;
 
 // entry points of the crawl; everything they import or link is added (same origin only)
@@ -17,10 +17,13 @@ const SHELL = [
   './assets/icon-maskable-512.png', './assets/apple-touch-icon.png', './assets/favicon-32.png',
 ];
 // = DATA_FILES in src/core/data.js + the lazily loaded world map + the pack manifest and scenario list
-// (tests/sw-pwa.test.mjs checks it). Every file listed in data/packs.json (core, era packs, scenarios) is added by
+// (tests/sw-pwa.test.mjs checks it), plus two files the UI fetches outside the manifest: world-eras (épocas do
+// mapa-múndi, worldmap.js) and core/stars (setor e galáxia, starmap.js). Every file listed in data/packs.json (core,
+// era packs, scenarios) is added by
 // the crawl when the manifest is fetched (packFiles), so new era packs need no edit here.
 const DATA = ['scenario', 'actors', 'vehicles', 'spacecraft', 'destinations', 'calendar', 'politics', 'geopolitics',
-  'tech', 'events', 'crew', 'bodies', 'world', 'packs', 'scenarios/index'];
+  'tech', 'events', 'crew', 'bodies', 'world', 'packs', 'scenarios/index',
+  'world-eras', 'core/stars'];
 const MAX_PRECACHE = 250;
 
 self.addEventListener('install', (event) => {

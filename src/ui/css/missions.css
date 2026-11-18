@@ -376,3 +376,46 @@
 /* ---------- motion ---------- */
 body.reduce-motion .missions > * { animation: none; }
 @media (prefers-reduced-motion: reduce) { .missions > * { animation: none; } }
+
+/* ---------- Phase B: investors (agenda, mandates, badge) and builder designs ---------- */
+.chip.chip-investor {
+  display: inline-flex; align-items: center; gap: 5px; padding-left: 3px;
+  color: var(--violet); background: #a78bfa14; border-color: #a78bfa40;
+}
+.chip-investor .ms-holder-em, .ms-holder-em { line-height: 0; flex: none; }
+.chip-investor .ms-holder-em svg { width: 16px; height: 16px; display: block; }
+.ms-holder-dot { line-height: 0; display: grid; place-items: center; }
+.ms-holder-dot svg { width: 36px; height: 36px; display: block; }
+.chip.ms-deadline { font-family: var(--mono); }
+
+.ms-agenda {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; margin-bottom: var(--gap);
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0;
+}
+.ms-agenda.full { border-color: #a78bfa40; }
+.ms-agenda-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.ms-agenda-pct { color: var(--text-2); }
+.ms-slots { display: flex; gap: 4px; flex-wrap: wrap; }
+.ms-slot { flex: 1 1 0; min-width: 14px; max-width: 44px; height: 8px; border-radius: 4px; background: var(--s3); border: 1px solid var(--line-strong); }
+.ms-slot.own { background: var(--green-bg); border-color: var(--green-line); }
+.ms-slot.own.used { background: var(--green); border-color: var(--green); }
+.ms-slot.inv { background: #a78bfa2a; border-color: #a78bfa55; }
+
+.ms-mandate.late { box-shadow: inset 2px 0 0 var(--red); }
+.ms-mandate-block {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  background: #a78bfa0d; border: 1px solid #a78bfa33; border-radius: var(--r-card); min-width: 0;
+}
+.ms-mandate-block.late { border-color: var(--red-line); }
+.ms-mandate-block .kv { background: none; border: 0; padding: 0; }
+.ms-mandate-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ms-mandate-head .ms-holder-em svg { width: 32px; height: 32px; display: block; }
+.ms-mandate-titles { min-width: 0; }
+.ms-mandate-name { font-size: var(--t13); font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.hw-holder { margin-top: 8px; }
+
+.design-tag {
+  display: inline-block; margin-left: 6px; vertical-align: 1px; font-size: var(--t9); font-weight: 600; letter-spacing: .04em;
+  color: var(--info); border: 1px solid var(--info-line); border-radius: 8px; padding: 0 6px;
+}
+.design-tag.testing { color: var(--text-3); border-color: var(--line-strong); }

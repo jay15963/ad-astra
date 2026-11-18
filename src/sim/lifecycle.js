@@ -1072,11 +1072,264 @@ export const decisionHandlers = {
   },
 };
 
-// ---------------------------------------------------------------- actions (Phase B reserve)
+// ---------------------------------------------------------------- founding an agency (Phase B, B1: EXPANSION.md §5.3)
+//
+// Action 'agency/found' {name, short, kind: 'agency'|'company', nationId, hq: {id} | {lat, lon, name?}, emblem}.
+// Valid only at the start of a game (no step taken). The UI creates the new game with playerId = customIdFor(payload,
+// seed), then this action brings the actor to life through the same addActor path as every birth: tier core,
+// `custom: true`, lineage = its own id. A game created for another player id is re-keyed (crew and missions follow
+// the new id). Numbers: data/core/hq-sites.json `founding`. 'agency/emblem' {emblem} changes the logo later.
+
+const FOUND_DEFAULTS = {
+  privateFromYear: 1980,
+  stateBudget: { large: 160, medium: 85, small: 60 },
+  privateBudget: 65,
+  cashYears: { state: 0.35, company: 1.4 },
+  scale: [[1950, 1], [2026, 4], [2600, 16]],
+  start: {
+    state: { support: 55, reputation: 35, culture: 0, fixedCostShare: 0.35 },
+    company: { support: 45, reputation: 30, culture: 50, fixedCostShare: 0.3 },
+  },
+  launchSiteBonus: { reputation: 5 },
+};
+const EMBLEM_SHAPES = ['roundel', 'shield', 'hex', 'chevron', 'wing', 'star', 'wordmark'];
+const EMBLEM_DIVISIONS = ['none', 'half', 'band', 'chevron', 'quarter'];
+const EMBLEM_GLYPHS = ['rocket', 'orbit', 'star', 'planet', 'comet', 'capsule', 'atom', 'globe', 'wreath', 'satellite', 'crescent'];
+const HEXCOL = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+const strip = (s, max) => String(s ?? '').replace(/[<>&"'`\\{}]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+const shortOf = (s) => strip(s, 12).toUpperCase().replace(/[^\p{L}\p{N}-]/gu, '');
+
+const foundCfg = (data) => ({ ...FOUND_DEFAULTS, ...(data?.hqSites?.founding || {}) });
+const hqSitesOf = (data) => listOf(data?.hqSites, 'sites');
+
+/**
+ * Safe emblem spec (EXPANSION.md §5.4) or null: whitelisted keys, #rgb/#rrggbb colours, known shape/division/glyph
+ * (lists from data/core/emblem-parts.json when loaded), texts stripped of markup, JSON ≤ 200 B (the motto shrinks).
+ */
+export function sanitizeEmblem(spec, data) {
+  if (!spec || typeof spec !== 'object') return null;
+  const parts = data?.emblemParts || {};
+  const ids = (k, dflt) => { const l = listOf(parts[k], k).map((x) => x?.id).filter(Boolean); return l.length ? l : dflt; };
+  const glyphs = [...new Set([...ids('glyphs', EMBLEM_GLYPHS), ...Object.keys(parts.paths || {})])];
+  const col = (c) => (HEXCOL.test(String(c || '')) ? String(c).toLowerCase() : null);
+  const shape = ids('shapes', EMBLEM_SHAPES).includes(spec.shape) ? spec.shape : null;
+  const field = col(spec.field);
+  if (!shape || !field) return null;
+  const out = { shape, field };
+  if (col(spec.field2)) out.field2 = col(spec.field2);
+  if (ids('divisions', EMBLEM_DIVISIONS).includes(spec.division) && spec.division !== 'none') out.division = spec.division;
+  if (spec.ring && typeof spec.ring === 'object' && col(spec.ring.color)) {
+    out.ring = { color: col(spec.ring.color) };
+    const t = strip(spec.ring.text, 22).toUpperCase();
+    if (t) out.ring.text = t;
+  }
+  out.glyph = glyphs.includes(spec.glyph) ? spec.glyph : 'star';
+  if (col(spec.glyphColor)) out.glyphColor = col(spec.glyphColor);
+  if (col(spec.accent)) out.accent = col(spec.accent);
+  const orbit = Math.round(Number(spec.orbit));
+  if (orbit > 0) out.orbit = Math.min(2, orbit);
+  const stars = Math.round(Number(spec.stars));
+  if (stars > 0) out.stars = Math.min(12, stars);
+  const label = strip(spec.label, 12).toUpperCase().replace(/[^\p{L}\p{N}ª.-]/gu, '').slice(0, 6);
+  if (label) out.label = label;
+  while (out.ring?.text && JSON.stringify(out).length > 200) out.ring.text = out.ring.text.slice(0, -1).trim();
+  if (out.ring && !out.ring.text) delete out.ring.text;
+  if (JSON.stringify(out).length > 200) return null;
+  return out;
+}
+
+/** Start year/month of the scenario and whether founding is offered there. */
+function foundingStart(data, scenario = data?.scenario) {
+  const { year, month } = scenarioStart(scenario || {});
+  const offered = !!(scenario?.playable?.found ?? scenario?.lifecycle === 'on');
+  return { year, month, offered };
+}
+
+/**
+ * What the founding wizard may offer at the scenario start (works before a state exists):
+ * {offered, year, privateOk, privateFrom, privateNote, nations: [{id, name, of, economy, isos, sites}]}.
+ */
+export function foundingOptions(data, scenario = data?.scenario) {
+  const { year, offered } = foundingStart(data, scenario);
+  const cfg = foundCfg(data);
+  const sites = hqSitesOf(data);
+  const nations = nationsOf(data).filter((n) => nationAlive(n, year)).map((n) => ({
+    id: n.id, name: n.name, of: n.of || `de ${n.name}`, economy: n.economy || 'medium',
+    isos: (n.isos || []).filter((x) => (x.from ?? -Infinity) <= year && (x.to == null || year <= x.to)).map((x) => x.iso),
+    sites: sites.filter((s) => s.nation === n.id),
+  })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const privateOk = year >= cfg.privateFromYear;
+  return {
+    offered, year, privateFrom: cfg.privateFromYear, privateOk,
+    privateNote: privateOk ? null : 'Empresas privadas de lançamento só surgem nos anos 80.',
+    nations,
+  };
+}
+
+/** Deterministic id of a founded agency: `custom_<base36 hash>` of its name, short, nation and the world seed. */
+export function customIdFor(payload, seed = 0) {
+  const p = payload || {};
+  return `custom_${hash32(strip(p.name, 40).toLowerCase(), shortOf(p.short), p.nationId || '', seed >>> 0).toString(36)}`;
+}
+
+/** {ok, error?, value} — the cleaned payload of 'agency/found' (pt-BR messages for the wizard). */
+export function validateFound(data, payload, scenario = data?.scenario) {
+  const p = payload || {};
+  const opts = foundingOptions(data, scenario);
+  if (!opts.offered) return { ok: false, error: 'Este cenário não permite fundar uma agência.' };
+  const kind = p.kind === 'company' ? 'company' : p.kind === 'agency' || p.kind == null ? 'agency' : null;
+  if (!kind) return { ok: false, error: 'Escolha entre agência estatal e empresa privada.' };
+  if (kind === 'company' && !opts.privateOk) return { ok: false, error: opts.privateNote };
+  const nation = opts.nations.find((n) => n.id === p.nationId);
+  if (!nation) return { ok: false, error: 'Escolha um país que exista na data de início.' };
+  const name = strip(p.name, 40);
+  if (name.length < 3) return { ok: false, error: 'O nome precisa de pelo menos 3 letras.' };
+  const short = shortOf(p.short);
+  if (short.length < 2 || short.length > 6) return { ok: false, error: 'A sigla precisa ter de 2 a 6 letras.' };
+  let hq = null;
+  if (p.hq?.id) {
+    const s = nation.sites.find((x) => x.id === p.hq.id);
+    if (!s) return { ok: false, error: 'Esta sede não fica no país escolhido.' };
+    hq = { id: s.id, name: s.name, lat: s.lat, lon: s.lon, ...(s.launch ? { launch: true } : {}) };
+  } else if (p.hq && Number.isFinite(Number(p.hq.lat)) && Number.isFinite(Number(p.hq.lon))) {
+    const lat = Math.round(clamp(Number(p.hq.lat), -85, 85) * 100) / 100;
+    const lon = Math.round(clamp(Number(p.hq.lon), -180, 180) * 100) / 100;
+    hq = { name: strip(p.hq.name, 40) || `Sede própria (${nation.name})`, lat, lon };
+  } else if (nation.sites.length) {
+    const s = nation.sites[0];
+    hq = { id: s.id, name: s.name, lat: s.lat, lon: s.lon, ...(s.launch ? { launch: true } : {}) };
+  }
+  const emblem = sanitizeEmblem(p.emblem, data);
+  if (p.emblem && !emblem) return { ok: false, error: 'O logo não é válido. Sorteie outro ou ajuste as cores.' };
+  return { ok: true, value: { name, short, kind, nationId: nation.id, nation, hq, emblem } };
+}
+
+function scaleAt(cfg, year) {
+  const s = Array.isArray(cfg.scale) && cfg.scale.length ? cfg.scale : FOUND_DEFAULTS.scale;
+  if (year <= s[0][0]) return s[0][1];
+  for (let i = 1; i < s.length; i++) {
+    if (year <= s[i][0]) { const [y0, v0] = s[i - 1]; const [y1, v1] = s[i]; return v0 + (v1 - v0) * ((year - y0) / Math.max(1, y1 - y0)); }
+  }
+  return s[s.length - 1][1];
+}
+
+/**
+ * Starting numbers of a founded agency and a derived difficulty (pure; the wizard's summary uses it):
+ * {budget, cash, support, reputation, culture, fixedCostShare, launchSites, difficulty: {id, label, score, notes[]}}.
+ */
+export function foundPreview(data, value, scenario = data?.scenario) {
+  const cfg = foundCfg(data);
+  const { year } = foundingStart(data, scenario);
+  const v = value || {};
+  const eco = v.nation?.economy || nationsOf(data).find((n) => n.id === v.nationId)?.economy || 'medium';
+  const company = v.kind === 'company';
+  const scale = scaleAt(cfg, year);
+  const budget = Math.max(5, Math.round((company ? cfg.privateBudget : (cfg.stateBudget?.[eco] ?? 40)) * scale));
+  const cash = Math.round(budget * (company ? cfg.cashYears?.company ?? 1.4 : cfg.cashYears?.state ?? 0.35));
+  const st = { ...(company ? cfg.start?.company : cfg.start?.state) };
+  const launchSites = v.hq?.launch ? [v.hq.name] : [];
+  if (launchSites.length) st.reputation = (st.reputation ?? 35) + (cfg.launchSiteBonus?.reputation ?? 0);
+  // difficulty: this budget against the biggest live rival at the date, plus the handicaps
+  const t0 = dateToTurn(year, 0, year);
+  const ref = lineagesOf(data).filter((l) => aliveAt(data, l.id, t0, year)).map((l) => budgetAt(l, year) || 0);
+  const top = Math.max(budget, ...ref);
+  let score = Math.log10(top / budget) * 2; // 10× smaller than the leader = +2
+  const notes = [];
+  if (company) { score += 0.8; notes.push('Empresa: a receita vem de contratos e investidores, não do governo.'); }
+  else notes.push(`Verba do governo ${v.nation?.of || ''}, economia ${eco === 'large' ? 'grande' : eco === 'small' ? 'pequena' : 'média'}.`.replace('  ', ' '));
+  if (!launchSites.length) { score += 0.6; notes.push('Sem base de lançamento própria: vai depender de bases de outros.'); }
+  else notes.push(`Base de lançamento própria em ${v.hq.name}.`);
+  notes.push('Agência nova: sem tecnologias iniciais e sem histórico de voos.');
+  const id = score < 1.2 ? 'media' : score < 2.4 ? 'dificil' : 'muito_dificil';
+  const label = { media: 'Média', dificil: 'Difícil', muito_dificil: 'Muito difícil' }[id];
+  return {
+    budget, cash, support: st.support ?? 55, reputation: st.reputation ?? 35, culture: st.culture ?? 0,
+    fixedCostShare: st.fixedCostShare ?? 0.5, launchSites, difficulty: { id, label, score: Math.round(score * 100) / 100, notes },
+  };
+}
+
+const hexLum = (c) => {
+  const x = c.length === 4 ? c.slice(1).split('').map((d) => d + d).join('') : c.slice(1);
+  return [0, 2, 4].reduce((s, i, k) => s + parseInt(x.slice(i, i + 2), 16) * [0.2126, 0.7152, 0.0722][k], 0) / 255;
+};
+
+/** Actor definition of a founded agency (the shape addActor takes). */
+function foundDef(state, data, id, value) {
+  const pv = foundPreview(data, value);
+  const n = value.nation;
+  const emblem = value.emblem || { shape: value.kind === 'company' ? 'wordmark' : 'roundel', field: '#13294b', glyph: 'rocket' };
+  if (!emblem.label) emblem.label = value.short.slice(0, 6);
+  // map/line colour: the field, or its accent when the field is too dark to read on the dark map
+  const color = hexLum(emblem.field) < 0.12 ? (emblem.accent || emblem.glyphColor || emblem.field) : emblem.field;
+  return {
+    id, name: value.name, short: value.short, kind: value.kind, tier: 'core', custom: true,
+    country: n.name, flag: '', color,
+    description: value.kind === 'company' ? `Empresa espacial privada ${n.of}` : `Agência espacial ${n.of}`,
+    style: value.kind === 'company' ? 'Empresa recém-fundada' : 'Agência recém-fundada',
+    budget: pv.budget, cash: pv.cash, support: pv.support, reputation: pv.reputation, culture: pv.culture, prestige: 0,
+    fixedCostShare: pv.fixedCostShare,
+    capabilities: { crewed: false, launchSites: pv.launchSites },
+    ai: { cooperation: 0.5, aggression: 0.4, riskTolerance: 0.45, goals: [] },
+    nation: n.id, lineage: id, born: { year: yearAt(state, state.turn), month: turnToDate(state.turn, state.startYear).month },
+    identityIdx: 0, emblem, hq: value.hq || null,
+  };
+}
+
+function foundAgency(state, data, action, ctx) {
+  if ((state.clock?.steps ?? 0) > 0 || (state.missions || []).length) {
+    return { ok: false, error: 'Só é possível fundar uma agência no início de um jogo novo.' };
+  }
+  const chk = validateFound(data, action);
+  if (!chk.ok) return chk;
+  const value = chk.value;
+  const old = state.playerId;
+  // one founding per game: a second call would leave the first custom agency in the world as an AI actor
+  if (old && state.actors?.[old]?.custom) return { ok: false, error: 'Esta partida já tem uma agência fundada.' };
+  const id = old && String(old).startsWith('custom_') && !state.actors?.[old] ? old : customIdFor(value, state.seed);
+  if (state.actors?.[id]) return { ok: false, error: 'Esta agência já foi fundada.' };
+  // re-key the player-owned records when the game was created for another actor (it stays in the world as AI)
+  if (old && old !== id) {
+    for (const p of Object.values(state.crew || {})) if (p?.actorId === old) p.actorId = id;
+    if (state.research) state.research.unlocked = [];
+    // the old actor's real programs go back to the AI calendar: the new agency starts with no story missions
+    for (const inst of Array.isArray(state.calendar) ? state.calendar : []) {
+      if (inst?.status !== 'player') continue;
+      inst.status = inst.launchTurn != null || inst.inTransit ? 'launched' : 'planned';
+    }
+  }
+  state.playerId = id;
+  const def = foundDef(state, data, id, value);
+  addActor(state, data, ctx, def, { reason: 'found' });
+  const a = state.actors[id];
+  a.custom = true;
+  a.tier = 'core';
+  a.lineage = id;
+  a.hq = def.hq ? clone(def.hq) : null;
+  news(state, {
+    importance: 3, actorId: id,
+    headline: `Começa a operar ${value.name} (${value.short}), ${value.kind === 'company' ? 'nova empresa espacial' : 'nova agência espacial'} ${value.nation.of}`,
+    text: value.hq?.name ? `Sede em ${value.hq.name}.` : '',
+  }, state.turn);
+  emitSignal(state, 'agency/founded', { actorId: id, kind: value.kind, nation: value.nationId });
+  return { ok: true, actorId: id };
+}
+
+/** Change the player's emblem (Identidade e logo): any time, free; map colour stays as it was. */
+function setEmblem(state, data, action) {
+  const a = state.actors?.[state.playerId];
+  if (!a) return { ok: false, error: 'Nenhuma agência para editar.' };
+  const spec = sanitizeEmblem(action?.emblem, data);
+  if (!spec) return { ok: false, error: 'O logo não é válido. Sorteie outro ou ajuste as cores.' };
+  if (!spec.label) spec.label = shortOf(a.short).slice(0, 6);
+  a.emblem = spec;
+  return { ok: true, emblem: spec };
+}
+
+// ---------------------------------------------------------------- actions
 
 export const actions = {
-  /** Phase B (B1 takes ownership): found a custom agency at turn 0. */
-  'agency/found': () => ({ ok: false, error: 'Fundar a sua agência chega numa próxima versão.' }),
+  'agency/found': foundAgency,
+  'agency/emblem': setEmblem,
 };
 
 // ---------------------------------------------------------------- queries (UI)
@@ -1163,6 +1416,11 @@ export const queries = {
   'lifecycle/identity': (state, data, id, turn) => identityNow(state, data, id, turn ?? state.turn),
   'lifecycle/playable': (state, data, scenario) => playableAt(data, scenario || data?.scenario),
   'lifecycle/actors': (state, data, opts) => actorList(state, data, opts || {}),
+  'agency/foundingOptions': (state, data, scenario) => foundingOptions(data, scenario || data?.scenario),
+  'agency/foundPreview': (state, data, payload) => { const v = validateFound(data, payload); return v.ok ? foundPreview(data, v.value) : null; },
+  'agency/validateFound': (state, data, payload, scenario) => validateFound(data, payload, scenario || data?.scenario),
+  'agency/previewValue': (state, data, value, scenario) => foundPreview(data, value, scenario || data?.scenario),
+  'agency/customId': (state, data, payload, seed) => customIdFor(payload, seed),
   'lifecycle/info': (state, data, id) => {
     const live = state.actors?.[id] || state.actors?.[state.lifecycle?.aliases?.[id]];
     return live || state.lifecycle?.tombstones?.[id] || null;

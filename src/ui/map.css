@@ -1143,3 +1143,65 @@ body.reduce-motion .map-discovery__art {
   .map-discovery__card h3 { font-size: var(--t18, 19px); }
   .map-discovery__card p { font-size: var(--t12, 13px); line-height: 1.5; }
 }
+
+/* ---------- níveis profundos: setor estelar e galáxia (starmap.js, EXPANSION §8) ---------- */
+/* deep level buttons sit after the solar ones, separated by a hairline: "farther than the Solar System" */
+.map-levels .map-level--deep:first-of-type,
+.map-levels button[data-level] + .map-level--deep { margin-left: 6px; position: relative; }
+.map-levels button[data-level] + .map-level--deep::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--line-strong, #2a2a33);
+}
+/* the launch-window chips and the "in transit" count belong to the Solar System */
+.map-root[data-deep='sector'] .map-windows,
+.map-root[data-deep='galaxy'] .map-windows { display: none; }
+.map-root[data-deep='sector'] .map-canvas { cursor: grab; }
+.map-deep-cap {
+  position: absolute;
+  left: max(12px, var(--safe-l, 0px));
+  bottom: 12px;
+  right: calc(max(12px, var(--safe-r, 0px)) + 12px);
+  z-index: 2;
+  display: none;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
+  border-radius: var(--r-big, 12px);
+  background: rgba(12, 12, 15, 0.92);
+  border: 1px solid var(--line-strong, #2a2a33);
+  color: var(--text-2, #9b9ba6);
+  font-size: var(--t11, 12px);
+  line-height: 1.35;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.map-root[data-deep='sector'] .map-deep-cap,
+.map-root[data-deep='galaxy'] .map-deep-cap { display: block; }
+/* the galaxy draws its scale bar in the bottom-left corner: the caption goes on top of the stage there */
+.map-root[data-deep='galaxy'] .map-deep-cap { bottom: auto; top: 12px; right: calc(max(12px, var(--safe-r, 0px)) + 60px); }
+.map-root[data-deep='sector'] .map-deep-cap { right: calc(max(12px, var(--safe-r, 0px)) + 12px); }
+
+.map-chip--deep-observed { color: var(--text-2, #9b9ba6); border-color: var(--line-strong, #2a2a33); }
+.map-chip--deep-surveyed { color: var(--info, #7aa2c4); background: var(--info-bg, #7aa2c416); border-color: var(--info-line, #7aa2c440); }
+.map-chip--deep-colony { color: var(--yellow, #e3b341); background: var(--yellow-bg, #e3b34116); border-color: var(--yellow-line, #e3b34140); }
+.map-chip--deep-home { color: var(--text, #ecedf0); border-color: var(--line-strong, #2a2a33); }
+
+.lg-deep { width: 10px; height: 10px; border-radius: 50%; }
+.lg-deep--obs { background: #ff9a6b; box-shadow: 0 0 0 2px rgba(255, 154, 107, 0.18); }
+.lg-deep--surv { background: #ffcf8a; box-shadow: 0 0 0 2px #0c0c0f, 0 0 0 3.4px #56b4e9; }
+.lg-deep--col { border-radius: 3px; background: #0c0c0f; border: 1.3px solid #e3b341; }
+.lg-deep--home { background: #fff1c4; box-shadow: 0 0 0 3px rgba(86, 180, 233, 0.35); }
+.lg-deep--hz { width: 6px; height: 6px; background: #4ade80; }
+.lg-deep--pl { width: 6px; height: 6px; background: #b9c2d6; }
+.lg-col { width: 12px; height: 12px; border-radius: 3px; background: #0c0c0f; border: 1.3px solid #e3b341; }
+/* a deep level scrolled into view must not end under the pinned legend button */
+.map-levels { scroll-padding-right: 54px; scroll-padding-left: 12px; }
+/* the Solar System discovery card waits while a deep level is shown */
+.map-root[data-deep='sector'] .map-discovery,
+.map-root[data-deep='galaxy'] .map-discovery { display: none; }

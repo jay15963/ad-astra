@@ -831,3 +831,107 @@ body.reduce-motion .tab-central.girando .tab-disc::before { animation: none; }
 /* .ms-crewrisk, .veh-help, .cert-*, .fleet-* are styled in src/ui/css/missions.css (Montar / Frota / mission sheet). */
 .veh-wrap { display: flex; flex-direction: column; gap: 0; }
 .fleet, .fleet-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- Phase B shell screens (src/ui/screen-kit.js: title → one primary action → sections) ----------
+   Calendário de lançamentos, Identidade e logo, Finanças, Anais. Grey is the interface; colour is meaning. */
+/* no sideways panning anywhere: a page that could pan left/right moved the fixed drawer and clipped its icons */
+html { overflow-x: hidden; }
+@supports (overflow: clip) { html, body { overflow-x: clip; } }
+.gaveta { will-change: transform; backface-visibility: hidden; }
+.gaveta-lista { overflow-x: hidden; }
+.gaveta-ic { min-width: 20px; justify-content: center; }
+
+.tela { gap: 14px; }
+.tela-cab { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.tela-cab .view-head { align-items: center; }
+.tela-emblema { flex: none; display: inline-flex; line-height: 0; }
+.tela-emblema svg { width: 40px; height: 40px; }
+.tela-acao { display: flex; flex-direction: column; gap: 6px; }
+.tela-acao .btn { width: 100%; }
+.tela-acao-nota { margin: 0; font-size: var(--t11); color: var(--text-3); text-align: center; }
+.tela-sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tela-kpis .tile-static { cursor: default; }
+.tela-kpis .tile-static:active { transform: none; }
+.tela-kpis .tile-value.up { color: var(--green); }
+.tela-kpis .tile-value.down { color: var(--red); }
+.tela-filtros { margin: 2px 0 0; padding: 2px 0 4px; }
+.tela-filtros .chip { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.tela-filtro-n { font-family: var(--mono); font-size: var(--t10); opacity: .7; font-variant-numeric: tabular-nums; }
+.tela-nota { margin: 0; }
+.tela-nota-warn { background: var(--yellow-bg); color: var(--yellow); }
+.tela-nota-warn .ic-wrap { color: var(--yellow); }
+.tela .pn-row .pn-meta { white-space: nowrap; }
+.tela .pn-row > .chip { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Calendário */
+.lancamentos .agenda-prazo .pn-lead { box-shadow: 0 0 0 1px #e3b34155; border-radius: 50%; }
+.lancamentos .agenda-programa .pn-name { color: var(--text); }
+/* at 320px nothing the player needs is cut off: KPI labels/subtitles and row titles/subtitles wrap instead of "…" */
+.tela .tela-kpis .tile-label, .tela .tela-kpis .tile-sub { white-space: normal; overflow-wrap: break-word; }
+.lancamentos .pn-row .pn-name, .lancamentos .pn-row .pn-sub { white-space: normal; overflow-wrap: break-word; }
+.lancamentos .pn-row > .chip { max-width: 36%; white-space: normal; text-align: center; line-height: 1.2; }
+.lancamentos .view-title { white-space: normal; overflow-wrap: break-word; }
+
+/* Finanças: cash flow bars (in = neutral light, out = muted) and the cap table */
+.fluxo { gap: 8px; }
+.fluxo-ano { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 30px; }
+.fluxo-ano.parcial .fluxo-rotulo { color: var(--text-2); }
+.fluxo-rotulo { font-size: var(--t11); color: var(--text-3); }
+.fluxo-barras { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fluxo-barra { display: block; height: 5px; border-radius: 3px; min-width: 2px; max-width: 100%; }
+.fluxo-barra.entra, .fluxo-legenda i.entra { background: var(--text-2); }
+.fluxo-barra.sai, .fluxo-legenda i.sai { background: var(--text-3); opacity: .6; }
+.fluxo-saldo { font-size: var(--t11); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; min-width: 72px; }
+.fluxo-nota { margin: 0; font-size: var(--t10); color: var(--text-3); }
+.fluxo-legenda { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t10); color: var(--text-3); }
+.fluxo-legenda i { display: inline-block; width: 10px; height: 5px; border-radius: 2px; margin-left: 6px; }
+.investidores { gap: 12px; }
+.cota { display: flex; flex-direction: column; gap: 6px; }
+.cota-barra { height: 10px; border-radius: 5px; background: var(--s4); overflow: hidden; }
+.cota-sua { display: block; height: 100%; background: var(--yellow); border-radius: 5px 0 0 5px; }
+.cota-legenda { display: flex; justify-content: space-between; gap: 8px; font-size: var(--t11); color: var(--text-3); }
+.cota-legenda b { color: var(--text); font-weight: 600; }
+.verba-extra { gap: 10px; align-items: flex-start; }
+
+/* Identidade */
+.id-cartao { flex-direction: row; align-items: center; gap: 16px; padding: 16px; }
+.id-emblema { flex: none; display: inline-flex; line-height: 0; }
+.id-emblema svg { width: 96px; height: 96px; }
+.id-nome { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.id-titulo { font-size: var(--t17); font-weight: 650; letter-spacing: -.01em; line-height: 1.25; overflow-wrap: anywhere; }
+.id-sigla { display: flex; flex-wrap: wrap; gap: 6px; }
+.id-spec { margin: 0; font-size: var(--t11); color: var(--text-3); }
+.id-ficha { margin: 0; gap: 0; padding: 4px 14px; }
+.id-linha { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.id-linha:last-child { border-bottom: 0; }
+.id-linha dt { font-size: var(--t10); text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); padding-top: 2px; }
+.id-linha dd { margin: 0; font-size: var(--t13); color: var(--text); overflow-wrap: anywhere; }
+.id-cores { flex-direction: row; flex-wrap: wrap; gap: 12px 16px; }
+.id-cor { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.id-amostra { flex: none; width: 32px; height: 32px; border-radius: 50%; box-shadow: inset 0 0 0 1px #ffffff26; }
+.id-cor-txt { display: flex; flex-direction: column; font-size: var(--t11); color: var(--text-3); }
+.id-cor-txt b { font-weight: 600; color: var(--text-2); }
+.id-usos { gap: 14px; }
+.id-uso { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.id-uso-rotulo { font-size: var(--t10); text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.id-mock-topo { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 10px; border-radius: var(--r); background: linear-gradient(180deg, var(--s2), var(--s1)); border: 1px solid var(--line); min-width: 0; }
+.id-mock-topo b { flex: 1; min-width: 0; font-size: var(--t15, 15px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.id-mock-topo .agency-emblem svg { width: 30px; height: 30px; }
+.id-mock-mapa { position: relative; height: 72px; border-radius: var(--r); border: 1px solid var(--line); overflow: hidden;
+  background: radial-gradient(60% 90% at 30% 50%, #1b2430 0%, #11161d 60%, var(--s0) 100%); }
+.id-pino { position: absolute; left: 30%; top: 50%; transform: translate(-50%, -50%); line-height: 0; filter: drop-shadow(0 2px 4px #000a); }
+.id-pino svg { width: 26px; height: 26px; }
+.id-ano { font-size: var(--t10); color: var(--text-2); }
+.id-bases { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+
+/* Anais */
+.anais-ano .pn-row.anais-topo .pn-name { color: var(--text); font-weight: 600; }
+.anais-manchete { display: block; margin-top: 4px; font-size: var(--t11); color: var(--text-2); line-height: 1.45; white-space: normal; }
+.anais-mais { align-self: center; min-width: 160px; }
+@media (max-width: 360px) {
+  .id-cartao { gap: 12px; padding: 14px; }
+  .id-emblema svg { width: 72px; height: 72px; }
+  .id-linha { grid-template-columns: 76px minmax(0, 1fr); }
+  .fluxo-ano { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; }
+  .fluxo-saldo { min-width: 64px; }
+}

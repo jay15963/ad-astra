@@ -1,0 +1,115 @@
+{
+  "note": "Emblemas das linhagens reais, um por identidade (índice = identities[] de core/lineages.json). Identidades originais que evocam cada agência na sua época — nenhum logotipo oficial é reproduzido (GDD: identidade visual própria). Formato: docs/EXPANSION.md §5.4 (≤ 200 B cada). Dono: B1; desenho em src/ui/emblem.js.",
+  "specs": {
+    "nasa": [
+      { "shape": "wing", "field": "#1c2f4f", "field2": "#b9c0ca", "glyph": "globe", "glyphColor": "#eef1f5", "accent": "#c9a227", "ring": { "color": "#2a3b57", "text": "AERONÁUTICA · EUA" }, "label": "NACA" },
+      { "shape": "roundel", "field": "#0b3d91", "ring": { "color": "#e9edf2", "text": "NASA · ESTADOS UNIDOS" }, "glyph": "rocket", "glyphColor": "#ffffff", "accent": "#d6342c", "orbit": 1, "stars": 4, "label": "NASA" }
+    ],
+    "roscosmos": [
+      { "shape": "star", "field": "#a3161a", "field2": "#7e1013", "glyph": "rocket", "glyphColor": "#f2c14e", "accent": "#f2c14e", "ring": { "color": "#5c0b0e", "text": "BUREAU DE PROJETOS 1" }, "label": "OKB-1" },
+      { "shape": "shield", "field": "#1d3f8f", "field2": "#eef0f3", "division": "chevron", "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#c8202f", "ring": { "color": "#c8202f" }, "stars": 3, "label": "RKA" },
+      { "shape": "roundel", "field": "#16306e", "ring": { "color": "#c8202f", "text": "ROSCOSMOS · RÚSSIA" }, "glyph": "globe", "glyphColor": "#e9eef5", "accent": "#e9eef5", "orbit": 2, "label": "ROSC" }
+    ],
+    "abma": [
+      { "shape": "shield", "field": "#4b5320", "field2": "#3a4119", "division": "chevron", "glyph": "rocket", "glyphColor": "#f2e7c9", "accent": "#c9a227", "stars": 3, "ring": { "color": "#2f3414" }, "label": "ABMA" }
+    ],
+    "cnsa": [
+      { "shape": "star", "field": "#b3201c", "field2": "#8d1915", "glyph": "rocket", "glyphColor": "#f6c344", "accent": "#f6c344", "stars": 5, "ring": { "color": "#7d1512", "text": "QUINTA ACADEMIA" }, "label": "5ªACAD" },
+      { "shape": "roundel", "field": "#123f84", "ring": { "color": "#d7261e", "text": "CNSA · CHINA" }, "glyph": "globe", "glyphColor": "#ffffff", "accent": "#f6c344", "orbit": 2, "stars": 1, "label": "CNSA" }
+    ],
+    "cnes": [
+      { "shape": "hex", "field": "#21468b", "field2": "#1a3a73", "division": "band", "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#e4313b", "ring": { "color": "#e4313b", "text": "ESPAÇO FRANCÊS" }, "label": "CNES" }
+    ],
+    "isro": [
+      { "shape": "roundel", "field": "#f08a24", "ring": { "color": "#1b3a6b", "text": "INCOSPAR · ÍNDIA" }, "glyph": "rocket", "glyphColor": "#ffffff", "accent": "#1b3a6b", "label": "INCOSP" },
+      { "shape": "chevron", "field": "#1b3a6b", "field2": "#f08a24", "division": "chevron", "glyph": "satellite", "glyphColor": "#ffffff", "accent": "#f08a24", "orbit": 1, "ring": { "color": "#f08a24" }, "label": "ISRO" }
+    ],
+    "eldo": [
+      { "shape": "hex", "field": "#2f6f5e", "field2": "#265a4c", "division": "quarter", "glyph": "rocket", "glyphColor": "#f3efe0", "accent": "#e9b44c", "ring": { "color": "#1b4a3e", "text": "EUROPA" }, "label": "ELDO" }
+    ],
+    "esa": [
+      { "shape": "roundel", "field": "#163a73", "ring": { "color": "#0f2b57", "text": "ESRO · EUROPA" }, "glyph": "planet", "glyphColor": "#f2d16b", "accent": "#f2d16b", "stars": 8, "label": "ESRO" },
+      { "shape": "wordmark", "field": "#0a3a5a", "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#35a7d9", "orbit": 1, "ring": { "color": "#0a3a5a", "text": "ESPAÇO EUROPEU" }, "label": "ESA" }
+    ],
+    "isas": [
+      { "shape": "roundel", "field": "#e9eef3", "ring": { "color": "#a8923a", "text": "ISAS · JAPÃO" }, "glyph": "comet", "glyphColor": "#1d2a44", "accent": "#c0392b", "label": "ISAS" }
+    ],
+    "dlr": [
+      { "shape": "shield", "field": "#2d3e5e", "field2": "#22304a", "division": "half", "glyph": "atom", "glyphColor": "#e6e8ec", "accent": "#e3b341", "ring": { "color": "#1a2438", "text": "ALEMANHA" }, "label": "DFVLR" },
+      { "shape": "wordmark", "field": "#f4f4f2", "glyph": "orbit", "glyphColor": "#13294b", "accent": "#2f6fb0", "orbit": 1, "ring": { "color": "#dfe3e8", "text": "CENTRO AEROESPACIAL" }, "label": "DLR" }
+    ],
+    "jaxa": [
+      { "shape": "roundel", "field": "#1f5fb0", "ring": { "color": "#e9eef3", "text": "NASDA · JAPÃO" }, "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#d6342c", "stars": 1, "label": "NASDA" },
+      { "shape": "wordmark", "field": "#0d2c6c", "glyph": "crescent", "glyphColor": "#ffffff", "accent": "#3d8fe0", "orbit": 1, "ring": { "color": "#0d2c6c", "text": "EXPLORAR PARA REALIZAR" }, "label": "JAXA" }
+    ],
+    "arianespace": [
+      { "shape": "chevron", "field": "#1f4e8c", "field2": "#163a68", "division": "band", "glyph": "rocket", "glyphColor": "#ffffff", "accent": "#f2c14e", "stars": 5, "ring": { "color": "#0f2c52" }, "label": "ARIANE" }
+    ],
+    "orbital": [
+      { "shape": "hex", "field": "#8c6d3b", "field2": "#735a30", "glyph": "orbit", "glyphColor": "#fbf5e8", "accent": "#1d2a44", "orbit": 1, "label": "ORB" },
+      { "shape": "hex", "field": "#1d2a44", "field2": "#8c6d3b", "division": "chevron", "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#e3b341", "orbit": 1, "label": "OATK" },
+      { "shape": "wordmark", "field": "#13294b", "glyph": "star", "glyphColor": "#ffffff", "accent": "#7aa2c4", "orbit": 1, "ring": { "color": "#13294b", "text": "SISTEMAS ESPACIAIS" }, "label": "NGSPC" }
+    ],
+    "isa_il": [
+      { "shape": "shield", "field": "#2f6fb0", "field2": "#24578c", "division": "band", "glyph": "satellite", "glyphColor": "#ffffff", "accent": "#ffffff", "stars": 1, "ring": { "color": "#1c4573" }, "label": "ISA" }
+    ],
+    "asi": [
+      { "shape": "roundel", "field": "#1d6b45", "ring": { "color": "#f4f4f2", "text": "ASI · ITÁLIA" }, "glyph": "planet", "glyphColor": "#ffffff", "accent": "#c8202f", "orbit": 1, "label": "ASI" }
+    ],
+    "csa": [
+      { "shape": "roundel", "field": "#c0392b", "ring": { "color": "#f4f4f2", "text": "CSA · CANADÁ" }, "glyph": "globe", "glyphColor": "#ffffff", "accent": "#ffffff", "stars": 3, "label": "CSA" }
+    ],
+    "kasa": [
+      { "shape": "hex", "field": "#3c5daa", "field2": "#2f4a8a", "glyph": "atom", "glyphColor": "#ffffff", "accent": "#e4313b", "ring": { "color": "#24396b", "text": "INSTITUTO AEROESPACIAL" }, "label": "KARI" },
+      { "shape": "roundel", "field": "#13294b", "ring": { "color": "#c8202f", "text": "KASA · COREIA" }, "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#3c7fe0", "orbit": 1, "label": "KASA" }
+    ],
+    "ssau": [
+      { "shape": "shield", "field": "#1f57a8", "field2": "#f2c94c", "division": "chevron", "glyph": "rocket", "glyphColor": "#ffffff", "accent": "#f2c94c", "ring": { "color": "#173f7a", "text": "UCRÂNIA" }, "label": "SSAU" }
+    ],
+    "aeb": [
+      { "shape": "roundel", "field": "#0b6b3a", "ring": { "color": "#f2c94c", "text": "AEB · BRASIL" }, "glyph": "rocket", "glyphColor": "#ffffff", "accent": "#1e3f8a", "orbit": 1, "stars": 5, "label": "AEB" }
+    ],
+    "blueorigin": [
+      { "shape": "wing", "field": "#1b3f73", "field2": "#56b4e9", "glyph": "planet", "glyphColor": "#ffffff", "accent": "#56b4e9", "ring": { "color": "#0f274a", "text": "PASSO A PASSO" }, "label": "BLUE" }
+    ],
+    "spacex": [
+      { "shape": "wordmark", "field": "#0d1117", "glyph": "comet", "glyphColor": "#e8e8e8", "accent": "#9aa3ad", "orbit": 1, "ring": { "color": "#0d1117", "text": "MARTE OU NADA" }, "label": "SPACEX" }
+    ],
+    "rocketlab": [
+      { "shape": "wordmark", "field": "#1a1a1a", "glyph": "rocket", "glyphColor": "#f4f4f2", "accent": "#e4572e", "label": "RKTLAB" }
+    ],
+    "ula": [
+      { "shape": "chevron", "field": "#2b4c7e", "field2": "#22406b", "division": "band", "glyph": "rocket", "glyphColor": "#ffffff", "accent": "#d6342c", "stars": 3, "ring": { "color": "#182f52", "text": "EUA" }, "label": "ULA" }
+    ],
+    "uaesa": [
+      { "shape": "roundel", "field": "#00732f", "ring": { "color": "#1a1a1a", "text": "AGÊNCIA DOS EMIRADOS" }, "glyph": "crescent", "glyphColor": "#ffffff", "accent": "#e4313b", "stars": 3, "label": "UAESA" }
+    ],
+    "firefly": [
+      { "shape": "hex", "field": "#e4572e", "field2": "#c2451f", "glyph": "comet", "glyphColor": "#1a1a1a", "accent": "#1a1a1a", "orbit": 1, "label": "FFLY" }
+    ],
+    "relativity": [
+      { "shape": "wordmark", "field": "#3a3a3a", "glyph": "atom", "glyphColor": "#f4f4f2", "accent": "#e3b341", "label": "RELAT" }
+    ],
+    "landspace": [
+      { "shape": "star", "field": "#b03a2e", "field2": "#8a2c23", "glyph": "rocket", "glyphColor": "#f4f4f2", "accent": "#f2c14e", "label": "LSPACE" }
+    ],
+    "axiom": [
+      { "shape": "hex", "field": "#2c2c54", "field2": "#23234a", "glyph": "capsule", "glyphColor": "#f0e6ff", "accent": "#e3b341", "stars": 3, "label": "AXIOM" }
+    ],
+    "ispace_cn": [
+      { "shape": "chevron", "field": "#7a2e3a", "field2": "#5e222c", "division": "chevron", "glyph": "rocket", "glyphColor": "#f4f4f2", "accent": "#f2c14e", "label": "ISPACE" }
+    ],
+    "skyroot": [
+      { "shape": "wing", "field": "#ff7f11", "field2": "#1b3a6b", "glyph": "rocket", "glyphColor": "#ffffff", "accent": "#1b3a6b", "label": "SKYRT" }
+    ],
+    "asa": [
+      { "shape": "roundel", "field": "#00843d", "ring": { "color": "#f2c14e", "text": "ASA · AUSTRÁLIA" }, "glyph": "satellite", "glyphColor": "#ffffff", "accent": "#f2c14e", "stars": 5, "label": "ASA" }
+    ],
+    "vast": [
+      { "shape": "wordmark", "field": "#4b4b8f", "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#9ad1d4", "orbit": 1, "label": "VAST" }
+    ],
+    "afsa": [
+      { "shape": "shield", "field": "#c8a400", "field2": "#1e6b3a", "division": "chevron", "glyph": "globe", "glyphColor": "#1a1a1a", "accent": "#1e6b3a", "stars": 5, "ring": { "color": "#1e6b3a" }, "label": "AFSA" }
+    ]
+  }
+}

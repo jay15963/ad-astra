@@ -176,6 +176,10 @@ launch.js   ← risk.js, missions.js, crew.js, research.js, helpers, rng
 | `lifecycle` | lifecycle | `{applied, aliases, tombstones, births, nextGenTurn, booted, lastYear, idents, watch, mergeWatch, once}` |
 | `signals`/`signalsPending` | qualquer, via `emitSignal` | ver Sinais |
 | `stats` | qualquer, chaves `"modulo.chave"` | contadores |
+| `cap` | investors (Fase B) | tabela de acionistas do jogador `{actorId, kind, playerPct 10..100, holders[], lastRoundTurn, valuationM, lowRounds, warned, year, lastPrestige, seen, history}` ou `null` (Corrida Lunar) |
+| `mandates` | investors (Fase B) | `[{id, holderId, source: investor|calendar, calendarId?, title, type, destination, count, delivered, deadlineTurn, rewardM, penalty, missionIds, credited, status, …}]` (resolvidos: teto 24) |
+| `designs` | designs (Fase B) | `{[dsg_<n>]: Design}` foguetes do Hangar (ver "Fase B") |
+| `explored` | explore (Fase B) | ids explorados do mapa espacial (estrelas, regiões), teto 400, só ids |
 
 ### Actor (data/actors.json → state.actors)
 ```
@@ -660,14 +664,14 @@ Resumo do que já é contrato no código; números, esquemas e o plano das fases
   mês exato, gerador anual depois de 2031 (teto 12 principais + 24 menores), aliases/tombstones para ids antigos.
   `diplomacy.addActor/retireActor`, `politics.ensureNation/retireNation`; sinais `actor/born|renamed|merged|gone|tier`,
   `nation/split`; consultas `lifecycle/timeline|identity|playable|actors|info`. Leituras de atores vivos sempre por
-  `liveActors`/`resolveActor` (helpers). `agency/found` é esboço até a Fase B.
+  `liveActors`/`resolveActor` (helpers). `agency/found` chegou na Fase B (ver abaixo).
 - **Escolha do veículo (item 9)**: aceitar briefing/oportunidade/contrato cria a missão em `planning` com
   `vehicleId: null, spacecraftId: null` e `suggestion {vehicleId, spacecraftId, reason}`; `mission/schedule` recusa com
   "Escolha o foguete e a nave antes de agendar."; a UI abre a montagem no passo 2 com "Sugestão dos engenheiros" em destaque
   e nada pré-selecionado, e grava a escolha com `mission/update {missionId, patch:{vehicleId, spacecraftId,
   secondarySpacecraftId}}`. `missions/costRange` dá a faixa de custo dos cartões. Exceção: demo de certificação tripulada.
   A IA e os bots continuam usando `pickConfig`.
-- **Saves** (`src/core/migrate.js`, `SAVE_VERSION = 2`): v1 → v2 automático; recusa com mensagens pt-BR (códigos `newer`,
+- **Saves** (`src/core/migrate.js`, `SAVE_VERSION = 2`; na Fase B o engine grava a versão mais alta que as migrações registradas alcançam, hoje **3**): v1 → v2 → v3 automático; recusa com mensagens pt-BR (códigos `newer`,
   `unreadable`, `scenario`). A Fase B acrescenta passos com `registerMigration`. Store: chaves `adastra.save.auto`,
   `slot1..3`, `era.<id>` e `adastra.save.v1` (legado), índice `adastra.saves.index`.
 - **Compactação** (`compact`, só em campanhas > 10 anos): históricos mais curtos (missões, contratos, notícias 60, anais por
@@ -678,6 +682,53 @@ Resumo do que já é contrato no código; números, esquemas e o plano das fases
   Tela de título: Campanha 1950–3000 · Cenários · Continuar (espaços). `body[data-era]` é o gancho de pele por era (só e4 hoje).
 - **Service worker**: o crawl do precache segue `data/packs.json` (todo arquivo de pacote e cenário) e os `import()` dinâmicos
   das telas, então pacote ou tela nova não precisa de edição em sw.js (99 arquivos hoje, teto 250).
+
+## Fase B — o jogador e suas ferramentas (v0.7.0)
+
+Contrato em [docs/EXPANSION.md](docs/EXPANSION.md) §5–§8 e §12. Módulos novos registrados em `MODULES` do engine (ordem: …
+`designs` antes de `missions`, `investors` depois de `missions`, `explore` no fim). Todos com `meta.maxDt 52`, rng só por
+`ctx.rng`/`rngFor`, slices JSON e tolerância a slice ausente (saves antigos).
+
+- **Dados novos no pacote `core`** (`data/packs.json`): `emblem-parts`, `emblems`, `hq-sites`, `investors`, `parts` →
+  `data.emblemParts`, `data.emblems`, `data.hqSites`, `data.investors`, `data.parts`. Fora do manifesto (buscados pela UI e
+  listados em `sw.js` DATA): `data/world-eras.json` (épocas do mapa-múndi) e `data/core/stars.json` (setor e galáxia).
+- **Fundar agência** (`src/sim/lifecycle.js`): `agency/found {kind, nationId, name, short, hq, emblem}` só antes do primeiro
+  passo; cria o ator `custom_<hash>` (`custom: true`, `actor.hq {id?, name, lat, lon, launch?}`) pelo mesmo `addActor` dos
+  nascimentos; devolve as 21 missões de calendário do ator anterior para a IA; segunda fundação na mesma partida é recusada.
+  `agency/emblem` troca o logo depois. Puras: `sanitizeEmblem`, `foundingOptions`, `validateFound`, `foundPreview`, `customIdFor`
+  (também como consultas `agency/*`). Empresas privadas só a partir de 1980; nações só as vivas na data de início.
+- **Emblemas** (`src/ui/emblem.js`, SVG puro, roda em Node): forma · campo/padrão · órbitas · símbolo · estrelas · anel/fita ·
+  rótulo, com nível de detalhe por tamanho (< 44 px sem texto; ≥ 72 px com lema), contraste checado, cache. Spec da linhagem
+  (`emblems.json`, 44 identidades originais de 33 linhagens) > spec do ator > procedural por `hash32(id)` e tipo de ator.
+  `portrait.emblemSVG` é só um invólucro. `app.js` registra os dados com `useEmblemData(data)` no boot.
+- **Investidores** (`src/sim/investors.js`, slices `cap` e `mandates`; ativo com `scenario.unlocks.investors`): investidores
+  somam no máx. 90%; jogador ≥ 50% = autonomia (recusar/adiar mandato uma vez, humor −15, o conselho não demite); abaixo de
+  50% mandatos obrigatórios, prazo perdido = humor −25 + multa/ações, humor ponderado < 20 em duas rodadas seguidas →
+  `gameOver {reason: 'board'}`. Vagas por ano `K` (por era), mandatadas `M = min(K−1, round(K·s^0,6))`. Rodada anual
+  (`investors/round`), recompra 1,15× (`investors/buyback {holderId, pct}`), dividendos, fim de prazo (`investors/term`).
+  Itens de programa do calendário viram mandatos do acionista âncora (governo 40% para agências nacionais, fundadores 30% para
+  empresas; agência fundada começa com 100%). "Voo próprio" (cota e veto) = missão `source: 'custom'` sem mandato, a mesma
+  conta da agenda de `missions.agendaOf`; contratos pagos e itens de programa não contam. Mandato encerrado sem voo fecha os
+  rascunhos em planejamento (`missions.closeMandateMissions`). Migração v2 → v3 em `src/core/migrations/v3.js`.
+- **Missões com mandato** (`missions.js`): `createMandateMission`, `mission/fromMandate`, selo do acionista, prazo e
+  penalidade na lista e no detalhe; `mission/create` e "Aceitar" de oportunidade recusam com a agenda cheia (abaixo de 50%).
+  Pares ligados tarde por `bindPeers({investors, designs})` (sem ciclo de import).
+- **Hangar** (`src/sim/designs.js`, slice `designs`, catálogo `data/core/parts.json`): licença de um foguete do catálogo
+  (`design/license`) ou rascunho de modelo (`design/new`), edição por estágio (motor × N, tanque/diâmetro, módulo pronto,
+  propulsores, coifa, aviônica, escape, pintura), `design/save` → `derived` (Tsiolkovsky por estágio, TWR, frações
+  estruturais por ano, penalidade de estágio superior fraco), `design/develop` → programa (custo, semanas) → voos de teste
+  com lastro (missões `source: 'test'`) → operacional. `licenseKinship` desbota o que a licença herda conforme a mudança.
+  `asVehicle` é o que `catalog.vehicleDef` devolve; a IA nunca recebe projetos do jogador.
+- **Mapas**: mundo com épocas (`world-eras.json`: URSS, Pacto de Varsóvia, OTAN, Iugoslávia, colônias hachuradas, linha do
+  tempo 1950→hoje) e sedes de agências fundadas; mapa espacial com níveis Terra–Lua · Interno · Externo · Completo e, por era,
+  Setor (2200+) e Galáxia (2600+) em `src/ui/starmap.js`, névoa de guerra por `state.explored` (`src/sim/explore.js`,
+  consulta `explore/state`) e marcadores de colônia (placeholders da Fase C).
+- **Telas** (registro em `src/ui/screens.js`, kit comum `src/ui/screen-kit.js`): Conselho (`board.js`, disponível com
+  `state.cap`), Identidade e logo (`identidade.js`, editor em folha `openEmblemEditor`), Hangar (`hangar.js`, a partir de
+  `unlocks.builder`), Finanças (`financas.js`), Calendário de lançamentos (`lancamentos.js`), Anais (`anais.js`); assistente
+  de fundação em 4 passos (`found-agency.js` + `css/found.css`) a partir da escolha de agência da Campanha.
+- **Motor**: sinais só no primeiro sub-passo de um passo longo (antes cada módulo tratava o mesmo sinal 52 vezes); uma escolha
+  de decisão recusada pelo handler (`ok: false`) devolve o cartão à fila em vez de sumir com ele.
 
 ## Geo: mapa-múndi e blocos vivos (state.geo, dono: politics)
 

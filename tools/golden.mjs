@@ -56,7 +56,13 @@ export function botStep(state, data, { dispatch, query } = engine, { schedule = 
   for (const d of state.decisions.slice()) {
     if (state.gameOver) return; // a card ended the campaign (final event, director fired): nothing else to play
     const c = d.choices?.find((x) => !x.disabled) || d.choices?.[0];
-    const r = dispatch(state, data, { type: 'decision/resolve', id: d.id, choiceId: c?.id });
+    let r = dispatch(state, data, { type: 'decision/resolve', id: d.id, choiceId: c?.id });
+    // a choice the sim refuses now (e.g. "Aceitar" a briefing with the investors' agenda full): like a player,
+    // take the next enabled one (usually "Recusar"); only a card with no acceptable choice is a bot error
+    for (const alt of (d.choices || []).filter((x) => !x.disabled && x !== c)) {
+      if (r.ok || !state.decisions.includes(d)) break;
+      r = dispatch(state, data, { type: 'decision/resolve', id: d.id, choiceId: alt.id });
+    }
     if (!r.ok) throw new Error(`decision ${d.kind}: ${r.error}`);
   }
   if (state.gameOver) return;

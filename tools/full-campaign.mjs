@@ -18,8 +18,16 @@ import * as engine from '../src/core/engine.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SAVE_BUDGET_KB = 400;
 
-/** The shared bot of tools/golden.mjs when present (core-time), else a minimal one with the same rules. */
+/**
+ * The Phase B bot (tools/bot-b.mjs: investor rounds, mandates, Hangar designs, test flights) over the shared bot of
+ * tools/golden.mjs when present, else a minimal one with the same rules.
+ */
 async function loadBot() {
+  try {
+    const b = await import('./bot-b.mjs');
+    const mem = {};
+    if (typeof b.phaseBStep === 'function') return (state, data) => b.phaseBStep(state, data, engine, { schedule: true }, mem);
+  } catch { /* bot-b.mjs not available */ }
   try {
     const m = await import('./golden.mjs');
     if (typeof m.botStep === 'function') return (state, data) => m.botStep(state, data, engine, { schedule: true });

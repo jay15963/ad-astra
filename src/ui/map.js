@@ -1,6 +1,7 @@
 // Aba Mapa: vista esquemática do sistema solar em canvas 2D (4 níveis de zoom semântico: Terra-Lua, interno,
-// externo, completo), mapa de metrô das rotas por região, janelas de lançamento, missões em trânsito, névoa de
-// guerra ("não mapeado") e presença dos rivais.
+// externo, completo), mais os níveis profundos das eras 6–7 (setor estelar e galáxia, em starmap.js), mapa de metrô
+// das rotas por região, janelas de lançamento, missões em trânsito, névoa de guerra ("não mapeado"), presença dos
+// rivais e marcadores de colônias/postos avançados.
 // A UI só lê o estado (store.state / store.query); nunca muta. Funções puras exportadas para testes em Node.
 // Desempenho: fundo (estrelas + Via Láctea) pré-renderizado uma vez por tamanho; camada estática (órbitas,
 // cinturões, corpos, rótulos) em canvas fora da tela, refeita só quando câmera/estado mudam; rAF só enquanto
@@ -9,6 +10,7 @@
 import { weeksToText, formatTurn } from '../core/time.js';
 import { makeRng } from '../core/rng.js';
 import { iconSVG, hasFlagEmoji } from './components.js';
+import { loadStars, starsData, deepLevels, createDeepView, colonyList } from './starmap.js';
 
 /* ------------------------------------------------------------------ */
 /* Constantes                                                          */
@@ -806,7 +808,7 @@ function hashAngle(key) {
 }
 
 /* Persistent view across re-renders (app.js re-renders the tab on every state change). */
-const MEM = { mode: 'map', cam: null, selected: null, metroRegion: null, legend: false, prog: {}, intro: false, camAuto: false };
+const MEM = { mode: 'map', cam: null, selected: null, metroRegion: null, legend: false, prog: {}, intro: false, camAuto: false, deep: null };
 /* Pre-rendered layers shared across re-renders: background per size, belt particles per body. */
 const CACHE = { bgKey: '', bg: null, belts: {} };
 
@@ -932,7 +934,21 @@ export function render(container, store) {
   const levelBar = el('div', 'map-levels');
   levelBar.setAttribute('role', 'group');
   levelBar.setAttribute('aria-label', 'Nível de zoom');
-  levelBar.innerHTML = levels.map((l) => `<button type="button" data-level="${esc(l.id)}" title="${esc(l.name)}">${esc(l.short || l.name)}</button>`).join('') + `<button type="button" class="map-legend-btn" data-legend="1" aria-label="Legenda">${iconSVG('info', 20)}</button>`;
+  const yearNow = () => (state.startYear ?? data?.scenario?.startYear ?? 2026) + Math.floor((state.turn ?? 0) / 52);
+  const deepAvail = () => deepLevels(starsData(), yearNow());
+  let levelBarKey = '';
+  /** Solar levels + the deep ones the era allows (Setor from 2200, Galáxia from 2600; data/core/stars.json). */
+  function buildLevelBar() {
+    const dl = deepAvail();
+    const key = dl.map((l) => l.id).join(',');
+    if (key === levelBarKey && levelBar.childElementCount) return;
+    levelBarKey = key;
+    if (MEM.deep && !dl.some((l) => l.id === MEM.deep)) MEM.deep = null; // loaded an older save
+    levelBar.innerHTML = levels.map((l) => `<button type="button" data-level="${esc(l.id)}" title="${esc(l.name)}">${esc(l.short || l.name)}</button>`).join('')
+      + dl.map((l) => `<button type="button" class="map-level--deep" data-deep-level="${esc(l.id)}" title="${esc(l.name)}">${esc(l.short)}</button>`).join('')
+      + `<button type="button" class="map-legend-btn" data-legend="1" aria-label="Legenda">${iconSVG('info', 20)}</button>`;
+  }
+  buildLevelBar();
   const stage = el('div', 'map-stage');
   const canvas = document.createElement('canvas');
   canvas.className = 'map-canvas';
@@ -947,7 +963,9 @@ export function render(container, store) {
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'false');
   const discovery = el('div', 'map-discovery');
-  stage.append(zoomBox, legend, winBox, discovery);
+  const deepCap = el('div', 'map-deep-cap');
+  deepCap.setAttribute('aria-live', 'polite');
+  stage.append(zoomBox, legend, winBox, deepCap, discovery);
   root.append(hud, levelBar, stage, metro, sheet);
   container.append(root);
 
@@ -970,6 +988,47 @@ export function render(container, store) {
   const progAnim = {};
 
   const bump = (ms = 16000) => { animUntil = Math.max(animUntil, now0() + ms); };
+
+  // ---------- deep levels (setor estelar, galáxia): starmap.js draws on this same canvas ----------
+  const deep = createDeepView({
+    getState: () => state,
+    data,
+    query: q,
+    invalidate: () => invalidate(),
+    colorOf: (id) => actorInfo(state, data, id).color,
+  });
+  if (MEM.deep) deep.setLevel(MEM.deep, { fromOutside: true });
+  /** Enter a deep level (from the level bar, or by zooming out past the full Solar System). */
+  function enterDeep(id) {
+    if (!deepAvail().some((l) => l.id === id)) return;
+    const from = MEM.deep;
+    MEM.deep = id;
+    MEM.selected = null;
+    tween = null;
+    deep.setLevel(id, { fromOutside: from !== id && !(from === 'galaxy' && id === 'sector') });
+    renderSheet();
+    updateHud();
+    invalidate();
+  }
+  /** Back from the sector to the Solar System ('in'), or from the galaxy to the sector. */
+  function leaveDeep(dir = 'in') {
+    if (MEM.deep === 'galaxy' && dir === 'in' && deepAvail().some((l) => l.id === 'sector')) { enterDeep('sector'); return; }
+    MEM.deep = null;
+    MEM.selected = null;
+    deep.select(null);
+    sceneKey = '';
+    renderSheet();
+    updateHud();
+    goLevel(levels[levels.length - 1]);
+    checkDiscoveries();
+  }
+  /** Deep zoom with the level hand-off at both ends of the range. */
+  function deepZoom(f, sx, sy) {
+    const r = deep.zoomBy(f, sx, sy);
+    if (r === 'in') leaveDeep('in');
+    else if (r === 'out' && MEM.deep === 'sector' && deepAvail().some((l) => l.id === 'galaxy')) enterDeep('galaxy');
+  }
+  let overshoot = 1; // zooming out past the full Solar System accumulates here before handing off to the sector
 
   // ---------- camera ----------
   const minDim = () => Math.max(1, Math.min(W, H));
@@ -1096,6 +1155,10 @@ export function render(container, store) {
 
   function zoomAt(sx, sy, factor) {
     const cam = camNow();
+    if (factor < 1 && cam.span >= spanMax * 0.995 && deepAvail().some((l) => l.id === 'sector')) {
+      overshoot *= factor;
+      if (overshoot < 0.7) { overshoot = 1; enterDeep('sector'); return; }
+    } else overshoot = 1;
     tween = null;
     MEM.camAuto = false;
     MEM.cam = zoomedCam(cam, sx, sy, factor);
@@ -1103,7 +1166,10 @@ export function render(container, store) {
     invalidate();
   }
   function zoomAnimated(sx, sy, factor) {
-    moveTo(zoomedCam(camNow(), sx, sy, factor), 420);
+    if (MEM.deep) { deepZoom(factor, sx, sy); return; }
+    const cam = camNow();
+    if (factor < 1 && cam.span >= spanMax * 0.995 && deepAvail().some((l) => l.id === 'sector')) { enterDeep('sector'); return; }
+    moveTo(zoomedCam(cam, sx, sy, factor), 420);
   }
   function panBy(dx, dy) {
     const cam = camNow();
@@ -1139,6 +1205,7 @@ export function render(container, store) {
     scene.width = canvas.width;
     scene.height = canvas.height;
     sceneKey = '';
+    deep.resize(W, H, dpr);
     refitAuto();
     invalidate();
   }
@@ -1160,6 +1227,17 @@ export function render(container, store) {
     if (!root.isConnected) return cleanup();
     const busy = !!tween || gesture.active || progBusy(now);
     const amb = ambient(now);
+    if (MEM.mode === 'map' && MEM.deep) {
+      try {
+        deep.draw(cx2d, textScale());
+      } catch (e) {
+        if (!drawErrorLogged) console.warn('[mapa] erro ao desenhar o espaço profundo', e);
+        drawErrorLogged = true;
+      }
+      lastDraw = now;
+      if (busy) rafId = requestAnimationFrame(frame);
+      return;
+    }
     if (MEM.mode === 'map' && (busy || !amb || now - lastDraw > 33)) {
       try {
         draw(now);
@@ -2025,19 +2103,81 @@ export function render(container, store) {
       }
       tHits.push({ x: pt.x, y: pt.y, r: 18, kind: 'transit', id: t.key, bodyId: t.bodyId });
     }
+    drawColonies(g, scr, ts);
+  }
+
+  /** Colony / outpost markers (placeholders until Phase C): a small house badge on the body, owner's colour. */
+  function drawColonies(g, scr, ts) {
+    const cols = colonyList(state).filter((c) => c.bodyId && scr[c.bodyId]?.vis > 0.5);
+    if (!cols.length) return;
+    const byBody = {};
+    for (const c of cols) (byBody[c.bodyId] ||= []).push(c);
+    for (const [bodyId, list] of Object.entries(byBody)) {
+      const p = scr[bodyId];
+      const x = p.x + p.R * 0.75 + 7;
+      const y = p.y - p.R * 0.75 - 7;
+      const mine = list.some((c) => c.ownerId === state.playerId);
+      const col = mine ? '#e3b341' : actorInfo(state, data, list[0].ownerId).color;
+      g.save();
+      g.fillStyle = 'rgba(12,12,15,0.92)';
+      g.strokeStyle = col;
+      g.lineWidth = 1.3;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x - 7, y - 7, 14, 14, 3); else g.rect(x - 7, y - 7, 14, 14);
+      g.fill(); g.stroke();
+      g.fillStyle = col;
+      g.beginPath();
+      g.moveTo(x - 4, y + 3.5); g.lineTo(x - 4, y - 0.5); g.lineTo(x, y - 4); g.lineTo(x + 4, y - 0.5); g.lineTo(x + 4, y + 3.5); g.closePath();
+      g.fill();
+      if (list.length > 1) {
+        g.font = `600 ${(9 * ts).toFixed(1)}px ${FONT}`;
+        g.textAlign = 'left'; g.textBaseline = 'middle';
+        g.fillStyle = '#ecedf0';
+        g.fillText(String(list.length), x + 9, y);
+      }
+      g.restore();
+      tHits.push({ x, y, r: 14, kind: 'body', id: bodyId, bodyId });
+    }
   }
 
   // ---------- HUD ----------
   function updateLevelBar(id = activeLevelFor(levels, targetSpan(), (tween?.to || MEM.cam)?.follow, parentOf)?.id ?? null) {
+    if (MEM.deep) id = null;
     for (const b of levelBar.querySelectorAll('button[data-level]')) {
       const on = b.dataset.level === id;
       b.classList.toggle('is-on', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
+    for (const b of levelBar.querySelectorAll('button[data-deep-level]')) {
+      const on = b.dataset.deepLevel === MEM.deep;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (on && levelBar.scrollWidth > levelBar.clientWidth) b.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+
+  /** One line over the deep views: what the level shows and how much of it is known. */
+  function deepCaption() {
+    if (!MEM.deep) return '';
+    const sd = starsData();
+    if (MEM.deep === 'sector') {
+      const n = arr(sd?.stars).filter((x) => !x.home).length;
+      const max = Math.max(0, ...arr(sd?.stars).map((x) => Number(x.ly) || 0));
+      return `Setor estelar · ${n} estrelas a até ${Math.round(max)} anos-luz`;
+    }
+    return 'Via Láctea · esquema dos braços e regiões';
   }
 
   function updateHud() {
+    buildLevelBar();
     root.dataset.mode = MEM.mode;
+    root.dataset.deep = MEM.deep || '';
+    deepCap.textContent = deepCaption();
+    canvas.setAttribute('aria-label', MEM.deep === 'sector'
+      ? 'Mapa do setor estelar: as estrelas mais próximas do Sol. Toque numa estrela para abrir a ficha; arraste para girar, pinça para aproximar.'
+      : MEM.deep === 'galaxy'
+        ? 'Mapa esquemático da Via Láctea com braços, regiões e nós de colonização. Toque numa região para a ficha; pinça para aproximar.'
+        : 'Mapa do sistema solar. Toque em um corpo para abrir a ficha; pinça ou toque duplo para aproximar.');
     for (const b of seg.querySelectorAll('button')) {
       const on = b.dataset.mode === MEM.mode;
       b.classList.toggle('is-on', on);
@@ -2066,7 +2206,7 @@ export function render(container, store) {
     winBox.innerHTML = parts.join('');
     if (MEM.camAuto) refitAuto();
     legend.classList.toggle('is-open', !!MEM.legend);
-    legend.innerHTML = MEM.legend ? legendHtml() : '';
+    legend.innerHTML = MEM.legend ? (MEM.deep ? deep.legendHtml() : legendHtml()) : '';
     levelBar.querySelector('[data-legend]')?.setAttribute('aria-pressed', MEM.legend ? 'true' : 'false');
   }
 
@@ -2080,6 +2220,7 @@ export function render(container, store) {
       <div><span class="lg-mk lg-mk--p"></span> Destino visitado por você · <span class="lg-mk lg-mk--r"></span> por rivais</div>
       <div><span class="lg-win"></span> Arco azul: janela aberta · amarelo: em breve</div>
       <div><span class="lg-belt"></span> Pontilhado: cinturões</div>
+      ${colonyList(state).length ? '<div><span class="lg-col"></span> Colônia ou posto avançado</div>' : ''}
       <p>Pinça, roda ou toque duplo aproxima. Os destinos aparecem ao chegar perto.</p>
     </div>`;
   }
@@ -2087,8 +2228,9 @@ export function render(container, store) {
   // ---------- sheets (ficha do corpo, cartão de missão, destino) ----------
   function openSheet(sel) {
     MEM.selected = sel;
+    if (sel?.deep) deep.select(sel);
     renderSheet();
-    if (MEM.mode === 'map') keepAboveSheet(sel);
+    if (MEM.mode === 'map' && !sel?.deep) keepAboveSheet(sel);
     invalidate();
   }
 
@@ -2111,6 +2253,7 @@ export function render(container, store) {
   }
   function closeSheet() {
     MEM.selected = null;
+    deep.select(null);
     renderSheet();
     invalidate();
   }
@@ -2118,7 +2261,8 @@ export function render(container, store) {
   function renderSheet() {
     const sel = MEM.selected;
     let html = '';
-    if (sel?.transitKey) html = transitSheet(sel);
+    if (sel?.deep) html = MEM.deep ? deep.sheetHtml(sel, { head, actorInfo }) : '';
+    else if (sel?.transitKey) html = transitSheet(sel);
     else if (sel?.mode === 'dest' && destById(data, sel.destId)) html = destSheet(sel.destId);
     else if (sel && bodyIdx[sel.bodyId]) html = bodySheet(sel);
     if (!html) {
@@ -2157,6 +2301,11 @@ export function render(container, store) {
       const a = actorInfo(state, data, e.actorId);
       return `<li><span class="map-pres__flag" style="--c:${esc(a.color)}"></span><b>${esc(a.flag)} ${esc(a.short)}${e.actorId === pid ? ' (você)' : ''}</b> <small>${esc(e.items.slice(0, 3).map(prettyItem).join(', '))}</small></li>`;
     }).join('');
+    const colRows = colonyList(state).filter((c) => c.bodyId === b.id).map((c) => {
+      const a = actorInfo(state, data, c.ownerId);
+      const kind = c.kind === 'outpost' ? 'posto avançado' : c.kind === 'station' ? 'estação' : c.kind === 'base' ? 'base' : 'colônia';
+      return `<li><span class="map-pres__flag" style="--c:${esc(a.color)}"></span><b>${esc(c.name)}</b> <small>${esc(kind)}${c.ownerId ? ` · ${esc(a.short)}${c.ownerId === pid ? ' (você)' : ''}` : ''}${c.population ? ` · ${esc(c.population.toLocaleString('pt-BR'))} habitantes` : ''}</small></li>`;
+    }).join('');
     const active = model.transits.filter((t) => t.bodyId === b.id || bodyIdx[t.bodyId]?.parent === b.id);
     const act = active.map((t) => transitRow(t, sel)).join('');
     const moons = bodies.filter((m) => m.parent === b.id && m.kind !== 'belt');
@@ -2178,6 +2327,7 @@ export function render(container, store) {
         ${act ? `<section><h4>Em andamento</h4><ul class="map-pres">${act}</ul></section>` : ''}
         ${destRows ? `<section><h4>Destinos</h4><ul class="map-dests">${destRows}</ul></section>` : ''}
         <section><h4>Presença</h4>${pres ? `<ul class="map-pres">${pres}</ul>` : '<p class="map-fogged">Ninguém chegou lá nesta campanha.</p>'}</section>
+        ${colRows ? `<section><h4>Colônias e postos</h4><ul class="map-pres">${colRows}</ul></section>` : ''}
       </div>`;
   }
 
@@ -2311,6 +2461,7 @@ export function render(container, store) {
     }
   }
   function checkDiscoveries() {
+    if (MEM.deep) return; // the Solar System discovery scene waits until the player is back at planet scale
     const seen = loadSeen();
     const fresh = bodies.filter((b) => b.fog !== 'known' && model.fog.bodies[b.id] === 'known' && !seen.includes(b.id));
     if (!fresh.length || discovery.classList.contains('is-open')) return;
@@ -2427,7 +2578,7 @@ export function render(container, store) {
     }
     const p = localXY(e);
     pointers.set(e.pointerId, p);
-    freezeTween();
+    if (!MEM.deep) freezeTween();
     bump();
     if (pointers.size === 1) Object.assign(gesture, { active: true, moved: false, sx: p.x, sy: p.y, lx: p.x, ly: p.y, pinch: null });
     if (pointers.size === 2) {
@@ -2446,12 +2597,15 @@ export function render(container, store) {
       const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2;
-      zoomAt(mx, my, d / gesture.pinch.d);
-      panBy(mx - gesture.pinch.mx, my - gesture.pinch.my);
+      if (MEM.deep) deepZoom(d / gesture.pinch.d, mx, my);
+      else {
+        zoomAt(mx, my, d / gesture.pinch.d);
+        if (!MEM.deep) panBy(mx - gesture.pinch.mx, my - gesture.pinch.my);
+      }
       gesture.pinch = { d, mx, my };
     } else if (pointers.size === 1) {
       if (Math.hypot(p.x - gesture.sx, p.y - gesture.sy) > 7) gesture.moved = true;
-      if (gesture.moved) panBy(p.x - gesture.lx, p.y - gesture.ly);
+      if (gesture.moved) (MEM.deep ? deep.drag(p.x - gesture.lx, p.y - gesture.ly) : panBy(p.x - gesture.lx, p.y - gesture.ly));
       gesture.lx = p.x;
       gesture.ly = p.y;
     }
@@ -2473,7 +2627,8 @@ export function render(container, store) {
         if (lastTap && t - lastTap.t < 320 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 30) {
           // double tap: zoom in there (at max zoom, back out to the level)
           lastTap = null;
-          if (targetSpan() <= spanMin * 1.05) goLevel(currentLevel());
+          if (MEM.deep) deepZoom(1.8, p.x, p.y);
+          else if (targetSpan() <= spanMin * 1.05) goLevel(currentLevel());
           else zoomAnimated(p.x, p.y, 2.4);
           return;
         }
@@ -2488,10 +2643,19 @@ export function render(container, store) {
     e.preventDefault();
     const p = localXY(e);
     const k = e.deltaMode === 1 ? 40 : 1;
-    zoomAt(p.x, p.y, Math.exp(-e.deltaY * k * 0.0016));
+    const f = Math.exp(-e.deltaY * k * 0.0016);
+    if (MEM.deep) deepZoom(f, p.x, p.y);
+    else zoomAt(p.x, p.y, f);
     bump(4000);
   }
   function onTap(x, y) {
+    if (MEM.deep) {
+      const h = deep.hit(x, y);
+      if (!h) { if (MEM.selected) closeSheet(); return; }
+      store?.vibrate?.(8);
+      openSheet({ deep: true, kind: h.kind, id: h.id });
+      return;
+    }
     let best = null;
     let bd = Infinity;
     const prio = { transit: 0, dest: 1, body: 2 };
@@ -2521,7 +2685,7 @@ export function render(container, store) {
   }
 
   function onRootClick(e) {
-    const t = e.target.closest?.('[data-mode],[data-level],[data-legend],[data-close],[data-body],[data-discovery],[data-dest],[data-zoom],[data-focus],[data-plan],[data-transit],[data-mission],[data-region],[data-show]');
+    const t = e.target.closest?.('[data-mode],[data-level],[data-deep-level],[data-deep-leave],[data-legend],[data-close],[data-body],[data-discovery],[data-dest],[data-zoom],[data-focus],[data-plan],[data-transit],[data-mission],[data-region],[data-show]');
     if (!t) return;
     const ds = t.dataset;
     if (ds.mode) {
@@ -2533,7 +2697,19 @@ export function render(container, store) {
       updateHud();
       sceneKey = '';
       invalidate();
+    } else if (ds.deepLevel) {
+      if (MEM.deep === ds.deepLevel) { deep.home(); closeSheet(); } else enterDeep(ds.deepLevel);
+    } else if (ds.deepLeave) {
+      leaveDeep(ds.deepLeave);
     } else if (ds.level) {
+      if (MEM.deep) {
+        MEM.deep = null;
+        MEM.selected = null;
+        deep.select(null);
+        sceneKey = '';
+        renderSheet();
+        updateHud();
+      }
       goLevel(levelById(ds.level));
     } else if (ds.legend) {
       MEM.legend = !MEM.legend;
@@ -2542,6 +2718,7 @@ export function render(container, store) {
       closeSheet();
     } else if (ds.zoom) {
       zoomAnimated(W / 2, H / 2, ds.zoom === 'in' ? 2 : 0.5);
+      if (MEM.deep) updateHud();
     } else if (ds.focus) {
       goBody(ds.focus);
     } else if (ds.plan) {
@@ -2627,6 +2804,7 @@ export function render(container, store) {
     model = buildModel(state, data, q);
     positions = bodyPositions(data, state.turn ?? 0);
     version++;
+    deep.refresh();
     syncProgress();
     bump();
     updateHud();
@@ -2654,12 +2832,23 @@ export function render(container, store) {
     else globalThis.removeEventListener?.('resize', resize);
     if (typeof unsub === 'function') unsub();
     pathCache.clear();
+    deep.destroy();
     // free the offscreen scene bitmap now (the shared background stays cached for the next visit)
     scene.width = 0;
     scene.height = 0;
     if (container.__mapCleanup === cleanup) delete container.__mapCleanup;
   }
   container.__mapCleanup = cleanup;
+
+  // deep levels need data/core/stars.json (lazy, small): add their buttons when it arrives
+  if (!starsData()) {
+    loadStars().then((sd) => {
+      if (destroyed || !sd) return;
+      deep.refresh();
+      updateHud();
+      invalidate();
+    });
+  }
 
   // first paint
   syncProgress();

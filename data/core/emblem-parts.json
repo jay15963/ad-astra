@@ -1,0 +1,76 @@
+{
+  "note": "Peças dos emblemas das agências (docs/EXPANSION.md §5.4). Dono: B1 (src/ui/emblem.js desenha; src/sim/lifecycle.js valida 'agency/found' contra estas listas). A geometria base dos formatos e símbolos vive em emblem.js; 'paths' acrescenta símbolos extras em SVG (caixa 100×100, centro 50,50). Paletas: [campo, campo 2, símbolo, destaque]. Nenhum logo oficial é copiado: as agências reais ganham identidades originais em core/emblems.json.",
+  "shapes": [
+    { "id": "roundel", "name": "Selo redondo" },
+    { "id": "shield", "name": "Escudo" },
+    { "id": "hex", "name": "Hexágono" },
+    { "id": "chevron", "name": "Distintivo" },
+    { "id": "wing", "name": "Asas" },
+    { "id": "star", "name": "Estrela" },
+    { "id": "wordmark", "name": "Marca nominal" }
+  ],
+  "divisions": [
+    { "id": "none", "name": "Liso" },
+    { "id": "half", "name": "Partido" },
+    { "id": "band", "name": "Faixa" },
+    { "id": "chevron", "name": "Divisa" },
+    { "id": "quarter", "name": "Quartelado" }
+  ],
+  "glyphs": [
+    { "id": "rocket", "name": "Foguete" },
+    { "id": "orbit", "name": "Órbita" },
+    { "id": "star", "name": "Estrela" },
+    { "id": "planet", "name": "Planeta" },
+    { "id": "comet", "name": "Cometa" },
+    { "id": "capsule", "name": "Cápsula" },
+    { "id": "atom", "name": "Átomo" },
+    { "id": "globe", "name": "Globo" },
+    { "id": "wreath", "name": "Louros" },
+    { "id": "satellite", "name": "Satélite" },
+    { "id": "crescent", "name": "Lua crescente" }
+  ],
+  "paths": {
+    "satellite": "<rect x=\"40\" y=\"40\" width=\"20\" height=\"20\" rx=\"3\" fill=\"{g}\"/><rect x=\"8\" y=\"43\" width=\"27\" height=\"14\" rx=\"1.5\" fill=\"{g}\"/><rect x=\"65\" y=\"43\" width=\"27\" height=\"14\" rx=\"1.5\" fill=\"{g}\"/><path d=\"M35 50H40M60 50H65M17 43V57M26 43V57M74 43V57M83 43V57\" stroke=\"{b}\" stroke-width=\"1.6\"/><path d=\"M50 40V30M44 26Q50 18 56 26\" stroke=\"{g}\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"4.5\" fill=\"{a}\"/>",
+    "crescent": "<path d=\"M58 12A38 38 0 1 0 88 62A30 30 0 1 1 58 12Z\" fill=\"{g}\"/><path d=\"M70 26l2.6 5.6 5.6 2.6-5.6 2.6-2.6 5.6-2.6-5.6-5.6-2.6 5.6-2.6z\" fill=\"{a}\"/>"
+  },
+  "palettes": [
+    { "id": "marinho", "name": "Marinho", "colors": ["#13294b", "#1f3d6e", "#f2f4f7", "#d6453d"] },
+    { "id": "cosmos", "name": "Cosmos", "colors": ["#0e1a2b", "#23395b", "#e8d5a3", "#e3b341"] },
+    { "id": "rubro", "name": "Rubro e ouro", "colors": ["#9e1b1b", "#7a1414", "#f2c14e", "#f2c14e"] },
+    { "id": "esmeralda", "name": "Esmeralda", "colors": ["#0b5d4b", "#08473a", "#f5f1e6", "#e9b44c"] },
+    { "id": "ceu", "name": "Céu", "colors": ["#1f6fb2", "#175a92", "#ffffff", "#f2c14e"] },
+    { "id": "grafite", "name": "Grafite", "colors": ["#1d1f24", "#2b2e35", "#e6e8ec", "#3fa7d6"] },
+    { "id": "acafrao", "name": "Açafrão", "colors": ["#d9741c", "#1b3a6b", "#ffffff", "#1b3a6b"] },
+    { "id": "areia", "name": "Areia", "colors": ["#c9b38a", "#a8916a", "#2a2a2a", "#8c2f1f"] },
+    { "id": "oceano", "name": "Oceano", "colors": ["#0b4f6c", "#083b52", "#eaf6fb", "#f4a259"] },
+    { "id": "vinho", "name": "Vinho", "colors": ["#5e1f2d", "#44141f", "#f0dcc0", "#d4a24c"] },
+    { "id": "floresta", "name": "Floresta", "colors": ["#1e4d2b", "#163a20", "#f3efe0", "#c9a227"] },
+    { "id": "aurora", "name": "Aurora", "colors": ["#2d1e4f", "#3e2a6b", "#9ad1d4", "#f28c28"] },
+    { "id": "gelo", "name": "Gelo", "colors": ["#e9eef3", "#c7d3df", "#14202e", "#2f6fb0"] },
+    { "id": "marte", "name": "Marte", "colors": ["#8c3b1f", "#6b2c17", "#f7e3c6", "#f2b544"] },
+    { "id": "noite", "name": "Noite", "colors": ["#0a0e16", "#1a2232", "#c9ccd3", "#e3b341"] },
+    { "id": "jade", "name": "Jade", "colors": ["#0f6e6e", "#0b5454", "#f1f5f2", "#e85d4a"] },
+    { "id": "sol", "name": "Sol", "colors": ["#f2c14e", "#d9a62f", "#1b2a41", "#b8321f"] },
+    { "id": "violeta", "name": "Violeta", "colors": ["#4b2a6b", "#371f50", "#f0e6ff", "#f2c14e"] },
+    { "id": "tropico", "name": "Trópico", "colors": ["#0b6b3a", "#f2c94c", "#ffffff", "#f2c94c"] },
+    { "id": "porcelana", "name": "Porcelana", "colors": ["#f4f4f2", "#dfe3e8", "#13294b", "#c8102e"] }
+  ],
+  "grammar": {
+    "agency": { "shapes": ["roundel", "roundel", "shield", "star", "hex"], "glyphs": ["rocket", "orbit", "globe", "star", "planet", "satellite"], "divisions": ["none", "none", "band", "half", "chevron"], "ring": 0.7, "stars": [0, 7], "orbit": [0, 2] },
+    "company": { "shapes": ["wordmark", "wordmark", "hex", "chevron", "wing"], "glyphs": ["rocket", "comet", "orbit", "atom", "capsule"], "divisions": ["none", "chevron", "band"], "ring": 0.2, "stars": [0, 2], "orbit": [0, 2] },
+    "consortium": { "shapes": ["hex", "shield", "chevron"], "glyphs": ["planet", "comet", "atom", "crescent"], "divisions": ["quarter", "half", "none"], "ring": 0.3, "stars": [0, 4], "orbit": [0, 1] },
+    "colony": { "shapes": ["shield", "roundel"], "glyphs": ["planet", "wreath", "globe", "crescent"], "divisions": ["half", "band", "quarter"], "ring": 0.6, "stars": [1, 9], "orbit": [0, 1] },
+    "order": { "shapes": ["roundel"], "glyphs": ["wreath"], "divisions": ["none"], "ring": 1, "stars": [0, 0], "orbit": [0, 0] },
+    "investor": { "shapes": ["hex", "shield", "wordmark"], "glyphs": ["star", "globe", "atom", "orbit"], "divisions": ["none", "band", "quarter"], "ring": 0.3, "stars": [0, 3], "orbit": [0, 1] }
+  },
+  "eraStyle": {
+    "note": "Tendência de formato por era para emblemas gerados sem especificação (selos e escudos no meio do século XX, marcas nominais e hexágonos depois).",
+    "e1": ["roundel", "shield", "star", "wing"],
+    "e2": ["roundel", "shield", "chevron", "hex"],
+    "e3": ["wordmark", "roundel", "hex", "chevron"],
+    "e4": ["wordmark", "hex", "roundel", "chevron"],
+    "e5": ["hex", "wordmark", "star", "roundel"],
+    "e6": ["star", "hex", "wing", "roundel"],
+    "e7": ["star", "wing", "roundel", "hex"]
+  }
+}

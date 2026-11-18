@@ -402,7 +402,13 @@ function advanceRival(state, data, ctx, id) {
   const has = r.rivals[id] || (r.rivals[id] = []);
   let proj = r.rivalProjects[id];
   if (!proj) {
-    const options = nodesOf(data).filter((n) => !n.secret && !has.includes(n.id) && requiresMet(has, n) && nodeOpen(state, data, n));
+    // same filter as before, with set lookups and the year window read once (rivals that ran out of open nodes
+    // repeat this every week)
+    const hasSet = new Set(has);
+    const year = yearAt(state);
+    const undatedFrom = legacyFromYear(data);
+    const options = nodesOf(data).filter((n) => !n.secret && !hasSet.has(n.id) && (n.requires || []).every((req) => hasSet.has(req))
+      && inYearWindow(n, year, { undatedFrom }));
     if (!options.length) return;
     const rng = ctx.rng(`rival-pick:${id}`);
     const actor = state.actors?.[id];
