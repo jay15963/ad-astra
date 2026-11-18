@@ -11,6 +11,7 @@
 import { clamp, relKey, addNews, pushDecision, emitSignal, changeActor, log } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
 import { turnToDate, dateToTurn, WEEKS_PER_YEAR } from '../core/time.js';
+import { crossed, monthCrossed } from './simtime.js';
 
 /** Static content cache so setTension(state, ...) can phrase news without a data argument. */
 let DATA = null;
@@ -19,6 +20,9 @@ const PD = (data) => (data || DATA)?.politics || {};
 const LEVEL_LABELS = ['normal', 'tensão', 'crise', 'conflito regional', 'guerra aberta'];
 const OUTCOME_SCORE = { total: 1, partial: 0.4, recoverable: -0.5, catastrophic: -1 };
 const HISTORY_CAP = { tension: 150, events: 80, elections: 40, crises: 40, budgets: 80 };
+// a 1950–3000 campaign (save budget 400 KB) keeps a shorter memory; the Corrida Lunar keeps HISTORY_CAP
+const LONG_HISTORY_CAP = { tension: 50, events: 30, elections: 20, crises: 20, budgets: 60 };
+const histCap = (state, k) => (Number.isFinite(state?.endTurn) && state.endTurn > 10 * WEEKS_PER_YEAR ? LONG_HISTORY_CAP : HISTORY_CAP)[k];
 
 // ---------------------------------------------------------------- small utils
 
@@ -67,7 +71,62 @@ function isMonthStart(state) {
 // ---------------------------------------------------------------- lookups
 
 const nations = (data) => PD(data).nations || [];
-const nationDef = (data, id) => nations(data).find((n) => n.id === id) || null;
+const NATION_IDX = new WeakMap(); // politics nations list -> Map(id -> first def), so nationDef is not a scan
+function nationDef(data, id) {
+  const list = nations(data);
+  let m = NATION_IDX.get(list);
+  if (!m) {
+    m = new Map();
+    for (const n of list) if (n && !m.has(n.id)) m.set(n.id, n);
+    NATION_IDX.set(list, m);
+  }
+  return m.get(id) || genericNationDef(data, id);
+}
+
+// ---------------------------------------------------------------- nations through time (data/core/nations.json)
+
+const coreNations = (data) => (data || DATA)?.nations?.nations || [];
+const coreNation = (data, id) => (data || DATA)?.index?.nations?.[id] || coreNations(data).find((n) => n.id === id) || null;
+const monthOf = (d, dflt) => (d == null ? dflt : (typeof d === 'number' ? d * 12 : (d.year ?? 0) * 12 + (d.month ?? 0)));
+/** Is the nation alive at this turn? Unknown to the core table = always (the politics data predates it). */
+export function nationAliveAt(state, data, nid, turn = state.turn) {
+  const def = coreNation(data, nid);
+  if (!def) return true;
+  const dt = turnToDate(turn, state.startYear);
+  const now = dt.year * 12 + dt.month;
+  return monthOf(def.from, -Infinity) <= now && now <= monthOf(def.to, Infinity);
+}
+const GENERIC_CACHE = new WeakMap();
+/** A politics definition for a nation the politics data does not describe (URSS 1950, a colony in 2300). */
+function genericNationDef(data, id) {
+  const src = coreNation(data, id);
+  if (!src) return null;
+  const d = data || DATA;
+  let m = GENERIC_CACHE.get(d);
+  if (!m) GENERIC_CACHE.set(d, (m = {}));
+  if (m[id]) return m[id];
+  const p = src.politics || {};
+  m[id] = {
+    id, name: src.name || id, flag: src.flag || '', art: src.art || p.art || 'o', capital: src.capital || p.capital || src.name || id,
+    generic: true, actors: [], aliases: src.aliases || [], system: p.system || 'generic',
+    legislature: p.legislature || 'parlamento', hearingBody: p.hearingBody || p.legislature || 'parlamento',
+    economy: { growth: 2, trend: 2, inflation: 3, inflationTarget: 3, debt: 50, debtTolerance: 100, debtDrift: 0.5, volatility: 0.6, weight: 0.5, budgetBase: 0.02, budgetVolatility: 0.03, ...(p.economy || {}) },
+    factions: p.factions || [{ id: 'gov', name: 'governo', short: 'o governo', gov: 'governo', spaceStance: 0.35, priority: 'crewed_prestige', hawk: 0.5, art: 'o' }],
+    government: p.government || { exec: (p.factions?.[0]?.id) || 'gov' },
+  };
+  return m[id];
+}
+/** Nation of a lineage at this turn (data/core/lineages.json `nation: [{from, id}]`), or null. */
+function lineageNationAt(state, data, actorId, turn = state.turn) {
+  const d = data || DATA;
+  const lin = d?.index?.lineages?.[actorId] || d?.lineages?.lineages?.find((l) => l.id === actorId);
+  if (!Array.isArray(lin?.nation)) return null;
+  const dt = turnToDate(turn, state.startYear);
+  const now = dt.year * 12 + dt.month;
+  let hit = null;
+  for (const n of lin.nation) if (monthOf(n.from, -Infinity) <= now) hit = n.id;
+  return hit;
+}
 const nationName = (data, id) => nationDef(data, id)?.name || id;
 const factionDef = (nd, fid) => nd?.factions?.find((f) => f.id === fid) || nd?.factions?.[0] || null;
 const priorityLabel = (data, pid) => PD(data).priorities?.[pid]?.label || pid || '';
@@ -123,9 +182,25 @@ export function blocAlignment(state, data, actorId, blocId) {
 }
 
 /** Known actor ids of a nation (data-listed + state actors mapped to it). */
+// memo of the inverse map (not saved): rebuilt when the map object, the turn or its size changes, or on invalidate
+const NATION_MEMO = { ref: null, turn: -1, n: -1, by: null };
+const invalidateNations = () => { NATION_MEMO.ref = null; };
 function actorsOfNation(state, nid) {
   const m = state.world?.actorNation || {};
-  return Object.keys(m).filter((k) => m[k] === nid);
+  const n = Object.keys(m).length;
+  if (NATION_MEMO.ref !== m || NATION_MEMO.turn !== state.turn || NATION_MEMO.n !== n) {
+    const by = {};
+    for (const k of Object.keys(m)) (by[m[k]] ||= []).push(k);
+    Object.assign(NATION_MEMO, { ref: m, turn: state.turn, n, by });
+  }
+  return (NATION_MEMO.by[nid] || []).slice();
+}
+/** nation id -> actor ids, one pass (same order as actorsOfNation). */
+function nationActorsMap(state) {
+  const m = state.world?.actorNation || {};
+  const out = {};
+  for (const k of Object.keys(m)) (out[m[k]] ||= []).push(k);
+  return out;
 }
 /** The nation's main agency present in the game (used as a/b in signals). */
 function leadActor(state, data, nid) {
@@ -143,13 +218,20 @@ function refreshActorNation(state, data) {
   w.actorNation = w.actorNation || {};
   for (const n of nations(data)) for (const id of n.actors || []) w.actorNation[id] = n.id;
   for (const [id, m] of Object.entries(PD(data).markets || {})) if (!w.actorNation[id] && m.nation) w.actorNation[id] = m.nation;
+  // the data lists describe 2026: an actor whose listed nation is not alive now (Roscosmos in 1950) follows its lineage
   for (const a of Object.values(state.actors || {})) {
-    if (!a?.id || w.actorNation[a.id]) continue;
+    if (!a?.id) continue;
+    const listed = w.actorNation[a.id];
+    if (listed && (!w.nations || w.nations[listed])) continue;
+    const ln = lineageNationAt(state, data, a.id) || (typeof a.nation === 'string' ? a.nation : null);
+    if (ln && w.nations?.[ln]) { w.actorNation[a.id] = ln; continue; }
+    if (listed) continue;
     const c = String(a.country || '').toLowerCase();
     const n = nations(data).find((x) => (x.aliases || []).some((al) => al.toLowerCase() === c) || x.name.toLowerCase() === c);
     if (n) w.actorNation[a.id] = n.id;
   }
   w.actorCount = Object.keys(state.actors || {}).length;
+  invalidateNations();
 }
 
 // ---------------------------------------------------------------- news (capped, varied)
@@ -183,11 +265,16 @@ function pnews(state, data, key, vars = {}, opts = {}) {
   const win = Math.min(recent.length, list.length - 1, pd.news?.noRepeat ?? 2);
   const banned = win > 0 ? recent.slice(-win) : [];
   for (let g = 0; g < list.length && banned.includes(idx); g++) idx = (idx + 1) % list.length;
+  // a variant may be dated ({text, minYear}): in a 1950 campaign "Banda larga por satélite" waits for its era
+  const year = turnToDate(state.turn, state.startYear ?? 0).year;
+  const okAt = (e) => typeof e === 'string' || !(e?.minYear > year);
+  for (let g = 0; g < list.length && !okAt(list[idx]); g++) idx = (idx + 1) % list.length;
+  if (!okAt(list[idx])) return null;
   w.tplLast[tplKey] = idx;
   w.tplRecent[tplKey] = [...recent, idx].slice(-3);
   w.newsMonth.count += 1;
   return addNews(state, {
-    headline: capFirst(fill(list[idx], vars)),
+    headline: capFirst(fill(typeof list[idx] === 'string' ? list[idx] : list[idx]?.text, vars)),
     body: opts.body || '',
     tags: ['politics', ...(opts.tags || [])],
     actors: opts.actors || [],
@@ -227,6 +314,7 @@ export function init(state, data, ctx) {
   refreshActorNation(state, data);
 
   for (const n of nations(data)) {
+    if (!nationAliveAt(state, data, n.id, 0)) continue; // e.g. Russia in a 1950 start (the USSR comes from data/core/nations.json)
     const e = n.economy || {};
     const gov = { exec: n.government?.exec || n.factions?.[0]?.id, legis: n.government?.legis || n.government?.exec || n.factions?.[0]?.id };
     w.nations[n.id] = {
@@ -370,12 +458,13 @@ export function nudgeTension(state, a, b, delta, reason = 'externo', data = null
   return setTension(state, a, b, tensionBetween(state, a, b) + Math.round(delta), reason, data);
 }
 
-function syncPair(state, pk) {
+function syncPair(state, pk, byNation = null) {
   const p = state.world.pairs[pk];
   if (!p) return;
-  const as = actorsOfNation(state, p.a);
-  const bs = actorsOfNation(state, p.b);
-  for (const x of as) for (const y of bs) state.tension[relKey(x, y)] = p.level;
+  const as = byNation ? byNation[p.a] || [] : actorsOfNation(state, p.a);
+  const bs = byNation ? byNation[p.b] || [] : actorsOfNation(state, p.b);
+  const T = state.tension;
+  for (const x of as) for (const y of bs) { const k = relKey(x, y); if (T[k] !== p.level) T[k] = p.level; }
 }
 
 /**
@@ -383,23 +472,44 @@ function syncPair(state, pk) {
  * A small nudge (±1) becomes a pressure impulse on the nation pair: provocations matter, but one card does not
  * start a war by itself. A jump of 2+ levels is treated as deliberate and adopted.
  */
+// nation pairs with actors on both sides (the only ones reconcileExternal can touch), memoized on the actor→nation
+// map and the pair count: 630 pairs in a late campaign, most of them between nations with no agency
+const LIVE_PAIRS = { sig: null, list: [] };
+function livePairs(state, byNation) {
+  const an = state.world?.actorNation || {};
+  const pairs = state.world.pairs;
+  let sig = String(Object.keys(pairs).length);
+  for (const k in an) sig += `|${k}:${an[k]}`;
+  if (LIVE_PAIRS.sig !== sig || LIVE_PAIRS.pairs !== pairs) {
+    LIVE_PAIRS.sig = sig;
+    LIVE_PAIRS.pairs = pairs;
+    LIVE_PAIRS.list = Object.keys(pairs).filter((pk) => (byNation[pairs[pk].a] || []).length && (byNation[pairs[pk].b] || []).length);
+  }
+  return LIVE_PAIRS.list;
+}
+
 function reconcileExternal(state, data) {
   const M = PD(data).tensionModel || {};
-  for (const [pk, p] of Object.entries(state.world.pairs)) {
+  const byNation = nationActorsMap(state);
+  for (const pk of livePairs(state, byNation)) {
+    const p = state.world.pairs[pk];
+    if (!p) continue;
     let ext = null;
-    for (const x of actorsOfNation(state, p.a)) {
-      for (const y of actorsOfNation(state, p.b)) {
+    let dirty = false;
+    for (const x of byNation[p.a] || []) {
+      for (const y of byNation[p.b] || []) {
         const v = state.tension[relKey(x, y)];
+        if (v !== p.level) dirty = true;
         if (typeof v === 'number' && Math.round(v) !== p.level) { ext = clamp(Math.round(v), 0, 4); break; }
       }
       if (ext != null) break;
     }
-    if (ext == null) { syncPair(state, pk); continue; }
+    if (ext == null) { if (dirty) syncPair(state, pk, byNation); continue; } // all in step: nothing to write
     const delta = ext - p.level;
     if (Math.abs(delta) >= 2) applyLevel(state, data, pk, ext, 'externo');
     else {
       p.pressure = r3(p.pressure + delta * (M.externalImpulse ?? 0.45));
-      syncPair(state, pk);
+      syncPair(state, pk, byNation);
       log(state, `politics: incidente externo em ${pk} vira pressão (${p.pressure})`);
     }
   }
@@ -407,15 +517,27 @@ function reconcileExternal(state, data) {
 
 function pairPlace(state, data, pk) {
   const p = state.world.pairs[pk];
-  const def = (PD(data).pairs || []).find((x) => relKey(x.a, x.b) === pk);
+  const def = pairDef(data, pk);
   const places = def?.places || [];
   if (!places.length) return '';
   const rng = rngFor(state.seed, 'politics', 'place', pk, p.changes || 0);
   return rng.pick(places);
 }
 
+// data pair definitions by key (first match wins, as with find)
+const PAIR_DEFS = new WeakMap();
+function pairDef(data, pk) {
+  const list = PD(data).pairs || [];
+  let m = PAIR_DEFS.get(list);
+  if (!m) {
+    m = new Map();
+    for (const x of list) { const k = relKey(x.a, x.b); if (!m.has(k)) m.set(k, x); }
+    PAIR_DEFS.set(list, m);
+  }
+  return m.get(pk);
+}
 function pairFloor(data, pk) {
-  return (PD(data).pairs || []).find((x) => relKey(x.a, x.b) === pk)?.floor ?? 0;
+  return pairDef(data, pk)?.floor ?? 0;
 }
 
 function applyLevel(state, data, pk, toLevel, reason = '', opts = {}) {
@@ -432,7 +554,7 @@ function applyLevel(state, data, pk, toLevel, reason = '', opts = {}) {
   p.peak = Math.max(p.peak || 0, to);
   p.changes = (p.changes || 0) + 1;
   syncPair(state, pk);
-  pushCapped(w.history.tension, { turn: state.turn, pair: pk, from, to, reason }, HISTORY_CAP.tension);
+  pushCapped(w.history.tension, { turn: state.turn, pair: pk, from, to, reason }, histCap(state, 'tension'));
   state.stats['politics.tensionChanges'] = (state.stats['politics.tensionChanges'] || 0) + 1;
   const la = leadActor(state, data, p.a);
   const lb = leadActor(state, data, p.b);
@@ -545,11 +667,17 @@ function exitLevel(state, data, pk, L) {
 }
 
 function updateGlobalTension(state) {
-  const lv = Object.values(state.world.pairs).map((p) => p.level).sort((a, b) => b - a);
-  if (!lv.length) { state.world.globalTension = 0; return; }
-  const top = lv.slice(0, 3);
+  // the three highest levels in one pass (same result as sorting every pair each week)
+  let t0 = -Infinity, t1 = -Infinity, t2 = -Infinity, n = 0;
+  for (const k in state.world.pairs) {
+    const x = state.world.pairs[k].level;
+    n++;
+    if (x > t0) { t2 = t1; t1 = t0; t0 = x; } else if (x > t1) { t2 = t1; t1 = x; } else if (x > t2) t2 = x;
+  }
+  if (!n) { state.world.globalTension = 0; return; }
+  const top = [t0, t1, t2].slice(0, Math.min(3, n));
   const avg = top.reduce((s, x) => s + x, 0) / top.length;
-  state.world.globalTension = Math.round(clamp(0.5 * lv[0] + 0.5 * avg, 0, 4) * 10) / 10;
+  state.world.globalTension = Math.round(clamp(0.5 * t0 + 0.5 * avg, 0, 4) * 10) / 10;
 }
 
 // ---------------------------------------------------------------- monthly dynamics
@@ -560,13 +688,26 @@ function tensionDynamics(state, data, rng) {
   const up = M.up || [0.55, 0.7, 1.0, 1.35];
   const drag = M.levelDrag || [0, 0, 0, 0.05, 0.18];
   const w = state.world;
+  // active treaties per actor pair, counted once (was a scan of every treaty for each of the 600+ pairs)
+  const peaceIdx = new Map();
+  for (const t of state.treaties || []) {
+    if (t?.status !== 'active' || !Array.isArray(t.parties)) continue;
+    const ps = [...new Set(t.parties)];
+    for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
+      const k = relKey(ps[i], ps[j]);
+      peaceIdx.set(k, (peaceIdx.get(k) || 0) + 1);
+    }
+  }
+  // lead agency per nation, once per month (the actors do not change inside this loop)
+  const leads = new Map();
+  const lead = (nid) => { let x = leads.get(nid); if (x === undefined) { x = leadActor(state, data, nid); leads.set(nid, x); } return x; };
   for (const [pk, p] of Object.entries(w.pairs)) {
-    const def = (pd.pairs || []).find((x) => relKey(x.a, x.b) === pk) || {};
+    const def = pairDef(data, pk) || {};
     const na = nationDef(data, p.a);
     const nb = nationDef(data, p.b);
     let drive = ((def.baseline ?? 0.2) - p.level) * (M.meanReversion ?? 0.12);
     // diplomacy relations between lead agencies (if diplomacy runs)
-    const rel = state.relations?.[relKey(leadActor(state, data, p.a), leadActor(state, data, p.b))];
+    const rel = state.relations?.[relKey(lead(p.a), lead(p.b))];
     if (rel) drive += (((rel.rivalry ?? 30) - 40) / 100) * (M.rivalryFactor ?? 0.08) - ((rel.trust ?? 0) / 100) * (M.trustFactor ?? 0.05);
     // hawkish governments push up
     const ha = factionDef(na, w.nations[p.a]?.government.exec)?.hawk ?? 0.5;
@@ -578,9 +719,9 @@ function tensionDynamics(state, data, rng) {
       if (c) drive += pd.crises?.[c.type]?.instability ?? 0.05;
     }
     // bilateral peaceful treaties dampen
-    const la = leadActor(state, data, p.a);
-    const lb = leadActor(state, data, p.b);
-    const peace = (state.treaties || []).filter((t) => t?.status === 'active' && t.parties?.includes(la) && t.parties?.includes(lb)).length;
+    const la = lead(p.a);
+    const lb = lead(p.b);
+    const peace = la === lb ? (state.treaties || []).filter((t) => t?.status === 'active' && t.parties?.includes(la)).length : (peaceIdx.get(relKey(la, lb)) || 0);
     drive -= Math.min(3, peace) * (M.peaceTreaty ?? 0.02);
     drive -= drag[p.level] || 0; // war exhaustion
     drive += rng.normal(0, (def.volatility ?? 0.2) * (M.noiseScale ?? 0.3));
@@ -600,7 +741,7 @@ function startCrisis(state, data, nid, type, rng, severity = 1) {
   const [lo, hi] = def.months || [6, 12];
   const months = rng.int(lo, hi);
   ns.econ.crisis = { type, startTurn: state.turn, untilTurn: state.turn + Math.round(months * WEEKS_PER_YEAR / 12), severity: r2(severity) };
-  pushCapped(state.world.history.crises, { turn: state.turn, nation: nid, type, months }, HISTORY_CAP.crises);
+  pushCapped(state.world.history.crises, { turn: state.turn, nation: nid, type, months }, histCap(state, 'crises'));
   state.stats['politics.crises'] = (state.stats['politics.crises'] || 0) + 1;
   for (const id of agenciesOf(state, data, nid)) {
     const p = state.politics[id];
@@ -687,13 +828,16 @@ function updateStances(state, data) {
 
 function pairCandidates(state, data, def) {
   const w = state.world;
-  let list;
-  if (def.pairs === 'any' || !def.pairs) list = Object.values(w.pairs).map((p) => [p.a, p.b]);
-  else list = def.pairs.filter(([a, b]) => w.pairs[relKey(a, b)]);
-  return list
-    .map(([a, b]) => ({ a, b, p: w.pairs[relKey(a, b)] }))
-    .filter(({ p }) => p.level >= (def.minLevel ?? 0) && p.level <= (def.maxLevel ?? 4))
-    .map((c) => ({ ...c, weight: 1 + c.p.level * (def.levelBias ?? 0.4) + Math.max(0, c.p.pressure) * 0.5 }));
+  const lo = def.minLevel ?? 0, hi = def.maxLevel ?? 4, bias = def.levelBias ?? 0.4;
+  const out = [];
+  const add = (a, b) => {
+    const p = w.pairs[relKey(a, b)];
+    if (p.level >= lo && p.level <= hi) out.push({ a, b, p, weight: 1 + p.level * bias + Math.max(0, p.pressure) * 0.5 });
+  };
+  // one pass (a late campaign has 600+ pairs and this runs for every eligible event each month)
+  if (def.pairs === 'any' || !def.pairs) for (const k in w.pairs) add(w.pairs[k].a, w.pairs[k].b);
+  else for (const [a, b] of def.pairs) if (w.pairs[relKey(a, b)]) add(a, b);
+  return out;
 }
 
 function eventEligible(state, data, def) {
@@ -701,6 +845,12 @@ function eventEligible(state, data, def) {
   if ((w.cooldowns[`ev:${def.id}`] ?? -1) > state.turn) return false;
   if (def.once && w.eventCounts[def.id]) return false;
   if (def.minTurn != null && state.turn < def.minTurn) return false;
+  // era gate (campaign 1950–3000): an event that only makes sense from/until a given year
+  if (def.minYear != null || def.maxYear != null) {
+    const y = turnToDate(state.turn, state.startYear ?? 0).year;
+    if (def.minYear != null && y < def.minYear) return false;
+    if (def.maxYear != null && y > def.maxYear) return false;
+  }
   if (def.minGlobal != null && w.globalTension < def.minGlobal) return false;
   if (def.maxGlobal != null && w.globalTension > def.maxGlobal) return false;
   return true;
@@ -779,7 +929,7 @@ function exogenousEvents(state, data, rng) {
         const c = pairCandidates(state, data, def);
         if (c.length) options.push({ def, cands: c, weight: def.weight ?? 1 });
       } else if (def.target === 'nation') {
-        let ns = def.nations === 'any' || !def.nations ? nations(data).map((x) => x.id) : def.nations.filter((x) => w.nations[x]);
+        let ns = def.nations === 'any' || !def.nations ? nations(data).map((x) => x.id).filter((x) => w.nations[x]) : def.nations.filter((x) => w.nations[x]);
         if (def.requiresDivided) ns = ns.filter((x) => w.nations[x]?.divided);
         if (ns.length) options.push({ def, nats: ns, weight: def.weight ?? 1 });
       } else options.push({ def, weight: def.weight ?? 1 });
@@ -807,7 +957,7 @@ function exogenousEvents(state, data, rng) {
       force: (def.importance ?? 2) >= 3, tags: ['event', def.id],
       actors: [tctx.a, tctx.b, tctx.n].filter(Boolean).map((x) => leadActor(state, data, x)),
     });
-    pushCapped(w.history.events, { turn: state.turn, id: def.id, a: tctx.a || null, b: tctx.b || null, n: tctx.n || null, headline: item?.headline || null, involved }, HISTORY_CAP.events);
+    pushCapped(w.history.events, { turn: state.turn, id: def.id, a: tctx.a || null, b: tctx.b || null, n: tctx.n || null, headline: item?.headline || null, involved }, histCap(state, 'events'));
     state.stats['politics.events'] = (state.stats['politics.events'] || 0) + 1;
     applyEventEffects(state, data, def, tctx, rng);
   }
@@ -819,7 +969,7 @@ function scheduleSnapElections(state, data, rng) {
   const w = state.world;
   const em = PD(data).electionModel || {};
   for (const n of nations(data)) {
-    if (!n.snapElectionPerYear) continue;
+    if (!n.snapElectionPerYear || !w.nations[n.id]) continue;
     const soon = w.elections.some((e) => e.nation === n.id && !e.done && (e.kind === 'executive' || e.kind === 'legislative') && e.turn - state.turn < WEEKS_PER_YEAR);
     if (soon || !rng.chance(n.snapElectionPerYear / 12)) continue;
     const [lo, hi] = em.snapLeadWeeks || [5, 8];
@@ -920,7 +1070,7 @@ function resolveElection(state, data, e, rng) {
     }
   }
   e.result = result;
-  pushCapped(w.history.elections, { turn: state.turn, id: e.id, nation: e.nation, kind: e.kind, name: e.name, result, exec: gov.exec, legis: gov.legis }, HISTORY_CAP.elections);
+  pushCapped(w.history.elections, { turn: state.turn, id: e.id, nation: e.nation, kind: e.kind, name: e.name, result, exec: gov.exec, legis: gov.legis }, histCap(state, 'elections'));
   state.stats['politics.elections'] = (state.stats['politics.elections'] || 0) + 1;
   emitSignal(state, 'election', { actorId: leadActor(state, data, e.nation), result, nation: e.nation, electionId: e.id, kind: e.kind });
   // player's promise comes due
@@ -1048,6 +1198,48 @@ function companyBudgetPct(state, data, id, rng) {
   return { pct: clamp(pct, bm.min ?? -0.25, bm.companyMax ?? bm.max ?? 0.2), reasons };
 }
 
+/** Lineage budget series (data/core/lineages.json) at a year: linear interpolation, flat past the ends. */
+function lineageBudget(data, id, year) {
+  const raw = data?.lineages;
+  const list = Array.isArray(raw) ? raw : Array.isArray(raw?.lineages) ? raw.lineages : [];
+  const s = (list.find((l) => l?.id === id)?.budgetSeries || []).filter((p) => Array.isArray(p) && p.length >= 2);
+  if (!s.length) return null;
+  if (year <= s[0][0]) return s[0][1];
+  for (let i = 1; i < s.length; i++) {
+    if (year <= s[i][0]) {
+      const [y0, v0] = s[i - 1], [y1, v1] = s[i];
+      return v0 + (v1 - v0) * ((year - y0) / Math.max(1, y1 - y0));
+    }
+  }
+  return s[s.length - 1][1];
+}
+
+/**
+ * Keeps a budget near its anchor over a 1050-year campaign: the lineage's budgetSeries for real agencies, the
+ * birth budget for generated ones. Inside a dead zone (x0.67..x1.5) the yearly % runs free (a 5-year scenario is
+ * not touched); outside it a third of the excess (in log scale) goes back each year, and x0.33..x3 is a hard limit.
+ * Without this the yearly % compounds for centuries: some agencies grow without bound while others hit the floor.
+ */
+function anchorPull(state, data, id, year) {
+  const a = state.actors?.[id];
+  if (!a || typeof a.budget !== 'number' || !(a.budget > 0)) return;
+  // only long campaigns: a short scenario (Corrida Lunar, 5 years) keeps its free-running budgets
+  if (!(state.endTurn > (PD(data).budgetModel?.anchorMinWeeks ?? 10 * WEEKS_PER_YEAR))) return;
+  const bm = PD(data).budgetModel || {};
+  const anchor = lineageBudget(data, id, year) ?? state.world.baseBudget?.[id] ?? null;
+  if (!(anchor > 0)) return;
+  const lo = bm.anchorLow ?? 0.67, hi = bm.anchorHigh ?? 1.5;
+  const r = a.budget / anchor;
+  let target = r;
+  if (r > hi) target = hi * Math.pow(r / hi, 1 - (bm.anchorPull ?? 0.33));
+  else if (r < lo) target = lo * Math.pow(r / lo, 1 - (bm.anchorPull ?? 0.33));
+  target = clamp(target, bm.anchorMin ?? 0.33, bm.anchorMax ?? 3);
+  if (target === r) return;
+  const from = a.budget;
+  a.budget = Math.max(1, Math.round(anchor * target * 10) / 10);
+  if (a.budget !== from) emitSignal(state, 'budget/changed', { actorId: id, from, to: a.budget, reason: 'orçamento anual' });
+}
+
 function annualRollover(state, data, ctx) {
   const pd = PD(data);
   const bm = pd.budgetModel || {};
@@ -1076,16 +1268,17 @@ function annualRollover(state, data, ctx) {
         backers: md?.backers ? md.backers[0].toUpperCase() + md.backers.slice(1) : 'Os investidores',
       }, { pct, year, chance, reasons: r.reasons }, { urgency: 3, force: true, expiresWeeks: 6, defaultChoice: 'accept' });
       if (card) {
-        pushCapped(w.history.budgets, { turn: state.turn, year, actorId: id, from, to: from, pct: 0, proposed: r3(pct) }, HISTORY_CAP.budgets);
+        pushCapped(w.history.budgets, { turn: state.turn, year, actorId: id, from, to: from, pct: 0, proposed: r3(pct) }, histCap(state, 'budgets'));
         lines.push(`${actorShort(state, id)}: corte de ${fmtPct(-pct, false)} em negociação`);
         continue;
       }
     }
     budgetDelta(state, id, pct, 'orçamento anual');
+    anchorPull(state, data, id, year);
     const to = a.budget;
     const real = from ? to / from - 1 : 0;
     changes.push({ id, real });
-    pushCapped(w.history.budgets, { turn: state.turn, year, actorId: id, from: r2(from), to: r2(to), pct: r3(real) }, HISTORY_CAP.budgets);
+    pushCapped(w.history.budgets, { turn: state.turn, year, actorId: id, from: r2(from), to: r2(to), pct: r3(real) }, histCap(state, 'budgets'));
     lines.push(`${actorShort(state, id)}: ${fmtMoney(from)} → ${fmtMoney(to)} (${fmtPct(real)})`);
     if (id === pid) {
       const top = r.reasons.slice().sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta)).slice(0, 4).map((x) => `${x.label} ${fmtPct(x.delta)}`).join(' · ');
@@ -1333,7 +1526,7 @@ const HANDLERS = {
     const from = state.actors[pid]?.budget ?? 0;
     budgetDelta(state, pid, applied, 'corte negociado');
     const to = state.actors[pid]?.budget ?? 0;
-    pushCapped(state.world.history.budgets, { turn: state.turn, year: pl.year, actorId: pid, from: r2(from), to: r2(to), pct: r3(from ? to / from - 1 : 0), negotiated: choice }, HISTORY_CAP.budgets);
+    pushCapped(state.world.history.budgets, { turn: state.turn, year: pl.year, actorId: pid, from: r2(from), to: r2(to), pct: r3(from ? to / from - 1 : 0), negotiated: choice }, histCap(state, 'budgets'));
     pnews(state, data, 'budget_player_down', { actor: actorShort(state, pid), amount: fmtMoney(to), year: pl.year, pct: fmtPct(from ? to / from - 1 : 0) }, { importance: 2, force: true, actors: [pid], tags: ['budget'], body: message });
     return { message };
   },
@@ -1444,31 +1637,56 @@ function isoVars(data, iso, K) {
 export function initGeo(state, data) {
   const G = GD(data);
   const geo = { zones: {}, conflicts: [], events: [], shifts: 0, blocChanges: [], blocNextTurn: null };
+  state.geo = geo;
+  activateGeoFacts(state, data, 0);
+  return geo;
+}
+
+/**
+ * The geopolitics facts are dated (data/geopolitics.json, as of 2026). A zone or a conflict whose `since` is after
+ * the current turn does not exist yet (a 1950 campaign has no Kosovo and no Russia–Ukraine war): it is added when
+ * its date arrives, a conflict only if its nations exist in that world. Zones that join later start contested,
+ * not at war. A Corrida Lunar start (2026) gets every fact at turn 0, as before.
+ */
+function activateGeoFacts(state, data, turn) {
+  const G = GD(data);
+  const geo = state.geo;
+  geo.factsDone = geo.factsDone || [];
+  const done = new Set(geo.factsDone);
   for (const zd of G.zones || []) {
-    if (!zd?.id || !Array.isArray(zd.claimants) || !zd.claimants.length) continue;
+    if (!zd?.id || geo.zones[zd.id] || !Array.isArray(zd.claimants) || !zd.claimants.length) continue;
+    const since = geoTurn(data, zd.since, state.startYear) ?? 0;
+    if (since > turn) continue;
+    const late = turn > 0;
     const controller = zd.claimants.includes(zd.controller) ? zd.controller : zd.claimants[0];
+    const st = GEO_STATUS.includes(zd.status) ? zd.status : 'contested';
     geo.zones[zd.id] = {
-      controller, status: GEO_STATUS.includes(zd.status) ? zd.status : 'contested',
-      since: geoTurn(data, zd.since, state.startYear) ?? 0, conflictId: null, changedTurn: null, history: [],
+      controller, status: late && st === 'conflict' ? 'contested' : st,
+      since: late ? turn : since, conflictId: null, changedTurn: null, history: [],
     };
   }
+  const nationIds = state.world?.nations ? new Set(Object.keys(state.world.nations)) : null;
   for (const f of G.conflicts || []) {
+    if (!f?.id || done.has(f.id) || geo.conflicts.some((g) => g.id === f.id)) continue;
+    const startTurn = geoTurn(data, f.since, state.startYear) ?? 0;
+    if (startTurn > turn) continue;
+    const nations = Object.keys(f.sides || {});
+    geo.factsDone.push(f.id); // decided once: a fact whose nations do not exist in this world never happens
+    if (nationIds && nations.some((n) => !nationIds.has(n))) continue;
     const zoneIds = (f.zoneIds || []).filter((id) => geo.zones[id]);
     const lv = clamp(f.intensity ?? 3, 1, 4);
     const g = {
       id: f.id, def: f.id, fact: true, src: null, pair: null, name: f.name || null, place: f.place || '', parties: [...(f.parties || [])],
-      nations: Object.keys(f.sides || {}), zoneIds, area: null, startTurn: geoTurn(data, f.since, state.startYear) ?? 0, endTurn: null,
+      nations, zoneIds, area: null, startTurn: turn > 0 ? turn : startTurn, endTurn: null,
       intensity: lv, peak: lv, endCause: null, settled: false, shifted: [],
     };
     for (const id of zoneIds) { geo.zones[id].status = 'conflict'; geo.zones[id].conflictId = g.id; }
     geo.conflicts.push(g);
   }
-  state.geo = geo;
-  return geo;
 }
 
 function geoEvent(state, data, ev) {
-  pushCapped(state.geo.events, { turn: state.turn, ...ev }, GD(data).model?.eventsCap ?? 80);
+  pushCapped(state.geo.events, { turn: state.turn, ...ev }, (Number.isFinite(state.endTurn) && state.endTurn > 10 * WEEKS_PER_YEAR ? 40 : GD(data).model?.eventsCap ?? 80));
 }
 
 function setZone(state, data, zoneId, field, to, cause) {
@@ -1477,7 +1695,7 @@ function setZone(state, data, zoneId, field, to, cause) {
   const from = z[field];
   z[field] = to;
   z.since = state.turn;
-  pushCapped(z.history, { turn: state.turn, field, from, to, cause }, GD(data).model?.historyCap ?? 20);
+  pushCapped(z.history, { turn: state.turn, field, from, to, cause }, Number.isFinite(state.endTurn) && state.endTurn > 10 * WEEKS_PER_YEAR ? 6 : GD(data).model?.historyCap ?? 20);
   return true;
 }
 
@@ -1647,6 +1865,7 @@ function geoTick(state, data, ctx) {
   if (!G.zones) return;
   if (!state.geo?.zones) initGeo(state, data);
   const geo = state.geo;
+  if (monthCrossed(state, ctx)) activateGeoFacts(state, data, state.turn);
   const M = G.model || {};
   if (state.turn < (M.startTurn ?? 0)) return;
   // 1. pair conflicts born from the tension scale (world.conflicts, level 3+)
@@ -1665,7 +1884,7 @@ function geoTick(state, data, ctx) {
       g.peak = Math.max(g.peak, g.intensity);
     }
   }
-  if (!isMonthStart(state)) return;
+  if (!monthCrossed(state, ctx)) return;
   const rng = ctx?.rng ? ctx.rng('geo') : rngFor(state.seed, state.turn, 'politics', 'geo');
   for (const g of geo.conflicts.slice()) {
     if (g.endTurn == null) {
@@ -1859,7 +2078,7 @@ function recordAgencyBlocChange(state, data, s) {
   pushCapped(geo.blocChanges, { turn, kind: 'agency', actorId: s.actorId, blocId: s.blocId, bloc, joined, isos: (GD(data).actorCountries?.[s.actorId] || []).slice() }, blocDyn(data)?.cap ?? 60);
   const vars = { actor: actorShort(state, s.actorId), ...blocVars(data, bloc || s.blocId) };
   const tl = GD(data).timeline?.[joined ? 'agency_join' : 'agency_leave'] || '{actor}: {Bloc}';
-  pushCapped(geo.events, { turn, kind: joined ? 'bloc_join' : 'bloc_leave', actorId: s.actorId, bloc, zoneIds: [], text: capFirst(fill(tl, vars)) }, GD(data).model?.eventsCap ?? 80);
+  pushCapped(geo.events, { turn, kind: joined ? 'bloc_join' : 'bloc_leave', actorId: s.actorId, bloc, zoneIds: [], text: capFirst(fill(tl, vars)) }, (Number.isFinite(state.endTurn) && state.endTurn > 10 * WEEKS_PER_YEAR ? 40 : GD(data).model?.eventsCap ?? 80));
 }
 
 /** Bloc id of an agency at turn T (current bloc, undoing recorded changes after T). */
@@ -2009,8 +2228,9 @@ export function tick(state, data, ctx) {
   for (const [id, a] of Object.entries(state.actors || {})) if (typeof a?.budget === 'number' && w.baseBudget[id] == null) w.baseBudget[id] = a.budget;
   reconcileExternal(state, data);
   processSignals(state, data, ctx);
-  if (state.turn > 0 && ctx.date.week === 1) annualRollover(state, data, ctx);
-  if (isMonthStart(state)) {
+  if (state.turn > 0 && crossed(state, ctx, WEEKS_PER_YEAR, 0)) annualRollover(state, data, ctx);
+  if (monthCrossed(state, ctx)) {
+    syncNations(state, data, ctx);
     updateEconomy(state, data, ctx.rng('economy'));
     updateMarkets(state, data, ctx.rng('markets'));
     updateStances(state, data);
@@ -2097,3 +2317,144 @@ export const queries = {
     };
   },
 };
+
+// ---------------------------------------------------------------- 1950–3000 contract (EXPANSION.md §1.5, §3)
+
+/** Monthly economy, weekly elections and funding rounds: substepped week by week by the engine. */
+export const meta = { maxDt: 1 };
+
+/**
+ * Create the political entry of a nation (idempotent): government, economy, tension pairs with every live nation
+ * (level 0), and refresh the actor → nation map. Nations the politics data does not describe get a generic profile
+ * from data/core/nations.json. Returns the nation slice, or null when the nation is unknown.
+ */
+export function ensureNation(state, data, nationId, ctx) {
+  if (!state.world?.nations || !nationId) return null;
+  const w = state.world;
+  if (w.nations[nationId]) return w.nations[nationId];
+  const nd = nationDef(data, nationId);
+  if (!nd) return null;
+  const e = nd.economy || {};
+  const gov = { exec: nd.government?.exec || nd.factions?.[0]?.id, legis: nd.government?.legis || nd.government?.exec || nd.factions?.[0]?.id };
+  w.nations[nationId] = {
+    government: gov, econ: { growth: e.growth ?? 2, inflation: e.inflation ?? 2, debt: e.debt ?? 80, crisis: null },
+    incumbentMod: 0, pendingBudgetPct: 0, divided: gov.exec !== gov.legis, ...(nd.generic ? { generic: true } : {}),
+    bornTurn: state.turn,
+  };
+  for (const other of Object.keys(w.nations)) {
+    if (other === nationId) continue;
+    const k = relKey(nationId, other);
+    if (!w.pairs[k]) {
+      const p = (PD(data).pairs || []).find((x) => relKey(x.a, x.b) === k);
+      const lvl = Array.isArray(p?.initial) ? p.initial[0] : (p?.initial ?? 0);
+      w.pairs[k] = { a: nationId < other ? nationId : other, b: nationId < other ? other : nationId, level: clamp(lvl, 0, 4), pressure: 0, sinceTurn: state.turn, peak: lvl, changes: 0 };
+      syncPair(state, k);
+    }
+  }
+  refreshActorNation(state, data);
+  for (const [id, n] of Object.entries(w.actorNation)) {
+    if (n !== nationId || !state.politics?.[id] || state.politics[id].kind !== 'other') continue;
+    delete state.politics[id]; // re-created as an agency entry of its new nation
+  }
+  ensureEntries(state, data);
+  refreshGovernment(state, data, nationId);
+  return w.nations[nationId];
+}
+
+/**
+ * A nation ends (USSR in dez/1991): its pairs and elections go, its agencies move to `into` (or to their lineage's
+ * nation of the day) and keep their political entries (government, stance) from the successor.
+ */
+export function retireNation(state, data, nationId, { into = null } = {}, ctx) {
+  const w = state.world;
+  if (!w?.nations?.[nationId]) return false;
+  const succ = Array.isArray(into) ? into[0] : into;
+  if (succ && !w.nations[succ]) ensureNation(state, data, succ, ctx);
+  delete w.nations[nationId];
+  for (const k of Object.keys(w.pairs)) if (w.pairs[k].a === nationId || w.pairs[k].b === nationId) delete w.pairs[k];
+  w.elections = (w.elections || []).filter((e) => e.nation !== nationId || e.done);
+  for (const [id, n] of Object.entries(w.actorNation || {})) {
+    if (n !== nationId) continue;
+    const ln = lineageNationAt(state, data, id);
+    const to = ln && ln !== nationId && w.nations[ln] ? ln : succ && w.nations[succ] ? succ : null;
+    if (to) w.actorNation[id] = to; else delete w.actorNation[id];
+    if (state.politics?.[id]) { state.politics[id].nation = to; if (!to) state.politics[id].kind = 'other'; }
+  }
+  invalidateNations();
+  w.gone = w.gone || {};
+  w.gone[nationId] = { turn: state.turn, into: succ };
+  if (succ) refreshGovernment(state, data, succ);
+  return true;
+}
+
+/** Monthly: nations born (or needed by a live actor's lineage) enter, nations whose date ended leave. */
+function syncNations(state, data, ctx) {
+  const list = coreNations(data);
+  if (!list.length) return;
+  const w = state.world;
+  for (const nid of Object.keys(w.nations)) {
+    if (nationAliveAt(state, data, nid)) continue;
+    const def = coreNation(data, nid);
+    retireNation(state, data, nid, { into: def?.successors?.[0] ?? null }, ctx);
+  }
+  const want = new Set(nations(data).map((n) => n.id));
+  // only core actors bring their nation into world politics (background actors ride along when it exists)
+  for (const id of Object.keys(state.actors || {})) {
+    if ((state.actors[id]?.tier ?? 'core') !== 'core' && id !== state.playerId) continue;
+    const ln = lineageNationAt(state, data, id);
+    if (ln) want.add(ln);
+  }
+  for (const nid of want) if (!w.nations[nid] && coreNation(data, nid) && nationAliveAt(state, data, nid)) ensureNation(state, data, nid, ctx);
+}
+
+/** A born actor gets its nation (from its lineage) and its political entry. */
+export function onActorBorn(state, data, ctx, id) {
+  if (!state.world?.nations) return;
+  const ln = lineageNationAt(state, data, id) || state.actors?.[id]?.nation;
+  const core = (state.actors?.[id]?.tier ?? 'core') === 'core' || id === state.playerId;
+  if (core && ln && !state.world.nations[ln] && nationAliveAt(state, data, ln)) ensureNation(state, data, ln, ctx);
+  refreshActorNation(state, data);
+  ensureEntries(state, data);
+}
+
+/** A dead actor leaves the political slices (its tension rows go with it). */
+export function onActorGone(state, data, ctx, id) {
+  const w = state.world;
+  if (state.politics) delete state.politics[id];
+  if (w?.actorNation) delete w.actorNation[id];
+  invalidateNations();
+  if (w?.markets) delete w.markets[id];
+  if (w?.baseBudget) delete w.baseBudget[id];
+  if (w?.economy) delete w.economy[id];
+  if (w) w.actorCount = Object.keys(state.actors || {}).length;
+  for (const k of Object.keys(state.tension || {})) if (k.split('|').includes(id)) delete state.tension[k];
+}
+
+/** Era change / yearly: history lists are already capped on write; drop settled geo conflicts beyond 30. */
+export function compact(state) {
+  const geo = state.geo;
+  if (Array.isArray(geo?.conflicts) && geo.conflicts.length > 60) {
+    const settled = geo.conflicts.filter((g) => g.endTurn != null);
+    const drop = new Set(settled.slice(0, geo.conflicts.length - 60).map((g) => g.id));
+    geo.conflicts = geo.conflicts.filter((g) => !drop.has(g.id));
+  }
+  const w = state.world;
+  // economy views of actors that are gone (saves from before onActorGone cleaned them)
+  if (w?.economy && state.actors) for (const id of Object.keys(w.economy)) if (!state.actors[id]) delete w.economy[id];
+  if (Array.isArray(w?.conflicts) && w.conflicts.length > 60) w.conflicts = w.conflicts.filter((c, i) => c.endTurn == null || i >= w.conflicts.length - 60);
+  if (Array.isArray(w?.elections) && w.elections.length > 80) w.elections = w.elections.filter((e) => !e.done || e.turn > state.turn - 3 * WEEKS_PER_YEAR);
+  // a 1950–3000 campaign (save budget 400 KB) keeps a shorter memory; the Corrida Lunar is untouched
+  if (Number.isFinite(state.endTurn) && state.endTurn > 10 * WEEKS_PER_YEAR) {
+    for (const [k, n] of Object.entries(LONG_HISTORY_CAP)) if (Array.isArray(w?.history?.[k]) && w.history[k].length > n) w.history[k] = w.history[k].slice(-n);
+    if (Array.isArray(geo?.events) && geo.events.length > 40) geo.events = geo.events.slice(-40);
+    if (Array.isArray(geo?.conflicts)) {
+      const settled = geo.conflicts.filter((g) => g.endTurn != null && g.settled);
+      if (settled.length > 10) {
+        const drop = new Set(settled.slice(0, settled.length - 10).map((g) => g.id));
+        geo.conflicts = geo.conflicts.filter((g) => !drop.has(g.id));
+      }
+    }
+    for (const z of Object.values(geo?.zones || {})) if (Array.isArray(z?.history) && z.history.length > 6) z.history = z.history.slice(-6);
+    if (Array.isArray(w?.conflicts) && w.conflicts.length > 20) w.conflicts = w.conflicts.filter((c, i) => c.endTurn == null || i >= w.conflicts.length - 20);
+  }
+}

@@ -39,7 +39,24 @@ export function listRow({ lead, leadCls, title, sub, meta, extra, right, onClick
 const KIND_LABELS = {
   launch: 'Dia de Lançamento', briefing: 'Briefing', contract: 'Contrato', diplomacy: 'Diplomacia', politics: 'Governo',
   event: 'Evento', crew: 'Equipe', research: 'Pesquisa', mission: 'Missão', budget: 'Orçamento',
+  era: 'Nova era', ending: 'O Grande Silêncio', lifecycle: 'Agências', investors: 'Investidores', mandate: 'Investidores',
 };
+
+/**
+ * Item 9 (docs/EXPANSION.md §7): accepting a briefing/opportunity creates the mission without hardware, and the
+ * player picks the rocket and the craft. The accept choice says so, whatever the sim called it.
+ */
+export function choiceLabel(d, c) {
+  const k = String(d?.kind || '');
+  if (c?.id === 'accept' && (k === 'briefing' || k.startsWith('mission/opportunity')) && !d?.payload?.lockedHardware) return 'Aceitar e escolher o veículo';
+  return c?.label || c?.id || '';
+}
+
+/** Where the UI goes after a resolve: the mission's vehicle step when the result asks for it ({openBuilder}). */
+export function afterResolveTarget(res) {
+  const id = res?.openBuilder ?? null;
+  return id ? { tab: 'missoes', sub: `m/${id}`, step: res.step ?? 2 } : null;
+}
 
 /** Kind header of a card. The arrival of a mission reuses 'launch/ready' (payload.phase 'arrival'): it is a "Chegada". */
 export function kindLabel(kind, d = null) {
@@ -124,6 +141,15 @@ export function openDecision(store, id, { onResolved } = {}) {
   const d = store.state?.decisions?.find((x) => x.id === id);
   if (!d) { toast('Essa decisão já foi resolvida.', 'info'); return () => {}; }
   closeDecision();
+  // the era change and the year-3000 ending are full-screen scenes, not sheets
+  const k = String(d.kind || '');
+  if (k === 'era/transition' || k === 'ending/final') {
+    let closeScene = null;
+    import('./era-scene.js').then((m) => {
+      closeScene = k === 'era/transition' ? m.openEraScene(store, d) : m.openEndingCard(store, d);
+    }).catch((e) => { console.error(e); toast('A cena da nova era não pôde ser aberta.', 'bad'); });
+    return () => { try { closeScene?.(); } catch { /* */ } };
+  }
   let selected = null;
   const choices = Array.isArray(d.choices) ? d.choices : [];
 
@@ -137,9 +163,13 @@ export function openDecision(store, id, { onResolved } = {}) {
       const res = store.dispatch({ type: 'decision/resolve', id: d.id, choiceId: selected?.id });
       if (!res?.ok) { toast(res?.error || 'Não foi possível decidir agora.', 'bad'); return; }
       store.vibrate(25);
-      toast(res.message || (selected ? `Decidido: ${selected.label}` : 'Registrado.'), 'good');
-      close();
+      const target = afterResolveTarget(res);
+      toast(target ? 'Missão criada. Agora escolha o foguete e a nave.' : res.message || (selected ? `Decidido: ${selected.label}` : 'Registrado.'), 'good');
+      // leaving for another screen: keep the sheet's history entry (a pending history.back() would undo the
+      // navigation; components.onPopState skips the stale entry later)
+      close(target ? { fromHistory: true } : undefined);
       try { onResolved?.(res, selected); } catch (e) { console.error(e); }
+      if (target) { try { store.ui?.navigate?.(target.tab, target.sub); } catch (e) { console.error(e); } }
     };
 
     const choiceBtns = choices.map((c) => {
@@ -156,10 +186,10 @@ export function openDecision(store, id, { onResolved } = {}) {
           previewBox.appendChild(h('div', { class: 'preview-label' }, 'Efeito previsto'));
           previewBox.appendChild(h('div', { class: 'preview-text' }, c.preview || 'Consequências incertas.'));
           confirm.disabled = false;
-          confirm.textContent = `Confirmar: ${c.label}`;
+          confirm.textContent = `Confirmar: ${choiceLabel(d, c)}`;
         },
       },
-      h('span', { class: 'choice-label' }, c.label || c.id),
+      h('span', { class: 'choice-label' }, choiceLabel(d, c)),
       c.preview ? h('span', { class: 'choice-hint' }, c.preview) : null,
       c.disabled && c.reason ? h('span', { class: 'choice-reason' }, icon('cadeado', 14), c.reason) : null);
       return btn;

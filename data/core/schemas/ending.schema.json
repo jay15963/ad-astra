@@ -1,0 +1,33 @@
+{
+  "$id": "ending.schema.json",
+  "description": "Evento final (core/ending.json). As três escolhas sempre presentes (§9).",
+  "type": "object",
+  "required": [
+    "choices"
+  ],
+  "properties": {
+    "choices": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "contato",
+              "silencio",
+              "heranca"
+            ]
+          },
+          "label": {
+            "$ref": "common.schema.json#/$defs/name"
+          }
+        }
+      }
+    }
+  }
+}

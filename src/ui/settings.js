@@ -1,9 +1,9 @@
 // Settings / accessibility screen + app version (so players know the phone has the latest build).
-import { h, card, button, segmented, toast, confirmDialog, sectionTitle, viewHead } from './components.js';
+import { h, card, button, segmented, toast, confirmDialog, sectionTitle, viewHead, eraInfo } from './components.js';
 
-export const APP_VERSION = '0.5.0';          // keep in sync with package.json "version"
-export const BUILD_DATE = '2026-11-17';      // bump on every deploy
-export const BUILD = '2026.11.17-3';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
+export const APP_VERSION = '0.6.0';          // keep in sync with package.json "version"
+export const BUILD_DATE = '2026-11-18';      // bump on every deploy
+export const BUILD = '2026.11.18-1';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
 
 /** Apply settings to the document (text scale, motion, colorblind palette). */
 export function applySettings(settings) {
@@ -36,10 +36,10 @@ export function render(container, store, { onExit, onQuit } = {}) {
   const s = store.settings;
   const set = (patch) => { store.setSettings(patch); applySettings(store.settings); };
 
-  const era = store.data?.scenario?.era || 4;
+  const era = eraInfo(store.state, store.data);
   container.appendChild(h('div', { class: 'view-pad settings' },
     viewHead('Preferências', {
-      lead: `Era ${era} · A Década Lunar · v${APP_VERSION}`,
+      lead: `Era ${era.n || 4} · ${era.name || 'A Década Lunar'} · v${APP_VERSION}`,
       right: onExit ? button('Voltar', onExit, { kind: 'ghost', icon: 'voltar', small: true }) : null,
     }),
 

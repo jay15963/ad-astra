@@ -62,10 +62,11 @@ test('weekly tick: income and fixed costs for everyone, AI spends surplus', () =
   assert.ok(s.finance.rivals.cnsa.income > 0);
 });
 
-test('ledger is capped at 300 entries', () => {
+// cap lowered from 300 to 120 (docs/EXPANSION.md §10: saves must stay small over 1,050 years)
+test('ledger is capped at 120 entries', () => {
   const s = fresh();
   for (let i = 0; i < 400; i++) budget.earn(s, 'nasa', 1, 'grants');
-  assert.equal(s.finance.ledger.length, 300);
+  assert.equal(s.finance.ledger.length, 120);
 });
 
 test('year rollover closes the year, returns idle money, posts summary news', () => {

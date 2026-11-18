@@ -1216,3 +1216,6 @@ export function autoplay(state, data, { choose = () => 'maintain', hold = () => 
   }
   return state.activeLaunch?.outcome || null;
 }
+
+/** Command points regenerate week by week: the engine substeps this module (EXPANSION.md §1.5). */
+export const meta = { maxDt: 1 };

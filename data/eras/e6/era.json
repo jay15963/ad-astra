@@ -1,0 +1,35 @@
+{
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e6 em data/packs.json).",
+  "id": "e6",
+  "name": "Interplanetária e Interestelar",
+  "from": 2200,
+  "to": 2599,
+  "truthLayers": [
+    "especulacao"
+  ],
+  "closingMilestone": "Primeiro pouso em outro sol",
+  "palette": "anil",
+  "chapters": [
+    {
+      "from": {
+        "year": 2200,
+        "month": 0
+      },
+      "title": "As naves geracionais"
+    },
+    {
+      "from": {
+        "year": 2380,
+        "month": 0
+      },
+      "title": "A primeira estrela"
+    },
+    {
+      "from": {
+        "year": 2500,
+        "month": 0
+      },
+      "title": "Cartas de muito longe"
+    }
+  ]
+}

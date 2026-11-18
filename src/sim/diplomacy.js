@@ -2,6 +2,8 @@
 // No script: every alliance is born, cools and breaks from state (trust, dependence, rivalry, tension,
 // budget pressure, goals and culture). Pure JS, deterministic (ctx.rng / rngFor only), JSON state.
 import { clamp, relKey, nextId, addNews, pushDecision, emitSignal, changeActor, log, firstValue, milestoneShare } from '../core/helpers.js';
+import { crossed, yearAt, liveActorIds, aiGoals } from './simtime.js';
+const DATA_REF = { data: null }; // last data seen by tick/init (goals by era read the lineage table)
 import { rngFor } from '../core/rng.js';
 import * as politics from './politics.js';
 
@@ -35,8 +37,13 @@ const DEFAULT_REL = { trust: 0, dependence: 0, rivalry: 10 };
 
 // ---------------------------------------------------------------- small utils
 const A = (data) => data?.actors || {};
-const sortedIds = (state) => Object.keys(state.actors || {}).sort();
-const yearOf = (state, turn = state.turn) => (state.startYear || 2026) + Math.floor(turn / 52);
+// core-tier actors only (EXPANSION.md §3.1: minor actors have no relation rows); every actor is core in the Corrida Lunar
+const sortedIdsRaw = (state) => liveActorIds(state, { tier: 'core' }).filter((id) => state.actors?.[id]).sort();
+// Read-only memo for one AI evaluation (aiEvaluate builds its candidate list without touching the state): the
+// actor list, the active treaties (indexed by pair) and the era goals are computed once instead of once per deal.
+let SCOPE = null;
+const sortedIds = (state) => (SCOPE?.state === state ? SCOPE.ids : sortedIdsRaw(state));
+const yearOf = (state, turn = state.turn) => yearAt(state, turn);
 const round = (v, d = 1) => Math.round(v * 10 ** d) / 10 ** d;
 const pct = (f) => `${Math.round(f * 100)}%`;
 
@@ -98,9 +105,27 @@ export function blocOf(state, actorId) {
   return null;
 }
 
-const activeTreaties = (state) => (state.treaties || []).filter((t) => t.status === 'active');
+const activeTreatiesRaw = (state) => (state.treaties || []).filter((t) => t.status === 'active');
+const activeTreaties = (state) => (SCOPE?.state === state ? SCOPE.active : activeTreatiesRaw(state));
 function treatiesBetween(state, a, b, type) {
+  if (SCOPE?.state === state) {
+    const list = SCOPE.byPair.get(relKey(a, b)) || [];
+    return type ? list.filter((t) => t.type === type) : list.slice();
+  }
   return activeTreaties(state).filter((t) => t.parties.includes(a) && t.parties.includes(b) && (!type || t.type === type));
+}
+function openScope(state, data) {
+  const active = activeTreatiesRaw(state);
+  const byPair = new Map();
+  for (const t of active) {
+    const ps = [...new Set(t.parties || [])];
+    for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
+      const k = relKey(ps[i], ps[j]);
+      const l = byPair.get(k);
+      if (l) l.push(t); else byPair.set(k, [t]);
+    }
+  }
+  SCOPE = { state, data, ids: sortedIdsRaw(state), active, byPair, goals: new Map(), views: new Map(), rivals: new Map() };
 }
 
 /** True when a and b share an active treaty/partnership (the universal peaceful-use baseline does not count). */
@@ -127,7 +152,12 @@ export function tensionOf(state, a, b) {
 
 // ---------------------------------------------------------------- derived views
 
-const goalsOf = (state, id) => state.actors?.[id]?.ai?.goals || [];
+const goalsOf = (state, id) => {
+  if (SCOPE?.state !== state || SCOPE.data !== DATA_REF.data) return aiGoals(state, DATA_REF.data, id);
+  let g = SCOPE.goals.get(id);
+  if (!g) { g = aiGoals(state, DATA_REF.data, id); SCOPE.goals.set(id, g); }
+  return g;
+};
 function sharedOpenGoals(state, a, b) {
   const gb = new Set(goalsOf(state, b));
   return goalsOf(state, a).filter((g) => gb.has(g) && !state.firsts?.[g]);
@@ -147,6 +177,15 @@ export function budgetPressure(state, id) {
 }
 
 function view(state, a, b) {
+  if (SCOPE?.state === state) {
+    const k = `${a}>${b}`;
+    let v = SCOPE.views.get(k);
+    if (!v) { v = viewRaw(state, a, b); SCOPE.views.set(k, v); }
+    return v;
+  }
+  return viewRaw(state, a, b);
+}
+function viewRaw(state, a, b) {
   const r = relation(state, a, b);
   const ba = blocOf(state, a), bb = blocOf(state, b);
   const bil = treatiesBetween(state, a, b).filter((t) => t.type !== 'peaceful_use' && !t.terms?.multilateral).length;
@@ -165,10 +204,21 @@ const bilateralLoad = (state, id) =>
 
 /** Strongest rival both actors share (min of the two rivalries), 0..100. */
 function commonRival(state, a, b) {
+  if (SCOPE?.state === state) {
+    const k = relKey(a, b);
+    let v = SCOPE.rivals.get(k);
+    if (v == null) { v = commonRivalRaw(state, a, b); SCOPE.rivals.set(k, v); }
+    return v;
+  }
+  return commonRivalRaw(state, a, b);
+}
+function commonRivalRaw(state, a, b) {
   let best = 0;
-  for (const c of Object.keys(state.actors)) {
+  const R = state.relations || {};
+  for (const c of sortedIds(state)) {
     if (c === a || c === b) continue;
-    best = Math.max(best, Math.min(relation(state, a, c).rivalry, relation(state, b, c).rivalry));
+    const ra = (R[relKey(a, c)] || DEFAULT_REL).rivalry, rb = (R[relKey(b, c)] || DEFAULT_REL).rivalry;
+    best = Math.max(best, Math.min(ra, rb));
   }
   return best;
 }
@@ -385,6 +435,7 @@ function chanceLabel(p) {
 // ---------------------------------------------------------------- init
 
 export function init(state, data) {
+  DATA_REF.data = data;
   const src = A(data);
   state.actors = {};
   for (const raw of src.actors || []) {
@@ -462,17 +513,18 @@ function ensureSlices(state) {
 // ---------------------------------------------------------------- tick
 
 export function tick(state, data, ctx) {
+  DATA_REF.data = data;
   if (!state.actors || !Object.keys(state.actors).length) return;
   ensureSlices(state);
   const rng = ctx.rng('tick');
   readSignals(state, data, ctx.rng('signals'));
   driftRelations(state, data, rng);
   expireTreaties(state, data, ctx.rng('expire'));
-  if (state.turn % 4 === 0) {
+  if (crossed(state, ctx, 4, 0)) {
     treatyUpkeep(state, data, ctx.rng('upkeep'));
     incidents(state, data, ctx.rng('incidents'));
   }
-  if (state.turn % 13 === 0) techTransfers(state, data);
+  if (crossed(state, ctx, 13, 0)) techTransfers(state, data);
   resolveDueProposals(state, data, ctx);
   for (const id of sortedIds(state)) {
     if (isPlayer(state, id)) continue;
@@ -480,10 +532,13 @@ export function tick(state, data, ctx) {
     if (state.turn < (ac.ai.nextEvalTurn ?? 0)) continue;
     const r = ctx.rng(`eval:${id}`);
     aiEvaluate(state, data, id, r);
-    const every = clamp(Math.round(6 - (ac.culture || 0) / 40), 3, 9);
+    // long clock steps (13–52 weeks in the far future): the AI weighs deals less often, about as often per step as
+    // the player sees the world move (stepWeeks 1 in the Corrida Lunar: unchanged)
+    const slow = clamp((state.clock?.stepWeeks || 1) / 4, 1, 8);
+    const every = Math.round(clamp(Math.round(6 - (ac.culture || 0) / 40), 3, 9) * slow);
     ac.ai.nextEvalTurn = state.turn + every + r.int(-1, 2);
   }
-  if (state.turn % 13 === 0) {
+  if (crossed(state, ctx, 13, 0)) {
     for (const ac of Object.values(state.actors)) {
       ac.ai.prestigeHistory.push(Math.round(ac.prestige || 0));
       if (ac.ai.prestigeHistory.length > 24) ac.ai.prestigeHistory.shift();
@@ -649,6 +704,11 @@ function onContract(state, data, s) {
 
 // ---- relation drift toward a state-derived anchor (weekly)
 function driftRelations(state, data, rng) {
+  // read-only memo (treaties by pair, goals): each pair's view is read before its own relation moves
+  openScope(state, data);
+  try { driftPairs(state, data, rng); } finally { SCOPE = null; }
+}
+function driftPairs(state, data, rng) {
   const ids = sortedIds(state);
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
@@ -819,6 +879,23 @@ function incidents(state, data, rng) {
 // ---------------------------------------------------------------- AI evaluation
 
 function aiEvaluate(state, data, id, rng) {
+  openScope(state, data);
+  let res;
+  try { res = aiCandidates(state, data, id, rng); } finally { SCOPE = null; }
+  if (res.now) { executeAi(state, data, id, res.now, rng); return res.now; }
+  // pick the single best action that clears its threshold (margin = u - threshold)
+  let best = null;
+  for (const c of res.cands) {
+    const margin = c.u - c.t;
+    if (margin > 0 && (!best || margin > best.u - best.t)) best = c;
+  }
+  if (!best) return null;
+  executeAi(state, data, id, best, rng);
+  return best;
+}
+
+/** Candidate moves of one AI evaluation (reads the state only; aiEvaluate executes the winner). */
+function aiCandidates(state, data, id, rng) {
   const S = state.actors[id];
   const cands = [];
   const others = sortedIds(state).filter((o) => o !== id);
@@ -845,7 +922,7 @@ function aiEvaluate(state, data, id, rng) {
     const f = leaveUtility(state, data, id, myBloc);
     const c = { kind: 'leave', bloc: myBloc.id, u: f.u + rng.normal(0, NOISE), t: LEAVE_T, f };
     // leaving a bloc is a strategic decision, not one more deal on the table: when it clears, it happens
-    if (c.u > c.t) { executeAi(state, data, id, c, rng); return c; }
+    if (c.u > c.t) return { now: c, cands };
   }
   if (!myBloc) {
     for (const b of Object.values(state.blocs)) {
@@ -897,16 +974,7 @@ function aiEvaluate(state, data, id, rng) {
     const f = breakUtility(state, data, id, t);
     cands.push({ kind: 'break', treaty: t.id, u: f.u + rng.normal(0, NOISE), t: BREAK_T, f });
   }
-
-  // pick the single best action that clears its threshold (margin = u - threshold)
-  let best = null;
-  for (const c of cands) {
-    const margin = c.u - c.t;
-    if (margin > 0 && (!best || margin > best.u - best.t)) best = c;
-  }
-  if (!best) return null;
-  executeAi(state, data, id, best, rng);
-  return best;
+  return { now: null, cands };
 }
 
 function canProposeToPlayer(state) {
@@ -1693,4 +1761,123 @@ export function onGameEnd(state, data, ctx) {
     tags: ['tabela', 'era'], actors: [top.actorId], importance: 3, icon: '🏆',
   });
   state.stats['diplomacy.eraWinner'] = top.actorId;
+}
+
+// ---------------------------------------------------------------- 1950–3000 contract (EXPANSION.md §1.5, §3, §10)
+
+/** Weekly drift, monthly upkeep and staggered AI evaluations: substepped week by week by the engine. */
+export const meta = { maxDt: 1 };
+
+/**
+ * Bring an actor to life mid-game (lifecycle birth, a founded agency): same defaults as init, a staggered first AI
+ * evaluation, relation rows with every live core actor (minor actors carry none), bloc from `def.bloc`.
+ * Idempotent: an existing actor only gets the missing fields. Returns the live actor.
+ */
+export function addActor(state, data, def, ctx) {
+  if (!def?.id) return null;
+  DATA_REF.data = data || DATA_REF.data;
+  ensureSlices(state);
+  const ac = state.actors[def.id] || JSON.parse(JSON.stringify(def));
+  ac.cash = ac.cash ?? Math.round((ac.budget || 0) * 0.25);
+  ac.prestige = ac.prestige ?? 0;
+  ac.support = ac.support ?? 60;
+  ac.reputation = ac.reputation ?? 60;
+  ac.culture = ac.culture ?? 0;
+  ac.fixedCostShare = ac.fixedCostShare ?? 0.5;
+  ac.capabilities = ac.capabilities || { crewed: false, launchSites: [] };
+  ac.ai = { cooperation: 0.5, aggression: 0.5, riskTolerance: 0.5, goals: [], ...(ac.ai || {}) };
+  if (ac.ai.nextEvalTurn == null) ac.ai.nextEvalTurn = state.turn + 1 + rngFor(state.seed, 'diplomacy', 'stagger', ac.id).int(0, 5);
+  ac.ai.memory = ac.ai.memory || { rejected: {}, brokenBy: {}, withdrew: {} };
+  ac.ai.prestigeHistory = ac.ai.prestigeHistory || [];
+  ac.bloc = ac.bloc ?? null;
+  state.actors[ac.id] = ac;
+  memoryOf(state, ac.id);
+  if ((ac.tier ?? 'core') === 'core') {
+    for (const o of sortedIds(state)) {
+      if (o === ac.id) continue;
+      const k = relKey(ac.id, o);
+      if (!state.relations[k]) state.relations[k] = { ...DEFAULT_REL };
+    }
+  }
+  const bid = def.bloc && state.blocs?.[def.bloc] ? def.bloc : null;
+  if (bid && !state.blocs[bid].members.includes(ac.id)) {
+    state.blocs[bid].members.push(ac.id);
+    if (!state.blocs[bid].leader) state.blocs[bid].leader = ac.id;
+    syncActorBlocs(state);
+  }
+  return ac;
+}
+
+/**
+ * An actor leaves the world (dissolved, merged `into` another, never born): relation rows, bloc seats, open
+ * proposals and its seat in treaties go (a treaty left with one party ends). A merge hands the absorbed actor's
+ * partnerships to the survivor as trust. The actor leaves state.actors (lifecycle keeps its tombstone).
+ */
+export function retireActor(state, data, id, { into = null, reason = 'dissolve' } = {}, ctx) {
+  if (!id) return false;
+  const survivor = into && into !== id && state.actors?.[into] ? into : null;
+  for (const k of Object.keys(state.relations || {})) {
+    const [a, b] = k.split('|');
+    if (a !== id && b !== id) continue;
+    const other = a === id ? b : a;
+    if (survivor && other !== survivor && state.relations[k].trust > 0) bumpRelation(state, survivor, other, { trust: Math.round(state.relations[k].trust * 0.25) });
+    delete state.relations[k];
+  }
+  for (const b of Object.values(state.blocs || {})) {
+    if (!Array.isArray(b.members) || !b.members.includes(id)) continue;
+    b.members = b.members.filter((m) => m !== id);
+    if (survivor && !b.members.includes(survivor) && !blocOf(state, survivor)) b.members.push(survivor);
+    if (b.leader === id) b.leader = b.members[0] || null;
+  }
+  for (const t of state.treaties || []) {
+    if (!Array.isArray(t.parties) || !t.parties.includes(id)) continue;
+    const rest = t.parties.filter((p) => p !== id);
+    if (survivor && t.status === 'active' && !rest.includes(survivor) && t.type !== 'peaceful_use') rest.push(survivor);
+    t.parties = rest;
+    if (t.status === 'active' && t.parties.length < 2 && !t.terms?.multilateral) {
+      t.status = 'expired';
+      t.endedTurn = state.turn;
+      t.endReason = reason === 'merge' ? 'fusão' : 'fim de uma das partes';
+    }
+  }
+  if (Array.isArray(state.proposals)) state.proposals = state.proposals.filter((p) => p.from !== id && p.to !== id && !(p.parties || []).includes(id));
+  state.decisions = (state.decisions || []).filter((d) => !(d.kind?.startsWith('diplomacy/') && (d.payload?.from === id || d.payload?.actorId === id || d.payload?.partnerId === id)));
+  for (const ac of Object.values(state.actors || {})) {
+    const m = ac?.ai?.memory;
+    if (!m) continue;
+    for (const k of ['rejected', 'brokenBy', 'withdrew']) if (m[k]) for (const key of Object.keys(m[k])) if (key.split('|').includes(id) || key === id) delete m[k][key];
+  }
+  if (state.actors) delete state.actors[id];
+  syncActorBlocs(state);
+  return true;
+}
+
+/** Engine hook (lifecycle birth through ctx.hooks): make sure the diplomacy fields exist. */
+export function onActorBorn(state, data, ctx, id) {
+  if (state.actors?.[id]) addActor(state, data, state.actors[id], ctx);
+}
+/** Engine hook: idempotent cleanup (lifecycle already called retireActor). */
+export function onActorGone(state, data, ctx, id, info = {}) {
+  if (state.actors?.[id]) return; // still alive (a rename is not a death)
+  retireActor(state, data, id, info, ctx);
+}
+
+/** Treaties broken/expired more than 10 years ago leave the slice (EXPANSION.md §10). */
+export function compact(state) {
+  const long = Number.isFinite(state.endTurn) && state.endTurn > 10 * 52; // 1950–3000: keep 3 years of ended treaties
+  const limit = state.turn - (long ? 3 : 10) * 52;
+  if (long) {
+    // AI memories past the longest window that reads them (BREAK_MEMORY) never matter again: drop them
+    for (const ac of Object.values(state.actors || {})) {
+      const mem = ac?.ai?.memory;
+      if (!mem) continue;
+      for (const kind of ['rejected', 'withdrew', 'brokenBy']) {
+        const m = mem[kind];
+        if (!m || typeof m !== 'object') continue;
+        for (const [k, t] of Object.entries(m)) if (!Number.isFinite(t) || state.turn - t >= BREAK_MEMORY) delete m[k];
+      }
+    }
+  }
+  if (!Array.isArray(state.treaties)) return;
+  state.treaties = state.treaties.filter((t) => t.status === 'active' || !Number.isFinite(t.endedTurn ?? t.brokenTurn ?? t.expiredTurn) || (t.endedTurn ?? t.brokenTurn ?? t.expiredTurn) >= limit);
 }

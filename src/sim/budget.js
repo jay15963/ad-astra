@@ -2,6 +2,7 @@
 // Slice: state.finance (player ledger + yearly totals + rival yearly totals). Actor cash changes via changeActor.
 
 import { addNews, changeActor, log, clamp, player } from '../core/helpers.js';
+import { crossed, yearAt } from './simtime.js';
 
 export const CATEGORIES = ['missions', 'research', 'crew', 'facilities', 'contracts', 'diplomacy', 'grants'];
 export const CATEGORY_LABELS = {
@@ -14,7 +15,7 @@ export const CATEGORY_LABELS = {
   grants: 'Verba e repasses',
 };
 
-const LEDGER_CAP = 300;
+const LEDGER_CAP = 120; // EXPANSION.md §10
 const WEEKS = 52;
 const DEFAULT_FIXED_SHARE = 0.55;
 /** Overdraft allowed (fraction of annual budget) before spend() refuses. */
@@ -35,7 +36,7 @@ export function fmtMoney(m) {
   return `${sign}US$ ${(Math.round(a * 10) / 10).toString().replace('.', ',')} mi`;
 }
 
-const yearOf = (state) => (state.startYear ?? 2026) + Math.floor((state.turn || 0) / WEEKS);
+const yearOf = (state) => yearAt(state);
 const emptyYear = (state) => ({ year: yearOf(state), income: 0, spent: {}, budgetStart: state.actors?.[state.playerId]?.budget ?? 0, cashStart: state.actors?.[state.playerId]?.cash ?? 0 });
 
 function fin(state) {
@@ -78,7 +79,8 @@ function record(state, actorId, amount, category, note) {
   const cat = CATEGORIES.includes(category) ? category : 'facilities';
   if (actorId === state.playerId) {
     f.ledger.push({ turn: state.turn, amount: Math.round(amount * 1000) / 1000, category: cat, note: note || CATEGORY_LABELS[cat] });
-    if (f.ledger.length > LEDGER_CAP) f.ledger.splice(0, f.ledger.length - LEDGER_CAP);
+    const cap = Number.isFinite(state.endTurn) && state.endTurn > 520 ? 40 : LEDGER_CAP; // 1950–3000: save budget
+    if (f.ledger.length > cap) f.ledger.splice(0, f.ledger.length - cap);
     if (amount >= 0) f.year.income += amount;
     else f.year.spent[cat] = (f.year.spent[cat] || 0) - amount;
   } else {
@@ -188,7 +190,7 @@ function closeYear(state) {
       : `Verba de ${last.year + 1} mantida em ${fmtMoney(last.budget)}.`;
     const tone = last.net >= 0 ? 'Ano fechado no azul.' : last.endCash < 0 ? 'Ano fechado no vermelho, e o caixa está negativo.' : 'Gastamos mais do que entrou.';
     addNews(state, {
-      headline: pickV(YEAR_HEADLINES, last.year - (state.startYear ?? 2026))(last.year, fmtMoney(last.income), fmtMoney(last.totalSpent), last.net),
+      headline: pickV(YEAR_HEADLINES, last.year - (state.startYear ?? last.year))(last.year, fmtMoney(last.income), fmtMoney(last.totalSpent), last.net),
       body: `${tone} Maiores gastos: ${parts || 'nenhum'}. Caixa: ${fmtMoney(last.endCash)}. ${budgetLine}${returned > 0 ? (player(state)?.kind === 'company' ? ` Os investidores receberam ${fmtMoney(returned)} do caixa parado.` : ` O tesouro recolheu ${fmtMoney(returned)} de verba parada.`) : ''}`,
       tags: ['budget', 'year'],
       actors: [state.playerId],
@@ -347,7 +349,7 @@ function debtWeek(state) {
 export function tick(state, data, ctx) {
   fin(state);
   // year rollover (politics already adjusted actor.budget earlier in this tick)
-  if (state.turn > 0 && state.turn % WEEKS === 0) closeYear(state);
+  if (state.turn > 0 && crossed(state, ctx, WEEKS, 0)) closeYear(state);
   const live = new Set();
   for (const a of Object.values(state.actors || {})) {
     if (!a || !a.id) continue;
@@ -359,7 +361,7 @@ export function tick(state, data, ctx) {
   // forget the bills of programs that flew, got cancelled or changed hands (keeps the slice small)
   const f = fin(state);
   for (const k of Object.keys(f.programs)) if (!live.has(k)) delete f.programs[k];
-  if (state.turn % 13 === 12) companyPayout(state);
+  if (crossed(state, ctx, 13, 12)) companyPayout(state);
   debtWeek(state);
 }
 
@@ -445,3 +447,45 @@ export const queries = {
   'budget/ledger': (state, data, n = 30) => fin(state).ledger.slice(-n).reverse().map((e) => ({ ...e, label: CATEGORY_LABELS[e.category] || e.category })),
   'budget/categories': () => CATEGORIES.map((id) => ({ id, label: CATEGORY_LABELS[id] })),
 };
+
+// ---------- 1950–3000 contract (EXPANSION.md §1.5, §3, §10) ----------
+
+/** Weekly ledger, debt streaks and AI spending decisions: the engine substeps this module week by week. */
+export const meta = { maxDt: 1 };
+
+/** A new actor (lifecycle birth) gets the same defaults init gives everyone. */
+export function onActorBorn(state, data, ctx, id) {
+  const a = state.actors?.[id];
+  if (!a) return;
+  if (!Number.isFinite(a.cash)) a.cash = (a.budget || 0) * 0.25;
+  if (!Number.isFinite(a.fixedCostShare)) a.fixedCostShare = DEFAULT_FIXED_SHARE;
+}
+
+/** A dead actor leaves the rival totals (its money went with it, or to `into`). */
+export function onActorGone(state, data, ctx, id) {
+  const f = state.finance;
+  if (!f) return;
+  if (f.rivals) delete f.rivals[id];
+  if (f.rivalsLastYear) delete f.rivalsLastYear[id];
+}
+
+/** Caps: ledger 120 (enforced on write), yearly history 60 entries then decade means. */
+export function compact(state) {
+  const f = state.finance;
+  if (!f) return;
+  // a 1950–3000 campaign (save budget 400 KB) keeps a third of the ledger
+  const cap = Number.isFinite(state.endTurn) && state.endTurn > 520 ? Math.min(LEDGER_CAP, 40) : LEDGER_CAP;
+  if (Array.isArray(f.ledger) && f.ledger.length > cap) f.ledger.splice(0, f.ledger.length - cap);
+  if (Array.isArray(f.history) && f.history.length > 60) {
+    const old = f.history.splice(0, f.history.length - 50);
+    const decades = [];
+    for (const h of old) {
+      const dec = Math.floor(h.year / 10) * 10;
+      let d = decades.find((x) => x.year === dec);
+      if (!d) decades.push((d = { year: dec, decade: true, n: 0, income: 0, spent: 0, net: 0, cash: 0 }));
+      d.n++; d.income += h.income || 0; d.spent += h.spent || 0; d.net += h.net || 0; d.cash = h.cash ?? d.cash;
+    }
+    for (const d of decades) { d.income /= d.n; d.spent /= d.n; d.net /= d.n; }
+    f.history.unshift(...decades);
+  }
+}

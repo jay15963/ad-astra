@@ -1,0 +1,60 @@
+{
+  "$id": "actor.schema.json",
+  "description": "Ator inicial (actors.json → actors[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "short",
+    "kind"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "short": {
+      "type": "string",
+      "maxLength": 16
+    },
+    "kind": {
+      "enum": [
+        "agency",
+        "company",
+        "consortium",
+        "colony_gov",
+        "collective"
+      ]
+    },
+    "country": {
+      "type": "string"
+    },
+    "flag": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "budget": {
+      "$ref": "common.schema.json#/$defs/money"
+    },
+    "support": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "reputation": {
+      "type": "number"
+    },
+    "prestige": {
+      "type": "number"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 600
+    }
+  }
+}

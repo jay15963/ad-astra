@@ -1,0 +1,151 @@
+{
+  "$id": "scenario.schema.json",
+  "description": "Cenário (data/scenarios/<id>.json; §2.1). O legado data/scenario.json usa startYear/endYear e é normalizado em src/core/packs.js.",
+  "type": "object",
+  "required": [
+    "id",
+    "name"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "kind",
+        "start",
+        "end",
+        "eras"
+      ]
+    },
+    {
+      "required": [
+        "startYear",
+        "endYear",
+        "playableActors"
+      ]
+    }
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "kind": {
+      "enum": [
+        "campaign",
+        "scenario"
+      ]
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "subtitle": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "start": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "end": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "startYear": {
+      "type": "integer"
+    },
+    "endYear": {
+      "type": "integer"
+    },
+    "turnWeeks": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "enum": [
+            1,
+            2,
+            4,
+            13,
+            26,
+            52
+          ]
+        }
+      ]
+    },
+    "eras": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "common.schema.json#/$defs/eraId"
+      }
+    },
+    "snapshot": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/eraId"
+        }
+      ]
+    },
+    "playable": {
+      "type": "object",
+      "required": [
+        "rule"
+      ],
+      "properties": {
+        "rule": {
+          "enum": [
+            "alive",
+            "list"
+          ]
+        },
+        "actors": {
+          "$ref": "common.schema.json#/$defs/idList"
+        },
+        "found": {
+          "type": "boolean"
+        }
+      }
+    },
+    "playableActors": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "history": {
+      "enum": [
+        "faithful"
+      ]
+    },
+    "lifecycle": {
+      "enum": [
+        "on",
+        "off"
+      ]
+    },
+    "ending": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "final",
+            "end"
+          ]
+        }
+      }
+    },
+    "unlocks": {
+      "type": "object"
+    },
+    "historicalFirsts": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    }
+  }
+}

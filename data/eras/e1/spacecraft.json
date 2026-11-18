@@ -1,0 +1,30 @@
+{
+  "_comment": "Pacote e1 (semente da Fase A, prova do pipeline). Mesmo formato de data/spacecraft.json.",
+  "monthBase": 1,
+  "spacecraft": [
+    {
+      "id": "ps1", "name": "PS-1 (Sputnik)", "operator": "roscosmos", "provider": "OKB-1", "kind": "satellite", "crew": 0,
+      "massT": 0.084, "costM": 2, "availableFrom": { "year": 1957, "month": 10 }, "availableUntil": { "year": 1958, "month": 5 },
+      "truthLayer": "fato", "estimatedReliability": 0.85, "history": { "flights": 1, "failures": 0 },
+      "destinations": ["leo"], "compatibleVehicles": ["r7_sputnik"], "access": "own",
+      "notes": "Uma esfera de 58 cm, quatro antenas e um transmissor: o bip-bip que o mundo inteiro ouviu.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1957-001B"
+    },
+    {
+      "id": "vostok_3ka", "name": "Vostok 3KA", "operator": "roscosmos", "provider": "OKB-1", "kind": "capsule", "crew": 1,
+      "massT": 4.6, "costM": 15, "availableFrom": { "year": 1961, "month": 3 }, "availableUntil": { "year": 1963, "month": 6 },
+      "truthLayer": "fato", "estimatedReliability": 0.9, "history": { "flights": 6, "failures": 0 },
+      "destinations": ["leo"], "compatibleVehicles": ["vostok_8k72k"], "access": "own",
+      "notes": "Esfera de descida e módulo de equipamentos; o cosmonauta saltava de paraquedas antes do pouso.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1961-012A"
+    },
+    {
+      "id": "mercury_capsule", "name": "Mercury", "operator": "nasa", "provider": "McDonnell", "kind": "capsule", "crew": 1,
+      "massT": 1.36, "costM": 12, "availableFrom": { "year": 1961, "month": 5 }, "availableUntil": { "year": 1963, "month": 5 },
+      "truthLayer": "fato", "estimatedReliability": 0.9, "history": { "flights": 6, "failures": 0 },
+      "destinations": ["leo"], "compatibleVehicles": ["atlas_lv3b"], "access": "own",
+      "notes": "Cápsula de um lugar, tão apertada que se dizia que o astronauta a vestia.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1962-003A"
+    }
+  ]
+}

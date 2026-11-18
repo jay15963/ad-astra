@@ -1,0 +1,42 @@
+{
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e1 em data/packs.json).",
+  "id": "e1",
+  "name": "A Corrida",
+  "from": 1950,
+  "to": 1975,
+  "truthLayers": [
+    "fato"
+  ],
+  "closingMilestone": "Pouso na Lua e Apollo-Soyuz",
+  "palette": "ferrugem",
+  "chapters": [
+    {
+      "from": {
+        "year": 1950,
+        "month": 0
+      },
+      "title": "O Prólogo: foguetes de guerra, sonhos de órbita"
+    },
+    {
+      "from": {
+        "year": 1957,
+        "month": 9
+      },
+      "title": "Bip-bip: o primeiro satélite"
+    },
+    {
+      "from": {
+        "year": 1961,
+        "month": 3
+      },
+      "title": "Gente no espaço"
+    },
+    {
+      "from": {
+        "year": 1969,
+        "month": 6
+      },
+      "title": "A Lua e depois dela"
+    }
+  ]
+}

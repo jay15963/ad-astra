@@ -6,7 +6,11 @@ puros, carregados direto pelo navegador. Nenhuma dependência npm em runtime. Te
 O GDD original (`GDD.md`) foi escrito para Godot; aqui a mesma arquitetura vale para a web:
 **dados (data/*.json) → regras (src/core + src/sim, JS puro sem DOM) → interface (src/ui, observa o estado)**.
 
-Escopo atual: **corte vertical "Corrida Lunar" (2026 a 2030)**, Era 4, 1 turno = 1 semana (260 turnos).
+Escopo atual (v0.6.0, Fase A da expansão): **Campanha 1950 → jan/3000** (7 eras, passo de tempo variável por faixa, agências
+que nascem/morrem com a história, final do Eco em 3000 ainda como cartão-esboço) e o cenário **Corrida Lunar (2026 a 2030)**,
+Era 4, 1 turno = 1 semana (260 turnos), idêntico à v0.5 (teste golden). O contrato completo da expansão (fases A–D, números,
+esquemas, donos de arquivo) está em **[docs/EXPANSION.md](docs/EXPANSION.md)**; a seção "Expansão 1950–3000 (Fase A)" abaixo
+resume o que já vale no código.
 
 ## Regras invioláveis
 
@@ -30,7 +34,12 @@ sw.js                      service worker network-first (revalida tudo, cópia s
 styles.css                 estilos globais + temas por era                                  [ui-shell]
 manifest.webmanifest       PWA (instalar na tela inicial)                                    [ui-shell]
 assets/icon.svg            ícone                                                             [ui-shell]
-data/scenario.json         cenário (anos, atores jogáveis, metas)                            [core]
+data/scenario.json         cenário Corrida Lunar (lunar_race; normalizado por packs.js)       [core]
+data/packs.json            manifesto dos pacotes de dados (core, legacy-e4, e1..e7, cenários) [data-pipeline]
+data/scenarios/            index.json (tela de título) + campaign.json (1950→3000)          [data-pipeline]
+data/core/                 eras.json (eras + faixas de passo), ending.json, lineages.json, lifecycle.json,
+                           nations.json, actor-gen.json, schemas/ (validador)               [core-time/lifecycle]
+data/eras/eN/              pacote de cada era (era.json; e1 também snapshot/vehicles/spacecraft/calendar) [data-pipeline]
 data/actors.json           atores, relações iniciais, blocos                                 [diplomacy]
 data/vehicles.json         catálogo de lançadores                                            [catalog]
 data/spacecraft.json       cápsulas, landers, sondas, módulos                               [catalog]
@@ -44,7 +53,12 @@ data/bodies.json           corpos do Sistema Solar (planetas, luas, cinturões, 
 data/geopolitics.json      países por agência, sedes, bases de lançamento, blocos, zonas disputadas [politics]
 data/world.json            contornos dos países (só carregado quando o mapa-múndi abre)      [politics/worldmap]
 src/core/rng.js            RNG determinístico (hash32, makeRng, rngFor)                      [core]
-src/core/time.js           turno <-> data                                                    [core]
+src/core/time.js           turno <-> data, eras, faixas de passo, rótulos do disco, chip de data [core]
+src/core/migrate.js        migração de saves (v1 → v2) e recusa com mensagem pt-BR (SaveError) [core]
+src/core/packs.js          mescla pura dos pacotes, normalizeScenario, carimbo fromYear/untilYear [data-pipeline]
+src/core/catalog.js        vehicleDef/spacecraftDef/vehicleAvailable/listVehicles por data    [data-pipeline]
+src/sim/simtime.js         helpers de passo variável (dtOf, every, chanceInStep, dueIn…)     [sim-agnostic]
+src/sim/lifecycle.js       nascimento/renome/fusão/fim de agências e nações, gerador pós-2031 [lifecycle]
 src/core/helpers.js        helpers compartilhados                                            [core]
 src/core/data.js           carregador de dados (browser e Node)                              [core]
 src/core/engine.js         registro de módulos, newGame, tick, advance, dispatch, query      [core]
@@ -59,7 +73,12 @@ src/sim/politics.js        economia, política interna, escala de tensão 0-4, e
 src/sim/research.js        pesquisa e tech tree                                              [research-crew]
 src/sim/crew.js            equipe, contratação, experiência, mortes, Memorial, pontos de Comando [research-crew]
 src/sim/narrative.js       eventos narrativos/operação, cadeias, Álbum                       [narrative]
-src/ui/app.js              entrada da UI: boot, roteamento de abas, overlays                 [ui-shell]
+src/ui/app.js              entrada da UI: boot, roteador, barra inferior, gaveta, overlays   [ui-shell]
+src/ui/screens.js          registro de telas (registerScreen) — única lista de telas          [ui-shell]
+src/ui/screen-views.js     telas da gaveta (Finanças, Lançamentos, Salvar, Sobre, esboços "em breve") [ui-shell]
+src/ui/drawer.js           gaveta ☰ (.gaveta/.veu), foco preso, deslizar/Esc/voltar fecham    [ui-shell]
+src/ui/era-scene.js        cena de troca de era e cartão final de 3000                        [ui-shell]
+src/ui/css/shell.css       cabeçalho compacto, gaveta, chip de data                           [ui-shell]
 src/ui/store.js            store (estado + dispatch + autosave + settings)                   [ui-shell]
 src/ui/components.js       componentes DOM (cartão, chip, barra, botão, modal, toast, fmt)  [ui-shell]
 src/ui/portrait.js         retrato SVG composto por peças                                    [ui-shell]
@@ -81,10 +100,18 @@ src/ui/worldmap.css        (link injetado pelo próprio JS)                     
 src/ui/techtree.css        grafo da aba Pesquisa (link injetado por research-tab.js)          [techtree]
 tests/*.test.mjs           testes node:test por módulo
 tools/smoke.mjs            bot que joga campanhas inteiras e verifica invariantes            [core]
+tools/golden.mjs           grava/compara o golden da Corrida Lunar (bot compartilhado botStep) [core-time]
+tools/campaign.mjs         campanha 1950→3000 com pacotes ansiosos e invariantes por era      [core-time]
+tools/full-campaign.mjs    campanha 1950→3000 com pacotes sob demanda (como no celular), métricas por era
+tools/validate-data.mjs    validador de dados (tools/validate/{schema,rules}.js), sem dependências
 tools/sim-*.mjs            simulações em lote por módulo
 ```
 
 ## Motor (src/core/engine.js) — já implementado
+
+> Desde a v0.6.0 o tick é de **passo variável** (`ctx.dt` semanas, 1 a 52) e `MODULES` inclui `lifecycle` logo depois de
+> `politics`. O texto abaixo descreve o caso de 1 semana (Corrida Lunar); as regras de passo variável estão na seção
+> "Expansão 1950–3000 (Fase A)" e em docs/EXPANSION.md §1.
 
 - `newGame(data, {seed, playerId})` → cria o esqueleto (`createState`) e chama `init(state, data, ctx)` de cada módulo na ordem de `MODULES`.
 - `tick(state, data)` → uma semana: expira decisões vencidas (`expiresTurn`, usa `defaultChoice`), move `signalsPending → signals`,
@@ -143,7 +170,10 @@ launch.js   ← risk.js, missions.js, crew.js, research.js, helpers, rng
 | `album` | narrative | `[{id, turn, title, headline, kind, missionId?, crewIds?, rarity}]` |
 | `firsts` | qualquer, via `claimFirst` | `{[milestoneId]: {actorId, turn}}` |
 | `decisions` | qualquer, via `pushDecision` | fila do jogador |
-| `news` | qualquer, via `addNews` | feed (mais recente primeiro, cap 200) |
+| `news` | qualquer, via `addNews` | feed (mais recente primeiro, cap 120; 60 em campanhas > 10 anos) |
+| `annals` | core, via `addNews` | 3 manchetes de cada ano (agrupadas por década/século em campanhas longas) |
+| `clock` | core | era e faixa de passo atuais (`eraId`, `stepWeeks`…) |
+| `lifecycle` | lifecycle | `{applied, aliases, tombstones, births, nextGenTurn, booted, lastYear, idents, watch, mergeWatch, once}` |
 | `signals`/`signalsPending` | qualquer, via `emitSignal` | ver Sinais |
 | `stats` | qualquer, chaves `"modulo.chave"` | contadores |
 
@@ -445,8 +475,8 @@ store.vibrate(pattern)              // respeita settings
 **components.js** exporta helpers `h(tag, props, ...children)`, `fmtMoney(m)`, `fmtPct(p)`, `card`, `chip`, `bar`, `button`, `openModal(content)→close`,
 `toast(text)`, `sparkline(values)`, `fmtDate(turn, startYear)`.
 **portrait.js** exporta `portraitSVG(portrait, {size, mood})` → string SVG.
-Cada aba exporta `render(container, store)` (pode retornar função de limpeza). Abas: `dashboard` (Painel), `missions` (Missões), `research` (Pesquisa),
-`map` (Mapa — `src/ui/map.js`), `world` (Mundo). `app.js` monta a barra de 5 abas na base, re-renderiza a aba ativa a cada mudança,
+Cada tela exporta `render(container, store, route)` (pode retornar função de limpeza) e é registrada em `src/ui/screens.js` (v0.6.0: Pesquisa e
+Equipe saíram da barra para a gaveta ☰). `app.js` monta a barra inferior e a gaveta a partir do registro, re-renderiza a aba ativa a cada mudança,
 abre `decisions.js` para cartões e chama `openLaunchScene(store)` de `launch-scene.js` sempre que `state.activeLaunch` existir.
 **launch-scene.js** exporta `openLaunchScene(store) → close()` (overlay de tela cheia dentro de `#overlay-root`).
 **map.js** exporta `render(container, store)`. Monta sozinho 4 níveis (Terra-Lua, Interno, Externo, Completo); de `bodies.json levels` usa só
@@ -601,6 +631,53 @@ Decisões tomadas ao juntar os módulos. Onde este bloco contradiz o texto acima
 - `diplomacy/preview` e `diplomacy/proposalTypes` trazem `refusalTrust` (e `counterRefusalTrust` na prévia).
 - `missions/draftOptions` traz `autoName`; naves fora de `compatibleVehicles` do foguete escolhido vêm `valid: false`.
 - destinations.json: `emLabel` ("na órbita lunar") e `toLabel` ("à órbita lunar") para manchetes.
+
+## Expansão 1950–3000 (Fase A, v0.6.0)
+
+Resumo do que já é contrato no código; números, esquemas e o plano das fases B–D em [docs/EXPANSION.md](docs/EXPANSION.md).
+
+- **Tempo** (`data/core/eras.json`, `src/core/time.js`): 7 eras (e1 1950 … e7 2600–3000), 9 faixas de passo (1 sem → 1 ano).
+  Uma volta pela grade dá 3.670 turnos; o evento final cai em jan/3000 (turno 54.600 em semanas). `bandAt`, `gridNext`,
+  `stepLabel` (+1 sem … +1 ano), `formatTurnEra` (mar/1962, T3 2087, S1 2300, 2741), `yearOf`, `eraAt`.
+- **Tick** (§1.6): cada toque avança um passo, encurtado no próximo compromisso do jogador (`appointments` de missions:
+  "até o lançamento"), na fronteira de era ou no turno final. `ctx = {data, rng, date, dt, prevTurn, turn, eraId, year,
+  hooks:{actorBorn, actorGone}}`. Módulo com `meta.maxDt` menor que o passo roda em sub-passos. Ganchos opcionais:
+  `postInit` (chamado depois de todos os `init`), `onEraStart/onEraEnd/onYear/compact/onActorBorn/onActorGone/appointments`.
+  Regra de módulo em passo variável: só os helpers de `src/sim/simtime.js` / `helpers.js` (nada de `turn % N`, `?? 2026`
+  ou `/52` à mão). Com passo de 1 semana tudo dá exatamente o resultado antigo.
+- **Era nova**: bloqueia o tempo (`isBlocked` → `'era'`) até o jogador continuar (`era/transition`, cena `era-scene.js`);
+  sem o pacote da era carregado recusa com "Carregando a próxima era…" (`'needsData'`; a UI chama `store.ensureEra`).
+- **Final** (jan/3000): cartão bloqueante `ending/final` com Contato · Silêncio · Herança (`ENDINGS`); escolher encerra o jogo.
+  Conteúdo do Eco é da Fase C.
+- **Cenários** (`data/scenarios/index.json` + `scenarios` de `data/packs.json`): `loadData(reader, {scenarioId, eras})`,
+  `normalizeScenario` (lê `start/end/turnWeeks/ending`), `listScenarios`. `lunar_race` = `data/scenario.json` de sempre.
+- **Pacotes de dados** (`data/packs.json`, `src/core/packs.js`, `src/core/data.js`): `core` e `legacy-e4` sempre; pacotes de
+  era sob demanda (`ensurePacks`, `packsNeeded`: era atual, a anterior e a próxima depois de 85%; no máx. 3 na memória). A
+  mescla é pura e determinística (lazy = eager, conferido por `full-campaign --compare-eager`). Itens ganham
+  `fromYear/untilYear`; `src/core/catalog.js` responde o que existe numa data. Validador: `node tools/validate-data.mjs`.
+- **Ciclo de vida dos atores** (`src/sim/lifecycle.js`, só com `scenario.lifecycle === 'on'`): bootstrap na data inicial
+  (1950: NACA e OKB-1), eventos reais datados (nascer, renomear, fundir, dissolver, dividir nação, privatizar…) aplicados no
+  mês exato, gerador anual depois de 2031 (teto 12 principais + 24 menores), aliases/tombstones para ids antigos.
+  `diplomacy.addActor/retireActor`, `politics.ensureNation/retireNation`; sinais `actor/born|renamed|merged|gone|tier`,
+  `nation/split`; consultas `lifecycle/timeline|identity|playable|actors|info`. Leituras de atores vivos sempre por
+  `liveActors`/`resolveActor` (helpers). `agency/found` é esboço até a Fase B.
+- **Escolha do veículo (item 9)**: aceitar briefing/oportunidade/contrato cria a missão em `planning` com
+  `vehicleId: null, spacecraftId: null` e `suggestion {vehicleId, spacecraftId, reason}`; `mission/schedule` recusa com
+  "Escolha o foguete e a nave antes de agendar."; a UI abre a montagem no passo 2 com "Sugestão dos engenheiros" em destaque
+  e nada pré-selecionado, e grava a escolha com `mission/update {missionId, patch:{vehicleId, spacecraftId,
+  secondarySpacecraftId}}`. `missions/costRange` dá a faixa de custo dos cartões. Exceção: demo de certificação tripulada.
+  A IA e os bots continuam usando `pickConfig`.
+- **Saves** (`src/core/migrate.js`, `SAVE_VERSION = 2`): v1 → v2 automático; recusa com mensagens pt-BR (códigos `newer`,
+  `unreadable`, `scenario`). A Fase B acrescenta passos com `registerMigration`. Store: chaves `adastra.save.auto`,
+  `slot1..3`, `era.<id>` e `adastra.save.v1` (legado), índice `adastra.saves.index`.
+- **Compactação** (`compact`, só em campanhas > 10 anos): históricos mais curtos (missões, contratos, notícias 60, anais por
+  década/século, tombstones, política, zonas, tratados) e limpeza dos dados de agências extintas. Meta: save ≤ 400 KB.
+- **UI shell** (`src/ui/screens.js`, `drawer.js`): barra inferior Painel · Missões · ◉ tempo · Mapa · Mundo; gaveta ☰ com
+  grupos Agência · Operações · Universo · Mundo · Arquivo · Sistema. Tela nova = 1 arquivo + 1 linha `registerScreen`
+  (`nav`, `available`, `badge`, `load`, `go`, `action`, `soon`). Telas `soon` mostram esboço "em breve" até a fase indicada.
+  Tela de título: Campanha 1950–3000 · Cenários · Continuar (espaços). `body[data-era]` é o gancho de pele por era (só e4 hoje).
+- **Service worker**: o crawl do precache segue `data/packs.json` (todo arquivo de pacote e cenário) e os `import()` dinâmicos
+  das telas, então pacote ou tela nova não precisa de edição em sw.js (99 arquivos hoje, teto 250).
 
 ## Geo: mapa-múndi e blocos vivos (state.geo, dono: politics)
 

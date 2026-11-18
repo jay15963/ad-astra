@@ -1,0 +1,42 @@
+{
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e2 em data/packs.json).",
+  "id": "e2",
+  "name": "Estações e Sondas",
+  "from": 1976,
+  "to": 1999,
+  "truthLayers": [
+    "fato"
+  ],
+  "closingMilestone": "Primeiros módulos da ISS",
+  "palette": "cobre",
+  "chapters": [
+    {
+      "from": {
+        "year": 1976,
+        "month": 0
+      },
+      "title": "Sondas para os planetas"
+    },
+    {
+      "from": {
+        "year": 1981,
+        "month": 3
+      },
+      "title": "O ônibus espacial"
+    },
+    {
+      "from": {
+        "year": 1991,
+        "month": 11
+      },
+      "title": "O fim de um império"
+    },
+    {
+      "from": {
+        "year": 1998,
+        "month": 10
+      },
+      "title": "Uma estação para todos"
+    }
+  ]
+}

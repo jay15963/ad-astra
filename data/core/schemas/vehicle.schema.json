@@ -1,0 +1,154 @@
+{
+  "$id": "vehicle.schema.json",
+  "description": "Lançador (vehicles.json → vehicles[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "operator",
+    "country",
+    "class",
+    "availableFrom",
+    "truthLayer",
+    "costM",
+    "capacity"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "operator": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "class": {
+      "enum": [
+        "sounding",
+        "small",
+        "medium",
+        "heavy",
+        "superheavy"
+      ]
+    },
+    "availableFrom": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "availableUntil": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "truthLayer": {
+      "$ref": "common.schema.json#/$defs/truthLayer"
+    },
+    "costM": {
+      "$ref": "common.schema.json#/$defs/money"
+    },
+    "cadencePerYear": {
+      "type": "number",
+      "minimum": 0
+    },
+    "backgroundPerYear": {
+      "type": "number",
+      "minimum": 0
+    },
+    "history": {
+      "type": "object",
+      "properties": {
+        "flights": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstFlight": {
+          "type": "integer"
+        }
+      }
+    },
+    "reusable": {
+      "type": "boolean"
+    },
+    "crewRated": {
+      "type": "boolean"
+    },
+    "access": {
+      "enum": [
+        "open",
+        "bloc",
+        "own",
+        "generic"
+      ]
+    },
+    "embargo": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "standDownWeeks": {
+      "type": "number",
+      "minimum": 0
+    },
+    "capacity": {
+      "type": "object",
+      "required": [
+        "leo"
+      ],
+      "properties": {
+        "leo": {
+          "type": "number",
+          "minimum": 0
+        },
+        "gto": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tli": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mars": {
+          "type": "number",
+          "minimum": 0
+        },
+        "outer": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "estimatedReliability": {
+      "$ref": "common.schema.json#/$defs/prob"
+    },
+    "retired": {
+      "type": "boolean"
+    },
+    "debutCalendarId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "source": {
+      "$ref": "common.schema.json#/$defs/source"
+    },
+    "era": {},
+    "fromYear": {
+      "type": "integer"
+    },
+    "design": {
+      "type": "object"
+    }
+  }
+}

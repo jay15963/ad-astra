@@ -1,0 +1,36 @@
+{
+  "_comment": "Pacote e1 (semente da Fase A, prova do pipeline): três fatos da Corrida com data real. Mesmo formato de data/calendar.json (meses base 1). A Fase C completa a era.",
+  "monthBase": 1,
+  "missions": [
+    {
+      "id": "sputnik1", "name": "Sputnik 1", "owner": "roscosmos", "partners": [], "type": "satellite", "destination": "leo",
+      "vehicleId": "r7_sputnik", "spacecraftId": "ps1", "crewed": false, "planned": { "year": 1957, "month": 10 },
+      "truthLayer": "fato", "historicalOutcome": "total",
+      "delay": { "slipChance": 0, "meanMonths": 0, "sdMonths": 0, "maxMonths": 0 },
+      "prerequisites": [], "milestone": null, "importance": 3,
+      "statusNov2026": "Histórica: lançada em 4 de outubro de 1957.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1957-001B",
+      "description": "O primeiro satélite artificial: 83 kg em órbita e um sinal de rádio que começou a corrida espacial."
+    },
+    {
+      "id": "vostok1", "name": "Vostok 1", "owner": "roscosmos", "partners": [], "type": "crewed", "destination": "leo",
+      "vehicleId": "vostok_8k72k", "spacecraftId": "vostok_3ka", "crewed": true, "crewSize": 1, "planned": { "year": 1961, "month": 4 },
+      "truthLayer": "fato", "historicalOutcome": "total",
+      "delay": { "slipChance": 0, "meanMonths": 0, "sdMonths": 0, "maxMonths": 0 },
+      "prerequisites": ["sputnik1"], "milestone": "crewed_orbit_national", "importance": 3,
+      "statusNov2026": "Histórica: Iuri Gagárin deu uma volta na Terra em 12 de abril de 1961.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1961-012A",
+      "description": "108 minutos, uma órbita, o primeiro ser humano no espaço."
+    },
+    {
+      "id": "friendship7", "name": "Friendship 7 (Mercury-Atlas 6)", "owner": "nasa", "partners": [], "type": "crewed", "destination": "leo",
+      "vehicleId": "atlas_lv3b", "spacecraftId": "mercury_capsule", "crewed": true, "crewSize": 1, "planned": { "year": 1962, "month": 2 },
+      "truthLayer": "fato", "historicalOutcome": "total",
+      "delay": { "slipChance": 0, "meanMonths": 0, "sdMonths": 0, "maxMonths": 0 },
+      "prerequisites": [], "milestone": "crewed_orbit_national", "importance": 3,
+      "statusNov2026": "Histórica: John Glenn deu três voltas na Terra em 20 de fevereiro de 1962.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1962-003A",
+      "description": "O primeiro americano em órbita, depois de dez adiamentos e um escudo térmico sob suspeita."
+    }
+  ]
+}

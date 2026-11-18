@@ -1,0 +1,155 @@
+// Screen registry (docs/EXPANSION.md §12). app.js builds the bottom bar, the drawer (.gaveta) and the router from
+// these descriptors; it has no screen list of its own. Adding a screen = one file exporting
+// render(container, store, route) -> cleanup? + one registerScreen line below.
+//
+// Descriptor: { id, title, icon, group, order, nav: 'bottom'|'drawer'|'hidden', parent,
+//   available(state, data) -> bool   (false hides it from the drawer and the router),
+//   badge(state, store) -> 0 | true | n   (true = amber "precisa de você" dot),
+//   load() -> Promise<{render}>       (lazy module),
+//   go: 'tab/sub'                      (optional: a drawer shortcut into a sub-view of another screen),
+//   action: 'title'                    (optional: a drawer item that runs a shell action instead of a screen),
+//   soon: 'B' | 'C'                    (optional: the phase that delivers it; the stub says "em breve") }
+// DOM-free: tests import it in Node.
+
+/** Drawer groups, in order (pt-BR labels shown as eyebrows). */
+export const GROUPS = [
+  { id: 'agencia', label: 'Agência' },
+  { id: 'operacoes', label: 'Operações' },
+  { id: 'universo', label: 'Universo' },
+  { id: 'mundo', label: 'Mundo' },
+  { id: 'arquivo', label: 'Arquivo' },
+  { id: 'sistema', label: 'Sistema' },
+];
+
+const REGISTRY = new Map();
+
+/** Register (or replace, same id) a screen descriptor. Returns the stored descriptor. */
+export function registerScreen(desc) {
+  if (!desc || typeof desc.id !== 'string' || !/^[a-z0-9_-]+$/.test(desc.id)) throw new Error(`registerScreen: id inválido (${desc?.id})`);
+  const d = {
+    nav: 'drawer', group: null, order: 100, parent: null, icon: 'info',
+    available: null, badge: null, load: null, go: null, action: null, soon: null,
+    ...desc,
+  };
+  d.title = String(d.title || d.id);
+  REGISTRY.set(d.id, d);
+  return d;
+}
+
+/** All descriptors (registration order), optionally only those visible for (state, data). */
+export function screens(state = undefined, data = undefined) {
+  const all = [...REGISTRY.values()];
+  return state === undefined ? all : all.filter((d) => isAvailable(d, state, data));
+}
+
+export function screenById(id) { return REGISTRY.get(id) || null; }
+
+/** available() guarded: a throwing predicate hides the screen instead of breaking the shell. */
+export function isAvailable(d, state, data) {
+  if (!d) return false;
+  if (typeof d.available !== 'function') return true;
+  try { return !!d.available(state, data); } catch { return false; }
+}
+
+/** Badge value guarded: 0 | true | n. */
+export function badgeOf(d, state, store) {
+  if (!d || typeof d.badge !== 'function') return 0;
+  try {
+    const v = d.badge(state, store);
+    return v === true ? true : Number(v) > 0 ? Math.round(Number(v)) : 0;
+  } catch { return 0; }
+}
+
+/** Bottom-bar destinations in order (4 items; the time disc sits between them, see app.js DISC_AT). */
+export function bottomScreens() {
+  return screens().filter((d) => d.nav === 'bottom').sort((a, b) => a.order - b.order);
+}
+
+/** Drawer sections: [{group, label, items: [desc]}] with only available items and non-empty groups. */
+export function drawerSections(state, data) {
+  const items = screens(state, data).filter((d) => d.nav === 'drawer');
+  return GROUPS.map((g) => ({
+    group: g.id, label: g.label,
+    items: items.filter((d) => d.group === g.id).sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)),
+  })).filter((s) => s.items.length);
+}
+
+/**
+ * Route from a hash ("#missoes/m/abc"): {tab, sub}. Unknown or unavailable ids fall back to the Painel.
+ * Drawer shortcuts (go) resolve to their target, so "#noticias" opens Mundo › Notícias.
+ */
+export function resolveRoute(hash, state = undefined, data = undefined) {
+  const raw = String(hash || '').replace(/^#\/?/, '');
+  const [id, ...rest] = raw.split('/');
+  let d = REGISTRY.get(id);
+  if (d && d.go) {
+    const [gt, ...gs] = String(d.go).split('/');
+    return { tab: gt, sub: rest.length ? rest.join('/') : gs.join('/') };
+  }
+  if (!d || d.action || (state !== undefined && !isAvailable(d, state, data))) return { tab: 'painel', sub: '' };
+  return { tab: id, sub: rest.join('/') };
+}
+
+/** Bottom tab that owns a route (for the bar's indicator): itself, its parent, or none. */
+export function bottomOwner(tab) {
+  const d = REGISTRY.get(tab);
+  if (!d) return null;
+  if (d.nav === 'bottom') return d.id;
+  if (d.parent && REGISTRY.get(d.parent)?.nav === 'bottom') return d.parent;
+  return null;
+}
+
+/** Drawer item that is "current" for a route ({tab, sub}): exact screen, or the shortcut matching tab/sub. */
+export function drawerCurrent(route) {
+  if (!route) return null;
+  const key = `${route.tab}/${route.sub || ''}`;
+  for (const d of REGISTRY.values()) {
+    if (d.nav !== 'drawer') continue;
+    if (d.go && (key === d.go || key.startsWith(`${d.go}/`))) return d.id;
+  }
+  const d = REGISTRY.get(route.tab);
+  return d && d.nav === 'drawer' && !d.go ? d.id : null;
+}
+
+// ------------------------------------------------------------------ helpers for badges
+
+const playerMissions = (st) => (Array.isArray(st?.missions) ? st.missions : []).filter((m) => m && m.status === 'planning');
+/** Missions in planning that still have no rocket (item 9): the player must pick one before scheduling. */
+export function missionsNeedingVehicle(st) {
+  return playerMissions(st).filter((m) => !m.vehicleId && m.source !== 'cert');
+}
+const decisionsOf = (st, re) => (st?.decisions || []).filter((d) => re.test(String(d.kind || '')));
+const views = () => import('./screen-views.js');
+
+// ------------------------------------------------------------------ the registry (one line each)
+
+registerScreen({ id: 'painel', title: 'Painel', icon: 'painel', nav: 'bottom', order: 10, load: () => import('./dashboard.js'), badge: (st) => (st?.decisions || []).length });
+registerScreen({ id: 'missoes', title: 'Missões', icon: 'missoes', nav: 'bottom', order: 20, load: () => import('./missions-tab.js'), badge: (st) => missionsNeedingVehicle(st).length ? true : 0 });
+registerScreen({ id: 'mapa', title: 'Mapa espacial', icon: 'mapa', nav: 'bottom', order: 30, load: () => import('./map.js') });
+registerScreen({ id: 'mundo', title: 'Mundo', icon: 'mundo', nav: 'bottom', order: 40, load: () => import('./world-tab.js') });
+
+registerScreen({ id: 'equipe', title: 'Equipe', icon: 'equipe', group: 'agencia', order: 10, load: () => import('./crew-view.js') });
+registerScreen({ id: 'conselho', title: 'Conselho e investidores', icon: 'acoes', group: 'agencia', order: 20, soon: 'B', load: () => views().then((m) => m.stub) });
+registerScreen({ id: 'identidade', title: 'Identidade e logo', icon: 'editar', group: 'agencia', order: 30, soon: 'B', load: () => views().then((m) => m.stub) });
+registerScreen({ id: 'financas', title: 'Finanças', icon: 'caixa', group: 'agencia', order: 40, load: () => views().then((m) => m.financas) });
+
+registerScreen({ id: 'pesquisa', title: 'Pesquisa', icon: 'pesquisa', group: 'operacoes', order: 10, load: () => import('./research-tab.js') });
+registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', group: 'operacoes', order: 20, soon: 'B', load: () => views().then((m) => m.stub) });
+registerScreen({ id: 'lancamentos', title: 'Calendário de lançamentos', icon: 'calendario', group: 'operacoes', order: 30, load: () => views().then((m) => m.lancamentos) });
+registerScreen({ id: 'veiculo', title: 'Falta o veículo', icon: 'alerta', group: 'operacoes', order: 5, go: 'missoes/lista', available: (st) => missionsNeedingVehicle(st).length > 0, badge: (st) => missionsNeedingVehicle(st).length });
+
+registerScreen({ id: 'colonias', title: 'Colônias', icon: 'alvo', group: 'universo', order: 10, soon: 'C', available: (st) => !!st?.colonies, load: () => views().then((m) => m.stub) });
+
+registerScreen({ id: 'noticias', title: 'Notícias', icon: 'noticia', group: 'mundo', order: 10, go: 'mundo/noticias' });
+registerScreen({ id: 'diplomacia', title: 'Rivais e diplomacia', icon: 'transferir', group: 'mundo', order: 20, go: 'mundo/atores', badge: (st) => decisionsOf(st, /^(diplomacy|politics)/).length });
+registerScreen({ id: 'tabela', title: 'Tabela da Era', icon: 'ranking', group: 'mundo', order: 30, go: 'mundo/tabela' });
+
+registerScreen({ id: 'anais', title: 'Anais', icon: 'livro', group: 'arquivo', order: 10, soon: 'C', load: () => views().then((m) => m.anais) });
+registerScreen({ id: 'memorial', title: 'Memorial', icon: 'vela', group: 'arquivo', order: 20, go: 'equipe/memorial' });
+registerScreen({ id: 'album', title: 'Álbum', icon: 'estrela', group: 'arquivo', order: 30, go: 'equipe/album' });
+registerScreen({ id: 'eco', title: 'Arquivo do Eco', icon: 'eco', group: 'arquivo', order: 40, soon: 'C', available: (st) => (st?.eco?.pieces || []).length > 0, load: () => views().then((m) => m.stub) });
+
+registerScreen({ id: 'salvar', title: 'Salvar e capítulos', icon: 'salvar', group: 'sistema', order: 10, load: () => views().then((m) => m.salvar) });
+registerScreen({ id: 'ajustes', title: 'Ajustes', icon: 'ajustes', group: 'sistema', order: 20, load: () => views().then((m) => m.ajustes) });
+registerScreen({ id: 'sobre', title: 'Sobre', icon: 'info', group: 'sistema', order: 30, load: () => views().then((m) => m.sobre) });
+registerScreen({ id: 'titulo', title: 'Sair para o título', icon: 'sair', group: 'sistema', order: 40, action: 'title' });

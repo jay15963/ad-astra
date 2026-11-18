@@ -55,6 +55,13 @@ function choose(state, d) {
 /** Fix and schedule missions in planning. */
 function manageMissions(state, m, stats) {
   for (const mis of state.missions.filter((x) => x.status === 'planning')) {
+    // item 9: accepted briefings/contracts arrive without hardware; start from the engineers' suggestion
+    if ((!mis.vehicleId || (!mis.spacecraftId && !mis.clientPayload)) && mis.suggestion) {
+      const patch = {};
+      if (!mis.vehicleId && mis.suggestion.vehicleId) patch.vehicleId = mis.suggestion.vehicleId;
+      if (!mis.spacecraftId && mis.suggestion.spacecraftId) patch.spacecraftId = mis.suggestion.spacecraftId;
+      if (Object.keys(patch).length) dispatch(state, data, { type: 'mission/update', missionId: mis.id, patch });
+    }
     let opts = q(state, 'missions/draftOptions', { ...mis, missionId: mis.id });
     if (!opts) continue;
     if (!opts.valid) {

@@ -1,0 +1,29 @@
+{
+  "note": "Fim da campanha em jan/3000 (EXPANSION.md §9). Textos provisórios da Fase A: a Fase C (src/sim/eco.js) substitui o tratamento e enriquece os epílogos. As três escolhas ficam sempre disponíveis.",
+  "event": "ending/final",
+  "title": "O Grande Silêncio",
+  "body": "Janeiro de 3000. Mil e cinquenta anos depois do primeiro foguete, o Eco se cala de uma vez. Todos os receptores do sistema ouvem o mesmo vazio. O conselho espera a sua palavra: o que a humanidade faz agora?",
+  "choices": [
+    {
+      "id": "contato",
+      "label": "Contato",
+      "preview": "Responder ao Silêncio com tudo o que temos.",
+      "title": "Contato",
+      "text": "A agência aponta cada antena para o ponto de onde o Eco vinha e transmite a história inteira da espécie: os nomes do Memorial, os mapas, as canções. Por um ano nada volta. Então, numa madrugada de 3001, um único pulso responde. Não sabemos o que ele diz. Sabemos que alguém ouviu."
+    },
+    {
+      "id": "silencio",
+      "label": "Silêncio",
+      "preview": "Calar e seguir sozinhos.",
+      "title": "Silêncio",
+      "text": "A agência desliga os transmissores e guarda o Eco nos arquivos. Se havia alguém do outro lado, que siga seu caminho; nós seguimos o nosso. As naves continuam partindo, agora sem esperar resposta, e o céu volta a ser só nosso, imenso e quieto."
+    },
+    {
+      "id": "heranca",
+      "label": "Herança",
+      "preview": "Deixar tudo preparado para quem vier depois.",
+      "title": "Herança",
+      "text": "A agência não responde nem esquece. Constrói arquivos que durem um milhão de anos, sondas que esperam em órbitas estáveis e um mapa de tudo o que aprendemos desde 1950. Quem vier depois, nós ou outros, vai encontrar a porta aberta e a luz acesa."
+    }
+  ]
+}

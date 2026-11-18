@@ -1,5 +1,5 @@
 {
-  "_comment": "Catálogo de lançadores. Meses em base 1 (1 = janeiro). history = voos orbitais reais até o fim de 2025. capacity em toneladas (0 = não alcança). access: open (mercado, menos embargo/tensão >= 3), bloc (operador, bloco e parceiros de tratado), own (só o operador). tensionActor = ator cuja tensão governa o acesso quando o operador não é um ator do jogo. backgroundPerYear = voos comerciais/de rotina simulados em agregado (sem contar os itens do calendário).",
+  "_comment": "Catálogo de lançadores. untilYear 2999 = a última geração de cada bloco segue voando, modernizada, até os pacotes de era (Fase C) trazerem sucessores. Meses em base 1 (1 = janeiro). history = voos orbitais reais até o fim de 2025. capacity em toneladas (0 = não alcança). access: open (mercado, menos embargo/tensão >= 3), bloc (operador, bloco e parceiros de tratado), own (só o operador). tensionActor = ator cuja tensão governa o acesso quando o operador não é um ator do jogo. backgroundPerYear = voos comerciais/de rotina simulados em agregado (sem contar os itens do calendário).",
   "monthBase": 1,
   "_crewCertComment": "crewCert = programa de certificação tripulada (human-rating). flights = voos bem-sucedidos do foguete (histórico + fundo + calendário + jogador) exigidos; minReliability = confiabilidade média mínima; costM/weeks = engenharia e revisão (o voo de demonstração não tripulado é pago à parte); calendarGrant = item do calendário cujo sucesso certifica o foguete no cronograma real; ai = a operadora (IA) busca a certificação quando as metas pedem; feasible false + reason = a operadora não oferece. crewCertRules: regras gerais (demoExpiryWeeks = semanas que um programa pode ficar na fase de demonstração ou pausado sem voar antes de ser arquivado; cliente paga customerCostMult e precisa do acordo da operadora).",
   "crewCertRules": { "customerCostMult": 1.5, "customerWeeksMult": 1.15, "minTrust": 0, "maxTension": 1, "prestige": 10, "demoDestination": "leo", "demoPayloadT": 8, "demoRetryWeeks": 10, "demoExpiryWeeks": 52, "aiPeriod": 13, "aiChance": 0.35, "aiReserveShare": 0.15 },
@@ -25,7 +25,7 @@
     },
     {
       "id": "starship", "name": "Starship", "operator": "spacex", "provider": "SpaceX", "country": "EUA", "class": "superheavy",
-      "availableFrom": { "year": 2026, "month": 1 }, "truthLayer": "plano_oficial",
+      "availableFrom": { "year": 2026, "month": 1 }, "untilYear": 2999, "truthLayer": "plano_oficial",
       "costM": 100, "cadencePerYear": 25, "backgroundPerYear": 10,
       "backgroundByYear": { "2026": 8, "2027": 14, "2028": 22, "2029": 30, "2030": 38 },
       "history": { "flights": 11, "failures": 5, "firstFlight": 2023 },
@@ -54,7 +54,7 @@
     },
     {
       "id": "new_glenn", "name": "New Glenn", "operator": "blueorigin", "provider": "Blue Origin", "country": "EUA", "class": "heavy",
-      "availableFrom": { "year": 2025, "month": 1 }, "truthLayer": "fato",
+      "availableFrom": { "year": 2025, "month": 1 }, "untilYear": 2999, "truthLayer": "fato",
       "costM": 100, "cadencePerYear": 12, "backgroundPerYear": 5,
       "backgroundByYear": { "2026": 4, "2027": 7, "2028": 10, "2029": 12, "2030": 14 },
       "history": { "flights": 2, "failures": 0, "firstFlight": 2025 },
@@ -94,7 +94,7 @@
     },
     {
       "id": "neutron", "name": "Neutron", "operator": "rocketlab", "provider": "Rocket Lab", "tensionActor": "nasa", "country": "EUA", "class": "medium",
-      "availableFrom": { "year": 2026, "month": 9 }, "truthLayer": "projecao",
+      "availableFrom": { "year": 2026, "month": 9 }, "untilYear": 2999, "truthLayer": "projecao",
       "costM": 55, "cadencePerYear": 6, "backgroundPerYear": 3,
       "backgroundByYear": { "2026": 1, "2027": 3, "2028": 5, "2029": 7, "2030": 9 },
       "history": { "flights": 0, "failures": 0 },
@@ -105,7 +105,7 @@
     },
     {
       "id": "ariane6", "name": "Ariane 64", "operator": "esa", "provider": "Arianespace", "country": "Europa", "class": "heavy",
-      "availableFrom": { "year": 2024, "month": 7 }, "truthLayer": "fato",
+      "availableFrom": { "year": 2024, "month": 7 }, "untilYear": 2999, "truthLayer": "fato",
       "costM": 115, "cadencePerYear": 9, "backgroundPerYear": 7,
       "history": { "flights": 6, "failures": 0, "firstFlight": 2024 },
       "estimatedReliability": 0.94, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 18,
@@ -135,7 +135,7 @@
     },
     {
       "id": "h3", "name": "H3", "operator": "jaxa", "provider": "JAXA / Mitsubishi", "country": "Japão", "class": "medium",
-      "availableFrom": { "year": 2024, "month": 2 }, "truthLayer": "fato",
+      "availableFrom": { "year": 2024, "month": 2 }, "untilYear": 2999, "truthLayer": "fato",
       "costM": 50, "cadencePerYear": 6, "backgroundPerYear": 4,
       "history": { "flights": 7, "failures": 2, "firstFlight": 2023 },
       "estimatedReliability": 0.92, "reusable": false, "crewRated": false, "access": "open", "embargo": ["roscosmos", "cnsa"], "standDownWeeks": 24,
@@ -145,7 +145,7 @@
     },
     {
       "id": "lvm3", "name": "LVM3", "operator": "isro", "provider": "ISRO", "country": "Índia", "class": "medium",
-      "availableFrom": { "year": 2017, "month": 6 }, "truthLayer": "fato",
+      "availableFrom": { "year": 2017, "month": 6 }, "untilYear": 2999, "truthLayer": "fato",
       "costM": 50, "cadencePerYear": 4, "backgroundPerYear": 2,
       "history": { "flights": 8, "failures": 0, "firstFlight": 2017 },
       "estimatedReliability": 0.94, "reusable": false, "crewRated": true, "access": "open", "embargo": ["cnsa"], "standDownWeeks": 26,
@@ -212,7 +212,7 @@
     },
     {
       "id": "long_march_10", "name": "Longa Marcha 10", "operator": "cnsa", "provider": "CASC", "country": "China", "class": "superheavy",
-      "availableFrom": { "year": 2027, "month": 6 }, "truthLayer": "plano_oficial", "debutCalendarId": "cz10_maiden",
+      "availableFrom": { "year": 2027, "month": 6 }, "untilYear": 2999, "truthLayer": "plano_oficial", "debutCalendarId": "cz10_maiden",
       "costM": 300, "cadencePerYear": 3, "backgroundPerYear": 0,
       "history": { "flights": 0, "failures": 0 },
       "estimatedReliability": 0.87, "reusable": false, "crewRated": true, "access": "own", "embargo": [], "standDownWeeks": 36,
@@ -221,7 +221,7 @@
     },
     {
       "id": "zhuque3", "name": "Zhuque-3", "operator": "landspace", "provider": "LandSpace", "tensionActor": "cnsa", "country": "China", "class": "medium",
-      "availableFrom": { "year": 2026, "month": 1 }, "truthLayer": "fato",
+      "availableFrom": { "year": 2026, "month": 1 }, "untilYear": 2999, "truthLayer": "fato",
       "costM": 40, "cadencePerYear": 6, "backgroundPerYear": 3,
       "backgroundByYear": { "2026": 2, "2027": 4, "2028": 6, "2029": 8, "2030": 10 },
       "history": { "flights": 1, "failures": 0, "firstFlight": 2025 },
@@ -241,7 +241,7 @@
     },
     {
       "id": "angara_a5", "name": "Angara A5", "operator": "roscosmos", "provider": "Roscosmos / Khrunichev", "country": "Rússia", "class": "heavy",
-      "availableFrom": { "year": 2014, "month": 12 }, "truthLayer": "fato",
+      "availableFrom": { "year": 2014, "month": 12 }, "untilYear": 2999, "truthLayer": "fato",
       "costM": 100, "cadencePerYear": 2, "backgroundPerYear": 1,
       "history": { "flights": 4, "failures": 1, "firstFlight": 2014 },
       "estimatedReliability": 0.86, "reusable": false, "crewRated": false, "access": "bloc", "embargo": ["esa", "jaxa", "nasa", "spacex", "blueorigin"], "standDownWeeks": 30,

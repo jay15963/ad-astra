@@ -1,0 +1,18 @@
+{
+  "note": "Valores iniciais de jan/1950 das linhagens vivas (EXPANSION.md §2.1 'snapshot'). Atores fora desta lista e vivos na data usam lineages.json (budgetSeries + start). Relações sobrescrevem os pares listados; blocs/treaties substituem os de 2026 (em 1950 não há blocos espaciais nem tratados). Verbas em US$ milhões do jogo (valores constantes de 2026). Dono: lifecycle.",
+  "era": "e1",
+  "date": { "year": 1950, "month": 0 },
+  "actors": {
+    "nasa": { "budget": 250, "cash": 60, "support": 45, "reputation": 60, "culture": 15, "prestige": 0, "fixedCostShare": 0.6,
+      "capabilities": { "crewed": false, "launchSites": ["Wallops"] },
+      "ai": { "cooperation": 0.45, "aggression": 0.4, "riskTolerance": 0.4, "goals": [] } },
+    "roscosmos": { "budget": 300, "cash": 75, "support": 70, "reputation": 50, "culture": -20, "prestige": 0, "fixedCostShare": 0.55,
+      "capabilities": { "crewed": false, "launchSites": ["Kapustin Yar"] },
+      "ai": { "cooperation": 0.2, "aggression": 0.7, "riskTolerance": 0.65, "goals": [] } }
+  },
+  "relations": [
+    { "a": "nasa", "b": "roscosmos", "trust": -40, "dependence": 0, "rivalry": 60 }
+  ],
+  "blocs": [],
+  "treaties": []
+}

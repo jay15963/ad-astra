@@ -8,6 +8,7 @@
 import { addNews, emitSignal, claimFirst, isHistoricFirst, firstValue, milestoneShare, changeActor, log, relKey, clamp } from '../core/helpers.js';
 import { hash32, makeRng } from '../core/rng.js';
 import { formatTurn, weeksToText, WEEKS_PER_YEAR } from '../core/time.js';
+import { crossed, yearAt, aiGoals, retireYearOf, resolveActorId, liveActorIds } from './simtime.js';
 import { backgroundCrewLoss } from './crew.js';
 
 // outcome.js belongs to launch-core; load it defensively so this module works while it is missing.
@@ -329,12 +330,35 @@ export function availableTurnOf(state, data, item) {
   return t;
 }
 
+// Date window of a catalog item (pure function of the data and the start year), memoized per item object: the
+// catalog of every loaded era is filtered several times per actor and per week.
+const ITEM_WINDOW = new WeakMap();
+function catalogWindow(state, data, item) {
+  const sy = startYearOf(state, data);
+  let w = ITEM_WINDOW.get(item);
+  if (w && w.sy === sy && w.data === data) return w;
+  w = {
+    sy, data,
+    from: turnOfDate(item.availableFrom, sy, data) ?? -Infinity,
+    until: item.availableUntil ? turnOfDate(item.availableUntil, sy, data) : null,
+    retireYear: item.availableUntil ? null : retireYearOf(data, item, item.capacity ? 'vehicles' : 'spacecraft'),
+  };
+  ITEM_WINDOW.set(item, w);
+  return w;
+}
+
 function inCatalogAt(state, data, item, turn) {
-  const from = availableTurnOf(state, data, item);
+  // cheap date checks first (same result as before: the debut only ever moves the start later)
+  const w = catalogWindow(state, data, item);
+  if (turn < w.from) return false;
+  if (w.until != null && turn > w.until + 4) return false;
+  if (w.retireYear != null && yearAt(state, turn) > w.retireYear) return false;
+  const from = item.debutCalendarId ? availableTurnOf(state, data, item) : w.from;
   if (from == null || turn < from) return false;
-  if (item.availableUntil) {
-    const until = turnOfDate(item.availableUntil, startYearOf(state, data), data);
-    if (until != null && turn > until + 4) return false;
+  // hardware of a lineage that died without a successor leaves the catalog (its factories closed)
+  if (item.operator && state?.lifecycle?.tombstones) {
+    const op = resolveActorId(state, item.operator);
+    if (!state.actors?.[op] && state.lifecycle.tombstones[op] && !state.lifecycle.tombstones[op].into) return false;
   }
   return true;
 }
@@ -442,8 +466,11 @@ function newInstance(state, data, item) {
   const sy = startYearOf(state, data);
   const plannedTurn = turnOfDate(item.planned, sy, data) ?? 0;
   // a probe launched before the scenario: `planned` is the arrival, `launched` the real launch date
-  if (item.inTransit) {
-    const launchTurn = Math.min(plannedTurn - 1, turnOfDate(item.launched, sy, data) ?? plannedTurn - Math.max(1, destinationById(data, item.destination)?.transitWeeks || 1));
+  const realLaunch = item.inTransit ? Math.min(plannedTurn - 1, turnOfDate(item.launched, sy, data) ?? plannedTurn - Math.max(1, destinationById(data, item.destination)?.transitWeeks || 1)) : null;
+  // a campaign that starts before the real launch (1950): the probe is not flying yet; it is an ordinary
+  // calendar launch at its real launch date (not an inherited transit)
+  if (item.inTransit && realLaunch < 0) {
+    const launchTurn = realLaunch;
     return {
       id: item.id, plannedTurn, currentTurn: launchTurn,
       status: item.owner === state.playerId ? 'player' : 'launched',
@@ -453,10 +480,11 @@ function newInstance(state, data, item) {
       waived: [], lastWaitNewsTurn: null,
     };
   }
+  const planTurn = item.inTransit ? realLaunch : plannedTurn;
   return {
     id: item.id,
-    plannedTurn,
-    currentTurn: snapToWindow(state, data, item.destination, plannedTurn, item),
+    plannedTurn: planTurn,
+    currentTurn: snapToWindow(state, data, item.destination, planTurn, item),
     status: item.owner === state.playerId ? 'player' : 'planned',
     delayWeeks: 0,
     programDelayWeeks: 0,
@@ -528,7 +556,7 @@ export function tick(state, data, ctx) {
     try {
       if (inst.status === 'planned') {
         const ahead = inst.currentTurn - turn;
-        if (ahead >= 3 && ahead <= REVISION_HORIZON && (turn + (hash32(inst.id) % REVISION_PERIOD)) % REVISION_PERIOD === 0) {
+        if (ahead >= 3 && ahead <= REVISION_HORIZON && crossed(state, ctx, REVISION_PERIOD, (REVISION_PERIOD - (hash32(inst.id) % REVISION_PERIOD)) % REVISION_PERIOD)) {
           reviseSchedule(state, data, inst, item, ctx.rng(`rev:${inst.id}`));
         }
         if (inst.status === 'planned' && turn >= inst.currentTurn) tryLaunch(state, data, inst, item, ctx.rng(`launch:${inst.id}:${inst.attempts}`));
@@ -543,7 +571,7 @@ export function tick(state, data, ctx) {
   certTick(state, data, ctx);
   rivalOps(state, data, ctx);
   rivalProgramPrestige(state, data);
-  periodicSummaries(state, data);
+  periodicSummaries(state, data, ctx);
 }
 
 // ---------------------------------------------------------------- rival discretionary missions
@@ -624,11 +652,11 @@ function opsSlice(state) {
 }
 
 /** Cheapest generic spacecraft + vehicle an actor can fly to a destination right now, with its cost. */
-function opsConfig(state, data, actorId, destId, vehicles) {
+function opsConfig(state, data, actorId, destId, vehicles, spacecraft) {
   const dest = destinationById(data, destId);
   if (!dest) return null;
   const kinds = dest.kind === 'surface' ? ['lander'] : dest.body === 'earth' ? ['satellite'] : ['probe'];
-  const scs = availableSpacecraft(state, data, actorId)
+  const scs = (spacecraft || availableSpacecraft(state, data, actorId))
     .filter((s) => s.access === 'generic' && kinds.includes(s.kind) && (!s.destinations?.length || s.destinations.includes(destId)))
     .sort((a, b) => (a.costM || 0) - (b.costM || 0));
   const sc = scs[0];
@@ -713,19 +741,20 @@ export function opsOptions(state, data, actorId, { react = null, tun = opsTuning
   const ops = opsSlice(state);
   const turn = state.turn;
   const endTurn = endTurnOf(state, data);
-  const goals = a.ai?.goals || [];
+  const goals = aiGoals(state, data, actorId);
   const goalDests = new Set(goals.map((g) => goalDest(data, g)).filter(Boolean));
   // how much the actor cares about targets outside its goals (companies chase markets, not planetary science)
   const interest = clamp(a.ai?.scienceInterest ?? (a.kind === 'company' ? tun.companyInterest : 1), 0, 1);
   const tries = ops.tries[actorId] || {};
   const vehicles = availableVehicles(state, data, actorId);
+  const spacecraft = availableSpacecraft(state, data, actorId); // once per actor, not once per destination
   const own = (state.calendar || []).map((c) => ({ c, item: calendarItem(data, c.id) })).filter((x) => x.item?.owner === actorId);
   const out = [];
   for (const dest of destinationsOf(data)) {
     if (dest.body === 'earth') continue; // Earth orbit is routine: no prestige worth a program of its own
     if (ops.pending.some((p) => p.actorId === actorId && p.destination === dest.id)) continue;
     if ((tries[dest.id] || 0) >= tun.maxOpsPerDest + (goalDests.has(dest.id) ? 1 : 0)) continue; // no endless repeats of one site
-    const cfg = opsConfig(state, data, actorId, dest.id, vehicles);
+    const cfg = opsConfig(state, data, actorId, dest.id, vehicles, spacecraft);
     if (!cfg || cfg.cost > a.budget * tun.maxCostShare) continue;
     const build = dest.kind === 'surface' ? 39 : 26;
     const ready = turn + build;
@@ -784,7 +813,7 @@ function opsReact(state, data, ctx) {
       const owner = item?.owner;
       const a = state.actors?.[owner];
       if (!item || !a || owner === state.playerId) continue;
-      const chases = (a.ai?.goals || []).includes(s.milestoneId) || item.milestone === s.milestoneId;
+      const chases = aiGoals(state, data, a.id).includes(s.milestoneId) || item.milestone === s.milestoneId;
       if (!chases || destinationById(data, item.destination)?.body !== body) continue;
       const floor = Math.max(state.turn + 3, (inst.plannedTurn ?? inst.currentTurn) - 8);
       const to = Math.max(floor, inst.currentTurn - rng.int(4, 8));
@@ -809,7 +838,7 @@ function opsReact(state, data, ctx) {
  */
 function opsRace(state, data, ctx, tun) {
   const ops = opsSlice(state);
-  if (state.turn % tun.raceCheckPeriod !== 5) return;
+  if (!crossed(state, ctx, tun.raceCheckPeriod, 5)) return;
   for (const inst of state.calendar || []) {
     if (inst.status !== 'planned' || ops.raced[inst.id] != null) continue;
     const item = calendarItem(data, inst.id);
@@ -820,7 +849,7 @@ function opsRace(state, data, ctx, tun) {
     if (ahead < 8 || ahead > 104) continue;
     const dest = destinationById(data, item.destination);
     const myEta = inst.currentTurn + Math.max(0, dest?.transitWeeks || 0);
-    const goals = a.ai?.goals || [];
+    const goals = aiGoals(state, data, owner);
     let threat = null;
     for (const mid of milestonesFor(state, data, item)) {
       if (state.firsts?.[mid] || mid.includes(':')) continue;
@@ -878,9 +907,9 @@ function rivalOps(state, data, ctx) {
   }
   if (tun.enabled === false) return;
   opsRace(state, data, ctx, tun);
-  if (state.turn % OPS_PERIOD !== 2 || state.turn < (tun.startTurn ?? 8)) return;
+  if (!crossed(state, ctx, OPS_PERIOD, 2) || state.turn < (tun.startTurn ?? 8)) return;
   const react = ops.react && ops.react.untilTurn > state.turn ? ops.react : null;
-  for (const id of Object.keys(state.actors || {}).sort()) {
+  for (const id of liveActorIds(state, { tier: 'core' }).sort()) { // background (minor) actors fly no discretionary missions
     const a = state.actors[id];
     if (id === state.playerId || !a || !(a.budget > 0)) continue;
     const pressure = racePressure(state, data, id, tun);
@@ -1320,7 +1349,7 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
       && calendarItem(data, c.id)?.destination === item.destination && !!calendarItem(data, c.id)?.crewed === !!item.crewed).length;
     // "contract": a delivery the owner buys (CLPS landers): a service, it pays half the novelty (core/outcome.js)
     const mp = scorePrestige(destinationById(data, item.destination), { crewed: !!item.crewed, level, p: 0.8, repeats, contract: !!item.contract });
-    const share = item.inTransit ? inheritedShare(data) : 1;
+    const share = inst.inTransit ? inheritedShare(data) : 1;
     changeActor(state, owner, 'prestige', Math.round(share * Math.max(mp.prestige, level === 'total' ? imp * 3 : imp * 1.5)));
     changeActor(state, owner, 'support', level === 'total' ? imp : 0);
     changeActor(state, owner, 'reputation', level === 'total' ? 1 : 0);
@@ -1390,7 +1419,7 @@ function backgroundRate(v, year) {
 
 function backgroundLaunches(state, data, ctx) {
   const turn = state.turn;
-  const year = ctx?.date?.year ?? startYearOf(state, data) + Math.floor(turn / WEEKS_PER_YEAR);
+  const year = yearAt(state, turn);
   let total = 0;
   for (const v of vehiclesOf(data)) {
     const rate = backgroundRate(v, year) / WEEKS_PER_YEAR;
@@ -1431,9 +1460,8 @@ function backgroundLaunches(state, data, ctx) {
   state.stats['calendar.backgroundLaunches'] = (state.stats['calendar.backgroundLaunches'] || 0) + total;
 }
 
-function periodicSummaries(state, data) {
-  const turn = state.turn;
-  if (turn % REVISION_PERIOD === REVISION_PERIOD - 1) {
+function periodicSummaries(state, data, ctx) {
+  if (crossed(state, ctx, REVISION_PERIOD, REVISION_PERIOD - 1)) {
     const rows = vehiclesOf(data)
       .map((v) => ({ v, n: state.vehicleStats[v.id]?.quarterFlights || 0 }))
       .filter((r) => r.n > 0)
@@ -1447,7 +1475,7 @@ function periodicSummaries(state, data) {
     }
     for (const st of Object.values(state.vehicleStats)) { st.quarterFlights = 0; st.quarterFailures = 0; }
   }
-  if (turn % WEEKS_PER_YEAR === WEEKS_PER_YEAR - 1) {
+  if (crossed(state, ctx, WEEKS_PER_YEAR, WEEKS_PER_YEAR - 1)) {
     for (const st of Object.values(state.vehicleStats)) st.yearFlights = 0;
   }
 }
@@ -1739,7 +1767,7 @@ function certTick(state, data, ctx) {
     const cc = v.crewCert;
     const a = state.actors?.[v.operator];
     if (!cc?.ai || cc.feasible === false || !a || v.operator === pid || cs.programs[v.id] || isCrewRated(state, data, v)) continue;
-    if (!(a.ai?.goals || []).some((g) => CREWED_GOALS.test(g))) continue;
+    if (!aiGoals(state, data, a.id).some((g) => CREWED_GOALS.test(g))) continue;
     const chk = canStartCert(state, data, v.id, v.operator);
     if (!chk.ok || (a.cash || 0) - chk.costM < (a.budget || 0) * r.aiReserveShare) continue;
     const rng = ctx?.rng ? ctx.rng(`cert:ai:${v.id}`) : makeRng(hash32(state.seed, turn, 'certai', v.id));
@@ -1817,7 +1845,7 @@ export function calendarView(state, data, inst) {
     name: item.name, owner: item.owner, ownerName: actorName(state, data, item.owner), partners: item.partners || [], client: item.client || null,
     type: item.type, destination: item.destination, destinationName: dest?.name || item.destination,
     vehicleId: item.vehicleId, vehicleName: item.vehicleName || vehicleById(data, item.vehicleId)?.name || item.vehicleId,
-    inTransit: !!item.inTransit, launchedText: inst.launchTurn != null ? fmt(state, data, inst.launchTurn) : null,
+    inTransit: !!inst.inTransit, launchedText: inst.launchTurn != null ? fmt(state, data, inst.launchTurn) : null,
     spacecraftId: item.spacecraftId, spacecraftName: spacecraftById(data, item.spacecraftId)?.name || item.spacecraftId,
     crewed: !!item.crewed, truthLayer: item.truthLayer, truthLabel: TRUTH_LABELS[item.truthLayer] || item.truthLayer,
     importance: item.importance || 1, milestone: item.milestone || null, prerequisites: item.prerequisites || [],
@@ -1863,3 +1891,18 @@ export const queries = {
   },
   'calendar/prerequisites': (state, data, id) => prerequisiteStatus(state, data, id),
 };
+
+/**
+ * Yearly compaction: the rival-ops ledgers (fund, tries, savings, flights per destination) of actors that left
+ * the game (a 1950–3000 campaign sees hundreds come and go). Nothing changes while every actor is alive.
+ */
+export function compact(state) {
+  const ops = state.rivalOps;
+  if (!ops || typeof ops !== 'object' || !state.actors) return;
+  const live = (id) => !!state.actors[id] || (ops.pending || []).some((p) => p.actorId === id);
+  for (const k of ['fund', 'tries', 'saving', 'flights']) {
+    const m = ops[k];
+    if (!m || typeof m !== 'object') continue;
+    for (const id of Object.keys(m)) if (!live(id)) delete m[id];
+  }
+}

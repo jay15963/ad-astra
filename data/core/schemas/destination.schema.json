@@ -1,0 +1,95 @@
+{
+  "$id": "destination.schema.json",
+  "description": "Destino (destinations.json → destinations[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "body",
+    "kind",
+    "capacityKey",
+    "route",
+    "transitWeeks"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "short": {
+      "type": "string",
+      "maxLength": 24
+    },
+    "body": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "kind": {
+      "enum": [
+        "orbit",
+        "station",
+        "flyby",
+        "surface",
+        "atmosphere",
+        "rendezvous",
+        "interstellar"
+      ]
+    },
+    "capacityKey": {
+      "type": "string"
+    },
+    "capacityFactor": {
+      "type": "number",
+      "minimum": 0
+    },
+    "route": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "dv"
+        ],
+        "properties": {
+          "dv": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "transitWeeks": {
+      "type": "number",
+      "minimum": 0
+    },
+    "window": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "arrivalMilestones": {
+      "type": "array"
+    },
+    "firsts": {
+      "type": "object"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "availableUntil": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "fromYear": {
+      "type": "integer"
+    },
+    "era": {}
+  }
+}

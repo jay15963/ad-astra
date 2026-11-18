@@ -49,15 +49,40 @@ export function fmtNum(n) {
   return Math.round(Number(n)).toLocaleString('pt-BR');
 }
 
-/** turn -> "sem 14 · abr/2026" */
-export function fmtDate(turn, startYear = 2026) {
-  if (turn == null || !Number.isFinite(Number(turn))) return '—';
+/** turn -> "sem 14 · abr/2026". startYear is required (no era default: the campaign starts in 1950). */
+export function fmtDate(turn, startYear) {
+  if (turn == null || !Number.isFinite(Number(turn)) || !Number.isFinite(Number(startYear))) return '—';
   return formatTurnLong(turn, startYear);
 }
-export function fmtMonth(turn, startYear = 2026) {
-  if (turn == null || !Number.isFinite(Number(turn))) return '—';
+export function fmtMonth(turn, startYear) {
+  if (turn == null || !Number.isFinite(Number(turn)) || !Number.isFinite(Number(startYear))) return '—';
   return formatTurn(turn, startYear);
 }
+/** pt-BR era names (docs/EXPANSION.md §2.3); data/core/eras.json wins when loaded. */
+export const ERA_NAMES = { e1: 'A Corrida', e2: 'Estações e Sondas', e3: 'A Era Comercial', e4: 'A Década Lunar', e5: 'Expansão do Sistema', e6: 'Interplanetária e Interestelar', e7: 'Galáctica' };
+
+/** Current era of a game: {id: 'e4', n: 4, name} from state.clock / data.eras, falling back to the scenario. */
+export function eraInfo(state, data) {
+  const sc = data?.scenario || {};
+  const list = Array.isArray(data?.eras) ? data.eras : Array.isArray(data?.eras?.eras) ? data.eras.eras : [];
+  let id = state?.clock?.eraId || null;
+  if (!id && Array.isArray(sc.eras) && sc.eras.length === 1) id = sc.eras[0];
+  if (!id && sc.era != null) id = /^e\d$/.test(String(sc.era)) ? String(sc.era) : `e${sc.era}`;
+  id = id || 'e4';
+  const def = list.find((e) => e && e.id === id) || {};
+  const n = Number(String(id).replace(/\D/g, '')) || null;
+  return { id, n, name: def.name || ERA_NAMES[id] || '', def };
+}
+
+/** "3 semanas", "2 meses", "1,5 anos": how much time a turn (or a run of turns) took. */
+export function passedText(weeks) {
+  const w = Math.max(0, Math.round(Number(weeks) || 0));
+  if (w < 9) return w === 1 ? '1 semana' : `${w} semanas`;
+  if (w < 52) { const m = Math.max(1, Math.round(w / (52 / 12))); return m === 1 ? '1 mês' : `${m} meses`; }
+  const y = Math.round((w / 52) * 10) / 10;
+  return y === 1 ? '1 ano' : `${String(y).replace('.', ',')} anos`;
+}
+
 /** relative weeks: "em 3 sem", "agora", "há 2 meses" */
 export function fmtIn(turn, now) {
   if (turn == null || !Number.isFinite(Number(turn))) return '—';
@@ -151,6 +176,15 @@ export const ICONS = {
   cadeado: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
   noticia: '<path d="M4 5.5h13v13a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9.5h3v9a2 2 0 0 1-4 0M7.5 9h6M7.5 12.5h6M7.5 16h4"/>',
   seta: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  chave: '<path d="M14.5 4.2a4.6 4.6 0 0 0-5.8 5.9L3.8 15a2 2 0 0 0 2.8 2.8l4.9-4.9a4.6 4.6 0 0 0 5.9-5.8l-2.9 2.9-2.4-.4-.4-2.4z"/>',
+  livro: '<path d="M4 5.5A2 2 0 0 1 6 3.5h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20.5a2 2 0 0 1 2-2h13v2H6"/><path d="M8.5 8h7M8.5 11.5h5"/>',
+  salvar: '<path d="M5 3.5h11l3.5 3.5v12A1.5 1.5 0 0 1 18 20.5H6A1.5 1.5 0 0 1 4.5 19V5A1.5 1.5 0 0 1 6 3.5z"/><path d="M8 3.5v5h7v-5M8 20.5v-6h8v6"/>',
+  sair: '<path d="M14 4.5h4a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-4"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
+  estrela: '<path d="M12 3.8l2.5 5.2 5.6.7-4.1 3.9 1.1 5.6L12 16.4l-5.1 2.8 1.1-5.6-4.1-3.9 5.6-.7z"/>',
+  vela: '<path d="M9 10.5h6v10H9z"/><path d="M12 10.5V8M12 3.5c1.6 1.6 1.6 3.2 0 4.5-1.6-1.3-1.6-2.9 0-4.5zM6.5 20.5h11"/>',
+  acoes: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V12l6 6"/>',
+  eco: '<path d="M3.5 12h2l2-5 3 10 3-14 3 12 2-3h2"/>',
 };
 
 /** SVG markup string for a stroke icon. Unknown name -> empty svg (never throws). */

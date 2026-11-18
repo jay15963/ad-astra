@@ -1,0 +1,36 @@
+{
+  "_comment": "Pacote e1 (semente da Fase A, prova do pipeline). Mesmo formato de data/vehicles.json. A Fase C completa e confere cada item com 'source'.",
+  "monthBase": 1,
+  "vehicles": [
+    {
+      "id": "r7_sputnik", "name": "R-7 Sputnik (8K71PS)", "operator": "roscosmos", "provider": "OKB-1", "country": "URSS",
+      "class": "medium", "availableFrom": { "year": 1957, "month": 10 }, "availableUntil": { "year": 1958, "month": 5 },
+      "truthLayer": "fato", "costM": 20, "cadencePerYear": 2, "backgroundPerYear": 0,
+      "history": { "flights": 2, "failures": 0, "firstFlight": 1957 },
+      "reusable": false, "crewRated": false, "access": "own", "embargo": [], "standDownWeeks": 12,
+      "capacity": { "leo": 0.5, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "O míssil intercontinental de Korolev adaptado às pressas: levou o Sputnik 1 e a cadela Laika.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1957-001B"
+    },
+    {
+      "id": "vostok_8k72k", "name": "Vostok-K (8K72K)", "operator": "roscosmos", "provider": "OKB-1", "country": "URSS",
+      "class": "medium", "availableFrom": { "year": 1960, "month": 12 }, "availableUntil": { "year": 1964, "month": 10 },
+      "truthLayer": "fato", "costM": 30, "cadencePerYear": 4, "backgroundPerYear": 0,
+      "history": { "flights": 13, "failures": 2, "firstFlight": 1960 },
+      "reusable": false, "crewRated": true, "access": "own", "embargo": [], "standDownWeeks": 12,
+      "capacity": { "leo": 4.75, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "O R-7 com um terceiro estágio: o foguete de Gagárin e de Tereshkova.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1961-012A"
+    },
+    {
+      "id": "atlas_lv3b", "name": "Atlas LV-3B (Mercury-Atlas)", "operator": "nasa", "provider": "Convair", "country": "EUA",
+      "class": "medium", "availableFrom": { "year": 1960, "month": 7 }, "availableUntil": { "year": 1963, "month": 5 },
+      "truthLayer": "fato", "costM": 25, "cadencePerYear": 3, "backgroundPerYear": 0,
+      "history": { "flights": 9, "failures": 2, "firstFlight": 1960 },
+      "reusable": false, "crewRated": true, "access": "own", "embargo": [], "standDownWeeks": 12,
+      "capacity": { "leo": 1.36, "gto": 0, "tli": 0, "mars": 0, "outer": 0 },
+      "notes": "Míssil Atlas com casco de balão, reforçado para levar a Mercury e os primeiros americanos à órbita.",
+      "source": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1962-003A"
+    }
+  ]
+}

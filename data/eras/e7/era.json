@@ -1,0 +1,35 @@
+{
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e7 em data/packs.json).",
+  "id": "e7",
+  "name": "Galáctica",
+  "from": 2600,
+  "to": 2999,
+  "truthLayers": [
+    "especulacao"
+  ],
+  "closingMilestone": "O Grande Silêncio",
+  "palette": "violeta",
+  "chapters": [
+    {
+      "from": {
+        "year": 2600,
+        "month": 0
+      },
+      "title": "Mil sóis"
+    },
+    {
+      "from": {
+        "year": 2800,
+        "month": 0
+      },
+      "title": "O sinal que falta"
+    },
+    {
+      "from": {
+        "year": 2990,
+        "month": 0
+      },
+      "title": "O Grande Silêncio"
+    }
+  ]
+}

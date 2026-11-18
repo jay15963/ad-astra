@@ -6,7 +6,7 @@
 // dynamic imports, found by following the import statements — the game data and the icons), so the app
 // opens offline from the second visit on, including screens never opened online (Mapa, Dia de Lançamento).
 // Keep SW_VERSION equal to APP_VERSION in src/ui/settings.js (tests/sw.test.mjs checks it).
-const SW_VERSION = '0.5.0';
+const SW_VERSION = '0.6.0';
 const CACHE = `adastra-${SW_VERSION}`;
 
 // entry points of the crawl; everything they import or link is added (same origin only)
@@ -16,9 +16,11 @@ const SHELL = [
   './assets/icon.svg', './assets/icon-192.png', './assets/icon-512.png', './assets/icon-maskable-192.png',
   './assets/icon-maskable-512.png', './assets/apple-touch-icon.png', './assets/favicon-32.png',
 ];
-// = DATA_FILES in src/core/data.js + the lazily loaded world map (tests/sw-pwa.test.mjs checks it)
+// = DATA_FILES in src/core/data.js + the lazily loaded world map + the pack manifest and scenario list
+// (tests/sw-pwa.test.mjs checks it). Every file listed in data/packs.json (core, era packs, scenarios) is added by
+// the crawl when the manifest is fetched (packFiles), so new era packs need no edit here.
 const DATA = ['scenario', 'actors', 'vehicles', 'spacecraft', 'destinations', 'calendar', 'politics', 'geopolitics',
-  'tech', 'events', 'crew', 'bodies', 'world'];
+  'tech', 'events', 'crew', 'bodies', 'world', 'packs', 'scenarios/index'];
 const MAX_PRECACHE = 250;
 
 self.addEventListener('install', (event) => {
@@ -100,6 +102,17 @@ function referencesOf(text, base, type) {
   return out;
 }
 
+/** data/packs.json -> every pack file and scenario file it lists (absolute URLs, same folder as the manifest). */
+function packFiles(text, base) {
+  const out = [];
+  try {
+    const m = JSON.parse(text);
+    for (const p of m.packs || []) for (const f of p.files || []) out.push(new URL(`${p.dir || ''}${f}.json`, base).href);
+    for (const f of Object.values(m.scenarios || {})) out.push(new URL(f, base).href);
+  } catch { /* bad manifest: the loader reports it */ }
+  return out;
+}
+
 const typeOf = (href) => (/\.m?js(\?|$)/.test(href) ? 'js' : /\.css(\?|$)/.test(href) ? 'css' : /(\/|\.html)(\?|$)/.test(href) ? 'html' : '');
 
 async function precache() {
@@ -115,6 +128,12 @@ async function precache() {
       try { res = await fetch(href, { cache: 'no-cache' }); } catch { continue; }
       if (!res || !res.ok || res.type !== 'basic') continue;
       const type = typeOf(href);
+      if (/\/data\/packs\.json(\?|$)/.test(href)) {
+        const text = await res.clone().text().catch(() => '');
+        for (const ref of packFiles(text, href)) {
+          if (!seen.has(ref) && seen.size < MAX_PRECACHE) { seen.add(ref); queue.push(ref); }
+        }
+      }
       if (type) {
         const text = await res.clone().text().catch(() => '');
         for (const ref of referencesOf(text, href, type)) {

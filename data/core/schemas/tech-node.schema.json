@@ -1,0 +1,79 @@
+{
+  "$id": "tech-node.schema.json",
+  "description": "Nó da árvore de pesquisa (tech.json → nodes[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "branch",
+    "era",
+    "name",
+    "cost",
+    "weeks",
+    "requires",
+    "effects"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "branch": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "era": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        {
+          "$ref": "common.schema.json#/$defs/eraId"
+        }
+      ]
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "short": {
+      "type": "string",
+      "maxLength": 30
+    },
+    "icon": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "cost": {
+      "$ref": "common.schema.json#/$defs/money"
+    },
+    "science": {
+      "type": "number",
+      "minimum": 0
+    },
+    "weeks": {
+      "type": "number",
+      "minimum": 0
+    },
+    "requires": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "effects": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "initialFor": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "tier": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fromYear": {
+      "type": "integer"
+    }
+  }
+}

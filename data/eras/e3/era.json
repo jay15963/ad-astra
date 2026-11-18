@@ -1,0 +1,42 @@
+{
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e3 em data/packs.json).",
+  "id": "e3",
+  "name": "A Era Comercial",
+  "from": 2000,
+  "to": 2025,
+  "truthLayers": [
+    "fato"
+  ],
+  "closingMilestone": "Reuso de foguetes vira rotina",
+  "palette": "aco",
+  "chapters": [
+    {
+      "from": {
+        "year": 2000,
+        "month": 0
+      },
+      "title": "A estação habitada"
+    },
+    {
+      "from": {
+        "year": 2008,
+        "month": 8
+      },
+      "title": "Empresas chegam à órbita"
+    },
+    {
+      "from": {
+        "year": 2015,
+        "month": 11
+      },
+      "title": "Foguetes que voltam"
+    },
+    {
+      "from": {
+        "year": 2020,
+        "month": 4
+      },
+      "title": "Táxis para a órbita"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "$id": "spacecraft.schema.json",
+  "description": "Nave, sonda ou módulo (spacecraft.json → spacecraft[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "kind",
+    "crew",
+    "massT",
+    "costM",
+    "availableFrom",
+    "truthLayer"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "operator": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "provider": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "capsule",
+        "cargo",
+        "lander",
+        "probe",
+        "satellite",
+        "station_module",
+        "rover",
+        "tug",
+        "habitat"
+      ]
+    },
+    "crew": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "massT": {
+      "type": "number",
+      "minimum": 0
+    },
+    "costM": {
+      "$ref": "common.schema.json#/$defs/money"
+    },
+    "availableFrom": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "availableUntil": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "truthLayer": {
+      "$ref": "common.schema.json#/$defs/truthLayer"
+    },
+    "estimatedReliability": {
+      "$ref": "common.schema.json#/$defs/prob"
+    },
+    "history": {
+      "type": "object"
+    },
+    "destinations": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "compatibleVehicles": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "landerRequired": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "access": {
+      "enum": [
+        "open",
+        "bloc",
+        "own",
+        "generic"
+      ]
+    },
+    "embargo": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "source": {
+      "$ref": "common.schema.json#/$defs/source"
+    },
+    "era": {},
+    "fromYear": {
+      "type": "integer"
+    }
+  }
+}

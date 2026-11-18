@@ -1,0 +1,52 @@
+{
+  "$id": "scenario-index.schema.json",
+  "description": "Lista de cenários (data/scenarios/index.json).",
+  "type": "object",
+  "required": [
+    "scenarios"
+  ],
+  "properties": {
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "kind": {
+            "enum": [
+              "campaign",
+              "scenario"
+            ]
+          },
+          "name": {
+            "$ref": "common.schema.json#/$defs/name"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "common.schema.json#/$defs/ym"
+          },
+          "end": {
+            "$ref": "common.schema.json#/$defs/ym"
+          },
+          "order": {
+            "type": "integer"
+          },
+          "blurb": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      }
+    }
+  }
+}

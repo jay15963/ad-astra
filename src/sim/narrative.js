@@ -14,6 +14,7 @@
 
 import { clamp, relKey, addNews, pushDecision, emitSignal, log, changeActor, nextId } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
+import { yearAt, inYearWindow, legacyFromYear } from './simtime.js';
 import * as budget from './budget.js';
 import * as politics from './politics.js';
 import * as diplomacy from './diplomacy.js';
@@ -54,9 +55,9 @@ const ROLE_LABELS = { engineer: 'engenheiro(a)', flight_director: 'diretor(a) de
 
 // Schemas used by validateEvent (unknown keys are errors).
 const EVENT_KEYS = ['id', 'kind', 'title', 'text', 'portrait', 'trigger', 'weight', 'cooldownWeeks', 'once', 'choices', 'chain',
-  'subject', 'rival', 'tags', 'defaultChoice', 'urgency', 'group', 'maxCount', 'variants'];
+  'subject', 'rival', 'tags', 'defaultChoice', 'urgency', 'group', 'maxCount', 'variants', 'era', 'fromYear', 'untilYear', 'truthLayer', 'source'];
 const TRIGGER_KEYS = ['minTurn', 'maxTurn', 'actors', 'requiresFlags', 'forbidsFlags', 'signal', 'signalWhere', 'chance',
-  'condition', 'destinations', 'crewed', 'scheduledOnly'];
+  'condition', 'destinations', 'crewed', 'scheduledOnly', 'fromYear', 'untilYear'];
 const CHOICE_KEYS = ['id', 'label', 'preview', 'requires', 'effects'];
 const COND_COMPARE_KEYS = ['culture', 'cash', 'support', 'reputation', 'prestige', 'budget', 'failStreak', 'turn', 'tension', 'trust'];
 const COND_KEYS = [...COND_COMPARE_KEYS, 'tech', 'flag', 'value', 'hasRole', 'all', 'any', 'not', 'bloc'];
@@ -331,7 +332,7 @@ export function renderText(state, data, text, context = {}) {
       case 'rival': return actorName(state, data, context.rival) || 'um rival';
       case 'person': return personName(state, context.person) || 'alguém da equipe';
       case 'mission': return missionName(state, data, context.mission) || 'a missão';
-      case 'year': return String((state.startYear || 2026) + Math.floor((state.turn || 0) / 52));
+      case 'year': return String(yearAt(state));
       case 'milestone': return context.milestone ? milestoneLabel(data, context.milestone) : 'um marco da corrida';
       case 'country': return context.country || 'um país vizinho';
       case 'bloc': return context.bloc || 'o bloco';
@@ -416,6 +417,8 @@ export function eligibleContext(state, data, event, { mode = 'random', base = {}
     }
     if (t.minTurn != null && state.turn < t.minTurn) return null;
     if (t.maxTurn != null && state.turn > t.maxTurn) return null;
+    // calendar window: era packs stamp fromYear; undated legacy events belong to the legacy era (2026+)
+    if (!eventInYear(state, data, event)) return null;
   }
   if (mode === 'random' && (event.kind === 'operation' || t.signal)) return null;
   if (mode === 'signal' && (!t.signal || event.kind === 'operation')) return null;
@@ -433,6 +436,14 @@ export function eligibleContext(state, data, event, { mode = 'random', base = {}
   if (!evalCondition(state, data, t.condition, context)) return null;
   if (!(event.choices || []).some((c) => evalCondition(state, data, c.requires, context))) return null;
   return context;
+}
+
+/** Event inside its calendar window (event or trigger fromYear/untilYear; undated = legacy era start). */
+export function eventInYear(state, data, event) {
+  const t = event?.trigger || {};
+  const year = yearAt(state);
+  const win = { fromYear: t.fromYear ?? event.fromYear, untilYear: t.untilYear ?? event.untilYear };
+  return inYearWindow(win, year, { undatedFrom: legacyFromYear(data) });
 }
 
 /** Weight with history decay (no repetition) and recovery boost after 3 failures in a row. */
@@ -513,7 +524,8 @@ function resolveEvent(state, data, decision, choiceId) {
   applyEffects(state, data, choice.effects, context);
   if (event.chain?.id) ev.chains[event.chain.id] = event.chain.step ?? 1;
   ev.journal.unshift({ turn: state.turn, eventId, title: context.note, choice: renderText(state, data, choice.label, context), chain: event.chain?.id || null });
-  if (ev.journal.length > JOURNAL_CAP) ev.journal.length = JOURNAL_CAP;
+  const jcap = Number.isFinite(state.endTurn) && state.endTurn > 520 ? 50 : JOURNAL_CAP; // 1950–3000: save budget
+  if (ev.journal.length > jcap) ev.journal.length = jcap;
   state.stats ||= {};
   state.stats['narrative.resolved'] = (state.stats['narrative.resolved'] || 0) + 1;
   return { eventId, choiceId: choice.id };

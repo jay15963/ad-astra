@@ -1869,12 +1869,13 @@
       "headlines": [
         "Euforia no mercado: capital de risco volta a fluir para o espaço",
         "Investidores disputam startups espaciais; avaliações disparam",
-        "Banda larga por satélite vira febre e anima o setor espacial"
+        { "text": "Banda larga por satélite vira febre e anima o setor espacial", "minYear": 2015 }
       ]
     },
     {
       "id": "space_law_agreement",
       "target": "global",
+      "minYear": 1990,
       "weight": 0.9,
       "cooldownMonths": 20,
       "minGlobal": 1,

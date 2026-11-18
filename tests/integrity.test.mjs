@@ -38,6 +38,10 @@ test('calendar program: destination/type/crew are locked; milestone only for the
   s.actors.nasa.cash = 1e6;
   const m = acceptProgram(s, 'artemis4');
   assert.equal(m.milestone, 'crewed_lunar_landing');
+  // item 9: accepting leaves the hardware to the player; take the program's own (the engineers' suggestion)
+  assert.equal(m.vehicleId, null);
+  const pick = dispatch(s, data, { type: 'mission/update', missionId: m.id, patch: { vehicleId: m.suggestion.vehicleId, spacecraftId: m.suggestion.spacecraftId } });
+  assert.equal(pick.ok, true, pick.error);
   assert.ok(m.grantShare > 0 && !(m.grantM > 0), 'grant stored as a share');
   const r = dispatch(s, data, { type: 'mission/update', missionId: m.id, patch: { destination: 'leo', vehicleId: 'falcon9', spacecraftId: 'crew_dragon' } });
   assert.equal(r.ok, false);

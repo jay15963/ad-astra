@@ -1,0 +1,114 @@
+{
+  "$id": "event.schema.json",
+  "description": "Carta de evento (events.json → events[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "text",
+    "trigger",
+    "weight",
+    "choices"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "kind": {
+      "enum": [
+        "narrative",
+        "operation"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "portrait": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "trigger": {
+      "type": "object",
+      "properties": {
+        "fromYear": {
+          "type": "integer"
+        },
+        "untilYear": {
+          "type": "integer"
+        },
+        "minTurn": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxTurn": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chance": {
+          "$ref": "common.schema.json#/$defs/prob"
+        }
+      }
+    },
+    "weight": {
+      "type": "number",
+      "minimum": 0
+    },
+    "cooldownWeeks": {
+      "type": "number",
+      "minimum": 0
+    },
+    "once": {
+      "type": "boolean"
+    },
+    "choices": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "preview": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "effects": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    "era": {},
+    "fromYear": {
+      "type": "integer"
+    }
+  }
+}

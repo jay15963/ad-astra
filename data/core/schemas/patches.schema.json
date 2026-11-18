@@ -1,0 +1,36 @@
+{
+  "$id": "patches.schema.json",
+  "description": "Remendos de um pacote (eras/eN/patches.json): { \"<arquivo>\": [ {\"$op\": \"patch\"|\"replace\"|\"remove\", \"id\": ...} ] }.",
+  "type": "object",
+  "additionalProperties": {
+    "anyOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "integer"
+      },
+      {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "$op": {
+              "enum": [
+                "patch",
+                "replace",
+                "remove"
+              ]
+            },
+            "id": {
+              "$ref": "common.schema.json#/$defs/id"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

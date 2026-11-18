@@ -1,5 +1,6 @@
 // Title screen (continue / new game / pick agency) and the game over screen.
-import { h, raw, chip, flagPrefix, button, icon, fmtMoney, fmtDate, sectionTitle, confirmDialog, attempt, safePanel, FIRST_LABELS } from './components.js';
+import { h, raw, chip, flagPrefix, button, icon, fmtMoney, fmtDate, sectionTitle, confirmDialog, attempt, safePanel, toast, FIRST_LABELS } from './components.js';
+import { playableAtStart } from './store.js';
 import { emblemSVG } from './portrait.js';
 import { APP_VERSION } from './settings.js';
 
@@ -40,10 +41,6 @@ export function tierOf(actor) {
   return TIERS.media;
 }
 
-function actorInfo(store, id) {
-  return store.data?.index?.actors?.[id] || { id, name: id.toUpperCase(), short: id.toUpperCase() };
-}
-
 function randomSeed() {
   try {
     const a = new Uint32Array(1);
@@ -52,48 +49,51 @@ function randomSeed() {
   } catch { return (Date.now() % 1000000) >>> 0; } // UI only (never in sim)
 }
 
-/** Title screen (CSmanager .modo-inicial). onStart() is called once a game is loaded or created. */
+/** "1950 a 3000" from a scenario summary ({start, end} or legacy startYear/endYear). */
+export function yearsOf(sc) {
+  const a = sc?.start?.year ?? sc?.startYear;
+  const b = sc?.end?.year ?? sc?.endYear;
+  return a && b ? `${a} a ${b}` : sc?.subtitle || '';
+}
+
+/** Split the scenario list into the campaign and the short scenarios (Corrida Lunar first among those). */
+export function titleModes(list) {
+  const all = Array.isArray(list) ? list.filter(Boolean) : [];
+  const campaign = all.find((x) => x.kind === 'campaign' || x.id === 'campaign') || null;
+  const scenarios = all.filter((x) => x !== campaign && !x.locked)
+    .sort((a, b) => (a.id === 'lunar_race' ? -1 : b.id === 'lunar_race' ? 1 : 0) || (a.start?.year ?? a.startYear ?? 0) - (b.start?.year ?? b.startYear ?? 0));
+  return { campaign, scenarios };
+}
+
+/** Save the raw text of a rejected save as a local file (no network: a Blob link). */
+function downloadText(name, text) {
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = h('a', { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * Title screen (CSmanager .modo-inicial): Continuar (saves), Campanha 1950–3000, Cenários. Choosing a mode loads
+ * its data (store.useScenario) and shows the agencies alive at its start date. onStart() runs once a game is up.
+ */
 export function renderTitle(root, store, { onStart, onSettings } = {}) {
   root.innerHTML = '';
-  const sc = store.data?.scenario || {};
+  const redraw = () => renderTitle(root, store, { onStart, onSettings });
   const info = store.saveInfo();
-  const picker = h('div', { class: 'actor-picker hidden' });
-  const startNew = async () => {
-    if (info && !(await confirmDialog('Começar um jogo novo substitui o save atual. Continuar?', { okLabel: 'Novo jogo', danger: true, title: 'Novo jogo' }))) return;
-    picker.classList.remove('hidden');
-    picker.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
+  const { campaign, scenarios } = titleModes(store.scenarios?.() || []);
+  const picker = h('div', { class: 'actor-picker hidden', id: 'escolha-agencia' });
+  const notice = h('div', { class: 'title-aviso' });
   const seedInput = h('input', { type: 'number', inputmode: 'numeric', class: 'input', value: String(randomSeed()), min: '0', 'aria-label': 'Semente' });
-  const playable = sc.playableActors?.length ? sc.playableActors : Object.keys(store.data?.index?.actors || {});
+  let busy = false;
 
-  picker.append(
-    sectionTitle('Escolha sua agência'),
-    h('p', { class: 'lead' }, 'Cada ator tem verba, aliados e rivais próprios. O mundo reage diferente a cada campanha.'),
-    h('div', { class: 'list actor-list' }, playable.map((id) => {
-      const a = actorInfo(store, id);
-      const [diff, kind] = tierOf(a);
-      return h('button', { class: 'list-row actor-option', type: 'button', onclick: () => start(id) },
-        raw(emblemSVG(a, { size: 40 }), 'actor-emblem'),
-        h('div', { class: 'list-text' },
-          h('div', { class: 'actor-top' },
-            h('div', { class: 'list-title' }, `${flagPrefix(a)}${a.name || id}`),
-            chip(diff, kind)),
-          h('div', { class: 'list-sub' }, a.style || (a.kind === 'company' ? 'Empresa privada' : 'Agência espacial')),
-          h('div', { class: 'chips' },
-            a.budget ? h('span', { class: 'selo' }, `${fmtMoney(a.budget)}/ano`) : null,
-            a.difficulty ? chip(`dificuldade: ${a.difficulty}`, 'muted') : null,
-            a.capabilities?.crewed ? chip('voo tripulado', 'info') : chip('sem voo tripulado próprio', 'muted'),
-            a.bloc ? chip(blocName(store, a.bloc), 'muted') : null)),
-        icon('avancar', 16, 'list-chev'));
-    })),
-    h('details', { class: 'advanced' },
-      h('summary', null, icon('avancar', 16), 'Opções avançadas'),
-      h('label', { class: 'field' }, h('span', null, 'Semente do mundo (mesma semente, mesmo mundo)'), seedInput)));
-
-  const start = (playerId) => {
+  const startGame = (playerId) => {
     try {
-      store.newGame({ playerId, seed: Number(seedInput.value) || randomSeed() });
+      store.newGame({ playerId, seed: Number(seedInput.value) || randomSeed(), scenarioId: store.scenarioId() });
       onStart?.();
     } catch (e) {
       console.error(e);
@@ -101,31 +101,123 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
     }
   };
 
-  const era = sc.era || 4;
+  const fillPicker = () => {
+    const data = store.data;
+    const playable = playableAtStart(data);
+    const year = data?.scenario?.start?.year ?? data?.scenario?.startYear;
+    picker.innerHTML = '';
+    picker.append(
+      sectionTitle(`Escolha sua agência${year ? ` · ${year}` : ''}`),
+      h('p', { class: 'lead' }, year && year < 2000
+        ? `As agências que existem em ${year}. Outras nascem com os anos; algumas mudam de nome.`
+        : 'Cada ator tem verba, aliados e rivais próprios. O mundo reage diferente a cada campanha.'),
+      playable.length ? h('div', { class: 'list actor-list' }, playable.map((a) => actorRow(store, a, () => startGame(a.id))))
+        : h('div', { class: 'aviso warn' }, 'Nenhuma agência jogável nesta data.'),
+      h('details', { class: 'advanced' },
+        h('summary', null, icon('avancar', 16), 'Opções avançadas'),
+        h('label', { class: 'field' }, h('span', null, 'Semente do mundo (mesma semente, mesmo mundo)'), seedInput)));
+  };
+
+  const choose = async (sc) => {
+    if (busy) return;
+    if (info && !(await confirmDialog('Começar um jogo novo substitui o salvamento automático (os espaços de save continuam). Continuar?', { okLabel: 'Novo jogo', danger: true, title: 'Novo jogo' }))) return;
+    busy = true;
+    notice.innerHTML = '';
+    picker.classList.remove('hidden');
+    picker.innerHTML = '';
+    picker.append(h('div', { class: 'loading' }, `Preparando ${sc.name || 'o cenário'}…`));
+    let ok = false;
+    try { ok = await store.useScenario(sc.id); } catch (e) { console.error(e); }
+    busy = false;
+    if (!ok) {
+      picker.classList.add('hidden');
+      notice.append(h('div', { class: 'aviso warn' }, sc.kind === 'campaign' || sc.id === 'campaign'
+        ? 'A campanha completa ainda não está disponível nesta versão. Jogue a Corrida Lunar enquanto isso.'
+        : 'Este cenário não pôde ser carregado. Verifique a conexão e tente de novo.'));
+      return;
+    }
+    fillPicker();
+    picker.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  };
+
+  const rej = store.rejection;
+  const rejection = rej ? h('div', { class: 'aviso bad rejeicao', role: 'alert' },
+    h('p', null, rej.message),
+    h('div', { class: 'btn-row' },
+      button('Exportar o save', () => {
+        const raw = store.rawSave?.(rej.slot) || null;
+        if (!raw || !downloadText(`adastra-save-${rej.slot || 'auto'}.json`, raw)) toast('Não foi possível exportar este save.', 'bad');
+      }, { small: true, icon: 'salvar', iconSize: 16 }),
+      button('Começar de novo', () => { store.dismissRejected?.(); redraw(); }, { small: true, kind: 'ghost' }))) : null;
+
+  const otherSlots = (store.slots?.() || []).filter((s) => s.name !== 'auto' && s.info);
+  const continueBtn = info && !rej ? button(`Continuar · ${info.actor?.short || info.actor?.name || String(info.playerId || '').toUpperCase()} · ${fmtDate(info.turn, info.startYear)}`, async () => {
+    if (await store.loadSlot('auto')) onStart?.();
+    else redraw();
+  }, { kind: 'primary', icon: 'continuar', big: true }) : null;
+
+  const campaignCard = h('button', {
+    class: ['mode-card', 'mode-card-btn', !campaign && 'indisponivel'], type: 'button',
+    onclick: () => choose(campaign || { id: 'campaign', kind: 'campaign', name: 'Campanha' }),
+  },
+  h('div', { class: 'mode-card-top' }, h('span', { class: 'idx' }, '01'), h('span', { class: 'mono-eyebrow' }, 'Campanha · 1950 a 3000'), !campaign ? chip('em breve', 'warn') : null),
+  raw(POSTER, 'poster-wrap'),
+  h('div', { class: 'mode-card-body' },
+    h('div', { class: 'mode-card-title' }, 'Da NACA ao ano 3000'),
+    h('div', { class: 'mode-card-sub' }, campaign?.blurb || campaign?.description || 'Agências nascem e somem, as eras passam, e no ano 3000 o Grande Silêncio pede uma resposta.')));
+
+  const list = scenarios.length ? scenarios : [{ id: 'lunar_race', name: 'Corrida Lunar', startYear: 2026, endYear: 2030 }];
+  const scenarioCard = h('div', { class: 'mode-card' },
+    h('div', { class: 'mode-card-top' }, h('span', { class: 'idx' }, '02'), h('span', { class: 'mono-eyebrow' }, 'Cenários')),
+    h('div', { class: 'mode-card-body' },
+      h('div', { class: 'mode-card-title' }, 'Partidas curtas'),
+      h('div', { class: 'mode-card-sub' }, 'Uma era, um objetivo, uma ou duas horas.')),
+    h('div', { class: 'list scenario-list' }, list.map((sc) =>
+      h('button', { class: 'list-row scenario-row', type: 'button', onclick: () => choose(sc) },
+        h('div', { class: 'list-text' }, h('div', { class: 'list-title' }, sc.name || sc.id), h('div', { class: 'list-sub' }, yearsOf(sc))),
+        icon('avancar', 16, 'list-chev')))));
+
+  const slotsBox = otherSlots.length ? h('details', { class: 'advanced title-slots' },
+    h('summary', null, icon('avancar', 16), `Outros saves (${otherSlots.length})`),
+    h('div', { class: 'list' }, otherSlots.map((sl) => h('button', { class: 'list-row', type: 'button', onclick: async () => { if (await store.loadSlot(sl.name)) onStart?.(); else redraw(); } },
+      h('div', { class: 'list-text' }, h('div', { class: 'list-title' }, sl.label), h('div', { class: 'list-sub' }, `${sl.info.actor?.short || String(sl.info.playerId || '').toUpperCase()} · ${fmtDate(sl.info.turn, sl.info.startYear)}`)),
+      icon('avancar', 16, 'list-chev'))))) : null;
+
   const screen = h('div', { class: 'title-screen' },
     h('div', { class: 'brand' },
       h('div', { class: 'brand-row' }, h('span', { class: 'monogram', 'aria-hidden': 'true' }, 'AA'), h('strong', { class: 'brand-name' }, 'Ad Astra')),
       h('div', { class: 'mono-eyebrow' }, 'Agência espacial / estratégia')),
     h('div', { class: 'opening' },
-      h('div', { class: 'mono-eyebrow' }, `Era ${era} · A Década Lunar`),
-      h('h1', null, 'Corrida lunar,', h('br'), h('em', null, sc.subtitle ? `${sc.subtitle}.` : '2026 a 2030.')),
+      h('h1', null, 'Mil anos de corrida,', h('br'), h('em', null, 'uma agência.')),
       h('p', { class: 'tagline' }, 'Você dirige uma agência espacial. No dia do lançamento, tudo o que decidiu vira torcida.')),
-    h('div', { class: 'mode-card' },
-      h('div', { class: 'mode-card-top' }, h('span', { class: 'idx' }, '01'), h('span', { class: 'mono-eyebrow' }, sc.name || 'Corrida Lunar')),
-      raw(POSTER, 'poster-wrap'),
-      h('div', { class: 'mode-card-body' },
-        h('div', { class: 'mode-card-title' }, 'Campanha'),
-        h('div', { class: 'mode-card-sub' }, sc.victory?.description || 'Missões reais, rivais que reagem e um calendário que não espera.'))),
-    h('div', { class: 'btn-col title-actions' },
-      info ? button(`Continuar · ${info.actor?.short || info.actor?.name || String(info.playerId || '').toUpperCase()} · ${fmtDate(info.turn, info.startYear)}`, () => {
-        if (store.load()) onStart?.();
-        else screen.prepend(h('div', { class: 'aviso warn' }, 'O save não pôde ser lido (versão antiga?). Comece um jogo novo.'));
-      }, { kind: 'primary', icon: 'continuar', big: true }) : null,
-      button(info ? 'Novo jogo' : 'Começar', startNew, { kind: info ? '' : 'primary', icon: info ? 'mais' : 'continuar', big: true }),
-      onSettings ? button('Ajustes', onSettings, { icon: 'ajustes', big: true }) : null),
+    rejection,
+    continueBtn || slotsBox ? h('div', { class: 'btn-col title-actions' }, continueBtn, slotsBox) : null,
+    h('div', { class: 'mono-eyebrow title-sec' }, info ? 'Novo jogo' : 'Começar'),
+    campaignCard,
+    scenarioCard,
+    notice,
     picker,
-    h('footer', { class: 'title-foot' }, `v${APP_VERSION} · calendário real de 2026; o futuro é simulação`));
+    onSettings ? h('div', { class: 'btn-col title-actions' }, button('Ajustes', onSettings, { icon: 'ajustes', big: true })) : null,
+    h('footer', { class: 'title-foot' }, `v${APP_VERSION} · passado fiel até hoje; o futuro é simulação`));
   root.appendChild(h('div', { class: 'title-page' }, screen));
+}
+
+/** One agency row of the picker. */
+function actorRow(store, a, onPick) {
+  const [diff, kind] = tierOf(a);
+  return h('button', { class: 'list-row actor-option', type: 'button', onclick: onPick },
+    raw(emblemSVG(a, { size: 40 }), 'actor-emblem'),
+    h('div', { class: 'list-text' },
+      h('div', { class: 'actor-top' },
+        h('div', { class: 'list-title' }, `${flagPrefix(a)}${a.name || a.id}`),
+        chip(diff, kind)),
+      h('div', { class: 'list-sub' }, a.style || (a.kind === 'company' ? 'Empresa privada' : 'Agência espacial')),
+      h('div', { class: 'chips' },
+        a.budget ? h('span', { class: 'selo' }, `${fmtMoney(a.budget)}/ano`) : null,
+        a.difficulty ? chip(`dificuldade: ${a.difficulty}`, 'muted') : null,
+        a.capabilities?.crewed ? chip('voo tripulado', 'info') : chip('sem voo tripulado próprio', 'muted'),
+        a.bloc ? chip(blocName(store, a.bloc), 'muted') : null)),
+    icon('avancar', 16, 'list-chev'));
 }
 
 function blocName(store, blocId) {
@@ -134,7 +226,7 @@ function blocName(store, blocId) {
 }
 
 const REASONS = {
-  end: ['Fim da Corrida Lunar', 'Dezembro de 2030. A era continua, mas o placar desta corrida está fechado.'],
+  end: ['Fim do cenário', 'A era continua, mas o placar desta corrida está fechado.'],
   fired: ['Você foi demitido', 'O apoio chegou a zero. O governo trocou a direção da agência.'],
   bankrupt: ['Falência', 'O caixa não aguentou. A agência fechou as portas.'],
 };
@@ -144,7 +236,17 @@ export function renderGameOver(root, store, { onNewGame, onKeepLooking } = {}) {
   root.innerHTML = '';
   const st = store.state;
   const go = st.gameOver || {};
-  const [title, text] = REASONS[go.reason] || ['Fim de jogo', go.summary?.text || 'A campanha terminou.'];
+  let [title, text] = REASONS[go.reason] || ['Fim de jogo', go.summary?.text || 'A campanha terminou.'];
+  const sc = store.data?.scenario || {};
+  if (go.reason === 'end') title = `Fim da ${sc.name || 'Corrida Lunar'}`;
+  if (go.reason === 'ending') {
+    // year 3000: the ending the player chose (data/core/ending.json texts; Phase C adds the epilogue screen)
+    const ends = store.data?.ending?.choices || store.data?.ending?.endings || store.data?.ending || {};
+    const e = (Array.isArray(ends) ? ends.find((x) => x?.id === go.ending) : ends[go.ending]) || {};
+    const names = { contato: 'Contato', silencio: 'Silêncio', heranca: 'Herança' };
+    title = `Final: ${e.title || e.name || names[go.ending] || 'o Grande Silêncio'}`;
+    text = e.text || (typeof go.summary === 'string' ? go.summary : null) || 'Janeiro de 3000. Mil anos de história terminam com a sua escolha.';
+  }
   const me = st.actors?.[st.playerId] || {};
 
   const league = attempt(() => {

@@ -66,7 +66,8 @@ test('campaigns: blocs are no longer frozen, membership stays consistent', () =>
     changes += (s.geo?.blocChanges || []).length;
     for (const b of Object.values(s.blocs)) for (const m of b.members) assert.equal(s.actors[m].bloc, b.id);
     for (const c of (s.geo?.blocChanges || []).filter((x) => x.kind === 'agency')) {
-      assert.ok(s.news.some((n) => n.tags.includes('bloco') && n.turn >= c.turn - 1 && n.turn <= c.turn + 1) || s.news.length >= 200, 'notícia da mudança de bloco');
+      // the live feed keeps 120 items since the 1950–3000 expansion (was 200): a full feed may have dropped the item
+      assert.ok(s.news.some((n) => n.tags.includes('bloco') && n.turn >= c.turn - 1 && n.turn <= c.turn + 1) || s.news.length >= 120, 'notícia da mudança de bloco');
     }
     // routine AI-AI expirations are not in the feed (only in the log)
     assert.ok(!s.news.some((n) => n.icon === '⌛' && !n.actors.includes('esa')), 'expiração IA-IA no feed');

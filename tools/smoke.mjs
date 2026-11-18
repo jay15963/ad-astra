@@ -47,6 +47,13 @@ for (const playerId of actors) {
         // schedule whatever is ready (exercises costs, launches, transit and arrivals)
         // (only missions that can still fly before the end of the scenario: no "Data além do fim do cenário")
         for (const m of state.missions.filter((x) => x.status === 'planning')) {
+          // item 9: accepted briefings/contracts arrive without hardware; the bot takes the engineers' suggestion
+          if ((!m.vehicleId || (!m.spacecraftId && !m.clientPayload)) && m.suggestion) {
+            const patch = {};
+            if (!m.vehicleId && m.suggestion.vehicleId) patch.vehicleId = m.suggestion.vehicleId;
+            if (!m.spacecraftId && m.suggestion.spacecraftId) patch.spacecraftId = m.suggestion.spacecraftId;
+            if (Object.keys(patch).length) dispatch(state, data, { type: 'mission/update', missionId: m.id, patch });
+          }
           const opts = query(state, data, 'missions/draftOptions', { ...m, missionId: m.id });
           if ((opts?.earliestLaunchTurn ?? state.turn) >= state.endTurn) continue;
           dispatch(state, data, { type: 'mission/schedule', missionId: m.id });

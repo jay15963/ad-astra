@@ -1,0 +1,37 @@
+{
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e4 em data/packs.json).",
+  "id": "e4",
+  "name": "A Década Lunar",
+  "from": 2026,
+  "to": 2050,
+  "truthLayers": [
+    "plano_oficial",
+    "projecao",
+    "especulacao"
+  ],
+  "closingMilestone": "Base lunar permanente",
+  "palette": "prata",
+  "chapters": [
+    {
+      "from": {
+        "year": 2026,
+        "month": 0
+      },
+      "title": "A volta à Lua"
+    },
+    {
+      "from": {
+        "year": 2036,
+        "month": 0
+      },
+      "title": "O que os planos prometeram"
+    },
+    {
+      "from": {
+        "year": 2045,
+        "month": 0
+      },
+      "title": "Uma base que não fecha"
+    }
+  ]
+}

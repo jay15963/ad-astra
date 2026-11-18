@@ -43,7 +43,7 @@
 }
 
 /* ---------- Era 4 palette (tokens) ---------- */
-body, body[data-era="4"] {
+body, body[data-era="4"], body[data-era="e4"] {
   /* surfaces, back to front */
   --s0: #070709;
   --s1: #0c0c0f;

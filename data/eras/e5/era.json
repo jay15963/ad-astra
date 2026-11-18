@@ -1,0 +1,35 @@
+{
+  "_doc": "Metadados da era (docs/EXPANSION.md §2.3/§2.5). Meses base 0 como em src/core/time.js. Conteúdo: arquivos ao lado (pacote e5 em data/packs.json).",
+  "id": "e5",
+  "name": "Expansão do Sistema",
+  "from": 2051,
+  "to": 2199,
+  "truthLayers": [
+    "especulacao"
+  ],
+  "closingMilestone": "Primeira colônia autônoma",
+  "palette": "ambar",
+  "chapters": [
+    {
+      "from": {
+        "year": 2051,
+        "month": 0
+      },
+      "title": "Marte deixa de ser visita"
+    },
+    {
+      "from": {
+        "year": 2100,
+        "month": 0
+      },
+      "title": "Cinturão e luas"
+    },
+    {
+      "from": {
+        "year": 2150,
+        "month": 0
+      },
+      "title": "Colônias que votam"
+    }
+  ]
+}

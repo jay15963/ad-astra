@@ -18,6 +18,8 @@ import { clamp, nextId, addNews, pushDecision, emitSignal, claimFirst, firstValu
 import { rngFor } from '../core/rng.js';
 import { destPrestige as outcomeDestPrestige, missionPrestige } from '../core/outcome.js';
 import { turnToDate, formatTurn, weeksToText } from '../core/time.js';
+import { vehicleDef as catalogVehicle, spacecraftDef as catalogCraft } from '../core/catalog.js';
+import { crossed, yearAt, destinationOpen, liveActorIds } from './simtime.js';
 
 // ---------------------------------------------------------------------------------------------
 // Tunables and vocabularies (generic rules; content names live in data/*.json)
@@ -94,15 +96,15 @@ const MILESTONE_LABELS = {
 
 // Contract templates (generic commercial demand, GDD "Leilões de contratos").
 const CONTRACT_KINDS = [
-  { kind: 'gto_sat', type: 'satellite', destination: 'gto', clientPayload: true, payload: [3, 6.5], weight: 3,
+  { kind: 'gto_sat', type: 'satellite', destination: 'gto', clientPayload: true, payload: [3, 6.5], weight: 3, fromYear: 1965,
     title: 'Satélite de comunicações para GTO',
     clients: ['Operadora de telecom do Sudeste Asiático', 'Consórcio europeu de banda larga', 'Operadora latino-americana de TV', 'Rede de satélites do Golfo'],
     body: 'Um satélite geoestacionário precisa de carona até a órbita de transferência. O cliente quer preço, prazo e um foguete confiável.' },
-  { kind: 'sso_sat', type: 'satellite', destination: 'sso', clientPayload: true, payload: [0.5, 2.5], weight: 2,
+  { kind: 'sso_sat', type: 'satellite', destination: 'sso', clientPayload: true, payload: [0.5, 2.5], weight: 2, fromYear: 1972,
     title: 'Constelação de observação em órbita polar',
     clients: ['Startup de imagens de radar', 'Agência ambiental regional', 'Seguradora agrícola'],
     body: 'Um lote de satélites de observação precisa de lançamento em órbita heliossíncrona.' },
-  { kind: 'station_cargo', type: 'cargo', destination: 'iss', payload: [2, 4], weight: 2, untilYear: 2030,
+  { kind: 'station_cargo', type: 'cargo', destination: 'iss', payload: [2, 4], weight: 2, fromYear: 2000, untilYear: 2030,
     title: 'Carga para a Estação Espacial',
     clients: ['Programa de reabastecimento da ISS', 'Laboratório farmacêutico em microgravidade'],
     body: 'Experimentos, comida e peças de reposição precisam chegar à estação. Atraso aqui vira manchete.' },
@@ -110,7 +112,7 @@ const CONTRACT_KINDS = [
     title: 'Carga para estação comercial',
     clients: ['Estação comercial em órbita baixa', 'Operadora de hotel orbital'],
     body: 'A sucessora comercial da ISS precisa de carga regular. Quem entregar agora pode virar fornecedor fixo.' },
-  { kind: 'clps', type: 'lander', destination: 'lunar_surface', payload: [0.3, 1.2], weight: 2,
+  { kind: 'clps', type: 'lander', destination: 'lunar_surface', payload: [0.3, 1.2], weight: 2, fromYear: 2018,
     title: 'Entrega de carga útil na Lua',
     clients: ['Programa de cargas lunares comerciais', 'Universidade com instrumento sísmico', 'Mineradora de olho no regolito'],
     body: 'Instrumentos científicos precisam pousar na superfície lunar. É dinheiro bom e risco alto: pouso lunar ainda falha muito.' },
@@ -118,19 +120,19 @@ const CONTRACT_KINDS = [
 
 // Opportunity briefings (custom targets). Drafts are completed from the player's catalog.
 const OPPORTUNITIES = [
-  { sub: 'earth_obs', type: 'satellite', destination: 'sso', grantShare: 0.35,
+  { sub: 'earth_obs', type: 'satellite', destination: 'sso', grantShare: 0.35, fromYear: 1972,
     title: 'Satélite de observação da Terra', body: 'Um consórcio de clima oferece financiar parte de um satélite de observação em órbita polar. Missão barata, ciência modesta, apoio garantido.' },
-  { sub: 'comms', type: 'satellite', destination: 'gto', grantShare: 0.3,
+  { sub: 'comms', type: 'satellite', destination: 'gto', grantShare: 0.3, fromYear: 1965,
     title: 'Satélite de comunicações nacional', body: 'O ministério das comunicações quer um satélite próprio em órbita geoestacionária e topa dividir a conta.' },
-  { sub: 'lunar_orbiter', type: 'probe', destination: 'lunar_orbit', grantShare: 0.2,
+  { sub: 'lunar_orbiter', type: 'probe', destination: 'lunar_orbit', grantShare: 0.2, fromYear: 1966,
     title: 'Orbitador lunar de mapeamento', body: 'Cientistas pedem um orbitador para mapear gelo nas crateras. Os dados valem ouro para quem quer pousar depois.' },
-  { sub: 'south_pole_lander', type: 'lander', destination: 'lunar_south_pole', grantShare: 0.15,
+  { sub: 'south_pole_lander', type: 'lander', destination: 'lunar_south_pole', grantShare: 0.15, fromYear: 2019,
     title: 'Pousador robótico no polo sul', body: 'O polo sul é a disputa da década. Um pousador robótico agora garante lugar na corrida e dados sobre o gelo.' },
-  { sub: 'lunar_lander', type: 'lander', destination: 'lunar_surface', grantShare: 0.15,
+  { sub: 'lunar_lander', type: 'lander', destination: 'lunar_surface', grantShare: 0.15, fromYear: 1966,
     title: 'Pousador lunar de demonstração', body: 'Engenheiros querem provar a tecnologia de pouso antes das missões grandes. Falhar aqui custa menos que falhar depois.' },
-  { sub: 'cislunar_demo', type: 'probe', destination: 'cislunar', grantShare: 0.25,
+  { sub: 'cislunar_demo', type: 'probe', destination: 'cislunar', grantShare: 0.25, fromYear: 2020,
     title: 'Demonstrador cislunar', body: 'Um teste de navegação no espaço cislunar, perto da futura estação lunar. Barato e útil para o programa.' },
-  { sub: 'crewed_demo', type: 'crewed', destination: 'leo', grantShare: 0.1,
+  { sub: 'crewed_demo', type: 'crewed', destination: 'leo', grantShare: 0.1, fromYear: 1961,
     title: 'Voo tripulado de demonstração', body: 'O governo quer astronautas no noticiário. Um voo curto em órbita baixa mantém a tripulação afiada e o público atento.' },
 ];
 
@@ -155,8 +157,9 @@ export function fmtMoney(m) {
   return `US$ ${Math.round(v)} mi`;
 }
 
-const vehicleDef = (data, id) => (id ? data.index?.vehicles?.[id] ?? data.vehicles?.vehicles?.find((v) => v.id === id) ?? null : null);
-const spacecraftDef = (data, id) => (id ? data.index?.spacecraft?.[id] ?? data.spacecraft?.spacecraft?.find((v) => v.id === id) ?? null : null);
+// single catalog lookup (src/core/catalog.js): Phase B player designs resolve here without touching the callers
+const vehicleDef = (data, id, state) => catalogVehicle(data, id, state);
+const spacecraftDef = (data, id, state) => catalogCraft(data, id, state);
 const destDef = (data, id) => (id ? data.index?.destinations?.[id] ?? data.destinations?.destinations?.find((v) => v.id === id) ?? null : null);
 const calDef = (data, id) => data.index?.calendar?.[id] ?? data.calendar?.missions?.find((v) => v.id === id) ?? null;
 const destList = (data) => data.destinations?.destinations || [];
@@ -292,6 +295,9 @@ export function windowFor(state, data, destId, fromTurn = state.turn, calendarId
 const inWindow = (w, t) => t >= w.openTurn && t < w.closeTurn;
 
 // --- type/destination/spacecraft compatibility ---
+/** Destination open in the current year (a station exists only between its dates: ISS until 2030). */
+const destOpenNow = (state, dest) => !!dest && destinationOpen(dest, yearAt(state));
+
 function destOkForType(dest, type) {
   if (!dest || !type) return false;
   const custom = dest.missionTypes || dest.types;
@@ -517,6 +523,7 @@ function validate(state, data, d, opts = {}) {
   if (!d.type) errors.push('Escolha o tipo de missão.');
   if (!d.destination) errors.push('Escolha o destino.');
   else if (!dest) errors.push('Destino desconhecido.');
+  else if (!destOpenNow(state, dest)) errors.push(`${dest.name} não existe nesta época.`);
   else if (d.type && !destOkForType(dest, d.type) && d.source !== 'calendar') errors.push(`${dest.name} não é destino para missão do tipo ${typeLabel.toLowerCase()}.`);
 
   // spacecraft
@@ -694,10 +701,99 @@ export function estimateFor(state, data, missionId) {
 // Catalog helpers for pre-filled drafts (briefings, contracts, opportunities)
 // ---------------------------------------------------------------------------------------------
 
+// --- item 9: the player chooses the hardware (EXPANSION.md §7) ---
+export const SUGGEST_PROGRAM = 'Plano do programa';
+export const SUGGEST_CHEAPEST = 'Mais barato que leva a carga';
+export const NEEDS_HARDWARE_TEXT = 'Escolha o foguete e a nave antes de agendar.';
+export const ACCEPT_LABEL = 'Aceitar e escolher o veículo';
+
+/** True when the mission still lacks a launcher, or a craft (client payloads fly without one of ours). */
+export function needsHardware(m) {
+  return !!m && (!m.vehicleId || (!m.spacecraftId && !m.clientPayload));
+}
+
+function cleanSuggestion(s) {
+  if (!s || typeof s !== 'object') return null;
+  return {
+    vehicleId: s.vehicleId || null, spacecraftId: s.spacecraftId || null,
+    secondarySpacecraftId: s.secondarySpacecraftId || null, reason: typeof s.reason === 'string' ? s.reason : SUGGEST_CHEAPEST,
+  };
+}
+
+/**
+ * A briefing/contract draft as it becomes a mission: no hardware, the engineers' pick kept as `suggestion`.
+ * Crew-certification demos never pass here (the vehicle is the object of that flight).
+ */
+function withoutHardware(draft, reason) {
+  const { suggestionReason, ...d } = draft || {};
+  return {
+    ...d,
+    suggestion: { vehicleId: d.vehicleId || null, spacecraftId: d.spacecraftId || null, secondarySpacecraftId: d.secondarySpacecraftId || null, reason },
+    vehicleId: null, spacecraftId: null, secondarySpacecraftId: null,
+  };
+}
+
+/** Largest fuel margin (≤ 10%) with which the craft still fits on the rocket, or null. */
+function programFuelFit(state, data, d) {
+  const sc = spacecraftDef(data, d.spacecraftId);
+  if (!d.vehicleId || !sc) return null;
+  const raw = capacityTo(data, d.vehicleId, d.destination) * (1 + techBonus(state, 'payload'));
+  const fit = [0.1, 0.07, 0.05, 0.03, 0.02, 0].find((mg) => raw * (1 - mg) >= (sc.massT || 0));
+  return fit ?? null;
+}
+
+function hardwareNames(data, d) {
+  const v = vehicleDef(data, d?.vehicleId)?.name;
+  const s = d?.clientPayload ? 'carga do cliente' : spacecraftDef(data, d?.spacecraftId)?.name;
+  if (!v && !s) return 'nenhuma opção válida agora';
+  return [v, s].filter(Boolean).join(' + ');
+}
+
+/**
+ * Cost of a draft over every valid (rocket, craft) pair the agency could pick: { minM, maxM, options }.
+ * Crewed drafts need a crew-rated rocket; the payload is the craft mass (or the client's payload).
+ */
+export function costRange(state, data, draftIn = {}) {
+  const base = normalizeDraft({ ...draftIn, vehicleId: null, spacecraftId: null, secondarySpacecraftId: null });
+  if (!base.type || !destDef(data, base.destination)) return { minM: null, maxM: null, options: 0 };
+  const own = draftIn.spacecraftId || draftIn.suggestion?.spacecraftId || null;
+  const scs = base.clientPayload ? [null]
+    : spacecraftFor(state, data).filter((s) => (s.id === own || scOkForType(s, base.type, base.crewed)) && scOkForDest(s, base.destination));
+  const vs = vehiclesFor(state, data).filter((v) => !base.crewed || crewRatedV(state, data, v));
+  const bonus = 1 + techBonus(state, 'payload');
+  let minM = Infinity;
+  let maxM = -Infinity;
+  let n = 0;
+  for (const sc of scs) {
+    const payload = base.config.payloadT ?? (sc?.massT ?? 1);
+    for (const v of vs) {
+      if (Array.isArray(sc?.compatibleVehicles) && sc.compatibleVehicles.length && !sc.compatibleVehicles.includes(v.id)) continue;
+      if (capacityTo(data, v.id, base.destination) * bonus * (1 - base.config.fuelMargin) < payload) continue;
+      const c = computeCost(state, data, { ...base, vehicleId: v.id, spacecraftId: sc?.id || null }).total;
+      n++;
+      if (c < minM) minM = c;
+      if (c > maxM) maxM = c;
+    }
+  }
+  return n ? { minM: round1(minM), maxM: round1(maxM), options: n } : { minM: null, maxM: null, options: 0 };
+}
+
+/** "US$ 120–310 mi conforme o foguete" (the single figure when every option costs the same). */
+function costRangeText(state, data, draft, fallbackM) {
+  const r = costRange(state, data, draft);
+  if (!r.options || r.minM == null) return fmtMoney(fallbackM);
+  if (Math.round(r.maxM) <= Math.round(r.minM)) return fmtMoney(r.minM);
+  const lo = fmtMoney(r.minM).slice(4); // "120 mi" / "1,2 bi"
+  const hi = fmtMoney(r.maxM).slice(4);
+  const [nLo, uLo] = lo.split(' ');
+  const [, uHi] = hi.split(' ');
+  return `US$ ${uLo === uHi ? nLo : lo}–${hi} conforme o foguete`;
+}
+
 /** Cheapest valid vehicle+spacecraft for (type, destination), or null. */
 function pickConfig(state, data, { type, destination, crewed = type === 'crewed', extraPayload = 0, payloadOverride = null, clientPayload = false, scKinds = null, actorId = state.playerId }) {
   const dest = destDef(data, destination);
-  if (!dest) return null;
+  if (!dest || !destOpenNow(state, dest)) return null;
   let scs = clientPayload
     ? [null]
     : spacecraftFor(state, data, actorId).filter((s) => (scKinds ? scKinds.includes(s.kind) && (!crewed || s.crew > 0) : scOkForType(s, type, crewed)) && scOkForDest(s, destination));
@@ -778,9 +874,22 @@ function createMission(state, data, draft) {
     phases: [],
     result: null,
   };
+  // item 9: briefings, opportunities and contracts arrive without hardware; the engineers' pick is only a suggestion
+  const sug = cleanSuggestion(draft?.suggestion);
   m.secondarySpacecraftId = companionOf(state, data, { ...d, crewed: m.crewed }) || null;
-  m.cost = computeCost(state, data, m).total;
-  m.estimate = estimateOf(riskFor(state, data, m));
+  if (sug && !m.vehicleId && !m.spacecraftId) {
+    // cost and odds shown at acceptance are those of the engineers' suggestion (the cheapest/planned option);
+    // picking exactly that hardware keeps them until the regular refresh (missions.tick, every 4 weeks)
+    m.suggestion = { ...sug, pristine: true };
+    const asSuggested = { ...m, vehicleId: sug.vehicleId, spacecraftId: sug.spacecraftId };
+    asSuggested.secondarySpacecraftId = companionOf(state, data, { ...d, crewed: m.crewed, vehicleId: sug.vehicleId, spacecraftId: sug.spacecraftId, secondarySpacecraftId: sug.secondarySpacecraftId }) || null;
+    m.cost = computeCost(state, data, asSuggested).total;
+    m.estimate = estimateOf(riskFor(state, data, asSuggested));
+  } else {
+    if (sug) m.suggestion = sug;
+    m.cost = computeCost(state, data, m).total;
+    m.estimate = estimateOf(riskFor(state, data, m));
+  }
   state.missions.push(m);
   stat(state, 'created');
   return { ok: true, missionId: m.id, mission: m };
@@ -788,6 +897,7 @@ function createMission(state, data, draft) {
 
 function scheduleMission(state, data, m, launchTurn) {
   if (!['planning', 'scheduled'].includes(m.status)) return { ok: false, error: 'Esta missão não pode ser agendada agora.' };
+  if (needsHardware(m)) return { ok: false, error: NEEDS_HARDWARE_TEXT, errors: [NEEDS_HARDWARE_TEXT] };
   const lt = Number.isFinite(launchTurn) ? Math.round(launchTurn) : earliestLaunch(state, data, m);
   const v = validate(state, data, m, { schedule: true, launchTurn: lt, missionId: m.id, paid: m.paid });
   if (v.errors.length) return { ok: false, error: v.errors[0], errors: v.errors, warnings: v.warnings };
@@ -908,8 +1018,22 @@ function updateMission(state, data, m, patch = {}) {
   if (patch.type && !('crewed' in patch)) merged.crewed = patch.type === 'crewed' || (m.crewed && m.source === 'calendar');
   // hardware/destination changed without a companion choice: pick it again
   if (!('secondarySpacecraftId' in patch) && ['type', 'destination', 'spacecraftId', 'crewed'].some((k) => k in patch)) merged.secondarySpacecraftId = null;
+  // taking the engineers' craft also takes the companion they planned with it (program landers)
+  if (!('secondarySpacecraftId' in patch) && m.suggestion?.secondarySpacecraftId && merged.spacecraftId === m.suggestion.spacecraftId
+    && merged.destination === m.destination && !!merged.crewed === !!m.crewed) merged.secondarySpacecraftId = m.suggestion.secondarySpacecraftId;
   const d = { ...normalizeDraft(merged), riskMod: riskModOf(state, m) };
   if (!d.type) return { ok: false, error: 'Tipo de missão inválido.' };
+  // tight programs (Lanyue on Long March 10) only fit with a thin fuel margin: when the hardware changes, find it
+  const hwChanged = ['vehicleId', 'spacecraftId'].some((k) => k in patch && (patch[k] || null) !== (m[k] || null));
+  // the player takes exactly the suggested hardware right after accepting: the acceptance figures stand
+  const sg = m.suggestion;
+  const tookSuggestion = !!sg?.pristine && !m.paid && Object.keys(patch).every((k) => k === 'vehicleId' || k === 'spacecraftId')
+    && (d.vehicleId || null) === (sg.vehicleId || null) && (d.spacecraftId || null) === (sg.spacecraftId || null);
+  if (sg?.pristine) delete sg.pristine;
+  if (m.source === 'calendar' && hwChanged && !tookSuggestion && !(patch.config && 'fuelMargin' in patch.config)) {
+    const fit = programFuelFit(state, data, d);
+    if (fit != null && (!m.vehicleId || !m.spacecraftId || fit < d.config.fuelMargin)) d.config.fuelMargin = fit;
+  }
   const newCost = computeCost(state, data, d).total;
   if (m.status === 'scheduled') {
     const v = validate(state, data, d, { schedule: true, launchTurn: m.launchTurn, missionId: m.id, paid: true, skipLead: true });
@@ -933,8 +1057,10 @@ function updateMission(state, data, m, patch = {}) {
     secondarySpacecraftId: companionOf(state, data, d) || null,
     crew: d.crewed ? d.crew : { flightDirector: d.crew.flightDirector, commander: null, astronauts: [] }, config: d.config,
   });
-  m.cost = newCost;
-  m.estimate = estimateOf(riskFor(state, data, m, m.launchTurn ?? undefined));
+  if (!tookSuggestion) {
+    m.cost = newCost;
+    m.estimate = estimateOf(riskFor(state, data, m, m.launchTurn ?? undefined));
+  }
   return { ok: true, missionId: m.id, cost: m.cost, estimate: m.estimate };
 }
 
@@ -953,7 +1079,9 @@ function calendarDraft(state, data, inst, def) {
     milestone: def.milestone || null, targetTurn: inst.currentTurn ?? inst.plannedTurn,
   };
   // program hardware missing from the catalog? complete it with the cheapest valid option
+  d.suggestionReason = SUGGEST_PROGRAM;
   if (!vehicleDef(data, d.vehicleId) || !spacecraftDef(data, d.spacecraftId)) {
+    d.suggestionReason = SUGGEST_CHEAPEST;
     const cfg = pickConfig(state, data, { type: d.type, destination: d.destination, crewed });
     if (cfg) {
       if (!vehicleDef(data, d.vehicleId)) d.vehicleId = cfg.vehicleId;
@@ -962,8 +1090,7 @@ function calendarDraft(state, data, inst, def) {
   }
   // tight programs (Lanyue on Long March 10) only fit with a thin fuel margin
   if (d.vehicleId && sc) {
-    const raw = capacityTo(data, d.vehicleId, d.destination) * (1 + techBonus(state, 'payload'));
-    const fit = [0.1, 0.07, 0.05, 0.03, 0.02, 0].find((mg) => raw * (1 - mg) >= (sc.massT || 0));
+    const fit = programFuelFit(state, data, { ...d, spacecraftId: sc.id });
     if (fit != null) d.config.fuelMargin = fit;
   }
   // flagship programs have their own appropriation (agencies) or customer money (companies): part of the bill is covered
@@ -991,7 +1118,7 @@ function pushCalendarBriefing(state, data, inst, def, reach = null) {
   const lines = [
     def.description || `Programa ${def.name}.`,
     `Data prevista: ${fmtT(state, target)} (${TRUTH_LABELS[def.truthLayer] || 'plano'}).`,
-    `Custo estimado: ${fmtMoney(cost)}.`,
+    `Custo estimado: ${costRangeText(state, data, draft, cost)}.`,
   ];
   if (prereqs.length) lines.push(`Depende de: ${prereqs.map((c) => calDef(data, c.id)?.name || c.id).join(', ')} (ainda não concluída).`);
   if (reach?.lateArrival) lines.push(`Atenção: chega só em ${fmtT(state, reach.arriveTurn)}, depois do fim de ${turnToDate(state.endTurn, state.startYear).year}. Não pontua na Tabela da Era.`);
@@ -1005,7 +1132,7 @@ function pushCalendarBriefing(state, data, inst, def, reach = null) {
     defaultChoice: 'accept',
     payload: { kind: 'calendar', calendarId: inst.id, draft },
     choices: [
-      { id: 'accept', label: 'Aprovar o plano', preview: `A missão entra em planejamento com o veículo e a nave do programa. Agendar cobra ${fmtMoney(cost)}.` },
+      { id: 'accept', label: ACCEPT_LABEL, preview: `A missão entra em planejamento e você escolhe o foguete e a nave. Sugestão dos engenheiros: ${hardwareNames(data, draft)}.` },
       { id: 'delay', label: 'Adiar 3 meses', preview: `−${delaySupport} apoio. Nova data: ${fmtT(state, target + 13)}.` },
       { id: 'cancel', label: 'Cancelar o programa', preview: `−${cancelSupport} apoio, −5 reputação. Os parceiros não vão esquecer.` },
     ],
@@ -1098,9 +1225,9 @@ function resolveCalendarBriefing(state, data, dec, choiceId) {
     programBeyondEnd(state, data, inst, def, reach);
     return { ok: true, beyondEnd: true };
   }
-  const res = createMission(state, data, { ...d0, readyTurn: programReadyTurn(state, data, inst, def) });
+  const res = createMission(state, data, withoutHardware({ ...d0, readyTurn: programReadyTurn(state, data, inst, def) }, d0.suggestionReason || SUGGEST_PROGRAM));
   if (res.ok) inst.missionId = res.missionId;
-  return res;
+  return res.ok ? { ...res, openBuilder: res.missionId, step: 2 } : res;
 }
 
 /**
@@ -1197,14 +1324,14 @@ function pushOpportunity(state, data, { sub, title, body, type, destination, gra
   return pushDecision(state, {
     kind: 'briefing',
     title,
-    body: `${body}\nDestino: ${dest?.name || destination}. Custo para a agência: ${fmtMoney(net)}${grantM > 0 ? ` (${fmtMoney(grantM)} vêm de fora)` : ''}.`,
+    body: `${body}\nDestino: ${dest?.name || destination}. Custo para a agência: ${costRangeText(state, data, draft, net)}${grantM > 0 ? ` (${Math.round(grantShare * 100)}% da conta vem de fora)` : ''}.`,
     portrait: { actorId: state.playerId },
     urgency,
     expiresTurn: state.turn + 8,
     defaultChoice: 'decline',
     payload: { kind: sub, draft },
     choices: [
-      { id: 'accept', label: 'Montar a missão', preview: `Cria a missão em planejamento (${TYPE_LABELS[type]}, ${dest?.name || destination}).` },
+      { id: 'accept', label: ACCEPT_LABEL, preview: `Cria a missão em planejamento (${TYPE_LABELS[type]}, ${dest?.name || destination}). Sugestão dos engenheiros: ${hardwareNames(data, draft)}.` },
       { id: 'decline', label: 'Deixar passar', preview: declineSupport ? `−${declineSupport} apoio.` : 'Nada muda.' },
     ],
   });
@@ -1212,7 +1339,7 @@ function pushOpportunity(state, data, { sub, title, body, type, destination, gra
 
 function windowOpportunity(state, data) {
   for (const dest of destList(data)) {
-    if (!dest.window) continue;
+    if (!dest.window || !destOpenNow(state, dest)) continue;
     if ((state.missions || []).some((m) => m.destination === dest.id && m.status !== 'done' && m.status !== 'cancelled')) continue;
     const w = windowFor(state, data, dest.id, state.turn + 10);
     const weeks = w.openTurn - state.turn;
@@ -1235,7 +1362,7 @@ function rivalOpportunity(state, data) {
   for (const s of state.signals || []) {
     if (s.type !== 'mission/resolved' || !s.actorId || s.actorId === pid || s.outcome !== 'total') continue;
     const dest = destDef(data, s.destination);
-    if (!dest || dest.body === 'earth') continue;
+    if (!dest || dest.body === 'earth' || !destOpenNow(state, dest)) continue;
     // same rule as windowOpportunity: no pitch for a mission that could only arrive after the end of the era
     const w = windowFor(state, data, dest.id, state.turn + (LEAD_WEEKS.probe ?? 8));
     if (w.openTurn >= state.endTurn || w.openTurn + (dest.transitWeeks || 0) > state.endTurn) continue;
@@ -1256,7 +1383,7 @@ function rivalOpportunity(state, data) {
 function customOpportunity(state, data, rng) {
   const pool = rng.shuffle(OPPORTUNITIES);
   for (const o of pool) {
-    if (!destDef(data, o.destination)) continue;
+    if (!destOpenNow(state, destDef(data, o.destination)) || (o.fromYear && yearAt(state) < o.fromYear) || (o.untilYear && yearAt(state) > o.untilYear)) continue;
     if ((state.missions || []).some((m) => m.destination === o.destination && m.type === o.type && !['done', 'cancelled'].includes(m.status))) continue;
     const d = pushOpportunity(state, data, { ...o });
     if (d) return d;
@@ -1281,7 +1408,7 @@ function followUp(state, data, m, success) {
   if (success) {
     const next = NEXT_STEP[m.destination];
     const dest = destDef(data, next);
-    if (!dest) return;
+    if (!dest || !destOpenNow(state, dest)) return;
     const type = m.crewed ? 'crewed' : next.includes('surface') || next.includes('pole') ? 'lander' : 'probe';
     pushOpportunity(state, data, {
       sub: 'followup', type, destination: next, crewed: m.crewed, grantShare: 0.1,
@@ -1366,7 +1493,7 @@ function winChances(state, c, playerRel) {
 
 function makeContract(state, data, rng) {
   const year = turnToDate(state.turn, state.startYear).year;
-  const kinds = CONTRACT_KINDS.filter((k) => destDef(data, k.destination) && (!k.untilYear || year <= k.untilYear) && (!k.fromYear || year >= k.fromYear));
+  const kinds = CONTRACT_KINDS.filter((k) => destOpenNow(state, destDef(data, k.destination)) && (!k.untilYear || year <= k.untilYear) && (!k.fromYear || year >= k.fromYear));
   if (!kinds.length) return null;
   const k = rng.weighted(kinds);
   const payloadT = round1(rng.range(k.payload[0], k.payload[1]));
@@ -1384,7 +1511,8 @@ function makeContract(state, data, rng) {
   c.deadlineTurn = Math.min(c.deadlineTurn, state.endTurn);
   // rival bidders: capable actors, hidden bids rolled now (deterministic)
   const bidRng = rngFor(state.seed, 'missions', 'contractBids', c.id);
-  const pool = Object.values(state.actors || {}).filter((a) => a.id !== state.playerId);
+  // bidders: live core actors (background actors do not bid for contracts)
+  const pool = liveActorIds(state, { tier: 'core' }).map((id) => state.actors[id]).filter((a) => a && a.id !== state.playerId);
   const capable = pool.map((a) => ({ a, rel: actorCapability(state, data, a.id, c) })).filter((x) => x.rel > 0);
   for (const { a, rel } of bidRng.shuffle(capable).slice(0, 3)) {
     const price = Math.round(c.valueM * (0.8 + bidRng.next() * 0.38 - 0.12 * (a.ai?.aggression ?? 0.5)));
@@ -1498,7 +1626,8 @@ function awardToPlayer(state, data, c) {
     crew: autoCrew(state, data, 0), config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: cfg?.payloadT ?? c.payloadT },
     deadlineTurn: c.deadlineTurn,
   };
-  const res = createMission(state, data, draft);
+  // the bid estimate used the cheapest capable hardware; the player now picks the real one (a pricier rocket eats the margin)
+  const res = createMission(state, data, withoutHardware(draft, SUGGEST_CHEAPEST));
   if (res.ok) c.missionId = res.missionId;
   c.advancePaidM = Math.round(c.winningPrice * 0.2);
   receive(state, pid, c.advancePaidM, 'contracts', `Adiantamento: ${c.title}`);
@@ -2011,7 +2140,7 @@ export function draftOptions(state, data, draftIn = {}) {
     return {
       id: x.id, name: x.name, body: x.body, kind: x.kind, transitWeeks: x.transitWeeks || 0, prestige: destPrestige(x),
       route: x.route || [], hasArrival: (x.arrivalMilestones || []).length > 0,
-      valid: d.type ? destOkForType(x, d.type) : true,
+      valid: (d.type ? destOkForType(x, d.type) : true) && destOpenNow(state, x), open: destOpenNow(state, x),
       window: Number.isFinite(w.closeTurn) ? { openTurn: w.openTurn, closeTurn: w.closeTurn, open: inWindow(w, state.turn) } : null,
       firsts: x.firsts || {}, selected: x.id === d.destination,
     };
@@ -2142,10 +2271,11 @@ export function tick(state, data, ctx) {
   calendarBriefings(state, data);
   certDemos(state, data);
   strandedMissions(state, data);
+  if (crossed(state, ctx, 13, 0)) obsoletePrograms(state, data);
   opportunities(state, data, ctx);
   contractOffers(state, data, ctx);
   // keep estimates fresh (research, crew and reliability change over time)
-  if (state.turn % 4 === 0) {
+  if (crossed(state, ctx, 4, 0)) {
     for (const m of state.missions) if (m.status === 'planning' || m.status === 'scheduled') m.estimate = estimateOf(riskFor(state, data, m, m.launchTurn ?? undefined));
   }
 }
@@ -2177,6 +2307,25 @@ function strandedMissions(state, data) {
       issueCard(state, `${m.name}: sem data possível`,
         `Com o preparo e a janela atuais, o primeiro lançamento seria depois do fim de ${year}. Troque destino ou hardware, ou cancele a missão.`);
     }
+  }
+}
+
+/**
+ * Program missions (calendar) still in planning long after their date: the hardware they were built around retires
+ * and the program is overtaken by history (a 1950–3000 campaign would otherwise keep Vostok 1 or Artemis II in
+ * planning for centuries). Unpaid ones leave quietly after OBSOLETE_AFTER weeks past the program date.
+ */
+const OBSOLETE_AFTER = 5 * 52;
+function obsoletePrograms(state, data) {
+  for (const m of state.missions) {
+    if (m.status !== 'planning' || m.source !== 'calendar' || m.paid) continue;
+    const inst = (state.calendar || []).find((c) => c.id === m.calendarId);
+    const due = Math.max(inst?.plannedTurn ?? -Infinity, inst?.currentTurn ?? -Infinity, m.createdTurn ?? -Infinity);
+    if (!Number.isFinite(due) || state.turn - due < OBSOLETE_AFTER) continue;
+    const res = cancelMission(state, data, m, { reason: 'obsolete', penalty: false });
+    if (!res.ok) continue;
+    issueCard(state, `${m.name}: programa superado`,
+      'O programa ficou anos no planejamento e o hardware dele saiu de linha. A missão foi arquivada sem custo político.');
   }
 }
 
@@ -2284,7 +2433,10 @@ export const actions = {
 export const decisionHandlers = {
   briefing: (state, data, dec, choiceId) => {
     if (dec.payload?.kind === 'calendar') return resolveCalendarBriefing(state, data, dec, choiceId);
-    if (choiceId === 'accept' && dec.payload?.draft) return createMission(state, data, dec.payload.draft);
+    if (choiceId === 'accept' && dec.payload?.draft) {
+      const res = createMission(state, data, withoutHardware(dec.payload.draft, SUGGEST_CHEAPEST));
+      return res.ok ? { ...res, openBuilder: res.missionId, step: 2 } : res;
+    }
     if (choiceId === 'decline' && dec.payload?.kind === 'rival') changeActor(state, state.playerId, 'support', -2);
     return { ok: true };
   },
@@ -2304,6 +2456,8 @@ function decorate(state, data, m) {
     launchDate: m.launchTurn != null ? fmtT(state, m.launchTurn) : null,
     arriveDate: m.transit ? fmtT(state, m.transit.arriveTurn) : null,
     contract: m.contractId ? (state.contracts || []).find((c) => c.id === m.contractId) || null : null,
+    needsHardware: ['planning', 'scheduled'].includes(m.status) && needsHardware(m),
+    suggestionNames: m.suggestion ? { vehicle: vehicleDef(data, m.suggestion.vehicleId)?.name || null, spacecraft: spacecraftDef(data, m.suggestion.spacecraftId)?.name || null } : null,
   };
 }
 
@@ -2323,6 +2477,8 @@ export const queries = {
     return out;
   },
   'missions/draftOptions': (state, data, draft) => draftOptions(state, data, draft || {}),
+  // item 9: the bill depends on the rocket the player picks: min/max over the valid hardware for this draft
+  'missions/costRange': (state, data, draft) => costRange(state, data, draft || {}),
   // Next window for a destination, or (no destId) the earliest window whose mission still arrives by the end of the
   // scenario. `late`: launching in it the craft arrives after the end (or it opens after the end) — `lateText` is the
   // pt-BR warning the UI shows; with no reachable window at all the earliest one comes back marked late.
@@ -2360,3 +2516,121 @@ export const queries = {
       };
     }),
 };
+
+// ---------------------------------------------------------------------------------------------
+// 1950–3000 contract (EXPANSION.md §1.3, §1.5, §5.2, §10)
+// ---------------------------------------------------------------------------------------------
+
+/** Launch day, transit and contract deadlines are checked week by week: the engine substeps this module. */
+export const meta = { maxDt: 1 };
+
+/**
+ * Player appointments the engine must not step over (§1.3): booked launches and arrivals of player craft.
+ * Turns strictly after now; the engine takes the nearest.
+ */
+export function appointments(state) {
+  const out = [];
+  for (const m of state.missions || []) {
+    if (m.status === 'scheduled' && Number.isFinite(m.launchTurn) && m.launchTurn > state.turn) out.push(m.launchTurn);
+    if (m.status === 'transit' && Number.isFinite(m.transit?.arriveTurn) && m.transit.arriveTurn > state.turn) out.push(m.transit.arriveTurn);
+  }
+  return out;
+}
+
+const ARCHIVE_AFTER = 5 * 52;
+/**
+ * Caps: contracts keep ≤ 40 (resolved ones older than a year go first); missions done/cancelled more than 5 years
+ * ago become a stub in state.missionsArchive (≤ 80 B each), stubs older than 50 years fold into per-destination counts.
+ */
+export function compact(state) {
+  const live = ['open', 'bidding', 'awarded', 'late'];
+  // a 1950–3000 campaign keeps less history in full (the save budget is 400 KB): resolved missions older than a
+  // year, beyond the 8 most recent, become stubs; contracts keep 12. The Corrida Lunar (5 years) is unchanged.
+  const long = Number.isFinite(state.endTurn) && state.endTurn > 10 * 52;
+  const cCap = long ? 12 : 40;
+  if (Array.isArray(state.contracts) && state.contracts.length > cCap) {
+    state.contracts = state.contracts.filter((c) => live.includes(c.status) || state.turn - (c.createdTurn ?? 0) < 52);
+    if (state.contracts.length > cCap) state.contracts = state.contracts.slice(-cCap);
+  }
+  if (!Array.isArray(state.missions)) return;
+  const keep = [];
+  const stubs = [];
+  const linked = new Set((state.contracts || []).map((c) => c.missionId).filter(Boolean));
+  const after = long ? 52 : ARCHIVE_AFTER;
+  const endOf = (m) => m.result?.resolvedTurn ?? m.createdTurn ?? state.turn;
+  const recent = long
+    ? new Set(state.missions.filter((m) => ['done', 'cancelled'].includes(m.status)).sort((a, b) => endOf(b) - endOf(a)).slice(0, 8).map((m) => m.id))
+    : null;
+  for (const m of state.missions) {
+    const end = endOf(m);
+    const old = state.turn - end > ARCHIVE_AFTER || (long && state.turn - end > after && !recent.has(m.id));
+    if (['done', 'cancelled'].includes(m.status) && old && !linked.has(m.id)) {
+      stubs.push({ id: m.id, n: String(m.name || '').slice(0, 40), d: m.destination, o: m.result?.outcome ?? null, t: end });
+    } else keep.push(m);
+  }
+  if (long) {
+    // the engineers' suggestion only matters while the player picks the hardware
+    for (const m of keep) if (m.suggestion && m.status !== 'planning' && m.vehicleId) delete m.suggestion;
+    // resolved half a year ago: the cause list and the extra headlines were read on Launch Day
+    for (const m of keep) {
+      const r = m.result;
+      // any phase resolved a quarter ago (a probe in transit keeps its ascent result for years)
+      if (!r || r.slim || !Number.isFinite(r.resolvedTurn ?? endOf(m)) || state.turn - (r.resolvedTurn ?? endOf(m)) <= 13) continue;
+      if (Array.isArray(r.causes)) r.causes = [];
+      if (Array.isArray(r.headlines)) r.headlines = r.headlines.slice(0, 1);
+      r.slim = 1;
+    }
+  }
+  if (!stubs.length) return;
+  state.missions = keep;
+  // the per-mission launch counters (launch.flown.<id>.<phase>) go with the archived mission
+  if (state.stats) {
+    const gone = new Set(stubs.map((x) => x.id));
+    for (const k of Object.keys(state.stats)) {
+      if (!k.startsWith('launch.flown.')) continue;
+      const id = k.slice(13, k.lastIndexOf('.'));
+      if (gone.has(id)) delete state.stats[k];
+    }
+  }
+  const arc = state.missionsArchive || (state.missionsArchive = { stubs: [], byDest: {} });
+  arc.stubs.push(...stubs);
+  const foldAfter = (long ? 15 : 50) * 52;
+  const old = arc.stubs.filter((s) => state.turn - s.t > foldAfter);
+  if (old.length) {
+    arc.stubs = arc.stubs.filter((s) => state.turn - s.t <= foldAfter);
+    for (const s of old) {
+      const b = arc.byDest[s.d || '?'] || (arc.byDest[s.d || '?'] = { flown: 0, ok: 0 });
+      b.flown++;
+      if (s.o === 'total' || s.o === 'partial') b.ok++;
+    }
+  }
+}
+
+/** A dead rival leaves the open auctions (its sealed bid goes with it). */
+export function onActorGone(state, data, ctx, id) {
+  for (const c of state.contracts || []) {
+    if (!['open', 'bidding'].includes(c.status) || !Array.isArray(c.rivals)) continue;
+    c.rivals = c.rivals.filter((r) => r.actorId !== id);
+  }
+}
+
+/**
+ * Phase B (investors, EXPANSION.md §5.2): a mandate of a holder becomes a player mission in planning, without
+ * hardware (item 9: the player picks it), with the mandate's deadline. Reserved signature; usable already.
+ * mandate: { id, holderId, title, type, destination, deadlineTurn, rewardM?, crewed? }
+ */
+export function createMandateMission(state, data, mandate) {
+  if (!mandate?.type || !mandate?.destination) return { ok: false, error: 'Mandato sem tipo ou destino.' };
+  const crewed = mandate.crewed ?? mandate.type === 'crewed';
+  const cfg = pickConfig(state, data, { type: mandate.type, destination: mandate.destination, crewed });
+  const sc = spacecraftDef(data, cfg?.spacecraftId);
+  const draft = {
+    name: mandate.title ? String(mandate.title).slice(0, 60) : undefined, source: 'custom', type: mandate.type, destination: mandate.destination,
+    vehicleId: cfg?.vehicleId || null, spacecraftId: cfg?.spacecraftId || null, crewed,
+    crew: autoCrew(state, data, crewed ? sc?.crew || 0 : 0), config: { strategy: 'balanced', fuelMargin: 0.1 },
+    deadlineTurn: Number.isFinite(mandate.deadlineTurn) ? mandate.deadlineTurn : null,
+  };
+  const res = createMission(state, data, withoutHardware(draft, SUGGEST_CHEAPEST));
+  if (res.ok) res.mission.mandateId = mandate.id ?? null;
+  return res.ok ? { ...res, openBuilder: res.missionId, step: 2 } : res;
+}

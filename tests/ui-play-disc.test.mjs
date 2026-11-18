@@ -57,7 +57,8 @@ test('shell: action bar replaced by the navbar disc', () => {
   assert.ok(!/\.timebar|--act-h/.test(css), 'styles.css still styles the old action bar');
   // tap = the old "+1 semana" dispatch; hold = stopOnEvent run; haptic; one-time hint
   assert.match(app, /advance\(1, false\)/);
-  assert.match(app, /type: 'time\/advance', weeks: 1, stopOnEvent: true/);
+  // one turn per dispatch (the engine counts turns since the 1950-3000 clock; a turn is 1 week in the Corrida Lunar)
+  assert.match(app, /store\.dispatch\(store\.advanceAction\(1, true\)\)/);
   assert.match(app, /HOLD_MS = 450/);
   assert.match(app, /store\.vibrate\(15\)/);
   assert.match(app, /Segure para avançar até o próximo evento/);
@@ -67,9 +68,12 @@ test('shell: action bar replaced by the navbar disc', () => {
   assert.match(app, /ui\.lookingAfterEnd = false;\s*renderAll\(\)/);
   // a run owns the clock: no extra week from the Painel link / keyboard while it runs
   assert.match(app, /if \(ui\.run\) return;/);
-  // 7 equal slots (6 tabs + disc at index 3): the disc sits on the screen centre
-  assert.match(app, /const DISC_AT = 3;/);
-  assert.equal((app.match(/^  \{ id: '[a-z]+', label: '[^']+' \},$/gm) || []).length, 6, '6 navbar tabs');
+  // 5 equal slots (4 bottom screens of the registry + the disc at index 2): the disc sits on the screen centre.
+  // Old single-scenario assumption updated (EXPANSION.md §12): 6 tabs + disc at 3 became 4 + disc at 2; the rest
+  // moved to the drawer.
+  assert.match(app, /const DISC_AT = 2;/);
+  const screensSrc = fs.readFileSync(path.join(root, 'src', 'ui', 'screens.js'), 'utf8');
+  assert.equal((screensSrc.match(/^registerScreen\(\{.*nav: 'bottom'/gm) || []).length, 4, '4 bottom-bar screens');
   // CSmanager look: raised 50px amber disc, ring in the bar colour, conic progress ring, spin
   for (const needle of ['.tab-central', '.tab-disc', 'var(--act)', '0 0 0 4px var(--s1)', 'conic-gradient', '.tab-central.girando', '.tab-central:disabled .tab-disc']) {
     assert.ok(css.includes(needle), `styles.css missing ${needle}`);

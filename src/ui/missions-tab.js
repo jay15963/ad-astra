@@ -133,6 +133,15 @@ export function render(container, store) {
     ], ui.seg, go, { cls: 'tabs' }));
   container.appendChild(root);
 
+  // item 9: an accepted mission without a rocket opens on its vehicle step (#missoes/m/<id>); 'm/<id>/veiculo'
+  // is the same step for a mission that already has one (Trocar o veículo)
+  const routeMission = sub.startsWith('m/') ? (st.missions || []).find((x) => x.id === sub.slice(2).split('/')[0]) : null;
+  const hwMission = routeMission && (needsHardware(routeMission) || (sub.endsWith('/veiculo') && routeMission.status === 'planning' && routeMission.source !== 'cert')) ? routeMission : null;
+  if (hwMission) {
+    ui.openedRoute = sub;
+    root.appendChild(safePanel(() => hardwareStep(store, hwMission, rerender), 'A escolha do veículo não pôde ser exibida.'));
+    return;
+  }
   if (ui.seg === 'nova') root.appendChild(safePanel(() => builder(store, rerender), 'A montagem de missões ainda está em construção.'));
   else if (ui.seg === 'contratos') root.appendChild(safePanel(() => contractsView(store, contracts, offers, go), 'Contratos indisponíveis por enquanto.'));
   else if (ui.seg === 'frota') root.appendChild(safePanel(() => fleetView(store, rerender), 'A frota não pôde ser exibida.'));
@@ -144,6 +153,66 @@ export function render(container, store) {
     const m = (st.missions || []).find((x) => x.id === sub.slice(2));
     if (m) setTimeout(() => openMission(store, m.id), 0);
   } else if (!sub.startsWith('m/')) ui.openedRoute = null;
+}
+
+// ------------------------------------------------------------------ vehicle step of an accepted mission (item 9)
+
+/** The mission still needs the player's rocket/craft choice (planning, no vehicle, not a certification flight). */
+export function needsHardware(m) {
+  return m && m.status === 'planning' && !m.vehicleId && m.source !== 'cert' ? m : null;
+}
+
+/** Choice -> mission/update payload (only the hardware fields; the sim recomputes cost, estimate and fuel fit). */
+export function hardwareUpdate(missionId, pick) {
+  return { type: 'mission/update', missionId, patch: { vehicleId: pick.vehicleId || null, spacecraftId: pick.spacecraftId || null, secondarySpacecraftId: pick.secondarySpacecraftId || null } };
+}
+
+const SUG_REASON = { 'Plano do programa': 'o hardware do plano do programa', 'Mais barato que leva a carga': 'o mais barato que leva a carga' };
+
+/**
+ * "Escolha o veículo": the accepted mission's type, destination and crew stay as they are; the player picks the
+ * rocket and the craft. The engineers' suggestion is shown and highlighted, never preselected.
+ */
+function hardwareStep(store, m, rerender) {
+  if (!ui.hw || ui.hw.missionId !== m.id) ui.hw = { missionId: m.id, vehicleId: null, spacecraftId: null, secondarySpacecraftId: null };
+  const pick = ui.hw;
+  const idx = store.data?.index || {};
+  const base = newDraft();
+  const d = {
+    ...base, ...m, missionId: m.id, crew: m.crew || base.crew, config: m.config || base.config,
+    vehicleId: pick.vehicleId, spacecraftId: pick.spacecraftId, secondarySpacecraftId: pick.secondarySpacecraftId,
+  };
+  const opts = draftOptions(store, d);
+  const sug = m.suggestion || null;
+  const set = (patch) => { Object.assign(pick, patch); rerender(); };
+  // the crew of an accepted mission is set elsewhere (programs lock it): only hardware problems block here
+  const blockers = step2Blockers(store, d, opts).filter((b) => b !== 'Escolha o comandante.');
+  const sugName = sug ? [idx.vehicles?.[sug.vehicleId]?.name || sug.vehicleId, sug.spacecraftId ? (idx.spacecraft?.[sug.spacecraftId]?.name || sug.spacecraftId) : null].filter(Boolean).join(' + ') : null;
+  const dest = idx.destinations?.[m.destination]?.name || m.destination || '—';
+  const confirm = () => {
+    const r = store.dispatch(hardwareUpdate(m.id, pick));
+    if (!r?.ok) { toast(r?.error || 'Não foi possível usar este veículo.', 'bad', 5000); return; }
+    toast('Veículo escolhido. Agora agende o lançamento.', 'good');
+    store.vibrate(20);
+    ui.hw = null;
+    store.ui?.navigate?.('missoes', 'lista');
+    setTimeout(() => openMission(store, m.id), 60);
+  };
+  return h('div', { class: 'hw-step' },
+    h('section', { class: 'card hw-head' },
+      h('div', { class: 'card-head' }, h('span', { class: 'card-icon', 'aria-hidden': 'true' }, typeDot(m.type)),
+        h('div', { class: 'card-titles' }, h('div', { class: 'card-title' }, m.name || 'Missão'), h('div', { class: 'card-sub' }, `${TYPE_LABELS[m.type] || m.type || ''} · ${dest}`))),
+      h('p', { class: 'small muted hw-lead' }, m.source === 'calendar' ? 'Tipo, destino e tripulação vêm do programa. O foguete e a nave são escolha sua.' : 'Missão aceita. Falta escolher o foguete e a nave.')),
+    sug && sugName ? h('div', { class: 'aviso ms-note sugestao' }, icon('info', 14, 'ms-note-ic'),
+      h('span', null, h('b', null, 'Sugestão dos engenheiros: '), `${sugName}${SUG_REASON[sug.reason] ? `, ${SUG_REASON[sug.reason]}` : sug.reason ? ` (${sug.reason})` : ''}.`),
+      button('Usar a sugestão', () => set({ vehicleId: sug.vehicleId || null, spacecraftId: sug.spacecraftId || null, secondarySpacecraftId: sug.secondarySpacecraftId || null }), { small: true, kind: 'ghost' })) : null,
+    hardwareSections(store, d, opts, set, sug),
+    pick.vehicleId && opts.estimate ? h('div', null, sectionTitle('Chance estimada'), chanceGauge(opts.estimate, { invalid: opts.valid === false })) : null,
+    pick.vehicleId && opts.cost != null ? h('div', { class: 'kv' }, kv('Custo com esta escolha', fmtMoney(opts.cost))) : null,
+    blockers.length ? h('div', { class: 'ms-notes' }, blockers.map((b) => note(b, 'bad', 'fechar'))) : null,
+    h('div', { class: 'builder-nav' },
+      button('Voltar', () => { ui.hw = null; store.ui?.navigate?.('missoes', 'lista'); }, { icon: 'voltar', big: true }),
+      button('Confirmar foguete e nave', confirm, { kind: 'primary', big: true, disabled: !pick.vehicleId || blockers.length > 0 })));
 }
 
 // ------------------------------------------------------------------ list
@@ -216,11 +285,13 @@ function missionCard(store, m) {
     m.estimate && !m.result ? chip(`Chance ${fmtBand(m.estimate.low, m.estimate.high)}`, '') : null,
     !m.result && crewRiskOf(m.estimate) != null ? chip(crewRiskText(crewRiskOf(m.estimate)), crewRiskOf(m.estimate) >= CREW_RISK_HIGH ? 'bad' : '', { class: 'ms-crewrisk-chip' }) : null,
     m.source === 'calendar' ? chip('calendário real', 'muted') : m.source === 'contract' ? chip('contrato', 'muted') : m.source === 'cert' ? chip('certificação', 'muted') : null,
+    needsHardware(m) ? chip('falta o veículo', 'warn', { class: 'falta-veiculo' }) : null,
     m.paid === false && m.status === 'planning' ? chip('não paga', 'muted') : null,
     m.stranded && m.status === 'planning' ? chip('sem data antes do fim', 'bad') : null,
     Number.isFinite(m.readyTurn) && m.readyTurn > st.turn && !m.result ? chip(`hardware pronto em ${fmtMonth(m.readyTurn, st.startYear)}`, 'muted') : null);
   return card({
-    cls: `mission-card st-${m.status}${m.paid === false && m.status === 'planning' ? ' needs-pay' : ''}`, onClick: () => openMission(store, m.id), icon: typeDot(m.type),
+    cls: `mission-card st-${m.status}${m.paid === false && m.status === 'planning' ? ' needs-pay' : ''}${needsHardware(m) ? ' needs-hw' : ''}`,
+    onClick: () => (needsHardware(m) ? store.ui?.navigate?.('missoes', `m/${m.id}`) : openMission(store, m.id)), icon: typeDot(m.type),
     title: m.name || 'Missão',
     subtitle: h('span', null, `${TYPE_LABELS[m.type] || m.type || ''} · ${dest} · `, h('span', { class: 'ms-veh' }, veh)),
   },
@@ -241,7 +312,10 @@ export function openMission(store, missionId) {
     const crewIds = [m.crew?.flightDirector, m.crew?.commander, ...(m.crew?.astronauts || [])].filter(Boolean);
     const uniq = [...new Set(crewIds)];
     const actions = h('div', { class: 'btn-col' });
-    if (m.status === 'planning') {
+    if (needsHardware(m)) {
+      actions.append(note('Escolha o foguete e a nave antes de agendar.', 'warn'),
+        button('Escolher o veículo', () => { close({ fromHistory: true }); store.ui?.navigate?.('missoes', `m/${m.id}`); }, { kind: 'primary', icon: 'missoes', big: true }));
+    } else if (m.status === 'planning') {
       const opts = launchTurnOptions(store, m, null);
       const hint = windowHint(store, m, null);
       actions.append(...[h('div', { class: 'ms-eyebrow' }, 'Agendar lançamento'),
@@ -251,7 +325,12 @@ export function openMission(store, missionId) {
             const r = store.dispatch({ type: 'mission/schedule', missionId: m.id, launchTurn: o.turn });
             if (r?.ok) { toast(`Agendada para ${fmtDate(o.turn, st.startYear)}.`, 'good'); close(); } else toast(scheduleErrorText(r), 'bad', 5000);
           },
-        }))) : note(noSlotText(store, m, null), 'warn')].filter(Boolean));
+        }))) : note(noSlotText(store, m, null), 'warn'),
+        m.source !== 'cert' ? button('Trocar o veículo', () => {
+          close({ fromHistory: true });
+          ui.hw = { missionId: m.id, vehicleId: m.vehicleId, spacecraftId: m.spacecraftId || null, secondarySpacecraftId: m.secondarySpacecraftId || null };
+          store.ui?.navigate?.('missoes', `m/${m.id}/veiculo`);
+        }, { kind: 'ghost', small: true, icon: 'transferir', iconSize: 16 }) : null].filter(Boolean));
     }
     if (['planning', 'scheduled'].includes(m.status)) {
       actions.append(button('Cancelar missão', async () => {
@@ -470,12 +549,8 @@ function builder(store, rerender) {
   const st = store.state;
   let d = ui.draft;
   let opts = draftOptions(store, d);
-  // past step 1 with no spacecraft chosen: preselect the cheapest compatible one (the player can still change it)
-  if (ui.step >= 2 && d.type && d.destination && !d.spacecraftId && !ui.noCraft) {
-    const pick = opts.spacecraft.filter((s) => s.ok && !flightBlock(store, s.id, d.vehicleId)).sort((a, b) => (a.costM || 0) - (b.costM || 0))[0];
-    if (pick) { ui.draft = d = { ...d, spacecraftId: pick.id }; opts = draftOptions(store, d); }
-  }
-  // and the best free flight director (an empty control room is rarely what the player wants)
+  // item 9 (docs/EXPANSION.md §7.6): the rocket and the craft are the player's call, nothing is preselected.
+  // The best free flight director still is (crew, not hardware: an empty control room is rarely wanted) (an empty control room is rarely what the player wants)
   if (ui.step >= 2 && !d.crew?.flightDirector && !ui.noFd) {
     const raw = opts.raw?.crew?.flightDirector;
     const fd = (Array.isArray(raw) ? raw : []).filter((p) => !p.busy).sort((a, b) => (b.skill || 0) - (a.skill || 0))[0];
@@ -605,13 +680,8 @@ function destCard(store, x, d, set) {
 }
 
 function step2(store, d, opts, set) {
-  const st = store.state;
   const idx = store.data?.index || {};
-  const dest = idx.destinations?.[d.destination];
-  const capKey = dest?.capacityKey;
-  // usable first; then the blocked ones the player can actually unlock (thinner margin, certification), nearest first
-  const vehicles = opts.vehicles.slice().sort((a, b) => (b.ok - a.ok) || (!a.ok && !b.ok ? vehicleFixRank(a, d) - vehicleFixRank(b, d)
-    || (Number(a.capacityShortT) || 0) - (Number(b.capacityShortT) || 0) : 0) || (a.costM || 0) - (b.costM || 0));
+  const vehicles = sortVehicles(opts.vehicles, d);
   const roster = rosterOf(store);
   const fds = Array.isArray(opts.crew?.flightDirector) ? opts.crew.flightDirector : roster.filter((c) => c.role === 'flight_director');
   const astros = Array.isArray(opts.crew?.astronauts) && opts.crew.astronauts.length ? opts.crew.astronauts : roster.filter((c) => c.role === 'astronaut');
@@ -619,6 +689,39 @@ function step2(store, d, opts, set) {
   const setCrew = (patch) => set({ crew: { ...d.crew, ...patch } });
 
   return h('div', null,
+    hardwareSections(store, d, opts, set, d.suggestion || null, vehicles),
+
+    sectionTitle('Sala de controle'),
+    pickPerson(store, 'Diretor(a) de voo', fds, d.crew.flightDirector, (id) => { ui.noFd = !id; setCrew({ flightDirector: id }); }),
+    crewed ? pickPerson(store, 'Comandante', astros, d.crew.commander, (id) => setCrew({ commander: id, astronauts: (d.crew.astronauts || []).filter((x) => x !== id) })) : null,
+    crewed ? pickMany(store, `Tripulação (${opts.crewSeats || '?'} lugares)`, astros.filter((a) => a.id !== d.crew.commander), d.crew.astronauts || [], Math.max(0, (opts.crewSeats || 3) - 1), (ids) => setCrew({ astronauts: ids })) : null,
+
+    sectionTitle('Configuração'),
+    h('div', { class: 'field' }, h('span', { class: 'ms-eyebrow' }, 'Estratégia'),
+      segmented(Object.entries(STRATEGY_LABELS).map(([id, label]) => ({ id, label })), d.config.strategy, (v) => set({ config: { ...d.config, strategy: v } }))),
+    h('div', { class: 'field' }, h('span', { class: 'ms-eyebrow' }, 'Margem de combustível'),
+      segmented(MARGINS.map((m) => ({ id: m, label: fmtPct(m) })), d.config.fuelMargin, (v) => set({ config: { ...d.config, fuelMargin: v } }))),
+    h('p', { class: 'tiny muted' }, 'Mais margem = menos carga, mais segurança. Agressiva encurta prazos e aumenta o risco.'));
+}
+
+/** Vehicles usable first, then the blocked ones the player can unlock (thinner margin, certification), nearest first. */
+function sortVehicles(list, d) {
+  return list.slice().sort((a, b) => (b.ok - a.ok) || (!a.ok && !b.ok ? vehicleFixRank(a, d) - vehicleFixRank(b, d)
+    || (Number(a.capacityShortT) || 0) - (Number(b.capacityShortT) || 0) : 0) || (a.costM || 0) - (b.costM || 0));
+}
+
+/**
+ * Rocket + craft pickers (builder step 2 and the vehicle step of an accepted mission). `sug` = the engineers'
+ * suggestion ({vehicleId, spacecraftId, reason}): highlighted, never preselected (item 9).
+ */
+function hardwareSections(store, d, opts, set, sug = null, sorted = null) {
+  const st = store.state;
+  const idx = store.data?.index || {};
+  const dest = idx.destinations?.[d.destination];
+  const capKey = dest?.capacityKey;
+  const vehicles = sorted || sortVehicles(opts.vehicles, d);
+  const sugTag = () => h('span', { class: 'sugestao-tag' }, 'sugestão');
+  return h('div', { class: 'hardware' },
     sectionTitle('Veículo lançador'),
     vehicles.length ? h('div', { class: 'veh-list' }, vehicles.map((v) => {
       const op = st.actors?.[v.operator] || { id: v.operator };
@@ -626,14 +729,15 @@ function step2(store, d, opts, set) {
       const rel = v.reliability || v.rel;
       const flights = rel?.flights ?? v.history?.flights ?? v.flights;
       const cardEl = h('button', {
-        class: ['veh-card', d.vehicleId === v.id && 'selected', !v.ok && 'disabled'], type: 'button', disabled: !v.ok,
+        class: ['veh-card', d.vehicleId === v.id && 'selected', !v.ok && 'disabled', sug?.vehicleId === v.id && 'sugerido'], type: 'button', disabled: !v.ok,
+        'aria-pressed': d.vehicleId === v.id ? 'true' : 'false',
         onclick: () => (d.spacecraftId && flightBlock(store, d.spacecraftId, v.id)
           ? (ui.noCraft = false, set({ vehicleId: v.id, spacecraftId: null, secondarySpacecraftId: null }))
           : set({ vehicleId: v.id })),
       },
       raw(emblemSVG(op, { size: 30 }), 'veh-emblem'),
       h('div', { class: 'veh-text' },
-        h('div', { class: 'veh-name' }, v.name || v.id),
+        h('div', { class: 'veh-name' }, v.name || v.id, sug?.vehicleId === v.id ? sugTag() : null),
         h('div', { class: 'tiny muted' }, [
           v.costM != null ? fmtMoney(v.costM) : null,
           cap != null && d.destination ? `${String(cap).replace('.', ',')} t até o alvo` : null,
@@ -654,24 +758,12 @@ function step2(store, d, opts, set) {
       opts.spacecraft.filter((s) => s.ok || s.id === d.spacecraftId).map((s) => {
         const block = s.ok ? flightBlock(store, s.id, d.vehicleId) : null;
         const usable = s.ok && !block;
-        return chip(`${s.name || s.id}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}${block ? ` · ${block}` : ''}`,
+        return chip(`${s.name || s.id}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}${block ? ` · ${block}` : ''}${sug?.spacecraftId === s.id ? ' · sugestão' : ''}`,
           d.spacecraftId === s.id && !usable ? 'bad' : usable ? '' : 'muted',
-          { class: d.spacecraftId === s.id && usable ? 'active' : null, 'aria-pressed': d.spacecraftId === s.id ? 'true' : 'false', onclick: usable ? () => { ui.noCraft = false; set({ spacecraftId: s.id, secondarySpacecraftId: null }); } : () => toast(`${s.name}: ${block || s.reason || 'incompatível'}.`, 'warn'), title: block || s.reason || s.notes || '', 'aria-disabled': usable ? null : 'true' });
+          { class: [d.spacecraftId === s.id && usable ? 'active' : null, sug?.spacecraftId === s.id ? 'sugerido' : null].filter(Boolean).join(' ') || null, 'aria-pressed': d.spacecraftId === s.id ? 'true' : 'false', onclick: usable ? () => { ui.noCraft = false; set({ spacecraftId: s.id, secondarySpacecraftId: null }); } : () => toast(`${s.name}: ${block || s.reason || 'incompatível'}.`, 'warn'), title: block || s.reason || s.notes || '', 'aria-disabled': usable ? null : 'true' });
       }))
       : h('p', { class: 'muted small' }, 'Sem espaçonaves compatíveis no catálogo (a carga vai como satélite genérico).'),
-    landerPicker(opts, d, set),
-
-    sectionTitle('Sala de controle'),
-    pickPerson(store, 'Diretor(a) de voo', fds, d.crew.flightDirector, (id) => { ui.noFd = !id; setCrew({ flightDirector: id }); }),
-    crewed ? pickPerson(store, 'Comandante', astros, d.crew.commander, (id) => setCrew({ commander: id, astronauts: (d.crew.astronauts || []).filter((x) => x !== id) })) : null,
-    crewed ? pickMany(store, `Tripulação (${opts.crewSeats || '?'} lugares)`, astros.filter((a) => a.id !== d.crew.commander), d.crew.astronauts || [], Math.max(0, (opts.crewSeats || 3) - 1), (ids) => setCrew({ astronauts: ids })) : null,
-
-    sectionTitle('Configuração'),
-    h('div', { class: 'field' }, h('span', { class: 'ms-eyebrow' }, 'Estratégia'),
-      segmented(Object.entries(STRATEGY_LABELS).map(([id, label]) => ({ id, label })), d.config.strategy, (v) => set({ config: { ...d.config, strategy: v } }))),
-    h('div', { class: 'field' }, h('span', { class: 'ms-eyebrow' }, 'Margem de combustível'),
-      segmented(MARGINS.map((m) => ({ id: m, label: fmtPct(m) })), d.config.fuelMargin, (v) => set({ config: { ...d.config, fuelMargin: v } }))),
-    h('p', { class: 'tiny muted' }, 'Mais margem = menos carga, mais segurança. Agressiva encurta prazos e aumenta o risco.'));
+    landerPicker(opts, d, set));
 }
 
 // ------------------------------------------------------------------ crew certification + capacity help

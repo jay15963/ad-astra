@@ -1,0 +1,21 @@
+{
+  "id": "campaign",
+  "kind": "campaign",
+  "name": "Campanha",
+  "subtitle": "1950 a 3000",
+  "start": { "year": 1950, "month": 0 },
+  "end": { "year": 3000, "month": 0 },
+  "turnWeeks": null,
+  "eras": ["e1", "e2", "e3", "e4", "e5", "e6", "e7"],
+  "snapshot": "e1",
+  "playable": { "rule": "alive", "actors": ["nasa", "roscosmos"], "found": true },
+  "history": "faithful",
+  "lifecycle": "on",
+  "ending": { "type": "final", "event": "ending/final" },
+  "unlocks": { "builder": { "fromYear": 1957 }, "investors": { "fromYear": 1950 }, "colonies": { "fromYear": 2051 } },
+  "historicalFirsts": null,
+  "victory": {
+    "description": "Em janeiro de 3000 chega o Grande Silêncio: Contato, Silêncio ou Herança. A Tabela de cada era guarda quem liderou o caminho até lá.",
+    "goals": []
+  }
+}

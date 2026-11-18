@@ -1,0 +1,46 @@
+{
+  "$id": "body.schema.json",
+  "description": "Corpo do mapa (bodies.json → bodies[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "kind"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "kind": {
+      "enum": [
+        "star",
+        "planet",
+        "moon",
+        "asteroid",
+        "belt",
+        "dwarf",
+        "comet",
+        "exoplanet"
+      ]
+    },
+    "parent": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/id"
+        }
+      ]
+    },
+    "milestones": {
+      "type": "array"
+    },
+    "destinations": {
+      "type": "array"
+    }
+  }
+}

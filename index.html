@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="description" content="Dirija uma agência espacial na corrida lunar de 2026 a 2030. Jogo de estratégia para celular." />
+  <meta name="description" content="Dirija uma agência espacial de 1950 ao ano 3000. Jogo de estratégia para celular." />
   <meta name="theme-color" content="#0c0c0f" />
   <meta name="color-scheme" content="dark" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -43,6 +43,7 @@
   <link rel="stylesheet" href="src/ui/css/dashboard.css" />
   <link rel="stylesheet" href="src/ui/css/missions.css" />
   <link rel="stylesheet" href="src/ui/css/world.css" />
+  <link rel="stylesheet" href="src/ui/css/shell.css" />
   <!-- stylesheets the tabs inject on first use: fetched at idle priority so the first visit has no unstyled flash -->
   <link rel="prefetch" href="src/ui/techtree.css" as="style" />
   <link rel="prefetch" href="src/ui/worldmap.css" as="style" />
@@ -55,6 +56,10 @@
   <link rel="modulepreload" href="src/core/time.js" />
   <link rel="modulepreload" href="src/core/outcome.js" />
   <link rel="modulepreload" href="src/core/engine.js" />
+  <link rel="modulepreload" href="src/core/packs.js" />
+  <link rel="modulepreload" href="src/core/migrate.js" />
+  <link rel="modulepreload" href="src/core/catalog.js" />
+  <link rel="modulepreload" href="src/sim/simtime.js" />
   <link rel="modulepreload" href="src/sim/politics.js" />
   <link rel="modulepreload" href="src/sim/diplomacy.js" />
   <link rel="modulepreload" href="src/sim/budget.js" />
@@ -77,6 +82,8 @@
   <link rel="modulepreload" href="src/ui/worldmap.js" />
   <link rel="modulepreload" href="src/ui/world-tab.js" />
   <link rel="modulepreload" href="src/ui/crew-view.js" />
+  <link rel="modulepreload" href="src/ui/screens.js" />
+  <link rel="modulepreload" href="src/ui/drawer.js" />
 </head>
 <body>
   <div id="app" aria-live="polite">

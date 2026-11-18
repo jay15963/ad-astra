@@ -1,0 +1,87 @@
+{
+  "$id": "common.schema.json",
+  "description": "Definições comuns dos dados do Ad Astra (docs/EXPANSION.md §4.4).",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "idList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+$"
+      }
+    },
+    "ym": {
+      "type": "object",
+      "required": [
+        "year"
+      ],
+      "properties": {
+        "year": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3100
+        },
+        "month": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "day": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31
+        }
+      }
+    },
+    "yearOrYm": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3100
+        },
+        {
+          "$ref": "#/$defs/ym"
+        }
+      ]
+    },
+    "truthLayer": {
+      "enum": [
+        "fato",
+        "plano_oficial",
+        "projecao",
+        "especulacao"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 900
+    },
+    "money": {
+      "type": "number",
+      "minimum": 0
+    },
+    "prob": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 4
+    },
+    "eraId": {
+      "type": "string",
+      "pattern": "^e[1-7]$"
+    }
+  }
+}

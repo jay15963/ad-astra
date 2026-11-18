@@ -1,0 +1,5 @@
+{
+  "$id": "snapshot.schema.json",
+  "description": "Valores iniciais de uma era (eras/eN/snapshot.json, dono lifecycle). Forma mínima.",
+  "type": "object"
+}

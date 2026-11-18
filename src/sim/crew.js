@@ -6,6 +6,7 @@
 
 import { addNews, emitSignal, clamp, changeActor, pushDecision } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
+import { crossed, yearAt, legacyFromYear } from './simtime.js';
 import { techBonus, addSciencePoints } from './research.js';
 import * as budget from './budget.js';
 
@@ -630,10 +631,10 @@ export function pickCrew(state, rng, filter = () => true) {
 // Tuning and texts: data/crew.json config.rivalCrewFlights. Slice: state.rivalCrew = {flown, standDown, losses, aborts, flights}.
 const rcfg = (data) => ccfg(data).rivalCrewFlights || {};
 
-function isFlightTurn(state, def, t) {
-  const sy = state.startYear ?? 2026;
-  const year = sy + Math.floor(t / 52);
-  if (year < (def.fromYear ?? sy) || year > (def.toYear ?? 9999)) return false;
+function isFlightTurn(state, data, def, t) {
+  const year = yearAt(state, t);
+  // undated flights are the legacy pack's routine (ISS/Tiangong rotations): they start with that era (2026)
+  if (year < (def.fromYear ?? legacyFromYear(data)) || year > (def.toYear ?? def.untilYear ?? 9999)) return false;
   const per = Math.max(0.1, def.perYear || 1);
   const w0 = def.week ?? 0;
   const k = (x) => Math.floor(((x - w0) * per) / 52);
@@ -646,7 +647,7 @@ function rivalSlice(state, data) {
     const flown = {};
     for (const def of rcfg(data).flights || []) {
       let n = 0;
-      for (let t = 0; t < (state.turn || 0); t++) if (isFlightTurn(state, def, t)) n++;
+      for (let t = 0; t < (state.turn || 0); t++) if (isFlightTurn(state, data, def, t)) n++;
       flown[def.id] = n;
     }
     state.rivalCrew = { flown, standDown: {}, losses: [], aborts: 0, flights: 0 };
@@ -713,7 +714,7 @@ function rivalCrewFlights(state, data, ctx) {
   const R = rivalSlice(state, data);
   const t = state.turn || 0;
   for (const def of defs) {
-    if (!isFlightTurn(state, def, t)) continue;
+    if (!isFlightTurn(state, data, def, t)) continue;
     if ((R.standDown[def.id] ?? -1) > t) continue; // grounded after an accident: this rotation slips
     if (!rivalFlightReady(state, def)) continue;
     const rng = ctx.rng(`rivalCrew:${def.id}`);
@@ -789,7 +790,7 @@ export function tick(state, data, ctx) {
   }
 
   // birthdays at the turn of the year
-  if (state.turn > 0 && state.turn % 52 === 0) for (const p of people) if (alive(p) && p.status !== 'left') p.age = (p.age || 30) + 1;
+  if (state.turn > 0 && crossed(state, ctx, 52, 0)) for (const p of people) if (alive(p) && p.status !== 'left') p.age = (p.age || 30) + 1;
 
   // payroll
   const payroll = people.filter(onPayroll).reduce((s, p) => s + (p.salaryM || 0), 0);
@@ -1036,3 +1037,50 @@ export const queries = {
   'crew/commandPoints': (state, data, crewSel) => commandPointsFor(state, data, crewSel),
   'crew/modifier': (state, data, crewSel, context) => crewModifier(state, data, crewSel, context),
 };
+
+// ---------- 1950–3000 contract (EXPANSION.md §1.5, §3, §10) ----------
+
+/** Weekly payroll, training timers and rival rotations: substepped week by week by the engine. */
+export const meta = { maxDt: 1 };
+
+/**
+ * Caps (yearly): people who left/retired more than 2 years ago leave state.crew unless they are legends, in the
+ * memorial or someone's legacy; the memorial keeps 300 full entries, older ones shrink to {name, year, mission}.
+ */
+export function compact(state) {
+  const crew = state.crew || {};
+  // only once the roster grows past the cap (never inside a 5-year scenario)
+  if (Object.keys(crew).length <= 80) return compactMemorial(state);
+  const keep = new Set();
+  for (const m of state.memorial || []) if (m.crewId) keep.add(m.crewId);
+  for (const p of Object.values(crew)) if (p?.legacyOf) keep.add(p.legacyOf);
+  for (const m of state.missions || []) {
+    if (!['planning', 'scheduled', 'launch', 'transit', 'arrival', 'operations'].includes(m.status)) continue;
+    for (const id of [m.crew?.flightDirector, m.crew?.commander, ...(m.crew?.astronauts || [])]) if (id) keep.add(id);
+  }
+  const limit = (state.turn || 0) - 104;
+  for (const [id, p] of Object.entries(crew)) {
+    if (!p || keep.has(id) || p.legend) continue;
+    const since = p.status === 'retired' ? p.retiredTurn : p.status === 'left' ? p.leftTurn : null;
+    if (Number.isFinite(since) && since < limit) delete crew[id];
+  }
+  compactMemorial(state);
+}
+
+function compactMemorial(state) {
+  const mem = state.memorial || [];
+  if (mem.length > 300) {
+    for (let i = 0; i < mem.length - 300; i++) {
+      const m = mem[i];
+      if (m && !m.compact) mem[i] = { compact: true, crewId: m.crewId ?? null, name: m.name, turn: m.turn, year: yearAt(state, m.turn ?? 0), missionId: m.missionId ?? null };
+    }
+  }
+  if (state.rivalCrew?.losses?.length > 40) state.rivalCrew.losses.splice(0, state.rivalCrew.losses.length - 40);
+}
+
+/** A dead lineage stops flying its routine rotations (they are keyed by owner; nothing to clean but stand-downs). */
+export function onActorGone(state, data, ctx, id) {
+  const r = state.rivalCrew;
+  if (!r?.standDown) return;
+  for (const def of rcfg(data).flights || []) if (def.owner === id) delete r.standDown[def.id];
+}

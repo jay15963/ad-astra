@@ -1,0 +1,157 @@
+{
+  "$id": "calendar-mission.schema.json",
+  "description": "Item do calendário (calendar.json → missions[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "owner",
+    "type",
+    "destination",
+    "vehicleId",
+    "spacecraftId",
+    "crewed",
+    "planned",
+    "truthLayer",
+    "delay",
+    "importance"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "owner": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "partners": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "type": {
+      "enum": [
+        "crewed",
+        "lander",
+        "cargo",
+        "station",
+        "probe",
+        "satellite"
+      ]
+    },
+    "destination": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "vehicleId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "spacecraftId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "secondarySpacecraftId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "crewed": {
+      "type": "boolean"
+    },
+    "crewSize": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12
+    },
+    "planned": {
+      "$ref": "common.schema.json#/$defs/ym"
+    },
+    "truthLayer": {
+      "$ref": "common.schema.json#/$defs/truthLayer"
+    },
+    "historicalOutcome": {
+      "enum": [
+        "total",
+        "partial",
+        "failure"
+      ]
+    },
+    "delay": {
+      "type": "object",
+      "required": [
+        "slipChance"
+      ],
+      "properties": {
+        "slipChance": {
+          "$ref": "common.schema.json#/$defs/prob"
+        },
+        "meanMonths": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sdMonths": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxMonths": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "prerequisites": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "milestone": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/id"
+        }
+      ]
+    },
+    "importance": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    },
+    "source": {
+      "$ref": "common.schema.json#/$defs/source"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "window": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "common.schema.json#/$defs/yearOrYm"
+        },
+        "to": {
+          "$ref": "common.schema.json#/$defs/yearOrYm"
+        }
+      }
+    },
+    "chance": {
+      "$ref": "common.schema.json#/$defs/prob"
+    },
+    "canon": {
+      "type": "object",
+      "properties": {
+        "requires": {
+          "type": "object"
+        },
+        "onBreak": {
+          "enum": [
+            "drop",
+            "reassign",
+            "retarget"
+          ]
+        }
+      }
+    },
+    "era": {},
+    "fromYear": {
+      "type": "integer"
+    }
+  }
+}

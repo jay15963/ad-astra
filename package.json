@@ -1,6 +1,6 @@
 {
   "name": "ad-astra",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Ad Astra — manager de agência espacial para navegador (mobile-first).",
@@ -11,6 +11,9 @@
     "sim:calendar": "node tools/sim-calendar.mjs",
     "sim:diplomacy": "node tools/sim-diplomacy.mjs",
     "sim:world": "node tools/sim-world.mjs",
-    "sim:campaign": "node tools/sim-campaign.mjs"
+    "sim:campaign": "node tools/sim-campaign.mjs",
+    "test:campaign": "node tools/campaign.mjs 1 --fast",
+    "golden": "node tools/golden.mjs",
+    "golden:record": "node tools/golden.mjs --record"
   }
 }

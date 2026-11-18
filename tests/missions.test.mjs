@@ -363,7 +363,8 @@ test('briefing from a player calendar item: accept / delay / cancel', () => {
   assert.ok(state.actors[PID].support < sup0);
   assert.ok(state.signalsPending.some((s) => s.type === 'calendar/delayed'));
 
-  // approaching again → new briefing → accept creates a pre-filled planning mission
+  // approaching again → new briefing → accept creates the planning mission WITHOUT hardware (item 9: the player
+  // chooses); the program's rocket and craft come back as the engineers' suggestion
   state.turn = inst.currentTurn - 8;
   missions.tick(state, data, ctxFor(state, data));
   const d2 = state.decisions.find((x) => x.kind === 'briefing' && x.payload?.calendarId === 't_cal_lander');
@@ -374,6 +375,15 @@ test('briefing from a player calendar item: accept / delay / cancel', () => {
   assert.ok(m);
   assert.equal(m.status, 'planning');
   assert.equal(m.source, 'calendar');
+  assert.equal(r.openBuilder, m.id);
+  assert.equal(r.step, 2);
+  assert.equal(m.vehicleId, null);
+  assert.equal(m.spacecraftId, null);
+  assert.equal(m.suggestion.vehicleId, 't_small');
+  assert.equal(m.suggestion.spacecraftId, 't_lander');
+  assert.equal(m.suggestion.reason, 'Plano do programa');
+  const up = missions.actions['mission/update'](state, data, { missionId: m.id, patch: { vehicleId: 't_small', spacecraftId: 't_lander' } });
+  assert.equal(up.ok, true, up.error);
   assert.equal(m.vehicleId, 't_small');
   assert.equal(m.spacecraftId, 't_lander');
   assert.equal(m.milestone, 'lunar_resource_demo');

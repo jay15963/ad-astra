@@ -1,0 +1,91 @@
+{
+  "$id": "lineage.schema.json",
+  "description": "Linhagem de ator (core/lineages.json → lineages[]; §3.2).",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "identities"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "tier": {
+      "enum": [
+        "core",
+        "minor"
+      ]
+    },
+    "nation": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "born": {
+      "$ref": "common.schema.json#/$defs/yearOrYm"
+    },
+    "truthLayer": {
+      "$ref": "common.schema.json#/$defs/truthLayer"
+    },
+    "playableFrom": {
+      "type": "integer"
+    },
+    "identities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "from",
+          "name"
+        ],
+        "properties": {
+          "from": {
+            "$ref": "common.schema.json#/$defs/yearOrYm"
+          },
+          "name": {
+            "$ref": "common.schema.json#/$defs/name"
+          },
+          "short": {
+            "type": "string",
+            "maxLength": 16
+          }
+        }
+      }
+    },
+    "budgetSeries": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "eraProfiles": {
+      "type": "object"
+    }
+  }
+}

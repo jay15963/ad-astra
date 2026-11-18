@@ -162,3 +162,18 @@ test('settings: install card with native prompt and iOS instructions; context de
   assert.equal(installContext({ userAgent: 'x', standalone: true }, mm(false)), 'standalone');
   assert.equal(installContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0)' }, mm(false)), 'other');
 });
+
+test('sw.js precaches every file of data/packs.json (era packs, core files, scenarios) through the manifest', () => {
+  const sw = read('sw.js');
+  const src = sw.match(/function packFiles\([\s\S]*?\n}\n/)?.[0];
+  assert.ok(src, 'packFiles in sw.js');
+  assert.ok(sw.includes('/\\/data\\/packs\\.json(\\?|$)/.test(href)'), 'the crawl expands data/packs.json');
+  const packFiles = new Function(`${src}; return packFiles;`)();
+  const base = 'https://x.test/app/data/packs.json';
+  const urls = packFiles(read('data/packs.json'), base).map((u) => u.replace('https://x.test/app/data/', ''));
+  const manifest = JSON.parse(read('data/packs.json'));
+  for (const p of manifest.packs) for (const f of p.files) assert.ok(urls.includes(`${p.dir}${f}.json`), `${p.dir}${f}.json`);
+  for (const f of Object.values(manifest.scenarios)) assert.ok(urls.includes(f), f);
+  assert.ok(urls.includes('eras/e1/era.json') && urls.includes('scenarios/campaign.json'));
+  assert.deepEqual(packFiles('não é json', base), []);
+});

@@ -313,7 +313,10 @@ Class names `.tabbar`, `.ticker`, `.modal` must remain (test). Shell: `max-width
 ### 3.4 Time: the navbar centre disc (`.tab-central`) — mirrors `.barra-inferior-central`
 CSmanager's "Jogar o dia" disc, ported 1:1 (`cs-dash-1.png`). It replaced the old `.timebar` action bar
 ("+1 semana" / "Próximo evento"), which cost 64px of height on every screen.
-- Position: between **Pesquisa** and **Mapa** (`DISC_AT = 3` in `app.js`), same `flex: 1 1 0` column as
+- Position (since the expansion): between **Missões** and **Mapa** (`DISC_AT = 2` in `app.js`; 4 tabs + the disc
+  = 5 equal slots). The tap advances one *turn*, whose length depends on the era (label from
+  `query('time/stepLabel')`: "+1 semana" in the Corrida Lunar, "+2 sem", "+1 trimestre", "+1 ano", "até o
+  lançamento" when the step is cut short). The text below describes the original 7-slot bar; same column as
   a tab. 6 tabs + the disc = 7 equal slots, so the disc sits exactly on the screen centre (CSmanager's bar
   has 7 slots too); never an even slot count. Markup: `button.tab-central > span.tab-disc (icon 26px) + span.tab-label` (label `aria-hidden`; the
   button carries an `aria-label` that names both actions).
@@ -364,6 +367,8 @@ Markup (app.js `renderTabbar`):
   </button> ... ×6
 </nav>
 ```
+Since the expansion the items come from the screen registry (`src/ui/screens.js`, `nav: 'bottom'`): **Painel**,
+**Missões**, [centre disc], **Mapa**, **Mundo**. Pesquisa and Equipe moved to the drawer (§3.6). Original list:
 Items, in order: **Painel** (`painel`), **Missões** (`missoes`), **Pesquisa** (`pesquisa`), [centre disc,
 §3.4], **Mapa** (`mapa`), **Mundo** (`mundo`), **Equipe** (`equipe`). The tab buttons and the disc are built once per shell
 and updated in place (a long-press must survive re-renders). Labels sentence case (CSmanager style). Drop the emoji `TABS[].icon`.
@@ -402,6 +407,34 @@ CSS:
   `background: var(--text); color: var(--s1)`; clamp inside the viewport (8px margin). This is
   **optional**; the in-page tabs (§4.6) are the required navigation.
 - `@media (max-width: 360px)`: label 9.5px.
+
+### 3.6 Drawer (`.gaveta` + `.veu`) — mirrors CSmanager `movel.css` + `responsivo.tsx` `useGaveta`
+The 1950-3000 expansion has more screens than a bottom bar can hold, so every secondary screen lives in a left
+drawer opened by the ☰ button (first item of the header). Structure: `nav.gaveta#gaveta > .gaveta-cabeca
+(agency emblem, name, "Era N · nome · data", close button) + .gaveta-lista (eyebrow .gaveta-grupo per group,
+then button.gaveta-item rows)`, and `div.veu` behind it. Both are siblings of `.shell` in `#app`.
+
+- Header after the expansion: `[☰ .menu-btn] [h1 screen title / "NASA · Era 4"] [.data-chip] [emblem button →
+  Painel]`. The date chip follows the era's precision (`time.formatTurnEra`: "sem 14 · abr/2026" weekly, "mar/1962",
+  "T3 2087", "2741"); at ≤360px the "sem N ·" part hides. Ajustes moved into the drawer.
+- `.gaveta`: `position: fixed; left: 0; top: 0; bottom: 0; width: min(86vw, 340px); background: var(--s1);
+  border-right: 1px solid var(--line-strong); box-shadow: 24px 0 60px #000000a6`, safe areas as padding,
+  `transform: translateX(-104%)` → `.aberta { transform: none }` with the shared curve (.3s / .34s); `visibility`
+  follows so the closed drawer is out of the tab order (it is also `inert` and `aria-hidden` while closed).
+- `.veu`: `#000000b3`, opacity 0 → `.visivel` 1, tap closes. `z-index` 65 / 70 (above the shell, under sheets).
+- Rows: 46px tall, icon 20px `--text-3`, label `--t13`; current screen = `aria-current="page"`, `--s3` background,
+  3px `--text` bar on the left. Groups (eyebrows): Agência, Operações, Universo, Mundo, Arquivo, Sistema.
+  Screens a later phase delivers show a small "em breve" pill and open an "em breve" page that says what is coming.
+- Needs-you: amber dot (`.gaveta-ponto`) or amber count (`.gaveta-contador`) on rows; the ☰ button gets the same
+  dot (`.menu-ponto`) when any drawer row needs the player. Bottom tabs keep their red counts; Missões shows an amber
+  dot when an accepted mission still has no rocket ("falta o veículo").
+- Behaviour: opens with focus on the current row; Tab is trapped inside; Esc, a tap on the veil, a left swipe
+  (> 64px, mostly horizontal), choosing a row and the Android back button close it (app.js pushes one history
+  entry while it is open; choosing a row replaces that entry with the destination). On close the focus returns to ☰,
+  whose `aria-expanded` follows the state. The screen behind is `inert` while the drawer is open.
+- `body.reduce-motion` / `prefers-reduced-motion`: no transition.
+- Screens are registered in `src/ui/screens.js` (`registerScreen({id, title, icon, group, order, nav, available,
+  badge, load | go | action})`); adding a screen is one file plus one line there.
 
 ---
 
@@ -798,9 +831,8 @@ Shared spec for any control floating over a canvas/SVG:
 | `.modo-inicial`, `.modo-marca`, `.modo-monograma`, `.modo-abertura`, `.modo-card`, `.modo-rodape`, `.radar-eyebrow` | title screen (B2) |
 | selected card amber border (Elenco) | §4.17 |
 
-Not ported (on purpose): the hamburger drawer (`.gaveta`, `.veu`) — Ad Astra's 6 tabs + Ajustes in the
-header cover all destinations; stories (`.stories`) and calendar grids — no equivalent screen yet (a future
-"calendário de lançamentos" could use `.agenda-do-mes` rows).
+Ported (1950-3000 expansion, EXPANSION.md §12): the hamburger drawer (`.gaveta`, `.veu`), see §3.6; the
+"Calendário de lançamentos" drawer screen uses `.agenda-do-mes` rows. Still not ported: stories (`.stories`).
 
 ---
 

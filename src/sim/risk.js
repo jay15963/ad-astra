@@ -463,7 +463,7 @@ export function missionRisk(state, data, plan = {}) {
   const astronauts = Array.isArray(crewSel.astronauts) ? crewSel.astronauts.filter(Boolean) : [];
   const crewed = !!(plan.crewed || type === 'crewed' || (sc?.crew > 0 && (astronauts.length > 0 || crewSel.commander)));
   const launchTurn = Number.isFinite(plan.launchTurn) ? plan.launchTurn : state?.turn ?? 0;
-  const startYear = state?.startYear ?? data?.scenario?.startYear ?? 2026;
+  const startYear = state?.startYear ?? data?.scenario?.startYear ?? data?.scenario?.start?.year ?? 0;
 
   if (!vehicle) errors.push('Escolha um veículo válido.');
   if (!dest) errors.push('Escolha um destino válido.');

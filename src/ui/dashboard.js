@@ -3,11 +3,26 @@
 import {
   h, raw, iconSVG, chip, bar, trend, countUp, sparkline, sectionTitle, emptyState, safePanel, openModal, icon, linkButton, viewHead,
   fmtMoney, fmtMoneyDelta, fmtIn, fmtMonth, fmtBand, fmtDate, attempt, TYPE_ICONS, TRUTH_LABELS, STATUS_LABELS, FIRST_LABELS,
+  TYPE_LABELS, eraInfo,
 } from './components.js';
 import { emblemSVG } from './portrait.js';
 import { sortDecisions, decisionRow, listRow, ensurePainelCss } from './decisions.js';
 
-const ERA_NAME = 'A Década Lunar';
+/** Missions in planning without a rocket (item 9): the Painel lists them with the decisions ("precisa de você"). */
+export function missionsWithoutVehicle(st) {
+  return (Array.isArray(st?.missions) ? st.missions : []).filter((m) => m && m.status === 'planning' && !m.vehicleId && m.source !== 'cert');
+}
+
+/** Current chapter title of the era (era.json chapters [{from:{year,month}, title}]), or null. */
+export function chapterOf(state, data, era) {
+  const list = data?.eraPacks?.[era?.id]?.chapters || era?.def?.chapters;
+  if (!Array.isArray(list) || !list.length || !state) return null;
+  const d = { year: state.startYear + Math.floor((state.turn || 0) / 52), month: Math.floor((((state.turn || 0) % 52) + 52) % 52 / (52 / 12)) };
+  const t = (x) => (Number(x?.year) || 0) * 12 + (Number(x?.month) || 0);
+  let cur = null;
+  for (const c of list) if (t(c.from) <= t(d)) cur = c;
+  return cur?.title || null;
+}
 
 export function render(container, store) {
   ensurePainelCss();
@@ -21,14 +36,19 @@ export function render(container, store) {
     safePanel(() => crewCertPrograms(store, nav)),
     safePanel(() => upcoming(store, nav), 'O calendário ainda está sendo montado.'),
     safePanel(() => eraGoals(store, nav)),
-    h('p', { class: 'pn-foot' }, `Turno ${st.turn + 1} de ${st.endTurn + 1}`)));
+    h('p', { class: 'pn-foot' }, Number.isFinite(st.clock?.steps) && store.stepWeeks?.() > 1
+      ? `Turno ${st.clock.steps + 1} · campanha até ${st.startYear + Math.floor((st.endTurn ?? 0) / 52)}`
+      : `Turno ${st.turn + 1} de ${st.endTurn + 1}`)));
 }
 
 function pageHead(store) {
   const st = store.state;
   const me = st.actors?.[st.playerId];
-  const era = store.data?.scenario?.era || 4;
-  return viewHead('Centro de controle', { lead: [me?.short || me?.name, `Era ${era}`, ERA_NAME].filter(Boolean).join(' · '), right: timeLinks(store) });
+  const era = eraInfo(st, store.data);
+  const chapter = chapterOf(st, store.data, era);
+  return h('div', { class: 'pn-head' },
+    viewHead('Centro de controle', { lead: [me?.short || me?.name, era.n ? `Era ${era.n}` : null, era.name].filter(Boolean).join(' · '), right: timeLinks(store) }),
+    chapter ? h('div', { class: 'pn-capitulo' }, chip(chapter, 'muted')) : null);
 }
 
 /**
@@ -41,7 +61,7 @@ function timeLinks(store) {
   const link = (label, ic, fn) => h('button', { class: 'btn-link pn-time-link', type: 'button', onclick: fn },
     raw(iconSVG(ic, 14), 'btn-link-ic'), label);
   return h('div', { class: 'pn-time', role: 'group', 'aria-label': 'Tempo' },
-    link('+1 semana', 'avancar', () => store.ui.advance(1, false)),
+    link(store.stepLabel?.() || '+1 semana', 'avancar', () => store.ui.advance(1, false)),
     link('Próximo evento', 'proximo', () => store.ui.advanceToEvent ? store.ui.advanceToEvent() : store.ui.advance(26, true)));
 }
 
@@ -169,6 +189,12 @@ export function computeNextWindow(store, filter = null) {
 // ------------------------------------------------------------------ sheets
 
 function openFinance(store) {
+  openModal(financeView(store), { title: 'Orçamento', cls: 'pn-sheet' });
+}
+
+/** Finance body (cash, runway, spending by category, ledger): the Painel sheet and the Finanças screen. */
+export function financeView(store) {
+  ensurePainelCss();
   const st = store.state;
   const me = st.actors[st.playerId];
   const s = store.tryQuery('budget/summary', {}) || {};
@@ -177,7 +203,7 @@ function openFinance(store) {
   const CAT = { missions: 'Missões', research: 'Pesquisa', crew: 'Equipe', facilities: 'Instalações', contracts: 'Contratos', diplomacy: 'Diplomacia', grants: 'Repasses' };
   const maxSpent = Math.max(1, ...Object.values(spent).map((v) => Math.abs(Number(v) || 0)));
   const runway = s.runwayWeeks != null && Number.isFinite(s.runwayWeeks) ? Math.round(s.runwayWeeks) : null;
-  openModal(h('div', { class: 'finance' },
+  return h('div', { class: 'finance' },
     h('div', { class: 'stat-grid' },
       stat('Caixa', fmtMoney(s.cash ?? me.cash), (s.cash ?? me.cash) < 0 ? 'down' : '', true),
       stat('Verba anual', fmtMoney(s.budget ?? me.budget)),
@@ -191,7 +217,7 @@ function openFinance(store) {
         h('span', { class: 'ledger-date' }, fmtMonth(l.turn, st.startYear)),
         h('span', { class: 'ledger-note' }, l.note || CAT[l.category] || l.category),
         h('span', { class: ['ledger-amt', l.amount < 0 ? 'neg' : 'pos'] }, fmtMoneyDelta(l.amount)))))
-        : emptyState('Nada lançado ainda.', 'caixa'))), { title: 'Orçamento', cls: 'pn-sheet' });
+        : emptyState('Nada lançado ainda.', 'caixa')));
 }
 
 function openSupport(store) {
@@ -224,10 +250,17 @@ function stat(label, value, cls = '', wide = false) {
 function decisionQueue(store) {
   const list = sortDecisions(store.state.decisions || []);
   const blocking = list.some((d) => d.blocking);
+  const noHw = missionsWithoutVehicle(store.state);
+  const total = list.length + noHw.length;
+  const hwRows = noHw.map((m) => listRow({
+    cls: 'falta-veiculo-row', lead: icon('missoes', 18), leadCls: 'lead-accent', title: m.name || 'Missão',
+    sub: `${TYPE_LABELS[m.type] || m.type || ''} · ${store.data?.index?.destinations?.[m.destination]?.name || m.destination || ''}`,
+    right: chip('falta o veículo', 'warn'), onClick: () => store.ui?.navigate?.('missoes', `m/${m.id}`),
+  }));
   return h('section', { class: 'queue pn-block' },
-    sectionTitle('Decisões', list.length ? h('span', { class: ['badge', blocking && 'badge-bad'], 'aria-label': `${list.length} pendentes` }, String(list.length)) : null),
-    list.length ? h('div', { class: 'decision-list' }, list.slice(0, 8).map((d) => decisionRow(store, d)))
-      : emptyState('Nenhuma decisão pendente. Avance o tempo ou monte uma missão.', 'caixa'),
+    sectionTitle('Precisa de você', total ? h('span', { class: ['badge', blocking && 'badge-bad'], 'aria-label': `${total} pendentes` }, String(total)) : null),
+    total ? h('div', { class: 'decision-list' }, list.slice(0, 8).map((d) => decisionRow(store, d)), hwRows)
+      : emptyState('Nada pendente. Avance o tempo ou monte uma missão.', 'caixa'),
     list.length > 8 ? h('p', { class: 'pn-more' }, `+${list.length - 8} na fila`) : null);
 }
 

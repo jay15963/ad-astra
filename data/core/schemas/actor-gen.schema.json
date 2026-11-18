@@ -1,0 +1,36 @@
+{
+  "$id": "actor-gen.schema.json",
+  "description": "Gerador de atores (core/actor-gen.json, §3.2). Forma mínima.",
+  "type": "object",
+  "properties": {
+    "caps": {
+      "type": "object",
+      "properties": {
+        "core": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24
+        }
+      }
+    },
+    "archetypes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      }
+    }
+  }
+}

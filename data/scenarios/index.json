@@ -1,0 +1,9 @@
+{
+  "_doc": "Lista de cenários da tela de título (src/core/data.js listScenarios). O arquivo de cada um está em data/packs.json 'scenarios'.",
+  "scenarios": [
+    { "id": "campaign", "kind": "campaign", "name": "Campanha", "subtitle": "1950 a 3000", "start": { "year": 1950, "month": 0 }, "end": { "year": 3000, "month": 0 }, "order": 1,
+      "blurb": "De 1950 até o ano 3000: a corrida, as estações, a era comercial, a Lua, o Sistema Solar e as estrelas." },
+    { "id": "lunar_race", "kind": "scenario", "name": "Corrida Lunar", "subtitle": "2026 a 2030", "start": { "year": 2026, "month": 0 }, "end": { "year": 2030, "month": 11 }, "order": 5,
+      "blurb": "Cinco anos, uma pergunta: quem volta primeiro à Lua?" }
+  ]
+}

@@ -1,6 +1,11 @@
 # PROGRESS — Ad Astra (web)
 
 ## Estado (nov/2026)
+- **Versão 0.6.0 — Fase A da expansão 1950–3000** (alicerce; contrato em `docs/EXPANSION.md`). Nova **Campanha 1950 → jan/3000**
+  jogável de ponta a ponta (7 eras, passo de tempo que cresce de 1 semana a 1 ano, agências que nascem, mudam de nome, se fundem
+  e acabam com a história real até 2030 e por geração depois, cartão final em 3000 com Contato · Silêncio · Herança). A
+  **Corrida Lunar 2026–2030** continua como Cenário, idêntica à v0.5 (teste golden). O jogador agora **escolhe o foguete e a nave**
+  ao aceitar uma missão (item 9). Novo menu ☰ (gaveta no estilo do CSmanager) com registro de telas. Detalhes em "v0.6.0" abaixo.
 - Versão 0.4.0: certificação tripulada de foguetes durante o jogo, rotações tripuladas dos rivais (mortes no alvo), programas da IA
   custam caixa, manchetes variadas, PWA instalável e ajustes para celular intermediário. (0.3.0: rivais ativos, chance mostrada =
   chance real, blocos vivos; 0.2.0: Sistema Solar, mapa espacial, grafo de pesquisa, mapa-múndi, SW.) Detalhes em "v0.4.0" abaixo.
@@ -167,7 +172,68 @@ Métricas finais:
 - Certificação: SpaceX jogadora tem a Starship certificada pelo calendário ~turno 96–105; New Glenn (Blue Origin) certificada nas
   campanhas de teste da SpaceX; com a NASA jogadora a Starship pode não ser certificada (demo do HLS atrasa/falha).
 
-## Roteiro (plano de 10 turnos do GDD, adaptado para web)
+## v0.6.0 — Fase A: alicerce da expansão 1950–3000 (nov/2026)
+- **Tempo e eras**: `data/core/eras.json` (7 eras, 9 faixas de passo). Cada toque no disco avança um passo (+1 sem … +1 ano),
+  encurtado no próximo compromisso do jogador ("até o lançamento"), na troca de era ou no fim. Chip de data por faixa
+  (mar/1962, T3 2087, S1 2300, 2741). Era nova para o tempo até o jogador continuar (cena de era); sem o pacote da era o jogo
+  avisa "Carregando a próxima era…".
+- **Simulação independente da era**: todos os módulos rodam com passo variável (`src/sim/simtime.js`, `meta.maxDt`,
+  `compact`, `appointments`, `onActorBorn/onActorGone`); passo de 1 semana dá o mesmo resultado de antes.
+- **Agências vivas** (`src/sim/lifecycle.js`): 33 linhagens, 45 eventos reais 1956–2025 com fonte, 37 nações (URSS até
+  dez/1991 → Rússia, Ucrânia, Cazaquistão). Em 1950 só existem NACA e OKB-1; NASA 1958-10, ISRO 1969-08, ESA 1975-05, CNSA
+  1993-04, Blue Origin 2000-09, SpaceX 2002-03, JAXA 2003-10. Depois de 2031 nascem agências e empresas geradas (nomes pt-BR,
+  emblema com semente), que se fundem e acabam; agências reais podem acabar depois de 2041 (a do jogador nunca). Agência do
+  jogador absorvida → cartão e troca para a sobrevivente; URSS dividida sob o jogador → crise com duas escolhas.
+- **Dados por era**: `data/packs.json` + `src/core/packs.js` (mescla pura) + carregamento sob demanda (no máx. 3 pacotes de era
+  na memória; lazy = eager). Catálogo datado (`src/core/catalog.js`), validador `node tools/validate-data.mjs` → "Dados válidos".
+  Pacote e1 com foguetes, naves, calendário e retrato de jan/1950; e2–e7 só com `era.json` (conteúdo é a Fase C).
+- **Cenários**: `data/scenarios/index.json` (Campanha, Corrida Lunar). Saves v1 migram para v2; saves inválidos são recusados
+  com mensagem pt-BR (`src/core/migrate.js`). Espaços de save (auto, 3 manuais, um por era).
+- **Escolha do veículo (item 9)**: aceitar briefing, oportunidade ou contrato cria a missão sem foguete/nave, com a "Sugestão dos
+  engenheiros"; agendar sem hardware é recusado ("Escolha o foguete e a nave antes de agendar."); a montagem abre no passo 2 sem
+  nada pré-selecionado; selo âmbar "falta o veículo" na lista, no Painel e na gaveta. A IA e os bots seguem com `pickConfig`.
+- **Interface**: menu ☰ com gaveta `.gaveta`/`.veu` (deslizar, Esc e voltar fecham; foco preso e devolvido ao ☰), grupos
+  Agência · Operações · Universo · Mundo · Arquivo · Sistema; barra inferior Painel · Missões · ◉ · Mapa · Mundo (Pesquisa e
+  Equipe foram para a gaveta). Telas novas: Finanças, Calendário de lançamentos, Salvar e capítulos, Sobre, Sair para o título;
+  esboços "em breve" para Conselho, Identidade, Hangar (B), Anais, Colônias, Arquivo do Eco (C). Tela de título com
+  Campanha 1950–3000 · Cenários · Continuar. Ajustes mostra a era atual.
+- **Testes antigos que mudaram por codificarem a hipótese antiga (cenário único / hardware automático)**: `missions`
+  (hardware preenchido no aceite), `integrity`, `budget` (teto do ledger), `diplomacy-blocs`, `ui-play-disc` (rótulo do disco
+  por faixa), `ui-static` e `sw-pwa` (precache dos pacotes). Durante a Fase A também mudaram testes novos: formato do
+  `mission/update` em `ui-shell` e "agências reais nunca acabam" em `lifecycle`. Novos: `golden-lunar`, `time-bands`, `engine-clock`, `migrate`, `campaign-short`, `lifecycle`,
+  `dt-equivalence`, `vehicle-choice`, `data-packs`, `data-schema`, `data-validate`, `sim-eras`, `ui-shell`.
+- **Medições (integração, 18/nov/2026)**: `npm test` → **445/445**; `node tools/smoke.mjs 2` → 10/10 ok; `node tools/campaign.mjs 1
+  --fast` → ok, fim Contato em T1 3000, **95 s** (meta ≤ 60 s não atingida). `node tools/full-campaign.mjs` (pacotes sob demanda):
+
+  | Era | 7919 nasa | 42 roscosmos | 3 nasa |
+  |---|---|---|---|
+  | e1 1950–1976 | 545 t · 1,4 ms/t · 116 KB | 544 t · 1,4 ms/t · 116 KB | 545 t · 1,4 ms/t · 114 KB |
+  | e2 1976–2000 | 312 t · 2,5 ms/t · 159 KB | 312 t · 2,6 ms/t · 157 KB | 312 t · 2,6 ms/t · 161 KB |
+  | e3 2000–2026 | 522 t · 3,5 ms/t · 275 KB | 394 t · 4,5 ms/t · 228 KB | 489 t · 3,8 ms/t · 255 KB |
+  | e4 2026–2051 | 774 t · 4,0 ms/t · 375 KB | 694 t · 4,4 ms/t · 316 KB | 755 t · 4,2 ms/t · 370 KB |
+  | e5 2051–2200 | 865 t · 18 ms/t · 381 KB | 633 t · 25 ms/t · 361 KB | 830 t · 19 ms/t · 380 KB |
+  | e6 2200–2600 | 880 t · 44 ms/t · 376 KB | 822 t · 49 ms/t · 379 KB | 842 t · 42 ms/t · 375 KB |
+  | e7 2600–3000 | 451 t · 83 ms/t · 372 KB | 437 t · 84 ms/t · 373 KB | 430 t · 77 ms/t · 360 KB |
+  | **Total** | 4.349 t · 104,8 s · final 339 KB | 3.836 t · 104,5 s · final 339 KB | 4.203 t · 96,9 s · final 327 KB |
+
+  (t = turnos; KB = maior save numa virada de ano na era; teto 400 KB respeitado nas três.) Todas terminam em Contato.
+
+## Roteiro (expansão 1950–3000 em 4 fases; contrato em docs/EXPANSION.md)
+- **Fase A — alicerce: FEITA (v0.6.0).** Motor de tempo/eras 1950–3000, cenários, ciclo de vida dinâmico das agências, simulação
+  independente da era, pipeline de dados por era, shell com gaveta ☰ e registro de telas, escolha do veículo pelo jogador (item 9).
+- **Fase B — o jogador e suas ferramentas (próxima).** Criar agência do zero (sede, país, logo personalizado; `agency/found`) e
+  logos melhores para todas as agências; investidores e participação (`state.cap`: até 90% com investidores, autonomia com
+  ≥ 50%, missões de programa viram missões de investidor, mais mandatos quanto menor a fatia do jogador; tela Conselho; migração
+  v2 → v3); construtor de foguetes (comprar e editar ou montar do zero a partir dos existentes; tela Hangar; voos de teste);
+  mapas mundial e espacial melhorados; telas Identidade, Finanças e Calendário de lançamentos completas.
+- **Fase C — conteúdo das 7 eras e o final de 3000.** Vocabulário congelado; por era: atores e eventos de ciclo de vida com fonte,
+  foguetes/naves com `design`, destinos, calendário, tech tier, ≥ 120 eventos, tom das notícias, investidores, tripulação,
+  snapshot e um cenário curto; separar `legacy-e4` em `core/` + `eras/e4/`; geradores para e5+; o mistério do Eco e "O Grande
+  Silêncio" com os 3 finais; colônias; Anais.
+- **Fase D — equilíbrio, revisão e publicação.** Equilíbrio por era (20 sementes × atores jogáveis), revisão de UX de cada tela
+  em 390×844 e 320 px, auditoria de tamanho/desempenho num celular intermediário, publicação.
+
+### Roteiro anterior (corte vertical "Corrida Lunar", plano de 10 turnos do GDD)
 - Turnos 1–9: feitos (fundação e dados, núcleo de simulação, calendário vivo, diplomacia, política e guerras, interface mobile,
   Dia de Lançamento, mapa e operações, eventos/equipe/legados).
 - **Turno 10 (atual): backend, balanceamento e teste fechado.** Feito: balanceamento em lote (v0.3.0); certificação tripulada de
@@ -176,10 +242,27 @@ Métricas finais:
   aprovado, Supabase (login, saves na nuvem, ligas semanais).
 - Depois do turno 10 o corte vertical "Corrida Lunar" fecha; as outras eras do GDD entram como expansões de conteúdo.
 
-## Pendências (por prioridade, atualizado na v0.4.0)
-Feitos na v0.4.0 (eram 1, 2, 3 e quase todo o 6 da lista da v0.3.0): certificação tripulada ✓; mortes de tripulação 25% das
-campanhas (alvo 15–35%) ✓; programas do calendário custam caixa à IA ✓ (vitórias cnsa 47 / nasa 40 / spacex 13); manchetes de
-balanço, caixa/dívida e rival_first com variantes ✓; PWA instalável e modo "lite" para celular intermediário ✓.
+## Pendências (por prioridade, atualizado na v0.6.0)
+Da Fase A:
+1. **Velocidade da campanha longa**: `tools/campaign.mjs 1 --fast` leva ~95 s e `full-campaign` ~97–105 s (meta ≤ 60 s). O custo por
+   turno cresce com o tempo (1,4 ms em e1 → ~80 ms em e7) mesmo com menos atores vivos em e7: algo acumula (histórico, listas do
+   catálogo ou a IA de diplomacia). Medir por módulo na Fase D (ou antes, se e5+ ficarem lentos no celular).
+2. **Saves perto do teto**: maior save numa virada de ano ~381 KB (teto 400 KB). Conteúdo da Fase C vai aumentar; a compactação
+   precisa de folga.
+3. **Datas dos eventos reais** (`data/core/lifecycle.json`, `lineages.json`) vêm de conhecimento geral; a Fase C deve conferir cada
+   uma com a `source`.
+4. **Hardware depois de 2080** é um tapa-buraco (`untilYear: 2999` nos últimos lançadores de cada bloco e nas naves genéricas) até
+   a Fase C trazer veículos das eras 5–7. Eras e2–e7 ainda só têm `era.json`.
+5. **Atores no fim da campanha**: em e6/e7 os menores somem (0 em e7 na semente 7919) e o núcleo conta 13 com o teto de 12
+   (provavelmente o jogador conta à parte) — conferir no equilíbrio da Fase D.
+6. Passos de 13–52 semanas: a IA considera acordos diplomáticos com menos frequência (mudança deliberada, só fora da Corrida Lunar).
+7. Esboços "em breve" na gaveta (Conselho, Identidade, Hangar → B; Anais, Colônias, Eco → C); `agency/found` responde "chega numa
+   próxima versão". Pele por era (`body[data-era]`) só tem e4.
+8. Não verificado em celular real: gaveta com o botão voltar do Android e a cena de era numa campanha longa.
+9. Destinos sem data: no Painel de jan/1950 a "Próxima janela" já mostra "Sobrevoo de Plutão" (destinations.json não tem
+   `fromYear`); a Fase C deve datar destinos e janelas por era.
+
+Herdadas da v0.4.0 (ainda abertas):
 1. Visual do Dia de Lançamento com cara genérica: foguetes, naves, planetas, solo e animações (subida, separação, pouso) precisam
    de texturas e formas realistas por veículo. (Em andamento em outro trabalho.)
 2. Certificação: com a NASA jogadora a Starship pode nunca ser certificada (demo do HLS rival atrasa/falha) — o caminho que sobra é

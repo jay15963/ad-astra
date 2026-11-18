@@ -8,6 +8,7 @@
 
 import { addNews, emitSignal, clamp, changeActor, pushDecision, removeDecision } from '../core/helpers.js';
 import * as budget from './budget.js';
+import { yearAt, inYearWindow, legacyFromYear } from './simtime.js';
 
 const DEFAULT_CFG = {
   startPoints: 30, baseSciencePerWeek: 1, engineerSciencePerWeek: 0.12, maxProjects: 2,
@@ -118,6 +119,11 @@ function isVisible(state, node) {
   const r = state.research || {};
   if (r.unlocked?.includes(node.id) || r.revealed?.includes(node.id)) return true;
   return !!(node.unlockedBy && state.events?.flags?.[node.unlockedBy]);
+}
+
+/** Researchable in the current year (fromYear/untilYear; undated legacy nodes open with the legacy era, 2026). */
+export function nodeOpen(state, data, node) {
+  return inYearWindow(node, yearAt(state), { undatedFrom: legacyFromYear(data) });
 }
 
 function requiresMet(list, node) {
@@ -235,7 +241,7 @@ export function tick(state, data, ctx) {
   for (const p of r.projects.slice()) advanceProject(state, data, ctx, p);
 
   // rivals
-  for (const id of Object.keys(r.rivals)) advanceRival(state, data, ctx, id);
+  for (const id of Object.keys(r.rivals)) if (state.actors?.[id]) advanceRival(state, data, ctx, id);
 }
 
 function revealSecrets(state, data) {
@@ -396,7 +402,7 @@ function advanceRival(state, data, ctx, id) {
   const has = r.rivals[id] || (r.rivals[id] = []);
   let proj = r.rivalProjects[id];
   if (!proj) {
-    const options = nodesOf(data).filter((n) => !n.secret && !has.includes(n.id) && requiresMet(has, n));
+    const options = nodesOf(data).filter((n) => !n.secret && !has.includes(n.id) && requiresMet(has, n) && nodeOpen(state, data, n));
     if (!options.length) return;
     const rng = ctx.rng(`rival-pick:${id}`);
     const actor = state.actors?.[id];
@@ -480,6 +486,7 @@ function startProject(state, data, action, ctx) {
   if (r.unlocked.includes(node.id)) return { ok: false, error: 'já pesquisada' };
   if (r.projects.some((p) => p.nodeId === node.id)) return { ok: false, error: 'já em andamento' };
   if (!requiresMet(r.unlocked, node)) return { ok: false, error: 'pré-requisitos faltando' };
+  if (!nodeOpen(state, data, node)) return { ok: false, error: 'tecnologia ainda fora do alcance desta época' };
   if (r.projects.length >= maxProjects(state, data)) return { ok: false, error: `limite de ${maxProjects(state, data)} projetos simultâneos` };
   const sci = node.science || 0;
   if (r.points < sci) return { ok: false, error: `ciência insuficiente (${sci} necessários)` };
@@ -553,7 +560,7 @@ function nodeView(state, data, n) {
   let status = 'locked';
   if (done && !proj) status = 'done';
   else if (proj) status = 'active';
-  else if (requiresMet(unlocked, n)) status = 'available';
+  else if (requiresMet(unlocked, n) && nodeOpen(state, data, n)) status = 'available';
   const speedSafe = weeklySpeed(state, data, 'safe');
   const speedBold = weeklySpeed(state, data, 'bold');
   const q = r.quality?.[n.id] ?? 1;
@@ -563,7 +570,7 @@ function nodeView(state, data, n) {
     : null;
   return {
     id: n.id, branch: n.branch, branchName: branch?.name || n.branch, name: n.name, description: n.description,
-    era: n.era, secret: !!n.secret, status, icon: n.icon || null, short: n.short || null,
+    era: n.era, secret: !!n.secret, status, fromYear: n.fromYear ?? null, icon: n.icon || null, short: n.short || null,
     tier: n.tier ?? null, row: n.row ?? null,
     cost: nodeMoneyCost(state, data, n, 'safe'), costBold: nodeMoneyCost(state, data, n, 'bold'),
     science: n.science || 0, canAffordScience: (r.points || 0) >= (n.science || 0),
@@ -609,3 +616,28 @@ export const queries = {
   'research/bonus': (state, data, actorId, key) => techBonus(state, actorId ?? state.playerId, key),
 };
 
+
+// ---------- 1950–3000 contract (EXPANSION.md §1.5, §3) ----------
+
+/** Weekly science and project progress: substepped week by week by the engine. */
+export const meta = { maxDt: 1 };
+
+/** A born actor starts with the techs data gives it (initialFor), like the founding rivals. */
+export function onActorBorn(state, data, ctx, id) {
+  if (!state.research || id === state.playerId) return;
+  ensureRivals(state, data);
+}
+
+/** A dead actor's research leaves the slice (its techs die with it, or live on in `into`). */
+export function onActorGone(state, data, ctx, id, info = {}) {
+  const r = state.research;
+  if (!r) return;
+  const into = info?.into;
+  if (into && into !== state.playerId && r.rivals?.[into] && r.rivals?.[id]) {
+    for (const n of r.rivals[id]) if (!r.rivals[into].includes(n)) r.rivals[into].push(n);
+    recompute(state, data, into);
+  }
+  if (r.rivals) delete r.rivals[id];
+  if (r.rivalProjects) delete r.rivalProjects[id];
+  if (r.bonus) delete r.bonus[id];
+}

@@ -1,0 +1,41 @@
+{
+  "$id": "nation.schema.json",
+  "description": "Nação (core/nations.json → nations[]).",
+  "type": "object",
+  "required": [
+    "id",
+    "name"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "name": {
+      "$ref": "common.schema.json#/$defs/name"
+    },
+    "from": {
+      "$ref": "common.schema.json#/$defs/yearOrYm"
+    },
+    "to": {
+      "$ref": "common.schema.json#/$defs/yearOrYm"
+    },
+    "successors": {
+      "$ref": "common.schema.json#/$defs/idList"
+    },
+    "isos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "iso"
+        ],
+        "properties": {
+          "iso": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_-]{2,8}$"
+          }
+        }
+      }
+    }
+  }
+}

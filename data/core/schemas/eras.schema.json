@@ -1,0 +1,36 @@
+{
+  "$id": "eras.schema.json",
+  "description": "Eras e faixas do relógio (core/eras.json, dono core-time). Forma mínima.",
+  "type": "object",
+  "required": [
+    "eras"
+  ],
+  "properties": {
+    "eras": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/eraId"
+          },
+          "from": {
+            "$ref": "common.schema.json#/$defs/yearOrYm"
+          },
+          "to": {
+            "$ref": "common.schema.json#/$defs/yearOrYm"
+          },
+          "truthLayer": {
+            "$ref": "common.schema.json#/$defs/truthLayer"
+          }
+        }
+      }
+    }
+  }
+}
