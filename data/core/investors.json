@@ -18,7 +18,8 @@
     },
     "mandate": {
       "expiryWeeks": 8, "minDeadlineSteps": 3, "calendarGraceWeeks": 13, "calendarHorizonWeeks": 104,
-      "maxOpenPerHolder": 2, "keepResolved": 24
+      "maxOpenPerHolder": 2, "keepResolved": 24,
+      "maxCostShare": 1, "yearCostShare": 0.8, "rewardCostShare": 0.5, "maxBundleYears": 4
     },
     "valuation": {
       "budget": 2.0, "prestige": 3.0, "reputation": 4.0, "fleet": 25, "cash": 0.5, "floorShareOfBudget": 1.0,

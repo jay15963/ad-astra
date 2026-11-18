@@ -2,8 +2,11 @@
 //
 // A late save is mostly repeated key names: 600 nation pairs with the same seven fields, lists of news, ledger rows,
 // history entries… serialize() writes, for campaigns longer than 10 years (state.endTurn > 520):
-//   - state.world.pairs as {"$p": [[key, flip, level, pressure, sinceTurn, peak, changes], …]} (a/b come from the key;
-//     a pair with any other shape is kept as [key, object]);
+//   - state.world.pairs in columns, {"$q": {n: [nations], k, l, x, p, s, c}}: k = the a/b nation indexes of each pair
+//     (2 base-36 characters each, in the pair's own a/b order, so the key and its flip come back), l/x = level and
+//     peak digits, p = pressure × 1000 (integers), s = sinceTurn as 4 base-36 characters, c = changes. Pairs whose
+//     values do not fit (an unexpected field, a fractional turn…) fall back to {"$p": [[key, flip, level, pressure,
+//     sinceTurn, peak, changes] | [key, object], …]};
 //   - every array of ≥ 3 plain objects that share the same keys in the same order as {"$c": [keys], "$r": [[values], …]}
 //     (nested values are encoded the same way), except under state.actors (the title screen reads it raw);
 //   - every object of ≥ 3 plain objects (vehicleStats, tombstones…) the same way, with its keys: {"$k": [keys], …};
@@ -93,7 +96,58 @@ function packArray(arr) {
   return out || arr;
 }
 
+// columns of the 630 nation pairs of a late campaign (~40 → ~19 characters a pair); null when any pair does not fit
+const B36 = (n, w) => n.toString(36).padStart(w, '0');
+function packPairColumns(pairs) {
+  const nations = [];
+  const at = new Map();
+  const nix = (id) => { let i = at.get(id); if (i === undefined) { i = nations.length; at.set(id, i); nations.push(id); } return i; };
+  let k = '', l = '', x = '', s = '';
+  const p = [], c = [];
+  const keys = Object.keys(pairs);
+  if (keys.length < 3) return null;
+  for (const key of keys) {
+    const v = pairs[key];
+    if (!isPlain(v)) return null;
+    const ks = jsonKeys(v);
+    if (ks.length !== PAIR_KEYS.length || !ks.every((f, i) => f === PAIR_KEYS[i])) return null;
+    const { a, b, level, pressure, sinceTurn, peak, changes } = v;
+    if (typeof a !== 'string' || typeof b !== 'string' || a === b || a.includes('|') || b.includes('|') || pairKey(a, b) !== key) return null;
+    const digit = (d) => Number.isInteger(d) && d >= 0 && d <= 9;
+    if (!digit(level) || !digit(peak)) return null;
+    if (typeof pressure !== 'number' || !Number.isFinite(pressure)) return null;
+    const pi = Math.round(pressure * 1000);
+    if (pi / 1000 !== pressure) return null; // (−0 is written as 0 by JSON either way)
+    if (!Number.isInteger(sinceTurn) || sinceTurn < 0 || sinceTurn >= 36 ** 4) return null;
+    if (!Number.isInteger(changes) || changes < 0) return null;
+    const ia = nix(a), ib = nix(b);
+    if (nations.length > CODE_MAX) return null;
+    k += B36(ia, 2) + B36(ib, 2);
+    l += level; x += peak; s += B36(sinceTurn, 4);
+    p.push(pi); c.push(changes);
+  }
+  return { $q: { n: nations, k, l, x, p, s, c } };
+}
+function unpackPairColumns(q) {
+  const pairs = {};
+  const n = q.k.length / 4;
+  for (let i = 0; i < n; i++) {
+    const a = q.n[parseInt(q.k.slice(i * 4, i * 4 + 2), 36)];
+    const b = q.n[parseInt(q.k.slice(i * 4 + 2, i * 4 + 4), 36)];
+    pairs[pairKey(a, b)] = {
+      a, b, level: Number(q.l[i]), pressure: q.p[i] / 1000, sinceTurn: parseInt(q.s.slice(i * 4, i * 4 + 4), 36),
+      peak: Number(q.x[i]), changes: q.c[i],
+    };
+  }
+  return pairs;
+}
+const isPairColumns = (v) => isPlain(v) && isPlain(v.$q) && Object.keys(v).length === 1 && Array.isArray(v.$q.n)
+  && typeof v.$q.k === 'string' && typeof v.$q.l === 'string' && typeof v.$q.x === 'string' && typeof v.$q.s === 'string'
+  && Array.isArray(v.$q.p) && Array.isArray(v.$q.c);
+
 function packPairs(pairs) {
+  const cols = packPairColumns(pairs);
+  if (cols) return cols;
   const list = [];
   for (const k of Object.keys(pairs)) {
     const p = pairs[k];
@@ -290,8 +344,8 @@ export function unpackState(s) {
   delete s[PACK_MARK];
   for (const k of Object.keys(s)) {
     if (k === 'actors') continue;
-    if (k === 'world' && isPlain(s.world) && isPlain(s.world.pairs) && Array.isArray(s.world.pairs.$p)) {
-      const pairs = unpackPairs(s.world.pairs);
+    if (k === 'world' && isPlain(s.world) && (isPairColumns(s.world.pairs) || (isPlain(s.world.pairs) && Array.isArray(s.world.pairs.$p)))) {
+      const pairs = isPairColumns(s.world.pairs) ? unpackPairColumns(s.world.pairs.$q) : unpackPairs(s.world.pairs);
       s.world.pairs = null;
       unpackValue(s.world);
       s.world.pairs = pairs;

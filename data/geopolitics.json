@@ -347,6 +347,9 @@
   },
   "model": {
     "_doc": "Taxas mensais. shiftHazard por intensidade (2..4) vale para zonas 'shiftable' (intensidade mínima) depois de minConflictWeeks; multiplicada pela razão de força entre os lados (economia, crise, governo) limitada a ratioClamp. maxShifts = teto de mudanças de controle por campanha. Zona: shiftWeight multiplica o risco; shiftBias { ISO3: fator } pesa a direção (retomar área fortificada é mais raro que avançar). factCeasefire/treatyChance/resumeChance por nível de tensão dos pares que movem o conflito (0..4).",
+    "freezeYear": 2100,
+    "_freezeDoc": "A partir de freezeYear (ou do 'until' de uma zona) as zonas e guerras deste arquivo, que são o mundo de 2026, viram história: congelam no último controlador, estáveis, e as guerras de 2026 terminam. Conflitos novos da escala de tensão continuam, mas sem pintar essas fronteiras (src/sim/lifecycle.js freezeGeo).",
+    "freezeBody": "Os mapas escolares já não mostram as linhas de frente de 2026. Crimeia, Taiwan, Caxemira e as outras disputas daquele século viraram capítulos de livro; as tensões de agora correm por outros lugares, e por outros mundos.",
     "startTurn": 0,
     "minConflictWeeks": 12,
     "shiftHazard": { "2": 0.0004, "3": 0.0045, "4": 0.014 },
@@ -409,6 +412,7 @@
     ]
   },
   "timeline": {
+    "frozen": "As fronteiras disputadas do século XXI viram assunto de historiadores",
     "conflict_start": "Conflito {place} ({A}–{B})",
     "conflict_start_noplace": "Conflito entre {A} e {B}",
     "ceasefire": "Cessar-fogo {place}",

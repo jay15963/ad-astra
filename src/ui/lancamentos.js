@@ -136,7 +136,7 @@ export function render(container, store, route) {
     screenHead({ title: 'Calendário de lançamentos', lead, primary: { label: 'Nova missão', icon: 'mais', onClick: () => nav('missoes', 'nova') } }),
     kpis([
       { label: 'Próximo voo', value: m.next ? rel(m.next.when) : '—', sub: m.next ? m.next.title : nTodo ? 'agende uma missão' : 'nenhum agendado', onClick: m.next?.missionId ? () => nav('missoes', `m/${m.next.missionId}`) : null },
-      { label: 'Voos rivais', value: String(m.counts.rivals), sub: m.counts.prazos ? `${m.counts.prazos} prazo${m.counts.prazos === 1 ? '' : 's'} de investidor` : 'planejados' },
+      { label: 'Voos rivais', value: String(m.counts.rivals), sub: m.counts.prazos ? `planejados · ${m.counts.prazos} prazo${m.counts.prazos === 1 ? '' : 's'} de investidor` : 'planejados' },
     ], { label: 'Resumo do calendário' }),
     section('A agendar', { right: countChip(m.toSchedule.length) }, m.toSchedule.length ? listCard(m.toSchedule.map((x) => row(x))) : null),
     h('section', { class: 'tela-sec' },

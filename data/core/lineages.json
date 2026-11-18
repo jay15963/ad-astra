@@ -12,12 +12,16 @@
       ],
       "budgetSeries": [[1950, 250], [1958, 450], [1959, 1500], [1961, 4000], [1963, 13000], [1966, 19000], [1970, 12000], [1975, 8000], [1990, 9500], [2000, 8500], [2010, 9500], [2026, 9000]] },
 
-    { "id": "roscosmos", "kind": "agency", "tier": "core", "color": "#CC79A7", "truthLayer": "fato", "source": "OKB-1 (1946); RKA (fev/1992); Roscosmos (mar/2004)",
+    { "id": "roscosmos", "kind": "agency", "tier": "core", "color": "#CC79A7", "truthLayer": "fato", "source": "OKB-1 (1946); TsKBEM (1966); NPO Energia (mai/1974); RKA (fev/1992); Roscosmos (mar/2004)",
       "born": { "year": 1946, "month": 7 }, "playableFrom": 1950,
       "nation": [{ "from": { "year": 1946, "month": 0 }, "id": "ussr" }, { "from": { "year": 1991, "month": 11 }, "id": "russia" }],
       "identities": [
         { "from": { "year": 1946, "month": 7 }, "name": "Programa Espacial Soviético (OKB-1)", "short": "OKB-1", "flag": "☭", "country": "URSS",
           "description": "O bureau de projetos de Korolev: mísseis de longo alcance e, em segredo, o caminho para a órbita.", "style": "Secreta, ousada" },
+        { "from": { "year": 1966, "month": 2 }, "name": "Programa Espacial Soviético (TsKBEM)", "short": "TsKBEM",
+          "description": "O bureau de Korolev, agora com Mishin, depois da morte do fundador: Soyuz, o foguete lunar N1 e as primeiras estações.", "style": "Secreta, sob pressão" },
+        { "from": { "year": 1974, "month": 4 }, "name": "Programa Espacial Soviético (NPO Energia)", "short": "NPO Energia",
+          "description": "Glushko une os bureaus, congela o N1 e aposta nas estações Salyut e Mir e no sistema Energia-Buran.", "style": "Estações de longa duração" },
         { "from": { "year": 1992, "month": 1 }, "name": "Agência Espacial Russa (RKA)", "short": "RKA", "flag": "🇷🇺", "country": "Rússia",
           "description": "Herdeira do programa soviético, com verba curta e a estação Mir em órbita.", "style": "Herança pesada, verba curta" },
         { "from": { "year": 2004, "month": 2 }, "name": "Roscosmos (Rússia)", "short": "Roscosmos" }

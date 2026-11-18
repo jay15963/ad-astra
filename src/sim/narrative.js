@@ -19,6 +19,7 @@ import * as budget from './budget.js';
 import * as politics from './politics.js';
 import * as diplomacy from './diplomacy.js';
 import * as research from './research.js';
+import { attentionStep, attentionPeriod } from './budget.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -475,6 +476,14 @@ export function eligibleEvents(state, data, mode = 'random') {
 
 // ---------------------------------------------------------------- decisions
 
+const longCampaign = (state) => Number.isFinite(state.endTurn) && state.endTurn > 520;
+/** Cash a choice takes from the player (US$ mi, after era scaling); gains do not offset. */
+function choiceCostM(state, effects) {
+  let m = 0;
+  for (const e of effects || []) if (e && 'cash' in e && !('actor' in e)) { const v = scaleMoney(state, e.cash); if (v < 0) m -= v; }
+  return Math.round(m * 10) / 10;
+}
+
 function pushEventDecision(state, data, event, context, source) {
   const ev = ensure(state);
   const h = ev.history[event.id] || (ev.history[event.id] = { count: 0, lastTurn: null });
@@ -489,8 +498,22 @@ function pushEventDecision(state, data, event, context, source) {
     const auto = describeEffects(state, data, c.effects, context);
     const out = { id: c.id, label: R(c.label), preview: [R(c.preview), auto].filter(Boolean).join(' · ') };
     if (!ok) { out.disabled = true; out.reason = `Requer ${describeCondition(state, data, c.requires, context)}`; }
+    // 1950–3000 (D1): a choice that costs more than the cash and the credit line allow is not offered (a small agency
+    // used to "bid" US$ 160 mi with US$ 36 mi in the bank and the government fired it for the debt)
+    const costM = longCampaign(state) ? choiceCostM(state, c.effects) : 0;
+    if (ok && costM > 0 && !budget.canAfford(state, state.playerId, costM)) {
+      out.disabled = true;
+      out.reason = `Caixa insuficiente: custa ${budget.fmtMoney(costM)}.`;
+      out.costM = costM;
+    }
     return out;
   });
+  // never leave a card without an answer: the cheapest unaffordable choice stays open
+  if (choices.length && choices.every((c) => c.disabled)) {
+    const cheap = choices.filter((c) => c.costM > 0).sort((a, b) => a.costM - b.costM)[0];
+    if (cheap) { delete cheap.disabled; delete cheap.reason; }
+  }
+  for (const c of choices) delete c.costM;
   const enabled = choices.filter((c) => !c.disabled);
   const def = enabled.find((c) => c.id === event.defaultChoice) || enabled[0] || choices[0];
   let portrait = null;
@@ -518,13 +541,20 @@ function pushEventDecision(state, data, event, context, source) {
   return d;
 }
 
-function resolveEvent(state, data, decision, choiceId) {
+function resolveEvent(state, data, decision, choiceId, opts = {}) {
   const ev = ensure(state);
   const eventId = decision.payload?.eventId || String(decision.kind || '').replace(/^event\//, '');
   const event = getEvent(data, eventId);
   if (!event) { log(state, `narrative: evento desconhecido ${eventId}`); return {}; }
-  const choice = event.choices?.find((c) => c.id === choiceId) || event.choices?.find((c) => c.id === decision.defaultChoice) || event.choices?.[0];
+  let choice = event.choices?.find((c) => c.id === choiceId) || event.choices?.find((c) => c.id === decision.defaultChoice) || event.choices?.[0];
   if (!choice) return {};
+  // 1950–3000 (D1): the cash may have gone since the card arrived; a choice the agency cannot pay any more is refused
+  // (the card stays), and an expired card falls back to its cheapest choice instead of digging a debt
+  const costM = longCampaign(state) ? choiceCostM(state, choice.effects) : 0;
+  if (costM > 0 && !budget.canAfford(state, state.playerId, costM)) {
+    if (!opts?.expired) return { ok: false, error: `Caixa insuficiente: custa ${budget.fmtMoney(costM)}.` };
+    choice = (event.choices || []).slice().sort((a, b) => choiceCostM(state, a.effects) - choiceCostM(state, b.effects))[0] || choice;
+  }
   const context = { ...(decision.payload?.context || {}), eventId, choiceId: choice.id, note: renderText(state, data, event.title, decision.payload?.context || {}) };
   applyEffects(state, data, choice.effects, context);
   if (event.chain?.id) ev.chains[event.chain.id] = event.chain.step ?? 1;
@@ -731,6 +761,9 @@ function signalContext(state, sig) {
   return base;
 }
 
+// signals that still raise a card outside the attention step (long steps): the player's own flights, crew and firsts
+const OWN_URGENT = /^(mission|crew|launch|first|colony|infra)/;
+
 function processSignals(state, data, ctx) {
   const ev = state.events;
   const sigs = state.signals || [];
@@ -758,14 +791,19 @@ function processSignals(state, data, ctx) {
       if (card && t?.name) card.headline = t.name;
     }
   }
-  // signal-triggered narrative events (at most one per week)
+  // signal-triggered narrative events (at most one per week); long steps (D1): reactions to other agencies wait for
+  // the attention step, reactions to the player's own flights, crew and treaties always show
+  const quiet = !attentionStep(state, ctx);
   const cands = [];
   for (const event of eventList(data)) {
     const t = event.trigger;
     if (!t?.signal || event.kind === 'operation') continue;
     // out-of-window events never draw from the rng: the result cannot depend on which era packs are loaded
     if (!eventInYear(state, data, event)) continue;
-    for (const sig of sigs) if (sig.type === t.signal && signalMatches(state, sig, t.signalWhere)) cands.push({ event, sig });
+    for (const sig of sigs) {
+      if (quiet && !(OWN_URGENT.test(sig.type || '') && (signalActor(state, sig) === pid || sig.actorId === pid))) continue;
+      if (sig.type === t.signal && signalMatches(state, sig, t.signalWhere)) cands.push({ event, sig });
+    }
   }
   if (!cands.length) return;
   // most certain reactions first (a crew death outranks a rival's press release); stable sort keeps data order
@@ -839,8 +877,11 @@ export function compact(state, data) {
 function maybeRandomEvent(state, data, ctx) {
   const ev = state.events;
   if (state.turn < 2 || pendingEvents(state).length >= PENDING_CAP) return;
+  // long steps (D1): random cards only in the attention step, at most one per step
+  const gated = attentionPeriod(state.clock?.stepWeeks) > 0;
+  if (gated && !attentionStep(state, ctx)) return;
   const since = ev.lastRandomTurn == null ? 6 : state.turn - ev.lastRandomTurn;
-  if (since < 2) return;
+  if (since < (gated ? state.clock.stepWeeks : 2)) return;
   let p = clamp(0.16 + 0.05 * (since - 3), 0.1, 0.65);
   if (ev.failStreak >= 3) p += 0.2; // recovery events should show up soon
   const rng = ctx.rng('random-event');
@@ -1049,6 +1090,37 @@ export function validateEvents(data) {
   return errors;
 }
 
+// ---------------------------------------------------------------- long steps: news thresholds (D1)
+
+const LOUD_TAGS = new Set(['gameover', 'era', 'ending', 'eco', 'debt']);
+// the player's own deeds keep their weight; the rest of the player's news (yearly budget, tension of its nation…) not
+const OWN_TAGS = new Set(['first', 'mission', 'launch', 'colony', 'crew', 'infra', 'investors']);
+/**
+ * Steps of a quarter or longer: a headline about other agencies or the world (rival firsts, crises, yearly budget
+ * moves, even of the player's own nation) no longer stops the clock. In the last substep of the step, importance-3
+ * news of this step drop to importance 2 unless they carry a loud tag (game over, era, ending, Eco, debt) or are the
+ * player's own deed (player in actors and a mission/first/crew/colony/infra/investors tag); the annals already
+ * noted them at their original importance.
+ */
+export function quietNews(state, ctx) {
+  const sw = state.clock?.stepWeeks ?? 1;
+  if (!attentionPeriod(sw) || !Array.isArray(state.news)) return 0;
+  const end = Number.isFinite(ctx?.stepEnd) ? ctx.stepEnd : state.turn + sw;
+  if (state.turn + Math.max(1, ctx?.dt ?? 1) < end) return 0;
+  const from = end - sw;
+  const pid = state.playerId;
+  let n = 0;
+  for (const it of state.news) {
+    if (it.turn < from) break;
+    const tags = it.tags || [];
+    if ((it.importance ?? 1) < 3 || tags.some((t) => LOUD_TAGS.has(t))) continue;
+    if ((it.actors || []).includes(pid) && tags.some((t) => OWN_TAGS.has(t))) continue;
+    it.importance = 2;
+    n++;
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------- module interface
 
 export function init(state, data, ctx) {
@@ -1060,9 +1132,15 @@ export function tick(state, data, ctx) {
   processSignals(state, data, ctx);
   fireScheduled(state, data, ctx);
   maybeRandomEvent(state, data, ctx);
+  quietNews(state, ctx);
   // forget per-mission bookkeeping for missions that no longer exist
   const live = new Set((state.missions || []).map((m) => m.id));
   for (const id of Object.keys(state.events.missionEvents)) if (!live.has(id)) delete state.events.missionEvents[id];
+}
+
+/** Year boundary: the news other modules wrote in their onYear (colonies, infra) obey the same long-step rule. */
+export function onYear(state, data, ctx) {
+  quietNews(state, ctx);
 }
 
 export function onGameEnd(state, data, ctx) {
@@ -1083,7 +1161,7 @@ export function onGameEnd(state, data, ctx) {
 export const actions = {};
 
 export const decisionHandlers = {
-  'event/*': (state, data, decision, choiceId) => resolveEvent(state, data, decision, choiceId),
+  'event/*': (state, data, decision, choiceId, opts) => resolveEvent(state, data, decision, choiceId, opts),
 };
 
 export const queries = {

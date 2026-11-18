@@ -7,6 +7,7 @@ import { h, raw, button, chip, bar, fmtMoney, fmtMonth, toast, openModal, confir
 import { emblemSVG as actorEmblemSVG } from './portrait.js';
 import { listRow, ensurePainelCss, openDecision, afterResolveTarget } from './decisions.js';
 import { screenHead, section, kpis, listCard, note, countChip, rerender } from './screen-kit.js';
+import { boardPending } from './screens.js';
 
 // B1's emblem renderer (§5.4 specs) when present; the round portrait emblem otherwise
 const emblemMod = await import('./emblem.js').catch(() => null);
@@ -235,7 +236,7 @@ export function render(container, store, route) {
   container.appendChild(root);
   if (!v) {
     root.append(screenHead({ title: 'Conselho', lead: 'Acionistas e mandatos' }),
-      emptyState(st?.cap ? 'O conselho ainda está se reunindo. Volte depois do próximo turno.' : 'Nesta partida a agência não tem acionistas.', 'acoes'));
+      emptyState(st?.cap || boardPending(st, store.data) ? 'O conselho se reúne pela primeira vez quando o tempo andar. Avance o tempo (+1 trimestre) para ver acionistas e mandatos.' : 'Nesta partida a agência não tem acionistas.', 'acoes'));
     return;
   }
   const again = () => rerender(container, render, store, route);
@@ -254,7 +255,7 @@ export function render(container, store, route) {
       { label: 'Valor da agência', value: fmtMoney(v.valuationM), sub: v.lastRoundTurn != null ? `última rodada ${fmtMonth(v.lastRoundTurn, st.startYear)}` : v.unlocked ? 'rodadas uma vez por ano' : `rodadas a partir de ${v.unlockYear}` },
       { label: 'Humor do conselho', value: mood == null ? '—' : String(mood), tone: mood != null && mood < 40 ? 'down' : mood != null && mood >= 60 ? 'up' : '', sub: mood == null ? 'sem sócios' : mi.label },
       { label: 'Missões por ano', value: String(v.agenda.K), sub: `${v.agenda.M} dos sócios · ${v.agenda.own} ${v.agenda.own === 1 ? 'sua' : 'suas'}` },
-      { label: `Suas em ${year}`, value: `${v.agenda.ownUsed}/${v.agenda.own}`, tone: v.agenda.ownUsed > v.agenda.own ? 'down' : '', sub: v.autonomous ? 'sem limite do conselho' : 'cota do conselho' },
+      { label: `Suas em ${year}`, value: `${v.agenda.ownUsed}/${v.agenda.own}`, tone: !v.autonomous && v.agenda.ownUsed > v.agenda.own ? 'down' : '', sub: v.autonomous ? 'sem limite do conselho' : 'cota do conselho' },
     ], { label: 'Números do conselho' }),
     v.round ? section('Rodada de investimento', { id: 'bd-rodada', right: countChip(v.round.offers.length) },
       ...v.round.offers.map((o) => offerCard(store, container, route, v, o)),

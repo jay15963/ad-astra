@@ -71,17 +71,19 @@ function agendaOf(store) {
 }
 
 /** "Agenda de 1962": own slots left vs the investors' share (EXPANSION.md §5.2). */
-function agendaStrip(store, a) {
+function agendaStrip(store, a, { compact = false } = {}) {
   if (!a) return null;
   const full = a.left <= 0;
-  return h('div', { class: ['ms-agenda', full && 'full'], role: 'group', 'aria-label': `Agenda de ${a.year}` },
+  // in the builder (compact) the strip is one line + slots while there is room: the type grid must fit a 320x640 screen
+  const brief = compact && (!full || !a.enforced);
+  return h('div', { class: ['ms-agenda', full && 'full', brief && 'compact'], role: 'group', 'aria-label': `Agenda de ${a.year}` },
     h('div', { class: 'ms-agenda-row' },
       h('span', { class: 'ms-eyebrow' }, `Agenda de ${a.year}`),
       h('span', { class: 'ms-agenda-pct tiny' }, `Você tem ${Math.round(a.playerPct)}%${a.binding ? ' · mandatos obrigatórios' : ' · autonomia'}`)),
     h('div', { class: 'ms-slots', 'aria-hidden': 'true' },
       ...Array.from({ length: a.own }, (_, i) => h('span', { class: ['ms-slot', 'own', i < a.used && 'used'] })),
       ...Array.from({ length: a.M }, () => h('span', { class: 'ms-slot inv' }))),
-    h('div', { class: 'tiny muted' }, full && !a.enforced
+    brief ? null : h('div', { class: 'tiny muted' }, full && !a.enforced
       ? `Cota própria de ${a.year} usada. Com autonomia o conselho não veta, mas os investidores esperam os mandatos deles.`
       : full
       ? `Sem vaga para missão própria até jan/${a.year + 1}. Os outros ${a.M} lugares são dos investidores.`
@@ -1204,7 +1206,7 @@ function builder(store, rerender) {
 
   const ag = agendaOf(store);
   return h('div', { class: 'builder' },
-    ag && !d.contractId ? agendaStrip(store, ag) : null,
+    ag && !d.contractId ? agendaStrip(store, ag, { compact: true }) : null,
     d.contractId ? h('div', { class: 'contract-banner' }, icon('transferir', 16, 'ms-note-ic'), h('span', null, 'Missão para contrato'), button('Remover', () => set({ contractId: null, source: 'custom' }), { kind: 'ghost', small: true })) : null,
     stepper, body, nav);
 }
@@ -1334,6 +1336,8 @@ function step1(store, d, opts, set, v2) {
   const selLock = d.type ? typeLock(missionTypeOf(d.type)) : null;
   return h('div', null,
     sectionTitle('Tipo de missão'),
+    // a new agency (1950, no technology) sees six padlocks: say why and where to start, before it picks anything
+    !d.type && TYPES.every((t) => typeLock(t)) ? lockNote(store, `Nenhum tipo de missão liberado ainda. Comece pela Pesquisa: ${typeLock(TYPES[0]).reason.replace(/\.$/, '')}.`, typeLock(TYPES[0])) : null,
     h('div', { class: 'type-grid' }, TYPES.map((t) => {
       const lk = typeLock(t);
       return h('button', {

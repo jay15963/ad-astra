@@ -839,7 +839,8 @@ export function render(container, store, opts = {}) {
       if (l.level === 0 && V.k < 3) continue;
       if (l.level === 1 && V.k < 1.4) continue;
       const word = V.k >= 2.2 || l.level >= 3 ? ` ${shortLevel(l.level)}` : '';
-      const txt = `${LINE_ICON[l.level]} ${l.level}${word}`;
+      // the digit is the tension LEVEL (0-4), not a count: with the word shown it reads as "3 conflito", so the word replaces it
+      const txt = word ? `${LINE_ICON[l.level]}${word}` : `${LINE_ICON[l.level]} ${l.level}`;
       const bopt = { fs: fs * 0.72, bold: l.level >= 3 };
       const [bw, bh] = pillSize(ctx, txt, bopt);
       // slide along the line's normal until it clears HQ tags, other badges and the controls

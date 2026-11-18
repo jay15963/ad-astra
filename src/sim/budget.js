@@ -27,6 +27,56 @@ const DEBT_GRACE = 6;
 /** Weeks in the red after which support 0 means being fired. */
 const FIRE_AFTER = 8;
 const FUNDS_COOLDOWN = 26;
+/** Share of the yearly budget the player's research payments never touch (1950–3000 campaign, D1). */
+const RESEARCH_RESERVE = 0.08;
+
+// ---------- attention windows (Phase D1: stops per turn 0.15–0.35 in eras 5–7) ----------
+// With steps of a quarter or longer, every step used to stop on something (a contract, an event card, a round, a
+// mandate…). Non-urgent cards of the player's own modules (narrative, missions, investors, market) now arrive
+// together in "attention" steps; urgent ones (launches, crises, derelicts, the board) are not gated. A step is an
+// attention step when the modules that tick before budget (politics, diplomacy, calendar) already raised a card in
+// it (the clock stops there anyway), or when ATTENTION_EVERY steps went by without one. budget.tick decides it in
+// the step's first substep (slice state.finance.attn = {end, on, last}); without that decision (unit tests calling
+// a module alone) the periodic rule holds. Steps shorter than ATTENTION_MIN_STEP weeks (eras 1–4, the Corrida Lunar)
+// are never gated.
+export const ATTENTION_MIN_STEP = 13;
+export const ATTENTION_EVERY = 6;
+
+/** Weeks of one attention window at this step length (0 = not gated). Pure. */
+export function attentionPeriod(stepWeeks) {
+  const sw = Math.max(1, Math.round(Number(stepWeeks) || 1));
+  return sw >= ATTENTION_MIN_STEP ? sw * ATTENTION_EVERY : 0;
+}
+
+/**
+ * True when non-urgent cards may be pushed in the current step: always with short steps; with long steps only in the
+ * step that contains a multiple of the attention period (the first quarter of each year in era 5, every other year in
+ * era 6, every fourth year in era 7). Works from any substep (reads ctx.stepEnd and the clock's step length).
+ */
+export function attentionStep(state, ctx) {
+  const sw = state?.clock?.stepWeeks ?? 1;
+  const P = attentionPeriod(sw);
+  if (!P) return true;
+  const end = Number.isFinite(ctx?.stepEnd) ? ctx.stepEnd : (state.turn || 0) + sw;
+  const s = state.finance?.attn;
+  if (s && s.end === end) return !!s.on;
+  return Math.floor((end - 1) / P) > Math.floor((end - 1 - sw) / P);
+}
+
+/** budget.tick, first substep of a long step: is this an attention step? (see attentionStep) */
+function planAttention(state, ctx) {
+  const sw = state.clock?.stepWeeks ?? 1;
+  const P = attentionPeriod(sw);
+  const f = state.finance;
+  if (!P || !Number.isFinite(ctx?.stepEnd)) { if (f.attn) delete f.attn; return; }
+  const s = f.attn || (f.attn = { end: null, on: false, last: null });
+  if (s.end === ctx.stepEnd) return;
+  const start = state.turn;
+  s.end = ctx.stepEnd;
+  const others = (state.decisions || []).some((d) => (d.createdTurn ?? -1) >= start);
+  s.on = others || !Number.isFinite(s.last) || start - s.last >= P;
+  if (s.on) s.last = start;
+}
 
 /** "US$ 1,2 bi" / "US$ 350 mi" */
 export function fmtMoney(m) {
@@ -98,6 +148,12 @@ export function spend(state, actorId, amount, category = 'missions', note = '') 
   if (!state.actors?.[actorId]) return false;
   if (amt <= 0) return true;
   if (!canAfford(state, actorId, amt)) return false;
+  // 1950–3000 (D1): the player's weekly research payments keep a reserve of RESEARCH_RESERVE × budget (about a month
+  // of fixed costs) and the projects wait for money. Before, research ate every week's income at the edge of the
+  // credit line, the fixed costs pushed the cash below zero and a small agency stayed in the red for months until
+  // the government fired it.
+  if (category === 'research' && actorId === state.playerId && Number.isFinite(state.endTurn) && state.endTurn > 520
+    && (state.actors[actorId].cash || 0) - amt < (state.actors[actorId].budget || 0) * RESEARCH_RESERVE) return false;
   changeActor(state, actorId, 'cash', -amt);
   record(state, actorId, -amt, category, note);
   return true;
@@ -331,6 +387,12 @@ function debtWeek(state) {
   const f = fin(state);
   const me = state.actors?.[state.playerId];
   if (!me) return;
+  // D1: with steps of a quarter or longer the player only sees the red at the end of a step; the grace, the pace of
+  // the support bleed and the firing threshold stretch by one step so there is always one step to react
+  const sw = state.clock?.stepWeeks ?? 1;
+  const slack = attentionPeriod(sw) ? sw : 0;
+  const grace = DEBT_GRACE + slack;
+  const pace = Math.max(6, slack);
   if ((me.cash || 0) < 0) {
     f.debtWeeks += 1;
     // 8 weeks of hysteresis: a cash line hovering around zero does not flip the headline every week
@@ -339,23 +401,23 @@ function debtWeek(state) {
       f.redCount = (f.redCount || 0) + 1;
       addNews(state, { headline: pickV(RED_HEADLINES, f.redCount - 1), body: 'O tesouro cobre por enquanto, mas o governo está de olho.', tags: ['budget'], actors: [state.playerId], importance: 2, icon: 'budget' });
     }
-    if (f.debtWeeks >= DEBT_GRACE) {
-      const cut = 1 + Math.floor((f.debtWeeks - DEBT_GRACE) / 6);
+    if (f.debtWeeks >= grace) {
+      const cut = 1 + Math.floor((f.debtWeeks - grace) / pace);
       changeActor(state, state.playerId, 'support', -cut);
       // first warning, then every 16 weeks of the same streak (and never twice within 16 weeks across streaks)
-      if ((f.debtWeeks === DEBT_GRACE || (f.debtWeeks - DEBT_GRACE) % 16 === 0) && state.turn - (f.debtNewsTurn ?? -99) >= 16) {
+      if ((f.debtWeeks === grace || (f.debtWeeks - grace) % 16 === 0) && state.turn - (f.debtNewsTurn ?? -99) >= 16) {
         f.debtNewsTurn = state.turn;
         f.debtCount = (f.debtCount || 0) + 1;
-        addNews(state, { headline: pickV(DEBT_HEADLINES, f.debtCount - 1)(f.debtWeeks), body: 'Parlamentares pedem cortes e a imprensa fala em descontrole.', tags: ['budget', 'politics'], actors: [state.playerId], importance: 3, icon: 'budget' });
+        addNews(state, { headline: pickV(DEBT_HEADLINES, f.debtCount - 1)(f.debtWeeks), body: 'Parlamentares pedem cortes e a imprensa fala em descontrole.', tags: ['budget', 'politics', 'debt'], actors: [state.playerId], importance: 3, icon: 'budget' });
       }
     }
-    if (f.debtWeeks >= FIRE_AFTER && (me.support ?? 0) <= 0 && !state.gameOver) {
+    if (f.debtWeeks >= FIRE_AFTER + slack && (me.support ?? 0) <= 0 && !state.gameOver) {
       state.gameOver = { reason: 'fired', turn: state.turn, summary: `Depois de ${f.debtWeeks} semanas no vermelho, o governo perdeu a paciência e trocou a direção da agência.` };
       addNews(state, { headline: 'Direção da agência é demitida', body: state.gameOver.summary, tags: ['budget', 'gameover'], actors: [state.playerId], importance: 3, icon: 'budget' });
       log(state, 'budget: game over (fired)');
     }
   } else if (f.debtWeeks > 0) {
-    if (f.debtWeeks >= DEBT_GRACE && state.turn - (f.redNewsTurn ?? -99) >= 8 && state.turn - (f.outNewsTurn ?? -99) >= 26) {
+    if (f.debtWeeks >= grace && state.turn - (f.redNewsTurn ?? -99) >= 8 && state.turn - (f.outNewsTurn ?? -99) >= 26) {
       f.outNewsTurn = state.turn;
       f.outCount = (f.outCount || 0) + 1;
       addNews(state, { headline: pickV(OUT_OF_RED, f.outCount - 1), body: 'O caixa voltou a ficar positivo.', tags: ['budget'], actors: [state.playerId], importance: 1, icon: 'budget' });
@@ -366,6 +428,7 @@ function debtWeek(state) {
 
 export function tick(state, data, ctx) {
   fin(state);
+  planAttention(state, ctx);
   // year rollover (politics already adjusted actor.budget earlier in this tick)
   if (state.turn > 0 && crossed(state, ctx, WEEKS, 0)) closeYear(state);
   const live = new Set();

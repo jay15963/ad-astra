@@ -249,7 +249,7 @@ export function render(container, store, route) {
     mine.length ? section('Suas ofertas', { right: countChip(mine.length) },
       listCard(mine.map((o) => listRow({
         lead: emblem(st, o.buyerId, 30), leadCls: 'pn-emblem', title: `${o.vehicleName} para ${o.buyerName}`,
-        sub: `${o.units} lançamentos a ${fmtMoney(o.priceM)} · chance ${pctText(o.p)}`, right: chip('aguardando', 'info'),
+        sub: `${o.units} ${o.units === 1 ? 'lançamento' : 'lançamentos'} a ${fmtMoney(o.priceM)} · chance ${pctText(o.p)}`, right: chip('aguardando', 'info'), cls: 'wrap',
       })))) : null,
     section('Seus foguetes', { right: countChip(v.sellables.length) },
       v.sellables.length ? v.sellables.map((s) => rocketCard(store, again, st, v, s))

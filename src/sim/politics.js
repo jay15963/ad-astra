@@ -11,7 +11,7 @@
 import { clamp, relKey, addNews, pushDecision, emitSignal, changeActor, log } from '../core/helpers.js';
 import { rngFor } from '../core/rng.js';
 import { turnToDate, dateToTurn, WEEKS_PER_YEAR } from '../core/time.js';
-import { crossed, monthCrossed } from './simtime.js';
+import { crossed, monthCrossed, dtOf } from './simtime.js';
 
 /** Static content cache so setTension(state, ...) can phrase news without a data argument. */
 let DATA = null;
@@ -760,12 +760,16 @@ function tensionDynamics(state, data, rng) {
     return v;
   };
   const PL = pairList(w);
+  const st = pairStatics(PL, data);
   for (let pi = 0; pi < PL.keys.length; pi++) {
     const pk = PL.keys[pi], p = PL.objs[pi];
-    const def = pairDef(data, pk) || EMPTY_DEF;
+    const def = st.defs[pi];
     let drive = ((def.baseline ?? 0.2) - p.level) * (M.meanReversion ?? 0.12);
-    // diplomacy relations between lead agencies (if diplomacy runs)
-    const rel = state.relations?.[relKey(lead(p.a), lead(p.b))];
+    // diplomacy relations between lead agencies (if diplomacy runs); the pair's last key is reused while the leads hold
+    const la0 = lead(p.a), lb0 = lead(p.b);
+    let rk = st.relKeys[pi];
+    if (!rk || rk.a !== la0 || rk.b !== lb0) rk = st.relKeys[pi] = { a: la0, b: lb0, k: relKey(la0, lb0) };
+    const rel = state.relations?.[rk.k];
     if (rel) drive += (((rel.rivalry ?? 30) - 40) / 100) * (M.rivalryFactor ?? 0.08) - ((rel.trust ?? 0) / 100) * (M.trustFactor ?? 0.05);
     // hawkish governments push up
     const ha = hawk(p.a);
@@ -777,8 +781,8 @@ function tensionDynamics(state, data, rng) {
     const ib = instability(p.b);
     if (ib !== null) drive += ib;
     // bilateral peaceful treaties dampen
-    const la = lead(p.a);
-    const lb = lead(p.b);
+    const la = la0;
+    const lb = lb0;
     const peace = la === lb ? (state.treaties || []).filter((t) => t?.status === 'active' && t.parties?.includes(la)).length : (peaceIdx.get(relKey(la, lb)) || 0);
     drive -= Math.min(3, peace) * (M.peaceTreaty ?? 0.02);
     drive -= drag[p.level] || 0; // war exhaustion
@@ -787,8 +791,22 @@ function tensionDynamics(state, data, rng) {
     const dwell = state.turn - (p.sinceTurn ?? 0) >= (M.minDwellWeeks ?? 8);
     if (!dwell) continue;
     if (p.level < 4 && p.pressure > up[p.level]) applyLevel(state, data, pk, p.level + 1, 'escalada');
-    else if (p.level > pairFloor(data, pk) && p.pressure < -(M.down ?? 0.55)) applyLevel(state, data, pk, p.level - 1, 'distensão');
+    else if (p.level > (def.floor ?? 0) && p.pressure < -(M.down ?? 0.55)) applyLevel(state, data, pk, p.level - 1, 'distensão');
   }
+}
+
+// data definition of each pair of the cached pair list (EMPTY_DEF when none; pairFloor reads def.floor the same way)
+// and a slot for its lead-agency relation key, rebuilt with the list or when the data changes (not saved)
+const PAIR_STATICS = { list: null, keys: null, data: null, defs: [], relKeys: [] };
+function pairStatics(PL, data) {
+  if (PAIR_STATICS.list !== PL || PAIR_STATICS.keys !== PL.keys || PAIR_STATICS.data !== data) {
+    PAIR_STATICS.list = PL;
+    PAIR_STATICS.keys = PL.keys;
+    PAIR_STATICS.data = data;
+    PAIR_STATICS.defs = PL.keys.map((pk) => pairDef(data, pk) || EMPTY_DEF);
+    PAIR_STATICS.relKeys = new Array(PL.keys.length).fill(null);
+  }
+  return PAIR_STATICS;
 }
 
 function startCrisis(state, data, nid, type, rng, severity = 1) {
@@ -1138,9 +1156,12 @@ function resolveElection(state, data, e, rng) {
 function electionsWeekly(state, data, ctx) {
   const w = state.world;
   const em = PD(data).electionModel || {};
+  const dt = dtOf(ctx);
   for (const e of w.elections) {
     if (e.done) continue;
-    if (state.turn === e.turn - (em.announceWeeks ?? 4) && e.weight >= 0.5 && e.kind !== 'budget_summit') {
+    // the announcement week falls inside this tick's window [turn, turn + dt) (dt = 1: turn === announce week)
+    const at = e.turn - (em.announceWeeks ?? 4);
+    if (at >= state.turn && at < state.turn + dt && e.weight >= 0.5 && e.kind !== 'budget_summit') {
       pnews(state, data, 'election_upcoming', ev(e), { importance: 1, tags: ['election'] });
     }
     if (state.turn >= e.turn) resolveElection(state, data, e, ctx.rng(`election:${e.id}`));
@@ -2377,8 +2398,13 @@ export const queries = {
 
 // ---------------------------------------------------------------- 1950–3000 contract (EXPANSION.md §1.5, §3)
 
-/** Monthly economy, weekly elections and funding rounds: substepped week by week by the engine. */
-export const meta = { maxDt: 1 };
+/**
+ * Monthly economy and tension, elections, funding rounds and demands. Substepped by the engine in windows of at most
+ * 4 weeks: a month (52/12 weeks) never starts twice inside one window, so monthCrossed() fires exactly once per month
+ * as week by week; the weekly checks compare against the window (election announcements) or fire at its first week
+ * (elections, rounds and demands due inside it), at a quarter of the weekly overhead.
+ */
+export const meta = { maxDt: 4 };
 
 /**
  * Create the political entry of a nation (idempotent): government, economy, tension pairs with every live nation

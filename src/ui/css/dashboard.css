@@ -133,7 +133,7 @@ body {
 .pn-row.pn-hist .pn-top { align-items: flex-start; }
 .pn-row.pn-hist .pn-name { white-space: normal; font-weight: 400; font-size: var(--t12, 13px); color: var(--pn-text-2); }
 .pn-row.pn-hist .pn-meta { padding-top: 2px; }
-.pn-row.trait .pn-sub { white-space: normal; }
+.pn-row.trait .pn-sub, .pn-row.wrap .pn-sub { white-space: normal; }
 
 /* ---------- decision rows (dashboard, Missões, Mundo) ---------- */
 .decision-face { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--pn-s3); overflow: hidden; display: grid; place-items: center; }

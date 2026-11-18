@@ -133,5 +133,6 @@
 .fa-entry-em { flex: none; width: 40px; height: 40px; }
 .fa-entry-em svg { display: block; }
 .fa-entry .list-text { flex: 1; min-width: 0; }
+.fa-entry .list-sub { white-space: normal; }
 .fa-sheet { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .fa-modal .modal-body { overflow-x: hidden; }

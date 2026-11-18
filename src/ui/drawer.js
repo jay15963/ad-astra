@@ -102,7 +102,7 @@ export function createDrawer({ onPick, onOpenChange, header } = {}) {
             onclick: () => onPick?.(d),
           },
           raw(iconSVG(d.icon, 20), 'gaveta-ic'),
-          h('span', { class: 'gaveta-rotulo' }, d.title),
+          h('span', { class: 'gaveta-rotulo' }, d.lockedNow && d.short ? d.short : d.title),
           d.soon ? h('span', { class: 'gaveta-breve' }, 'em breve') : (d.lockedNow ? h('span', { class: 'gaveta-breve' }, d.lockedNow) : null),
           dot));
         }

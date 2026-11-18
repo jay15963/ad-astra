@@ -30,7 +30,11 @@ export function render(container, store) {
     return;
   }
   wrap.append(
-    kpis(m.lean.map((l) => ({ label: l.label, value: String(l.value), sub: l.label === m.dominant ? 'para onde a agência pende' : `${Math.round(l.share * 100)}% da inclinação` })), { label: 'Inclinação da agência' }),
+    // the dominant lean first and wide (one tile + two halves, no empty cell); every tile shows its share
+    kpis(m.lean.slice().sort((a, b) => (b.label === m.dominant) - (a.label === m.dominant)).map((l) => ({
+      label: l.label, value: String(l.value), wide: l.label === m.dominant,
+      sub: l.label === m.dominant ? `${Math.round(l.share * 100)}% da inclinação · para onde a agência pende` : `${Math.round(l.share * 100)}% da inclinação`,
+    })), { label: 'Inclinação da agência' }),
     section('Peças', { right: countChip(m.count) }, listCard(m.pieces.map((p) => listRow({
       lead: h('span', { class: 'mono' }, p.era ? String(p.era) : '·'), title: p.title, sub: p.line || null, meta: p.year != null ? String(p.year) : '',
     })))),

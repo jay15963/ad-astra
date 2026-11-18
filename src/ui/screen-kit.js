@@ -32,9 +32,11 @@ export const countChip = (n) => h('span', { class: 'pn-count' }, String(n));
  */
 export function kpis(items, { label = 'Números' } = {}) {
   const list = (items || []).filter(Boolean);
+  // two columns: an odd count would leave a hole at the end, so the last tile spans the row (unless one is wide already)
+  if (list.length > 1 && list.length % 2 && !list.some((k) => k.wide)) list[list.length - 1] = { ...list[list.length - 1], wide: true, fill: true };
   return h('section', { class: 'tiles tela-kpis', 'aria-label': label }, list.map((k) => {
     const tag = typeof k.onClick === 'function' ? 'button' : 'div';
-    return h(tag, { class: ['tile', k.wide && 'tile-wide', tag === 'div' && 'tile-static'], type: tag === 'button' ? 'button' : null, onclick: k.onClick || null },
+    return h(tag, { class: ['tile', k.wide && 'tile-wide', k.fill && 'tile-fill', tag === 'div' && 'tile-static'], type: tag === 'button' ? 'button' : null, onclick: k.onClick || null },
       h('span', { class: 'tile-label' }, k.label),
       h('span', { class: 'tile-main' }, h('span', { class: ['tile-value', k.tone] }, k.value)),
       k.sub ? h('span', { class: 'tile-sub' }, k.sub) : null,

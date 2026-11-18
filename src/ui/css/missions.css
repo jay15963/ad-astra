@@ -397,6 +397,7 @@ body.reduce-motion .missions > * { animation: none; }
   background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0;
 }
 .ms-agenda.full { border-color: #a78bfa40; }
+.ms-agenda.compact { gap: 6px; padding: 10px 14px; }
 .ms-agenda-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .ms-agenda-pct { color: var(--text-2); }
 .ms-slots { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -516,4 +517,4 @@ body.reduce-motion .missions > * { animation: none; }
 .missions .ms-preview-title { font-weight: 650; font-size: var(--t14); line-height: 1.3; overflow-wrap: anywhere; }
 .missions .ms-preview .kv-row > span:last-child { max-width: 62%; }
 .missions .ms-preview p { margin: 0; }
-
+

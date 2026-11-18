@@ -280,6 +280,8 @@ export function capacityTo(data, vehicleId, destinationId) {
   const v = vehicleById(data, vehicleId);
   if (!v?.capacity) return 0;
   const d = destinationById(data, destinationId);
+  // a rocket may carry its own figure for one destination (Mercury-Redstone: suborbital only, no orbit)
+  if (d && Number.isFinite(v.capacity[d.id])) return Math.round(v.capacity[d.id] * 100) / 100;
   const key = d?.capacityKey || destinationId;
   const cap = (v.capacity[key] || 0) * (d?.capacityFactor ?? 1);
   return Math.round(cap * 100) / 100;
@@ -426,6 +428,8 @@ export function accessFor(state, data, actorId, item) {
   if (item.access === 'generic' || !item.operator) return { ok: true, reason: null };
   const ctrl = item.tensionActor || item.operator;
   if (ctrl === actorId || item.operator === actorId) return { ok: true, reason: null };
+  // hardware of an absorbed lineage belongs to the survivor (ABMA's Juno rockets → NASA, 1960)
+  if (state?.lifecycle?.aliases?.[item.operator] && resolveActorId(state, item.operator) === actorId) return { ok: true, reason: null };
   if ((item.embargo || []).includes(actorId)) return { ok: false, reason: 'Embargo: o operador não vende para você' };
   const t = tensionBetween(state, actorId, ctrl);
   if (t >= 3) return { ok: false, reason: `Bloqueado pela tensão com ${actorName(state, data, ctrl)}` };
@@ -633,15 +637,17 @@ function settleAsHistory(state, data, inst, item) {
 
 /** An item dated before the scenario start: its real outcome at its real date, firsts kept if unclaimed, no news. */
 function settleBeforeStart(state, data, inst, item) {
-  const h = item.historicalOutcome;
-  const level = h === 'failure' ? 'failure' : h === 'partial' ? 'partial' : 'total';
-  inst.status = level === 'failure' ? 'failed' : level === 'partial' ? 'partial' : 'success';
-  inst.outcome = { level, failureType: null, phase: 'arrival' };
+  // same scale as a flown historical item (historicalResult); items without a real outcome count as flown
+  const hr = historicalResult(data, item) || { level: 'total', failureType: null, phase: 'arrival', vehicleFails: false, lostCrew: false };
+  const level = hr.level;
+  const ok = OK_LEVELS.includes(level);
+  inst.status = level === 'total' ? 'success' : level === 'partial' ? 'partial' : 'failed';
+  inst.outcome = { level, failureType: hr.failureType, phase: hr.phase || 'arrival' };
   inst.launchTurn = inst.plannedTurn;
   inst.currentTurn = inst.plannedTurn;
   inst.resolvedTurn = inst.plannedTurn;
-  inst.history.push({ turn: inst.plannedTurn, level, phase: 'ascent', attempt: 0, vehicleOk: level !== 'failure', craftJudged: true, retro: true });
-  if (level === 'failure') return;
+  inst.history.push({ turn: inst.plannedTurn, level, phase: 'ascent', attempt: 0, vehicleOk: !hr.vehicleFails, craftJudged: true, retro: true, ...(hr.lostCrew ? { lostCrew: true } : {}) });
+  if (!ok) return;
   state.firsts = state.firsts || {};
   for (const mid of milestonesFor(state, data, item)) {
     if (state.firsts[mid]) continue;
@@ -1337,13 +1343,95 @@ function cancel(state, data, inst, item, reason, extra = {}) {
   changeActor(state, item.owner, 'support', -(item.importance || 1));
 }
 
+// ---------------------------------------------------------------- history (EXPANSION §2.2)
+
+/**
+ * The real outcome of a historical item (`truthLayer: 'fato'` with `historicalOutcome`), or null for any other item.
+ * `historicalFailure` (optional) says where it went wrong and whether the crew died:
+ * {phase: 'ascent'|'arrival', failureType, lostCrew, vehicleOk}. Without it a failure is a launch failure for Earth
+ * destinations and an arrival failure for probes to other worlds; a partial result is judged on the spacecraft (the
+ * rocket did its job). History is data, not dice: no rng draw decides a historical result.
+ */
+export function historicalResult(data, item) {
+  if (!item || item.truthLayer !== 'fato' || !item.historicalOutcome) return null;
+  const level = item.historicalOutcome === 'failure' ? 'failure' : item.historicalOutcome === 'partial' ? 'partial' : 'total';
+  const h = item.historicalFailure || {};
+  const dest = destinationById(data, item.destination);
+  const hasArrival = (dest?.arrivalMilestones?.length || 0) > 0;
+  let phase = h.phase === 'ascent' || h.phase === 'arrival' ? h.phase : null;
+  if (!hasArrival) phase = 'ascent';
+  else if (!phase) phase = level === 'failure' && dest?.body === 'earth' ? 'ascent' : 'arrival';
+  const failureType = level === 'total' ? null
+    : FAILURE_TYPES.includes(h.failureType) ? h.failureType : level === 'failure' && phase === 'ascent' ? 'propulsion' : 'structure';
+  // a partial result, an arrival failure or a spacecraft lost after a good launch (Soyuz 1, Columbia) never blows up the rocket
+  const vehicleFails = level === 'failure' && phase === 'ascent' && h.vehicleOk !== true;
+  const lostCrew = level === 'failure' && !!item.crewed && !!h.lostCrew;
+  // outcome scale of core/outcome.js: a crew that came home is a recoverable failure, the rest is a loss
+  const scale = level === 'failure' ? (item.crewed && !lostCrew ? 'recoverable' : 'catastrophic') : level;
+  return { level: scale, failureType, phase, vehicleFails, lostCrew };
+}
+
+const actorLive = (state, id) => !!state?.actors?.[id];
+
+/**
+ * canon.requires of an item (EXPANSION §2.2): the history it presupposes. Read only in campaigns with a live
+ * lifecycle (the Corrida Lunar keeps its world). Returns null (history holds), {wait: itemId} (an earlier item has not
+ * flown yet) or {reason} (pt-BR: why it no longer happens). onBreak 'reassign' accepts an owner absorbed by a living
+ * successor (the program goes on under the new name).
+ */
+export function canonStatus(state, data, item) {
+  const req = item?.canon?.requires;
+  if (!req || !state?.lifecycle || data?.scenario?.id === 'lunar_race') return null;
+  const reassign = item.canon.onBreak === 'reassign';
+  const alive = (id) => actorLive(state, id) || (reassign && actorLive(state, resolveActorId(state, id)));
+  const need = [];
+  if (req.actorsAlive === true) need.push(item.owner, ...(item.partners || []));
+  for (const id of [].concat(req.actorAlive || [])) if (!need.includes(id)) need.push(id);
+  for (const id of need) if (!alive(id)) return { reason: `${actorName(state, data, id)} não existe mais` };
+  if (Number.isFinite(req.maxTension)) {
+    const parties = [item.owner, ...(item.partners || [])];
+    for (let i = 0; i < parties.length; i++) for (let j = i + 1; j < parties.length; j++) {
+      if (tensionBetween(state, parties[i], parties[j]) >= req.maxTension) return { reason: 'a tensão entre os parceiros impediu o voo' };
+    }
+  }
+  for (const id of [].concat(req.items || [])) {
+    if (!calendarItem(data, id)) continue; // an item outside the loaded data says nothing
+    const p = instanceOrPast(state, id);
+    if (!p) return { wait: id };
+    if (p.status === 'cancelled') return { reason: `${calendarItem(data, id).name} não aconteceu` };
+    if (p.status === 'planned' || p.status === 'launched' || (p.status === 'player' && !p.outcome)) return { wait: id };
+  }
+  return null;
+}
+
+/** History broke (canon.onBreak drop/retarget): the item leaves the calendar with one news item, no penalty. */
+function dropFromCanon(state, data, inst, item, reason) {
+  inst.status = 'cancelled';
+  inst.resolvedTurn = state.turn;
+  inst.canonBroken = true;
+  emitSignal(state, 'calendar/delayed', { calendarId: inst.id, weeks: 0, reason: 'cancelled' });
+  addNews(state, {
+    headline: `A história muda: ${item.name} não acontece`,
+    body: `Na história real, ${item.name} voou em ${fmt(state, data, inst.plannedTurn)}. Neste mundo, ${reason}.`,
+    tags: ['calendar', 'cancelled'], actors: [item.owner, ...(item.partners || [])].filter((id) => actorLive(state, id)),
+    importance: clamp((item.importance || 1) - 1, 1, 2), icon: '🔀',
+  });
+}
+
 // ---------------------------------------------------------------- launch and arrival
 
 function tryLaunch(state, data, inst, item, rng) {
   const turn = state.turn;
-  // 1. fleet grounded after a failure (return to flight)
+  const hist = historicalResult(data, item);
+  // 0. the history this item presupposes (canon.requires)
+  const canon = canonStatus(state, data, item);
+  if (canon?.reason) return dropFromCanon(state, data, inst, item, canon.reason);
+  if (canon?.wait && !(item.prerequisites || []).includes(canon.wait)) {
+    return applySlip(state, data, inst, item, 0, 'prereqWait', rng, { toTurn: turn + 4, prereqName: calendarItem(data, canon.wait)?.name || canon.wait });
+  }
+  // 1. fleet grounded after a failure (return to flight); history flies on its real date
   const st = state.vehicleStats[item.vehicleId];
-  if (isGrounded(state, item.vehicleId)) {
+  if (!hist && isGrounded(state, item.vehicleId)) {
     return applySlip(state, data, inst, item, 0, 'grounded', rng, { toTurn: st.groundedUntil + rng.int(1, 4) });
   }
   // 2. prerequisites
@@ -1354,6 +1442,7 @@ function tryLaunch(state, data, inst, item, rng) {
     const pItem = calendarItem(data, pid);
     const pInst = calendarInstance(state, pid);
     const prereqName = pItem?.name || pid;
+    if (hist && s === 'failed') continue; // history went on after that failure (Falcon 1 flights 2–4)
     if (s === 'pending') {
       const ref = pInst?.status === 'launched' ? pInst.arrivalTurn : pInst?.status === 'planned' ? pInst.currentTurn : turn;
       const toTurn = Math.max(turn + 4, (ref ?? turn) + PREREQ_GAP_WEEKS);
@@ -1368,8 +1457,7 @@ function tryLaunch(state, data, inst, item, rng) {
   const win = nextWindow(state, data, item.destination, turn, item);
   if (!win.isOpen) return applySlip(state, data, inst, item, 0, 'windowMissed', rng, { toTurn: win.openTurn });
   // 4. last-week scrub (never for historical facts)
-  const historical = item.truthLayer === 'fato' && item.historicalOutcome;
-  if (!historical && rng.chance(SCRUB_CHANCE)) {
+  if (!hist && rng.chance(SCRUB_CHANCE)) {
     const w = rng.int(1, 2);
     if (win.closeTurn === Infinity || turn + w < win.closeTurn) {
       inst.currentTurn += w;
@@ -1403,12 +1491,13 @@ function arrivalWeights(dest) {
 
 function launch(state, data, inst, item, rng) {
   const turn = state.turn;
-  const historical = item.truthLayer === 'fato' && item.historicalOutcome;
+  const hist = historicalResult(data, item);
   const n = Math.max(1, item.launches || 1);
   let ascent = { level: 'total', failureType: null };
   let vehicleOk = true;
   for (let i = 0; i < n; i++) {
-    const o = historical ? { level: 'total', failureType: null } : quick(rng, vehicleSuccessP(state, data, item.vehicleId, item.owner), { failureWeights: ASCENT_WEIGHTS, crewed: !!item.crewed });
+    // history: the last launch of the item is the one that failed (if any)
+    const o = hist ? (hist.vehicleFails && i === n - 1 ? { level: hist.level, failureType: hist.failureType } : { level: 'total', failureType: null }) : quick(rng, vehicleSuccessP(state, data, item.vehicleId, item.owner), { failureWeights: ASCENT_WEIGHTS, crewed: !!item.crewed });
     const ok = OK_LEVELS.includes(o.level);
     recordFlight(state, item.vehicleId, ok);
     ascent = worse(ascent, o);
@@ -1420,8 +1509,8 @@ function launch(state, data, inst, item, rng) {
 
   const dest = destinationById(data, item.destination);
   const hasArrival = (dest?.arrivalMilestones?.length || 0) > 0;
-  if (!hasArrival) {
-    const o2 = historical ? { level: 'total', failureType: null } : quick(rng, craftSuccessP(state, data, item), { failureWeights: ASCENT_WEIGHTS, crewed: !!item.crewed });
+  if (!hasArrival || hist?.phase === 'ascent') {
+    const o2 = hist ? { level: hist.level, failureType: hist.failureType } : quick(rng, craftSuccessP(state, data, item), { failureWeights: ASCENT_WEIGHTS, crewed: !!item.crewed });
     return finish(state, data, inst, item, worse(ascent, o2), 'ascent', rng, { vehicleOk: true, craftJudged: true });
   }
   inst.status = 'launched';
@@ -1439,9 +1528,9 @@ function launch(state, data, inst, item, rng) {
 }
 
 function resolveArrival(state, data, inst, item, rng) {
-  const historical = item.truthLayer === 'fato' && item.historicalOutcome;
+  const hist = historicalResult(data, item);
   const dest = destinationById(data, item.destination);
-  const o2 = historical ? { level: 'total', failureType: null } : quick(rng, craftSuccessP(state, data, item), { failureWeights: arrivalWeights(dest), crewed: !!item.crewed });
+  const o2 = hist ? { level: hist.level, failureType: hist.failureType } : quick(rng, craftSuccessP(state, data, item), { failureWeights: arrivalWeights(dest), crewed: !!item.crewed });
   finish(state, data, inst, item, worse({ level: inst.ascentLevel || 'total', failureType: null }, o2), 'arrival', rng, { vehicleOk: true, craftJudged: true });
 }
 
@@ -1520,7 +1609,8 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
   // crewed failures without a scene: the same deaths-per-failure the player's scenes give (data/crew.json
   // config.backgroundCrewLoss), less the owner's crew-safety research
   const crewDest = destinationById(data, item.destination);
-  const lostCrew = !!item.crewed && rng.chance(backgroundCrewLoss(data, {
+  const hist = historicalResult(data, item);
+  const lostCrew = hist ? hist.lostCrew : !!item.crewed && rng.chance(backgroundCrewLoss(data, {
     phase, landing: phase === 'arrival' && crewDest?.kind === 'surface', safety: 0.5 * techBonusFor(state, data, owner, 'crewSafety'),
   }));
   if (lostCrew && inst.history.length) inst.history[inst.history.length - 1].lostCrew = true;
@@ -1528,19 +1618,20 @@ function finish(state, data, inst, item, outcome, phase, rng, flags) {
   changeActor(state, owner, 'reputation', lostCrew ? -6 : -imp);
   addNews(state, {
     headline: fill(pickText(data, lostCrew ? 'lostCrew' : 'failed', inst.id, turn), vars),
-    body: lostCrew ? fill(newsText(data, 'lostCrewBody'), vars) : item.description || '',
+    body: lostCrew && !(hist && item.description) ? fill(newsText(data, 'lostCrewBody'), vars) : item.description || '',
     tags: ['calendar', 'result', 'failure'], actors, importance: lostCrew ? 3 : clamp(Math.max(2, imp), 1, 3), icon: lostCrew ? '🕯️' : '💥',
   });
   if (lostCrew) {
     for (const other of state.calendar) {
       const oi = calendarItem(data, other.id);
-      if (other.status !== 'planned' || oi?.owner !== owner || !oi.crewed) continue;
+      // the real stand-down is already in the dates of the historical items
+      if (other.status !== 'planned' || oi?.owner !== owner || !oi.crewed || historicalResult(data, oi)) continue;
       const toTurn = turn + CREWED_STANDDOWN_WEEKS + rng.int(0, 26);
       if (other.currentTurn < toTurn) applySlip(state, data, other, oi, 0, 'suspended', rng, { toTurn });
     }
   }
   // test/demo flights are flown again
-  if (item.refly && inst.attempts < MAX_REFLIGHTS) {
+  if (item.refly && !hist && inst.attempts < MAX_REFLIGHTS) {
     inst.attempts++;
     inst.status = 'planned';
     inst.arrivalTurn = null;

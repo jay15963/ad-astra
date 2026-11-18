@@ -636,6 +636,8 @@ input[type=range] { accent-color: var(--text-2); }
 .actor-list .list-title { white-space: normal; }
 .actor-list .chips { margin-top: 6px; gap: 4px; }
 .actor-list .actor-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.actor-list .actor-top .chip { flex: none; }
+.actor-list .actor-top .list-title { min-width: 0; }
 .advanced { color: var(--text-2); font-size: var(--t12); background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); padding: 0 14px; }
 .advanced summary { min-height: var(--tap); display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
 .advanced summary::-webkit-details-marker { display: none; }
@@ -854,6 +856,9 @@ html { overflow-x: hidden; }
 .tela-kpis .tile-static:active { transform: none; }
 .tela-kpis .tile-value.up { color: var(--green); }
 .tela-kpis .tile-value.down { color: var(--red); }
+.tela-kpis .tile-wide:not(:has(.tile-spark)) { padding-right: 14px; }
+.tela-kpis .tile-fill .tile-value { font-size: var(--t22, 22px); }
+@media (max-width: 360px) { .tela-kpis .tile-fill .tile-value { font-size: calc(19px * var(--text-scale, 1)); } .tela-kpis .tile-wide:not(:has(.tile-spark)) { padding-right: 12px; } }
 .tela-filtros { margin: 2px 0 0; padding: 2px 0 4px; }
 .tela-filtros .chip { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .tela-filtro-n { font-family: var(--mono); font-size: var(--t10); opacity: .7; font-variant-numeric: tabular-nums; }

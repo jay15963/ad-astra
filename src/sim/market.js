@@ -568,10 +568,15 @@ function pushOffer(state, data, ctx, m, cand) {
 function maybeOffer(state, data, ctx, m) {
   const t = tuning(data).offer;
   if (aiOffers(m).length >= t.maxOpen || activeContracts(m).length >= t.maxContracts) return null;
+  // long steps (D1): offers arrive in the attention step, with the chance of the whole window (same rate per year)
+  const P = budget.attentionPeriod(state.clock?.stepWeeks);
+  if (P && !budget.attentionStep(state, ctx)) return null;
   const cands = offerCandidates(state, data, m);
   if (!cands.length) return null;
   const rng = ctx.rng('offers');
-  if (!rng.chance(chanceInStep(t.pPerQuarter / 13, ctx))) return null;
+  const pw = t.pPerQuarter / 13;
+  const p = P ? 1 - (1 - pw) ** ((P * Math.max(1, ctx.dt ?? 1)) / state.clock.stepWeeks) : chanceInStep(pw, ctx);
+  if (!rng.chance(p)) return null;
   return pushOffer(state, data, ctx, m, cands[0]);
 }
 

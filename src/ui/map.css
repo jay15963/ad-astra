@@ -1129,7 +1129,8 @@ body.reduce-motion .map-discovery__art {
   position: sticky;
   right: 0;
   z-index: 1;
-  box-shadow: -14px 0 10px -2px var(--s1, #0c0c0f);
+  /* second shadow: a solid block over the row's right padding, so scrolled pills never peek out beside the button */
+  box-shadow: -14px 0 10px -2px var(--s1, #0c0c0f), 14px 0 0 0 var(--s1, #0c0c0f);
 }
 @media (max-width: 360px) {
   .map-levels { gap: 4px; }

@@ -606,9 +606,61 @@ export function tick(state, data, ctx = {}) {
     const a = state.actors[id];
     if (!t.lineages[id] && !L.idents[id]) continue;
     const key = identityKey(state, data, id, end - 1);
-    if (key != null && key !== a.identityIdx) applyIdentity(state, data, id, end - 1);
+    if (key != null && key !== a.identityIdx) { applyIdentity(state, data, id, end - 1); dedupeNames(state, id); }
   }
   for (const y of yearStarts(state, prev, dt)) runYear(state, data, ctx, y);
+  freezeGeo(state, data, yearAt(state, end - 1), state.turn);
+}
+
+/**
+ * The disputed zones and wars of data/geopolitics.json are the world of 2026 (Crimea, Taiwan, Kashmir…). From
+ * `model.freezeYear` (or a zone's own `until`) on they are history: the zone is frozen in its last controller,
+ * stable, and the conflicts on it end ("history"). Politics runs before lifecycle in every step, so a tension pair
+ * that reaches war in 2400 never paints a 2026 border again: the frozen zones leave its conflict here, in the same
+ * step, and the conflict stays on the tension scale without a place on the map. No rng; idempotent.
+ */
+export function freezeGeo(state, data, year, turn = state?.turn ?? 0) {
+  const G = data?.geopolitics;
+  const geo = state?.geo;
+  const fy = G?.model?.freezeYear;
+  if (!geo?.zones || !Array.isArray(G?.zones) || !Number.isFinite(fy) || year < Math.min(fy, ...G.zones.map((z) => z.until?.year ?? fy))) return 0;
+  const frozen = new Set();
+  let fresh = 0;
+  for (const zd of G.zones) {
+    const z = geo.zones[zd.id];
+    if (!z || year < (zd.until?.year ?? fy)) continue;
+    frozen.add(zd.id);
+    if (!z.frozen) { z.frozen = turn; fresh++; }
+    if (z.status !== 'stable' || z.conflictId) {
+      if (Array.isArray(z.history) && z.status !== 'stable') {
+        z.history.push({ turn, field: 'status', from: z.status, to: 'stable', cause: 'história' });
+        if (z.history.length > 6) z.history.splice(0, z.history.length - 6);
+      }
+      z.status = 'stable';
+      z.conflictId = null;
+      z.since = turn;
+    }
+  }
+  if (!frozen.size) return 0;
+  for (const g of geo.conflicts || []) {
+    if (g.endTurn != null || !Array.isArray(g.zoneIds) || !g.zoneIds.some((id) => frozen.has(id))) continue;
+    const before = g.zoneIds.length;
+    g.zoneIds = g.zoneIds.filter((id) => !frozen.has(id));
+    // a 2026 war whose whole map froze ends; a pair conflict of the tension scale keeps going, off these borders
+    if (g.fact && !g.zoneIds.length) { g.endTurn = turn; g.endCause = 'history'; g.settled = true; }
+    else if (!g.fact && before && !g.zoneIds.length && g.startTurn === turn) {
+      // opened by politics in this very step on a frozen border: the map event goes with it
+      geo.events = (geo.events || []).filter((e) => !(e.conflictId === g.id && e.kind === 'conflict_start' && e.turn === turn));
+    }
+  }
+  if (fresh && !geo.frozenNews) {
+    geo.frozenNews = turn;
+    const text = G.timeline?.frozen || 'As fronteiras disputadas do século XXI viram assunto de historiadores';
+    (geo.events = geo.events || []).push({ turn, kind: 'treaty', conflictId: null, zoneIds: [...frozen], text });
+    if (geo.events.length > 40) geo.events.splice(0, geo.events.length - 40);
+    news(state, { headline: text, body: G.model?.freezeBody || '', actors: [], tags: ['lifecycle', 'geo'], importance: 1, icon: '🗺️' }, turn);
+  }
+  return fresh;
 }
 
 /** Engine year hook: same yearly work, guarded so a year never runs twice. */
@@ -683,6 +735,7 @@ function bornHere(state, data, ctx, id, turn, rng, e = {}) {
     return null;
   }
   addActor(state, data, ctx, def, { reason: 'birth' });
+  dedupeNames(state, id);
   const a = state.actors[id];
   news(state, {
     headline: e.headline || text(data, rng, 'birth', { name: a.name, country: a.country || 'O mundo' }, 'Nasce {name}'),
@@ -699,6 +752,7 @@ function opRename(state, data, ctx, e, turn, rng) {
   const id = e.actor;
   if (!state.actors[id]) return;
   const old = applyIdentity(state, data, id, turn);
+  dedupeNames(state, id);
   const a = state.actors[id];
   if (old === a.name) return;
   news(state, { headline: e.headline || text(data, rng, 'rename', { old, name: a.name }, '{old} agora é {name}'), actors: [id], tags: ['lifecycle', 'rename'], importance: 2 }, turn);
@@ -898,9 +952,12 @@ function yearSuccessors(state, data, year, turn, rng) {
     const n = (L.idents[id]?.n || 0) + 1;
     const name = fill(rng.pick(s.names), { short: base, name: a.name });
     if (name === a.name) continue;
+    const other = takenNames(state, id);
+    if (other.names.has(nameKey(name)) || (name.length <= 14 && other.shorts.has(nameKey(name)))) continue;
     const old = a.name;
     L.idents[id] = { fromTurn: turn, name, short: name.length <= 14 ? name : base, n, base };
     applyIdentity(state, data, id, turn);
+    dedupeNames(state, id);
     news(state, { headline: text(data, rng, 'successor', { old, name }, '{old} vira {name}'), actors: [id], tags: ['lifecycle', 'rename'], importance: 1 }, turn);
     emitSignal(state, 'actor/renamed', { actorId: id, from: old, to: name });
   }
@@ -961,6 +1018,56 @@ function pickNation(state, data, arch, year, rng) {
   return t.nations[pick.id] ? pick.id : null;
 }
 
+const nameKey = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+/** Names and acronyms (normalized) of the living actors, the player included. */
+function takenNames(state, exceptId = null) {
+  const names = new Set();
+  const shorts = new Set();
+  for (const id of liveIds(state)) {
+    if (id === exceptId) continue;
+    const a = state.actors[id];
+    if (a?.name) names.add(nameKey(a.name));
+    if (a?.short) shorts.add(nameKey(a.short));
+  }
+  return { names, shorts };
+}
+/** The acronym, or the acronym with the first free number (AEBRA → AEBRA2). */
+function uniqueShort(short, shorts) {
+  if (!shorts.has(nameKey(short))) return short;
+  for (let k = 2; k < 100; k++) {
+    const c = `${String(short).slice(0, 10)}${k}`;
+    if (!shorts.has(nameKey(c))) return c;
+  }
+  return short;
+}
+
+/**
+ * After a name change of `id` (birth, rename, successor): no other living actor may keep the same name or acronym.
+ * The generated actor (or the one renamed by a speculative successor) gives way, with a number (Aurora → Aurora 2);
+ * two lineages of the data never clash (the data is checked). Deterministic, no rng.
+ */
+function dedupeNames(state, id) {
+  const a = state.actors?.[id];
+  if (!a) return;
+  const L = slice(state);
+  const soft = (x) => !!(x.generated || L.idents[x.id]);
+  for (const oid of liveIds(state)) {
+    if (oid === id) continue;
+    const o = state.actors[oid];
+    const nameClash = nameKey(o.name) === nameKey(a.name);
+    const shortClash = nameKey(o.short) === nameKey(a.short);
+    if (!nameClash && !shortClash) continue;
+    const loser = soft(o) ? o : soft(a) ? a : null;
+    if (!loser) continue;
+    const { names, shorts } = takenNames(state, loser.id);
+    if (nameKey(loser.name) && names.has(nameKey(loser.name))) {
+      for (let k = 2; k < 100; k++) { const c = `${loser.name} ${k}`; if (!names.has(nameKey(c))) { loser.name = c; break; } }
+    }
+    if (shorts.has(nameKey(loser.short))) loser.short = uniqueShort(loser.short, shorts);
+    if (L.idents[loser.id]) { L.idents[loser.id].name = loser.name; L.idents[loser.id].short = loser.short; }
+  }
+}
+
 /** Deterministic speculative actor definition (null when caps are full). */
 function genActor(state, data, year, turn, arch, rng) {
   const L = slice(state);
@@ -973,9 +1080,11 @@ function genActor(state, data, year, turn, arch, rng) {
   const nat = tables(data).nations[nationId];
   if (arch.nation === 'emerging' && !nat) return null;
   const gr = g.grammar || {};
-  const taken = new Set([...liveIds(state).map((id) => state.actors[id].name), ...Object.values(L.tombstones).map((tb) => tb.name)]);
+  // no two living actors share a name or an acronym (and a dead one keeps its name in the annals)
+  const { names: taken, shorts } = takenNames(state);
+  for (const tb of Object.values(L.tombstones)) if (tb?.name) taken.add(nameKey(tb.name));
   let name = null, short = null;
-  for (let i = 0; i < 8 && !name; i++) {
+  for (let i = 0; i < 16 && !name; i++) {
     const pre = rng.pick(gr.pre || ['Astra']);
     const place = rng.pick(gr.place || ['Tharsis']);
     const vars = {
@@ -984,11 +1093,15 @@ function genActor(state, data, year, turn, arch, rng) {
       place3: place.normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3).toUpperCase(),
     };
     const cand = fill(rng.pick(arch.names || ['{pre}']), vars).replace(/\s+/g, ' ').trim();
-    if (!taken.has(cand)) { name = cand; short = fill(rng.pick(arch.short || ['{pre}']), vars).slice(0, 12); }
+    if (taken.has(nameKey(cand))) continue;
+    const sh = fill(rng.pick(arch.short || ['{pre}']), vars).slice(0, 12);
+    if (shorts.has(nameKey(sh)) && i < 15) continue;
+    name = cand;
+    short = uniqueShort(sh, shorts);
   }
   L.births += 1;
   const n = L.births;
-  if (!name) { name = `${fill((arch.names || ['{pre}'])[0], { of: nat?.of || '', pre: 'Nova', suf: '', place: '' }).trim()} ${n}`; short = `N${n}`; }
+  if (!name) { name = `${fill((arch.names || ['{pre}'])[0], { of: nat?.of || '', pre: 'Nova', suf: '', place: '' }).trim()} ${n}`; short = uniqueShort(`N${n}`, shorts); }
   const id = `gen_${n}`;
   const st = arch.start || {};
   const eraId = eraAt(data, year)?.id;

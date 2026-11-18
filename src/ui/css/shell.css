@@ -137,11 +137,14 @@ body.reduce-motion .gaveta, body.reduce-motion .gaveta.aberta, body.reduce-motio
 
 /* ---------- era scene / final card ---------- */
 .era-cena {
-  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+  /* flex + margin:auto centres the card but, unlike place-items:center, never clips a card taller than a 320x640
+     screen (final card with three choices): the scene scrolls instead */
+  position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
   padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
   background: radial-gradient(120% 80% at 50% 0%, #1a1f2b 0%, var(--s0) 60%);
 }
-.era-caixa { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; }
+.era-caixa { width: 100%; max-width: 440px; margin: auto; display: flex; flex-direction: column; gap: 16px; }
+@media (max-height: 700px) { .era-caixa .era-cartao { min-height: 0; padding: 16px 14px; } }
 .era-cartao {
   background: var(--s1); border: 1px solid var(--line-strong); border-radius: var(--r-card); padding: 20px 18px;
   display: flex; flex-direction: column; gap: 10px; min-height: 260px;

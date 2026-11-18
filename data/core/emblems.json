@@ -7,6 +7,8 @@
     ],
     "roscosmos": [
       { "shape": "star", "field": "#a3161a", "field2": "#7e1013", "glyph": "rocket", "glyphColor": "#f2c14e", "accent": "#f2c14e", "ring": { "color": "#5c0b0e", "text": "BUREAU DE PROJETOS 1" }, "label": "OKB-1" },
+      { "shape": "star", "field": "#8e1b1f", "field2": "#5f1114", "division": "band", "glyph": "orbit", "glyphColor": "#f2c14e", "ring": { "color": "#4a0b0e", "text": "TSKBEM" }, "label": "TsKBEM" },
+      { "shape": "roundel", "field": "#7a1418", "field2": "#2b3f6b", "division": "half", "glyph": "rocket", "glyphColor": "#f4e3b0", "ring": { "color": "#3a0a0c", "text": "NPO ENERGIA" }, "orbit": 1, "label": "ENERGIA" },
       { "shape": "shield", "field": "#1d3f8f", "field2": "#eef0f3", "division": "chevron", "glyph": "orbit", "glyphColor": "#ffffff", "accent": "#c8202f", "ring": { "color": "#c8202f" }, "stars": 3, "label": "RKA" },
       { "shape": "roundel", "field": "#16306e", "ring": { "color": "#c8202f", "text": "ROSCOSMOS · RÚSSIA" }, "glyph": "globe", "glyphColor": "#e9eef5", "accent": "#e9eef5", "orbit": 2, "label": "ROSC" }
     ],

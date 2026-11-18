@@ -2,7 +2,7 @@
 // No script: every alliance is born, cools and breaks from state (trust, dependence, rivalry, tension,
 // budget pressure, goals and culture). Pure JS, deterministic (ctx.rng / rngFor only), JSON state.
 import { clamp, relKey, nextId, addNews, pushDecision, emitSignal, changeActor, log, firstValue, milestoneShare, resolveActor } from '../core/helpers.js';
-import { crossed, yearAt, liveActorIds, aiGoals } from './simtime.js';
+import { crossed, every as countIn, yearAt, liveActorIds, aiGoals, dtOf } from './simtime.js';
 const DATA_REF = { data: null }; // last data seen by tick/init (goals by era read the lineage table)
 import { rngFor } from '../core/rng.js';
 import * as politics from './politics.js';
@@ -706,13 +706,16 @@ export function tick(state, data, ctx) {
   ensureSlices(state);
   const rng = ctx.rng('tick');
   readSignals(state, data, ctx.rng('signals'));
-  driftRelations(state, data, rng);
-  expireTreaties(state, data, ctx.rng('expire'));
-  if (crossed(state, ctx, 4, 0)) {
-    treatyUpkeep(state, data, ctx.rng('upkeep'));
+  driftRelations(state, data, rng, dtOf(ctx));
+  expireTreaties(state, data, ctx.rng('expire'), dtOf(ctx));
+  // monthly (every 4 weeks): once per month inside the window (a 13-week tick holds 3 or 4 of them)
+  const months = countIn(state, ctx, 4, 0);
+  for (let m = 0; m < months; m++) {
+    const tag = m ? `:${m}` : '';
+    treatyUpkeep(state, data, ctx.rng(`upkeep${tag}`));
     // read-only memo for the views (each pair's own view is read before its own relation moves, as in drift)
     openScope(state, data);
-    try { incidents(state, data, ctx.rng('incidents')); } finally { SCOPE = null; }
+    try { incidents(state, data, ctx.rng(`incidents${tag}`)); } finally { SCOPE = null; }
   }
   if (crossed(state, ctx, 13, 0)) techTransfers(state, data);
   resolveDueProposals(state, data, ctx);
@@ -894,12 +897,20 @@ function onContract(state, data, s) {
 }
 
 // ---- relation drift toward a state-derived anchor (weekly)
-function driftRelations(state, data, rng) {
+function driftRelations(state, data, rng, dt = 1) {
   // read-only memo (treaties by pair, goals): each pair's view is read before its own relation moves
   openScope(state, data);
-  try { driftPairs(state, data, rng); } finally { SCOPE = null; }
+  try { driftPairs(state, data, rng, dt); } finally { SCOPE = null; }
 }
-function driftPairs(state, data, rng) {
+// dt weeks of the weekly relaxation x += (anchor − x)·k + N(0, σ) in one move: the gap shrinks by (1 − k)^dt and the
+// noise of dt independent weeks adds up to σ·√((1 − (1 − k)^2dt) / (1 − (1 − k)^2)) ≈ σ·√dt (one draw per pair).
+// dt = 1 is exactly the weekly formula.
+const relaxGain = (k, dt) => (dt === 1 ? k : 1 - (1 - k) ** dt);
+const relaxSigma = (k, dt) => (dt === 1 ? 1 : Math.sqrt((1 - (1 - k) ** (2 * dt)) / (1 - (1 - k) ** 2)));
+function driftPairs(state, data, rng, dt = 1) {
+  const gT = relaxGain(0.015, dt), sT = 0.8 * relaxSigma(0.015, dt);
+  const gR = relaxGain(0.008, dt), sR = 0.4 * relaxSigma(0.008, dt);
+  const gD = relaxGain(0.01, dt);
   const ids = sortedIds(state);
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
@@ -914,17 +925,18 @@ function driftPairs(state, data, rng) {
       const rivAnchor = 8 + heat * v.shared.length + (v.opposing ? 12 : 0) + 5 * v.tension - 2 * Math.min(3, v.bilateral)
         + (isCompany(state, a) && isCompany(state, b) ? 20 : 0);
       const depAnchor = 10 * Math.min(3, v.bilateral) + 3 * Math.min(2, v.multilateral);
-      r.trust = round(clamp(r.trust + (trustAnchor - r.trust) * 0.015 + rng.normal(0, 0.8), -100, 100));
-      r.rivalry = round(clamp(r.rivalry + (rivAnchor - r.rivalry) * 0.008 + rng.normal(0, 0.4), 0, 100));
-      r.dependence = round(clamp(r.dependence + (depAnchor - r.dependence) * 0.01, 0, 100));
+      r.trust = round(clamp(r.trust + (trustAnchor - r.trust) * gT + rng.normal(0, sT), -100, 100));
+      r.rivalry = round(clamp(r.rivalry + (rivAnchor - r.rivalry) * gR + rng.normal(0, sR), 0, 100));
+      r.dependence = round(clamp(r.dependence + (depAnchor - r.dependence) * gD, 0, 100));
     }
   }
 }
 
 // ---- treaties lifecycle
-function expireTreaties(state, data, rng) {
+function expireTreaties(state, data, rng, dt = 1) {
   for (const t of state.treaties) {
-    if (t.status !== 'active' || t.terms?.untilTurn == null || state.turn < t.terms.untilTurn) continue;
+    // a treaty ending inside this tick's window [turn, turn + dt) ends now (dt = 1: turn ≥ untilTurn, as before)
+    if (t.status !== 'active' || t.terms?.untilTurn == null || state.turn + dt - 1 < t.terms.untilTurn) continue;
     t.status = 'expired';
     t.endedTurn = state.turn;
     emitSignal(state, 'treaty/expired', { treatyId: t.id, treatyType: t.type, parties: t.parties.slice() });
@@ -2056,8 +2068,13 @@ export function onGameEnd(state, data, ctx) {
 
 // ---------------------------------------------------------------- 1950–3000 contract (EXPANSION.md §1.5, §3, §10)
 
-/** Weekly drift, monthly upkeep and staggered AI evaluations: substepped week by week by the engine. */
-export const meta = { maxDt: 1 };
+/**
+ * dt-native up to a quarter: weekly drift in one move (relaxGain/relaxSigma), treaty expiry over the window, the
+ * monthly upkeep and incidents once per month inside it, quarterly transfers (a 13-week window holds exactly one
+ * multiple of 13) and the staggered AI evaluations (at most one per actor and window; long steps already space them
+ * 10+ weeks apart). A 52-week step runs 4 ticks instead of 52.
+ */
+export const meta = { maxDt: 13 };
 
 /**
  * Bring an actor to life mid-game (lifecycle birth, a founded agency): same defaults as init, a staggered first AI

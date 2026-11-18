@@ -17,11 +17,11 @@
     "atmosphere": { "label": "Atmosfera" },
     "rendezvous": { "label": "Encontro" },
     "interstellar": { "label": "Interestelar" },
-    "suborbital": { "label": "Voo suborbital", "status": "reserved", "needs": "enum de destination.schema.json + regras de missão (dono da era e1/e3)" }
+    "suborbital": { "label": "Voo suborbital" }
   },
 
   "destinations": {
-    "suborbital": { "body": "earth", "kind": "suborbital", "era": "e1", "label": "Voo suborbital", "status": "reserved" },
+    "suborbital": { "body": "earth", "kind": "suborbital", "era": "e1", "label": "Voo suborbital" },
     "leo": { "body": "earth", "kind": "orbit", "era": "e1", "label": "Órbita baixa" },
     "sso": { "body": "earth", "kind": "orbit", "era": "e1", "label": "Órbita polar heliossíncrona" },
     "gto": { "body": "earth", "kind": "orbit", "era": "e1", "label": "Transferência geoestacionária" },

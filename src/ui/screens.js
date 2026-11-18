@@ -152,6 +152,14 @@ export function infraAlerts(st, store = null) {
   return list.filter((a) => a && a.status !== 'ended' && (a.ownerId === pid || (a.partners || []).some((p) => p?.actorId === pid))
     && (a.status === 'derelict' || (Number.isFinite(a.supplyWeeks) && a.supplyWeeks < 13))).length;
 }
+/**
+ * A founded agency (lifecycle `custom`) in a scenario with investors has a board from its first turn, even before the
+ * investors module builds the cap table on the first advance: the drawer lists Conselho at once (Fase D, D4).
+ */
+export function boardPending(st, data) {
+  if (!data?.scenario?.unlocks?.investors || !st?.playerId) return false;
+  return !!st.actors?.[st.playerId]?.custom || String(st.playerId).startsWith('custom_');
+}
 /** Rocket designs of the player waiting for their test flights (Phase B builder, state.designs). */
 const designsInTest = (st) => (Array.isArray(st?.designs) ? st.designs : Object.values(st?.designs || {})).filter((d) => d && (!d.owner || d.owner === st.playerId) && d.program?.phase === 'testFlights');
 
@@ -163,12 +171,12 @@ registerScreen({ id: 'mapa', title: 'Mapa espacial', icon: 'mapa', nav: 'bottom'
 registerScreen({ id: 'mundo', title: 'Mundo', icon: 'mundo', nav: 'bottom', order: 40, load: () => import('./world-tab.js') });
 
 registerScreen({ id: 'equipe', title: 'Equipe', icon: 'equipe', group: 'agencia', order: 10, load: () => import('./crew-view.js') });
-registerScreen({ id: 'conselho', title: 'Conselho e investidores', icon: 'acoes', group: 'agencia', order: 20, available: (st) => !!st?.cap, load: orStub(() => import('./board.js')), badge: (st) => decisionsOf(st, /^(investors|mandate)/).length || (mandatesDueSoon(st).length ? true : 0) });
-registerScreen({ id: 'identidade', title: 'Identidade e logo', icon: 'editar', group: 'agencia', order: 30, load: () => import('./identidade.js') });
+registerScreen({ id: 'conselho', title: 'Conselho e investidores', short: 'Conselho', icon: 'acoes', group: 'agencia', order: 20, available: (st, data) => !!st?.cap || boardPending(st, data), load: orStub(() => import('./board.js')), badge: (st) => decisionsOf(st, /^(investors|mandate)/).length || (mandatesDueSoon(st).length ? true : 0) });
+registerScreen({ id: 'identidade', title: 'Identidade e logo', short: 'Identidade', icon: 'editar', group: 'agencia', order: 30, load: () => import('./identidade.js') });
 registerScreen({ id: 'financas', title: 'Finanças', icon: 'caixa', group: 'agencia', order: 40, load: () => import('./financas.js'), badge: (st) => ((st?.actors?.[st.playerId]?.cash ?? 0) < 0 ? true : 0) });
 
 registerScreen({ id: 'pesquisa', title: 'Pesquisa', icon: 'pesquisa', group: 'operacoes', order: 10, load: () => import('./research-tab.js') });
-registerScreen({ id: 'hangar', title: 'Hangar (construtor)', icon: 'chave', group: 'operacoes', order: 20,
+registerScreen({ id: 'hangar', title: 'Hangar (construtor)', short: 'Hangar', icon: 'chave', group: 'operacoes', order: 20,
   // always listed: before the scenario unlock year it shows "a partir de <ano>" and opens an explanation instead
   lockedText: (st, data) => (unlocked(st, data, 'builder') ? null : `a partir de ${data.scenario.unlocks.builder.fromYear}`),
   load: () => orStub(() => import('./hangar.js'))().then((m) => ({

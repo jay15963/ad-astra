@@ -14,7 +14,7 @@ const CSS = `
 .colonias .cl-card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;text-align:left;width:100%;color:inherit;font:inherit}
 .colonias button.cl-card{cursor:pointer}
 .colonias .cl-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
-.colonias .cl-nome{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.colonias .cl-nome{font-weight:600;min-width:0;overflow-wrap:break-word}
 .colonias .cl-sub{font-size:var(--t12);color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis}
 .colonias .cl-num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--t12);color:var(--text-2);white-space:nowrap}
 .colonias .cl-trilha{display:flex;gap:4px;align-items:center;min-width:0}

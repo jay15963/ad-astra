@@ -8,7 +8,7 @@
 
 import { addNews, emitSignal, clamp, changeActor, pushDecision, removeDecision } from '../core/helpers.js';
 import * as budget from './budget.js';
-import { yearAt, inYearWindow, legacyFromYear } from './simtime.js';
+import { yearAt, inYearWindow, legacyFromYear, dtOf, chanceInStep } from './simtime.js';
 import * as gating from '../core/gating.js';
 import { applyResearchGrant } from '../core/migrations/v4.js'; // also registers the v3 → v4 save migration
 
@@ -29,7 +29,17 @@ const REFINE_SHARE = 0.4; // refining a flawed node costs/takes 40% of the origi
 let lastData = null;
 
 // ---------- data helpers ----------
-const cfg = (data) => ({ ...DEFAULT_CFG, ...(data?.tech?.config || {}) });
+// merged config, built once per (data, config object): the tree views call it for each of ~540 nodes
+const CFG_MEMO = new WeakMap();
+const cfg = (data) => {
+  const src = data?.tech?.config || null;
+  const key = data && typeof data === 'object' ? data : null;
+  const hit = key ? CFG_MEMO.get(key) : null;
+  if (hit && hit.src === src) return hit.c;
+  const c = { ...DEFAULT_CFG, ...(src || {}) };
+  if (key) CFG_MEMO.set(key, { src, c });
+  return c;
+};
 const nodesOf = (data) => data?.tech?.nodes || [];
 const nodeById = (data, id) => data?.index?.tech?.[id] || nodesOf(data).find((n) => n.id === id) || null;
 const approachCfg = (data, a) => cfg(data).approaches?.[a] || DEFAULT_CFG.approaches[a] || DEFAULT_CFG.approaches.safe;
@@ -225,9 +235,18 @@ function sciencePerWeek(state, data) {
 // ---------- effect text (pt-BR) ----------
 
 /** ["+2 p.p. confiabilidade das missões", "−6% custo de lançamento", ...] */
-export function describeEffects(data, effects = {}, mult = 1) {
+const LABELS_MEMO = new WeakMap();
+function effectLabels(data) {
   // Missões v2 effect keys (lifetime, maintenance…) are labelled in data/core/techtree.json
-  const labels = data?.techtree?.effectLabels ? { ...(data?.tech?.effectLabels || {}), ...data.techtree.effectLabels } : (data?.tech?.effectLabels || {});
+  const a = data?.tech?.effectLabels, b = data?.techtree?.effectLabels;
+  const hit = data && typeof data === 'object' ? LABELS_MEMO.get(data) : null;
+  if (hit && hit.a === a && hit.b === b) return hit.labels;
+  const labels = b ? { ...(a || {}), ...b } : (a || {});
+  if (data && typeof data === 'object') LABELS_MEMO.set(data, { a, b, labels });
+  return labels;
+}
+export function describeEffects(data, effects = {}, mult = 1) {
+  const labels = effectLabels(data);
   const out = [];
   for (const [k, raw] of Object.entries(effects || {})) {
     if (typeof raw !== 'number') continue;
@@ -312,8 +331,9 @@ export function tick(state, data, ctx) {
   ensureRivals(state, data);
   revealSecrets(state, data);
 
-  // weekly science from labs + engineering team
-  addSciencePoints(state, sciencePerWeek(state, data));
+  const dt = dtOf(ctx);
+  // weekly science from labs + engineering team (dt weeks of it)
+  addSciencePoints(state, dt === 1 ? sciencePerWeek(state, data) : round2(sciencePerWeek(state, data) * dt));
   // tech-transfer treaties (diplomacy emits 'diplomacy/techTransfer' at signing and every quarter)
   for (const s of state.signals || []) {
     if (s?.type !== 'diplomacy/techTransfer' || s.actorId !== state.playerId || !(s.points > 0)) continue;
@@ -322,10 +342,10 @@ export function tick(state, data, ctx) {
   }
 
   // player projects
-  for (const p of r.projects.slice()) advanceProject(state, data, ctx, p);
+  for (const p of r.projects.slice()) advanceProject(state, data, ctx, p, dt);
 
   // rivals
-  for (const id of Object.keys(r.rivals)) if (state.actors?.[id]) advanceRival(state, data, ctx, id);
+  for (const id of Object.keys(r.rivals)) if (state.actors?.[id]) advanceRival(state, data, ctx, id, dt);
 }
 
 function revealSecrets(state, data) {
@@ -373,12 +393,13 @@ function canPay(state, actorId, amount) {
   return !a || (a.cash ?? 0) >= amount;
 }
 
-function advanceProject(state, data, ctx, p) {
+function advanceProject(state, data, ctx, p, dt = 1) {
   const node = nodeById(data, p.nodeId);
   const r = state.research;
   if (!node) { r.projects = r.projects.filter((x) => x !== p); return; }
   const ac = approachCfg(data, p.approach);
-  const inc = Math.min(1 - p.progress, weeklySpeed(state, data, p.approach) / Math.max(1, p.weeks || node.weeks || 10));
+  // dt weeks of progress (and of spending) at once; the project stops at 100%
+  const inc = Math.min(1 - p.progress, dt * weeklySpeed(state, data, p.approach) / Math.max(1, p.weeks || node.weeks || 10));
   const amount = round2((p.cost || 0) * inc);
   if (!pay(state, state.playerId, amount, 'research', `P&D: ${node.name}`)) {
     if (!p.stalled) {
@@ -394,7 +415,7 @@ function advanceProject(state, data, ctx, p) {
   // bold approach: surprises along the way
   if (p.approach === 'bold' && !p.refine && p.progress < 1 && ac.weeklyEventChance > 0) {
     const rng = ctx.rng(`bold:${p.nodeId}`);
-    if (rng.chance(ac.weeklyEventChance)) {
+    if (rng.chance(chanceInStep(ac.weeklyEventChance, { dt }))) {
       if (rng.chance(ac.leapShare ?? 0.4)) {
         p.progress = Math.min(1, p.progress + (ac.leapProgress ?? 0.12));
         addNews(state, { headline: `Salto inesperado em ${node.name}: teste rende mais que o previsto`, tags: ['research'], actors: [state.playerId], importance: 1, icon: '🚀' });
@@ -507,24 +528,37 @@ function rivalOptions(state, data, id, has) {
   return options;
 }
 
-function advanceRival(state, data, ctx, id) {
+// dt weeks of a rival's research: a project finished inside the window hands its spare weeks to the next pick, so a
+// long tick researches as much as the same weeks one by one (dt = 1: one week, the old weekly step)
+function advanceRival(state, data, ctx, id, dt = 1) {
+  let weeks = dt;
+  for (let n = 0; weeks > 0 && n < 64; n++) {
+    const used = advanceRivalOnce(state, data, ctx, id, weeks, n);
+    if (!(used > 0)) return;
+    weeks -= used;
+  }
+}
+function advanceRivalOnce(state, data, ctx, id, weeks, n) {
   const r = state.research;
   const has = r.rivals[id] || (r.rivals[id] = []);
   let proj = r.rivalProjects[id];
   if (!proj) {
     const options = rivalOptions(state, data, id, has);
-    if (!options.length) return;
-    const rng = ctx.rng(`rival-pick:${id}`);
+    if (!options.length) return 0;
+    const rng = ctx.rng(n ? `rival-pick:${id}:${n}` : `rival-pick:${id}`);
     const actor = state.actors?.[id];
-    const pick = rng.weighted(options, (n) => rivalWeight(actor, n));
-    if (!pick) return;
+    const pick = rng.weighted(options, (o) => rivalWeight(actor, o));
+    if (!pick) return 0;
     const bold = (actor?.culture ?? 0) > (cfg(data).rivals?.boldCultureThreshold ?? 30);
     proj = r.rivalProjects[id] = { nodeId: pick.id, progress: 0, startedTurn: state.turn, bold };
   }
   const node = nodeById(data, proj.nodeId);
-  if (!node) { delete r.rivalProjects[id]; return; }
-  proj.progress = round2((proj.progress + rivalSpeed(state, data, id) * (proj.bold ? 1.3 : 1) / Math.max(1, node.weeks || 20)) * 1000) / 1000;
-  if (proj.progress < 1) return;
+  if (!node) { delete r.rivalProjects[id]; return 0; }
+  const rate = rivalSpeed(state, data, id) * (proj.bold ? 1.3 : 1) / Math.max(1, node.weeks || 20);
+  // whole weeks this project still needs, at most the window's (1 for the weekly step)
+  const used = weeks === 1 ? 1 : Math.max(1, Math.min(weeks, Math.ceil((1 - proj.progress) / rate - 1e-9)));
+  proj.progress = round2((proj.progress + rate * used) * 1000) / 1000;
+  if (proj.progress < 1) return weeks;
   delete r.rivalProjects[id];
   if (!has.includes(node.id)) has.push(node.id);
   recompute(state, data, id);
@@ -536,6 +570,7 @@ function advanceRival(state, data, ctx, id) {
     tags: ['research', 'rival'], actors: [id], importance: 1, icon: '🧪',
   });
   emitSignal(state, 'research/completed', { nodeId: node.id, actorId: id });
+  return used;
 }
 
 // ---------- unlock (for narrative {unlockTech}) ----------
@@ -677,7 +712,47 @@ function viewCtx(state, data) {
     speedSafe: weeklySpeed(state, data, 'safe'),
     speedBold: weeklySpeed(state, data, 'bold'),
     kinds: Object.fromEntries(gating.kindsOf(data).map((k) => [k.id, k])),
+    // read once per batch (each node used to recompute them)
+    year: yearAt(state),
+    undatedFrom: legacyFromYear(data),
+    scale: costScale(state, data, state.playerId),
+    multSafe: approachCfg(data, 'safe').costMult ?? 1,
+    multBold: approachCfg(data, 'bold').costMult ?? 1,
   };
+}
+
+// The parts of a node view that depend only on the data (era, unlock labels, cross-era prerequisites, names, effect
+// text at quality 1): built once per (data, node) and copied into every view; the state-dependent fields are filled
+// per call. Kind labels come from the same data (gating.kindsOf).
+const STATIC_VIEWS = new WeakMap();
+function staticView(data, n, kinds) {
+  let byNode = STATIC_VIEWS.get(data);
+  if (!byNode) { byNode = new WeakMap(); STATIC_VIEWS.set(data, byNode); }
+  let s = byNode.get(n);
+  if (s) return s;
+  const branch = (data?.tech?.branches || []).find((b) => b.id === n.branch);
+  const eraId = gating.eraIdOf(n);
+  const keys = gating.nodeKeys(n);
+  const unlocks = (n.unlocks || []).map((u) => {
+    const key = typeof u === 'string' ? u : u?.key;
+    if (!key) return null;
+    const kind = gating.keyKind(key);
+    return { key, kind, kindLabel: kinds[kind]?.label || kind, label: (typeof u === 'object' && u.label) || gating.keyLabel(data, key) };
+  }).filter(Boolean);
+  const stubs = [];
+  for (const id of n.requires || []) {
+    const p = nodeById(data, id);
+    if (!p) continue;
+    const pe = gating.eraIdOf(p);
+    if (pe !== eraId) stubs.push({ id, eraId: pe, name: p.name || id, short: p.short || p.name || id });
+  }
+  s = {
+    branchName: branch?.name || n.branch, eraId, keys, unlocks, stubs,
+    requiresNames: (n.requires || []).map((id) => nodeById(data, id)?.name || id),
+    effectText: describeEffects(data, n.effects, 1),
+  };
+  byNode.set(n, s);
+  return s;
 }
 
 function nodeView(state, data, n, vc = viewCtx(state, data)) {
@@ -688,38 +763,28 @@ function nodeView(state, data, n, vc = viewCtx(state, data)) {
   let status = 'locked';
   if (done && !proj) status = 'done';
   else if (proj) status = 'active';
-  else if ((n.requires || []).every((x) => unlocked.has(x)) && nodeOpen(state, data, n)) status = 'available';
+  else if ((n.requires || []).every((x) => unlocked.has(x)) && inYearWindow(n, vc.year, { undatedFrom: vc.undatedFrom })) status = 'available';
   const q = r.quality?.[n.id] ?? 1;
-  const branch = (data?.tech?.branches || []).find((b) => b.id === n.branch);
   const eta = proj
     ? Math.ceil(((1 - proj.progress) * (proj.weeks || n.weeks || 10)) / weeklySpeed(state, data, proj.approach))
     : null;
-  const eraId = gating.eraIdOf(n);
-  const keys = gating.nodeKeys(n);
-  const unlocks = (n.unlocks || []).map((u) => {
-    const key = typeof u === 'string' ? u : u?.key;
-    if (!key) return null;
-    const kind = gating.keyKind(key);
-    return { key, kind, kindLabel: vc.kinds[kind]?.label || kind, label: (typeof u === 'object' && u.label) || gating.keyLabel(data, key) };
-  }).filter(Boolean);
+  const sv = staticView(data, n, vc.kinds);
+  const { eraId, keys } = sv;
+  // fresh copies: callers get their own objects, as before
+  const unlocks = sv.unlocks.map((u) => ({ ...u }));
   // prerequisites of another era: drawn as stubs at the top of the branch column (MISSIONS-V2 §6.1)
-  const stubs = [];
-  for (const id of n.requires || []) {
-    const p = nodeById(data, id);
-    if (!p) continue;
-    const pe = gating.eraIdOf(p);
-    if (pe !== eraId) stubs.push({ id, eraId: pe, name: p.name || id, short: p.short || p.name || id, status: unlocked.has(id) ? 'done' : 'locked' });
-  }
+  const stubs = sv.stubs.map((x) => ({ ...x, status: unlocked.has(x.id) ? 'done' : 'locked' }));
   return {
-    id: n.id, branch: n.branch, branchName: branch?.name || n.branch, name: n.name, description: n.description,
+    id: n.id, branch: n.branch, branchName: sv.branchName, name: n.name, description: n.description,
     era: n.era, eraId, secret: !!n.secret, status, fromYear: n.fromYear ?? null, histYear: n.histYear ?? null,
     icon: n.icon || null, short: n.short || null, tier: n.tier ?? null, row: n.row ?? null, lane: n.lane ?? null,
     kind: keys.length ? 'unlock' : 'efficiency', unlockKind: keys.length ? gating.keyKind(keys[0]) : null, unlocks,
-    cost: nodeMoneyCost(state, data, n, 'safe'), costBold: nodeMoneyCost(state, data, n, 'bold'),
+    // = nodeMoneyCost (same product, same order)
+    cost: Math.round((n.cost || 0) * vc.scale * vc.multSafe), costBold: Math.round((n.cost || 0) * vc.scale * vc.multBold),
     science: n.science || 0, canAffordScience: (r.points || 0) >= (n.science || 0),
     weeks: Math.ceil((n.weeks || 10) / vc.speedSafe), weeksBold: Math.ceil((n.weeks || 10) / vc.speedBold),
-    requires: n.requires || [], requiresNames: (n.requires || []).map((id) => nodeById(data, id)?.name || id), stubs,
-    effects: n.effects || {}, effectText: describeEffects(data, n.effects, done ? q : 1),
+    requires: n.requires || [], requiresNames: sv.requiresNames.slice(), stubs,
+    effects: n.effects || {}, effectText: done && q !== 1 ? describeEffects(data, n.effects, q) : sv.effectText.slice(),
     quality: done ? q : null, canRefine: done && q < 1 && !proj,
     progress: proj ? proj.progress : done ? 1 : 0, approach: proj?.approach || null, stalled: !!proj?.stalled,
     refining: !!proj?.refine, etaWeeks: eta, spent: proj?.spent || 0, projectCost: proj?.cost || null,
@@ -825,8 +890,12 @@ export const queries = {
 
 // ---------- 1950–3000 contract (EXPANSION.md §1.5, §3) ----------
 
-/** Weekly science and project progress: substepped week by week by the engine. */
-export const meta = { maxDt: 1 };
+/**
+ * Weekly science, project progress and rival research, dt-native: a tick covers up to a quarter (13 weeks) at once
+ * (science and spending × dt, the bold approach's weekly surprise as one chance over the window, rivals carry spare
+ * weeks into their next project). The 52-week steps of the far future run 4 ticks a year instead of 52.
+ */
+export const meta = { maxDt: 13 };
 
 /** A born actor starts with the techs data gives it (initialFor), like the founding rivals. */
 export function onActorBorn(state, data, ctx, id) {
