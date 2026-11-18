@@ -444,10 +444,10 @@ function grantHistory(st, data, year) {
   st.research.keys = gating.keysOfNodes(data, st.research.unlocked);
 }
 
-test('campaign: the Hangar opens in 1957; templates use the parts of the era and the nation', () => {
+test('campaign: the Hangar is open from 1950; templates use the parts of the era and the nation', () => {
   const st = game(campaign, 'nasa');
-  assert.equal(designs.queries['designs/unlocked'](st, campaign).ok, false);
-  assert.equal(act(st, campaign, { type: 'design/new', templateId: 'two_stage' }).ok, false);
+  assert.equal(designs.queries['designs/unlocked'](st, campaign).ok, true, 'o jogador pode construir desde o começo');
+  assert.equal(act(st, campaign, { type: 'design/new', templateId: 'two_stage' }).ok, false, 'dois estágios ainda pede pesquisa');
   st.turn = (1962 - st.startYear) * 52;
   grantHistory(st, campaign, 1962); // the campaign gates the Hangar by research (MISSIONS-V2 §5.3)
   const tpls = Object.fromEntries(designs.queries['designs/templates'](st, campaign).map((t) => [t.id, t]));
@@ -541,7 +541,7 @@ const gatedCampaign = withStubTree(campaign);
 
 test('v2 Hangar gating: templates and parts need research, with the node to open; research lifts it', () => {
   const st = engine.newGame(gatedCampaign, { seed: 7, playerId: 'nasa' });
-  st.turn = 10 * 52; // 1960: the Hangar is open (1957) and the parts exist, but only sounding rockets are researched
+  st.turn = 10 * 52; // 1960: the Hangar is open (since 1950) and the parts exist, but only sounding rockets are researched
   const r = act(st, gatedCampaign, { type: 'design/new', templateId: 'two_stage' });
   assert.equal(r.ok, false);
   assert.equal(r.error, 'Pesquise Foguete orbital de dois estágios.');

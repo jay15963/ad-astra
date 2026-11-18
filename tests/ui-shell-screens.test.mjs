@@ -44,10 +44,9 @@ test('registry: Conselho needs a cap table, Hangar follows the builder unlock, b
   assert.ok(ids(lunarState, lunar).includes('hangar'), 'Corrida Lunar (2026): the builder is open');
 
   const c = newGame(campaign, { seed: 3, playerId: campaign.scenario.playableActors[0] });
-  assert.equal(screens.unlocked(c, campaign, 'builder'), false, '1950: builder unlocks in 1957');
-  assert.ok(ids(c, campaign).includes('hangar'), 'Hangar is always listed (shown as locked before 1957)');
+  assert.equal(screens.unlocked(c, campaign, 'builder'), true, '1950: the Hangar is open from the start');
   const hg = screens.drawerSections(c, campaign).flatMap((x) => x.items).find((d) => d.id === 'hangar');
-  assert.equal(hg.lockedNow, 'a partir de 1957');
+  assert.ok(hg && !hg.lockedNow, 'Hangar listed and not locked in 1950');
   // a founded agency sees Conselho from its very first turn (before the investors module builds the cap table)
   const founded = { ...c, cap: null, playerId: 'custom_x', actors: { ...c.actors, custom_x: { id: 'custom_x', custom: true } } };
   assert.ok(screens.boardPending(founded, campaign));
