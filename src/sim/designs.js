@@ -415,7 +415,11 @@ export function designStats(data, spec, techCtx = {}) {
     const c = raw * calib;
     capacity[k] = c >= 0.02 ? r2(c) : 0;
   }
-  if (capacity.leo <= 0) warnings.push('Não chega à órbita: falta Δv. Aumente os tanques ou some um estágio.');
+  // suborbital hop (above 100 km and back): its own payload figure, read by calendar.capacityTo via capacity[destinationId]
+  const subRaw = solvePayload(model, num(P.deltaV.suborbital, 2.4), maxP) * calib;
+  capacity.suborbital = subRaw >= 0.02 ? r2(subRaw) : 0;
+  if (capacity.leo <= 0 && capacity.suborbital > 0) warnings.push(`Só voo suborbital: sobe acima dos 100 km com até ${String(capacity.suborbital).replace('.', ',')} t, mas não chega à órbita.`);
+  else if (capacity.leo <= 0) warnings.push('Não chega ao espaço: falta Δv. Aumente os tanques ou some um estágio.');
   const twrUp = deltaV(model, capacity.leo / Math.max(1e-6, calib)).twr;
   twrUp.forEach((t, i) => { if (t != null && t < 0.3) warnings.push(`Estágio ${i + 1} fraco (empuxo ${fmtPct1(t)} do peso): perde eficiência.`); });
   if (thrustSL / (G0 * (m0empty + capacity.leo)) > 2.6) warnings.push('Empuxo de sobra na decolagem: dá para pôr mais tanque.');
@@ -825,7 +829,7 @@ function refreshVehicle(state, data, d) {
       ? { feasible: true, flights: 3, costM: Math.round(num(der.costM, 50) * 4), weeks: 52, minReliability: 0.9, note: 'Projeto com sistema de escape: dá para certificar para tripulação.' }
       : { feasible: false, reason: 'Sem sistema de escape: o projeto não leva gente.' },
     access: 'own', embargo: [], standDownWeeks: 8,
-    capacity: { ...Object.fromEntries(CAP_KEYS.map((k) => [k, num(der.capacity?.[k], 0)])) },
+    capacity: { ...Object.fromEntries(CAP_KEYS.map((k) => [k, num(der.capacity?.[k], 0)])), suborbital: num(der.capacity?.suborbital, 0) },
     notes: d.origin === 'license' ? `Projeto derivado do ${base?.name || 'foguete licenciado'}.` : 'Projeto próprio do Hangar.',
     design: { baseVehicleId: d.baseVehicleId || null, geometry: der.geometry || null, unmodified: !!der.unmodified, paint: d.spec?.paint || 'white' },
   };
@@ -1150,7 +1154,9 @@ function makeOperational(state, data, d) {
   refreshVehicle(state, data, d);
   addNews(state, {
     headline: `${d.name} entra em operação`,
-    body: `O novo foguete da agência já aparece na escolha de veículo das missões (${fmtT(d.derived?.capacity?.leo)} em órbita baixa).`,
+    body: num(d.derived?.capacity?.leo, 0) > 0
+      ? `O novo foguete da agência já aparece na escolha de veículo das missões (${fmtT(d.derived?.capacity?.leo)} em órbita baixa).`
+      : `O novo foguete da agência já aparece na escolha de veículo das missões, para voos suborbitais (${fmtT(d.derived?.capacity?.suborbital)} acima dos 100 km).`,
     importance: 2, tags: ['designs'], actors: [d.owner], icon: 'rocket',
   });
   emitSignal(state, 'design/operational', { designId: d.id, actorId: d.owner });
@@ -1410,7 +1416,7 @@ export const actions = {
     if (locked.length) return { ok: false, error: `${locked[0].name}: ${locked[0].reason}.` };
     const der = recompute(state, data, d);
     if (!der.ok) return { ok: false, error: der.errors[0] || 'Projeto inválido.' };
-    if (!(der.capacity.leo > 0)) return { ok: false, error: 'Este projeto não chega à órbita.' };
+    if (!(der.capacity.leo > 0) && !(der.capacity.suborbital > 0)) return { ok: false, error: 'Este projeto não chega ao espaço (nem em voo suborbital).' };
     const pc = programCosts(state, data, d, der);
     if (pc.upfrontM > 0 && !budget.spend(state, d.owner, pc.upfrontM, 'designs', `Desenvolvimento: ${d.name}`)) return { ok: false, error: `Caixa insuficiente: a entrada é de ${pc.upfrontM} mi.` };
     d.program = {
@@ -1545,6 +1551,9 @@ export const queries = {
   'designs/testFlightPlan': (state, data, id) => {
     const d = state.designs?.[id];
     if (!d || d.program?.phase !== 'testFlights') return null;
-    return { vehicleId: d.id, destination: 'leo', ballastT: num(partsOf(data)?.tests?.ballastT, 0.5), costM: r1(testCost(data, d)), crewed: false, locked: true, source: 'test', testDesignId: d.id };
+    const orbital = num(d.derived?.capacity?.leo, 0) > 0;
+    const cap = orbital ? num(d.derived.capacity.leo, 0) : num(d.derived?.capacity?.suborbital, 0);
+    const ballastT = Math.min(num(partsOf(data)?.tests?.ballastT, 0.5), Math.max(0.02, Math.round(cap * 0.8 * 100) / 100));
+    return { vehicleId: d.id, destination: orbital ? 'leo' : 'suborbital', ballastT, costM: r1(testCost(data, d)), crewed: false, locked: true, source: 'test', testDesignId: d.id };
   },
 };

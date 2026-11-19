@@ -10,7 +10,7 @@ import {
 import { listRow } from './decisions.js';
 
 const CAP_KEYS = ['leo', 'gto', 'tli', 'mars', 'outer'];
-const CAP_SHORT = { leo: 'Órbita baixa', gto: 'GTO', tli: 'Lua', mars: 'Marte', outer: 'Externos' };
+const CAP_SHORT = { suborbital: 'Suborbital', leo: 'Órbita baixa', gto: 'GTO', tli: 'Lua', mars: 'Marte', outer: 'Externos' };
 const PROP_SHORT = { kerolox: 'Querosene', alcolox: 'Álcool', hypergolic: 'Hipergólico', hydrolox: 'Hidrogênio', methalox: 'Metano', nuclear: 'Nuclear', fusion: 'Fusão', solid: 'Sólido' };
 const STATUS_KIND = { project: 'muted', work: 'info', tests: 'warn', operational: 'good', retired: 'muted' };
 
@@ -315,7 +315,7 @@ function designRow(store, d) {
     box,
     h('span', { class: 'hg-txt' },
       h('span', { class: 'hg-name' }, h('b', null, d.name)),
-      h('span', { class: 'hg-toggles' }, statusChip(d.status), chip(`${fmtT(d.capacity?.leo)} LEO`, 'muted'), chip(fmtMoney(d.costM), 'muted')),
+      h('span', { class: 'hg-toggles' }, statusChip(d.status), (d.capacity?.leo > 0 || !(d.capacity?.suborbital > 0) ? chip(`${fmtT(d.capacity?.leo)} LEO`, 'muted') : chip(`Suborbital · ${fmtT(d.capacity?.suborbital)}`, 'info')), chip(fmtMoney(d.costM), 'muted')),
       pr ? h('span', { class: 'hg-sub' }, pr.text) : null,
       pr ? h('span', { class: 'hg-prog' }, h('i', { style: { width: `${Math.round(pr.frac * 100)}%` } })) : null),
     icon('avancar', 16, 'pn-chev'));
@@ -362,7 +362,7 @@ function renderTemplates(root, store) {
       h('b', null, t.name),
       h('span', { class: 'hg-sub' }, t.desc),
       t.ok && der?.ok
-        ? h('span', { class: 'hg-toggles' }, der.capacity.leo > 0 ? chip(`${fmtT(der.capacity.leo)} LEO`, 'muted') : chip('Não chega à órbita', 'warn'), chip(`${fmtMoney(der.costM)}/voo`, 'muted'), prev?.costs ? chip(`${fmtMoney(prev.costs.devCostM)} · ${fmtWeeks(prev.costs.devWeeks)}`, 'muted') : null)
+        ? h('span', { class: 'hg-toggles' }, der.capacity.leo > 0 ? chip(`${fmtT(der.capacity.leo)} LEO`, 'muted') : der.capacity.suborbital > 0 ? chip(`Suborbital · ${fmtT(der.capacity.suborbital)}`, 'info') : chip('Não chega ao espaço', 'warn'), chip(`${fmtMoney(der.costM)}/voo`, 'muted'), prev?.costs ? chip(`${fmtMoney(prev.costs.devCostM)} · ${fmtWeeks(prev.costs.devWeeks)}`, 'muted') : null)
         : h('span', { class: 'hg-sub' }, t.reason || (der?.errors?.[0] ?? 'Faltam peças'), t.nodeId ? h('span', { class: 'hg-research-link' }, ' · Ver pesquisa') : null)),
     icon('avancar', 16, 'pn-chev')));
   }
@@ -500,7 +500,7 @@ function renderEditor(root, store, id) {
     ));
     // ---- live numbers
     const bars = h('div', { class: 'hg-bars' });
-    for (const k of CAP_KEYS) {
+    for (const k of ['suborbital', ...CAP_KEYS]) {
       const v = der.capacity?.[k] ?? 0;
       const dv = dirty ? v - (sder.capacity?.[k] ?? 0) : 0;
       bars.append(h('div', { class: 'hg-bar' },
@@ -585,8 +585,9 @@ function renderEditor(root, store, id) {
     for (const e of pv?.errors || []) reasons.push(e);
     for (const l of pv?.locked || []) reasons.push(`${l.name}: ${l.reason}`);
     const leo = pv?.derived?.capacity?.leo;
-    if (pv?.ok && !(leo > 0)) {
-      reasons.push('O foguete não chega à órbita: falta velocidade (Δv). O Hangar só desenvolve foguetes que cheguem pelo menos à órbita baixa.');
+    const sub = pv?.derived?.capacity?.suborbital;
+    if (pv?.ok && !(leo > 0) && !(sub > 0)) {
+      reasons.push('O foguete não chega ao espaço: falta velocidade (Δv) até para um voo suborbital (acima dos 100 km).');
       if ((spec.stages || []).length < 2) tips.push('Acrescente um estágio superior: dois estágios chegam muito mais longe que um.');
       tips.push('Aumente o tanque ou use mais motores (sem deixar o empuxo ficar abaixo do peso).');
       tips.push('Pesquise motores melhores (ex.: Motores a querosene) e a família Lançador orbital.');
@@ -827,7 +828,7 @@ function renderEditor(root, store, id) {
         const ok = await confirmDialog(`Desenvolver o ${dr.name}: ${fmtMoney(c.devCostM)} no total (${fmtMoney(c.upfrontM)} agora, o resto aos poucos), cerca de ${fmtWeeks(c.devWeeks)}${c.needFlights ? ` e ${c.needFlights} voo(s) de teste` : ', sem voos de teste'}.`, { title: 'Começar o desenvolvimento', okLabel: 'Desenvolver' });
         if (!ok) return;
         result(store.dispatch({ type: 'design/develop', designId: d.id }), 'Desenvolvimento iniciado');
-      }, { kind: 'primary', big: true, icon: 'chave', disabled: !pv?.ok || !(pv?.derived?.capacity?.leo > 0) }));
+      }, { kind: 'primary', big: true, icon: 'chave', disabled: !pv?.ok || !(pv?.derived?.capacity?.leo > 0 || pv?.derived?.capacity?.suborbital > 0) }));
     } else if (phase === 'work') {
       const p = d.program;
       bar.append(h('p', { class: 'hg-note' }, `${p.paused ? 'Parado por falta de caixa. ' : ''}Pronto em ${fmtWeeks((p.readyTurn ?? 0) - store.state.turn)} · pago ${fmtMoney(p.paidM || 0)} de ${fmtMoney(p.devCostM)}`));

@@ -180,7 +180,7 @@
     "costPerDryT": [[1950, 0.9], [1965, 0.7], [1990, 0.6], [2010, 0.45], [2025, 0.3], [2060, 0.2], [2200, 0.12]]
   },
 
-  "deltaV": { "leo": 9.4, "gto": 11.8, "tli": 12.5, "mars": 13.1, "outer": 15.5 },
+  "deltaV": { "suborbital": 2.4, "leo": 9.4, "gto": 11.8, "tli": 12.5, "mars": 13.1, "outer": 15.5 },
   "destClasses": [
     { "key": "leo", "label": "Órbita baixa", "short": "LEO" },
     { "key": "gto", "label": "Transferência geoestacionária", "short": "GTO" },
