@@ -442,8 +442,16 @@ export function legacyLines(state, data, { labelOf = (id) => milestoneLabel(data
   const erasLived = new Set([...(state.eraHistory || []).map((h) => h.eraId), state.clock?.eraId].filter(Boolean)).size || 1;
   const eras = plural(erasLived, 'era', 'eras', 'uma');
   out.push(founded < state.startYear ? t('agencyOld', { agencia: name, ano: founded, eras, inicio: state.startYear }) : t('agency', { agencia: name, ano: founded, eras }));
-  const names = [...new Set([...e.chron.map((c) => c.name), a.name].filter(Boolean))];
+  // the agency's own names (chron rows of the agencies the player directed before are not renames)
+  const names = [...new Set([...e.chron.filter((c) => !c.id || c.id === pid).map((c) => c.name), a.name].filter(Boolean))];
   if (names.length > 1) out.push(t('renamed', { nomes: listPt(names.slice(-5)) }));
+  // v0.9.13: fired is not the end; the epilogue remembers the agencies the player directed before this one
+  const before = (state.director?.tenures || []).filter((x) => x && x.actorId !== pid);
+  if (before.length) {
+    const span = (x) => `${yearAtTurn(state, x.fromTurn ?? 0)}–${yearAtTurn(state, x.toTurn ?? state.turn)}`;
+    const lista = listPt(before.slice(-6).map((x) => `${x.name || x.short || x.actorId} (${span(x)})`));
+    out.push(t('directors', { lista, n: before.length }) || `Antes dela, a sua direção passou por ${lista}.`);
+  }
   const leads = (state.eraHistory || []).filter((h) => h.standings?.[0]?.id === pid).length;
   if (leads) out.push(t('league', { lideres: leads === 1 ? 'uma' : String(leads) }));
   const firsts = Object.entries(state.firsts || {}).filter(([id, f]) => f?.actorId === pid && !id.includes(':'))
@@ -556,7 +564,7 @@ export function onEraEnd(state, data, ctx, info = {}) {
   const a = state.actors?.[pid];
   const ranked = Object.entries(state.actors || {}).sort((x, y) => (Number(y[1]?.prestigeEra) || 0) - (Number(x[1]?.prestigeEra) || 0));
   const rank = ranked.findIndex(([id]) => id === pid) + 1;
-  e.chron.push({ era: info.from ?? null, name: a?.name ?? null, rank: rank || null, of: ranked.length });
+  e.chron.push({ era: info.from ?? null, name: a?.name ?? null, rank: rank || null, of: ranked.length, id: pid });
   if (e.chron.length > 8) e.chron.splice(0, e.chron.length - 8);
 }
 

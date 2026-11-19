@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadDataNode } from '../src/core/data.js';
-import { newGame, dispatch, tick, advance } from '../src/core/engine.js';
+import { newGame, dispatch, tick, advance, isBlocked } from '../src/core/engine.js';
 import { relKey, claimFirst, isHistoricFirst } from '../src/core/helpers.js';
 import { missionPrestige } from '../src/core/outcome.js';
 import * as missions from '../src/sim/missions.js';
@@ -129,18 +129,14 @@ test('public mission/create strips privileged fields', () => {
   assert.equal(mb.contractId, null);
 });
 
-test('game over: actions are rejected, decisions cleared, hooks run once (also when fired mid-tick)', () => {
+test('game over: actions are rejected, decisions cleared, hooks run once', () => {
   const s = newGame(data, { seed: 11, playerId: 'cnsa' });
   clearDecisions(s);
-  s.finance.debtWeeks = 40;
-  s.actors.cnsa.cash = -5000;
-  s.actors.cnsa.support = 0;
-  const turn = s.turn;
+  s.turn = s.endTurn;
   tick(s, data);
-  assert.equal(s.gameOver?.reason, 'fired');
+  assert.equal(s.gameOver?.reason, 'end');
   assert.equal(s.gameOver.hooksRun, true);
-  assert.equal(s.turn, turn + 1);
-  assert.ok(s.stats['diplomacy.eraWinner'], 'era trophy awarded on firing too');
+  assert.ok(s.stats['diplomacy.eraWinner'], 'era trophy awarded at the end');
   assert.ok(s.album.some((c) => c.kind === 'era'));
   assert.equal(s.decisions.length, 0);
   const albums = s.album.length;
@@ -150,6 +146,31 @@ test('game over: actions are rejected, decisions cleared, hooks run once (also w
   assert.equal(r.ok, false);
   assert.match(r.error, /encerrada/);
   assert.equal(dispatch(s, data, { type: 'time/advance', weeks: 1 }).ok, true);
+});
+
+test('fired mid-tick: not a game over; the step ends, the clock waits for the next agency, director actions only', () => {
+  const s = newGame(data, { seed: 11, playerId: 'cnsa' });
+  clearDecisions(s);
+  s.finance.debtWeeks = 40;
+  s.actors.cnsa.cash = -5000;
+  s.actors.cnsa.support = 0;
+  const turn = s.turn;
+  tick(s, data);
+  assert.equal(s.gameOver, null);
+  assert.equal(s.director.ousted?.reason, 'fired');
+  assert.equal(s.director.ousted.frozen, true);
+  assert.equal(s.turn, turn + 1);
+  assert.ok(s.decisions.every((d) => d.kind === 'era/transition' || d.kind === 'ending/final'));
+  assert.equal(s.activeLaunch, null);
+  assert.equal(isBlocked(s, data), 'ousted');
+  const r = dispatch(s, data, { type: 'crew/hire', candidateId: 'x' });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /afastado/);
+  const adv = dispatch(s, data, { type: 'time/advance', weeks: 1 });
+  assert.equal(adv.ok, true);
+  assert.equal(adv.advanced, 0);
+  assert.equal(adv.stoppedBy, 'ousted');
+  assert.equal(s.turn, turn + 1);
 });
 
 test('narrative tension effect goes through politics: no phantom level, no fake signal; relations through diplomacy', () => {

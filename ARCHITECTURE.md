@@ -181,6 +181,7 @@ launch.js   ← risk.js, missions.js, crew.js, research.js, helpers, rng
 | `mandates` | investors (Fase B) | `[{id, holderId, source: investor|calendar, calendarId?, title, type, destination, count, delivered, deadlineTurn, rewardM, penalty, missionIds, credited, status, …}]` (resolvidos: teto 24) |
 | `designs` | designs (Fase B) | `{[dsg_<n>]: Design}` foguetes do Hangar (ver "Fase B") |
 | `explored` | explore (Fase B) | ids explorados do mapa espacial (estrelas, regiões), teto 400, só ids |
+| `director` | director (v0.9.13) | `{since, ousted: null \| {reason: 'fired'\|'board', turn, summary, actorId, frozen?, reopened?}, tenures: [{actorId, name, short, flag, emblem, fromTurn, toTurn, reason, summary, missions, ok, firsts, crewLost, prestige, highlights}] (teto 40), closed?}` (ver "Demitido não é fim de jogo") |
 
 ### Actor (data/actors.json → state.actors)
 ```
@@ -335,7 +336,8 @@ o programa do jogador dono daquela demo.
   `earn(state, actorId, amount, category, note)`.
 - Categorias: `missions, research, crew, facilities, contracts, diplomacy, grants`.
 - tick: receita semanal `budget/52` para todos os atores; custos fixos `budget*fixedCostShare/52`; virada de ano fecha `finance.year → lastYear`.
-  Dívida prolongada (caixa < 0) corta `support`; `support` 0 → `gameOver = {reason: 'fired'}`.
+  Dívida prolongada (caixa < 0) corta `support`; `support` 0 → `helpers.removeDirector(state, 'fired', resumo)` (v0.9.13: o diretor sai,
+  a campanha continua; ver "Demitido não é fim de jogo").
 - queries: `'budget/summary'` → `{cash, budget, weeklyIncome, weeklyCost, yearSpent, lastYear, runwayWeeks}`.
 
 **src/sim/research.js** [research-crew]
@@ -572,7 +574,8 @@ Decisões tomadas ao juntar os módulos. Onde este bloco contradiz o texto acima
 ## Integridade e equilíbrio (revisão nov/2026)
 
 - **Fim de jogo**: `engine.dispatch` recusa toda ação (exceto `time/advance` e `mission/estimate`) quando `state.gameOver` existe
-  ("Campanha encerrada."). Se um módulo encerra a campanha no meio da semana (budget demite a direção), os módulos seguintes não rodam;
+  ("Campanha encerrada."). Se um módulo encerra a campanha no meio da semana, os módulos seguintes não rodam (desde a v0.9.13 a
+  demissão não encerra: o passo termina e o relógio espera a escolha, ver "Demitido não é fim de jogo");
   `engine.endGame` limpa a fila de decisões e chama os `onGameEnd` **uma vez** para qualquer motivo (`gameOver.hooksRun`).
   Lançamento não pode ser marcado para a última semana (`launchTurn < endTurn`).
 - **Missões** (campos novos em Mission): `paidM` (quanto foi pago de fato; ajustes cobram/devolvem a diferença sempre que `paid`,
@@ -708,7 +711,7 @@ Contrato em [docs/EXPANSION.md](docs/EXPANSION.md) §5–§8 e §12. Módulos no
 - **Investidores** (`src/sim/investors.js`, slices `cap` e `mandates`; ativo com `scenario.unlocks.investors`): investidores
   somam no máx. 90%; jogador ≥ 50% = autonomia (recusar/adiar mandato uma vez, humor −15, o conselho não demite); abaixo de
   50% mandatos obrigatórios, prazo perdido = humor −25 + multa/ações, humor ponderado < 20 em duas rodadas seguidas →
-  `gameOver {reason: 'board'}`. Vagas por ano `K` (por era), mandatadas `M = min(K−1, round(K·s^0,6))`. Rodada anual
+  `helpers.removeDirector(state, 'board', …)` (v0.9.13; antes `gameOver {reason: 'board'}`). Vagas por ano `K` (por era), mandatadas `M = min(K−1, round(K·s^0,6))`. Rodada anual
   (`investors/round`), recompra 1,15× (`investors/buyback {holderId, pct}`), dividendos, fim de prazo (`investors/term`).
   Itens de programa do calendário viram mandatos do acionista âncora (governo 40% para agências nacionais, fundadores 30% para
   empresas; agência fundada começa com 100%). "Voo próprio" (cota e veto) = missão `source: 'custom'` sem mandato ou contrato
@@ -812,3 +815,37 @@ Contrato em [docs/EXPANSION.md](docs/EXPANSION.md) §2, §3, §4, §9, §10 e §
   Sair de um bloco é decisão estratégica: quando passa do limiar, acontece antes de outras propostas. Empresas não saem por conta própria.
 - **Medir**: `node tools/sim-world.mjs 30 --engine --player=all` (eventos de bloco e territórios por campanha, manchetes e cartas mais
   repetidas); `node tools/sim-diplomacy.mjs 1 5 --quiet --seeds=10` (mudanças de bloco de agências e de países por semente).
+
+## Demitido não é fim de jogo (v0.9.13, src/sim/director.js)
+
+- **Saída**: budget (semanas no vermelho, apoio 0) e investors (voto do conselho) chamam `helpers.removeDirector(state, reason, resumo)`, que
+  marca `state.director.ousted` (nunca `gameOver`). O passo termina normalmente (o mundo anda até o fim do passo); no fim do `tick` o
+  engine chama `director.freeze`: some a fila de cartas do diretor (ficam só `era/transition` e `ending/final`) e o dia de lançamento.
+- **Relógio**: `isBlocked` → `'ousted'` (logo depois de `gameOver`); `advance` para com `stoppedBy: 'ousted'`; `dispatch` só aceita
+  `time/advance`, `mission/estimate`, `director/take`, `director/found` e o `decision/resolve` de `era/transition`. `tick()` cru (testes) não
+  é bloqueado.
+- **Escolha**: `'director/take' {actorId}` (atores vivos menos o que demitiu; cenário com lista fixa — Corrida Lunar — só os jogáveis da lista)
+  ou `'director/found' {payload do assistente}` (só onde o cenário tem `playable.found: true`; regras de fundação vistas de hoje:
+  `director/foundScenario` = cenário com `start` = data atual; `lifecycle.foundNow` cria o ator pelo mesmo `addActor`, id
+  `custom_<hash(nome, sigla, país, seed+turno)>`, tecnologia `foundingTech` do ano atual).
+- **Passagem para a IA** (`handOver`): grava o mandato em `tenures`, troca `state.playerId` e roda o gancho `onDirectorChange(state, data, ctx,
+  {from, to, mode, grant})` de cada módulo na ordem de `MODULES` (via `ctx.hooks.directorChanged`):
+  lifecycle (a nova agência vira `core`) · diplomacy (propostas com a antiga ou a nova caducam) · calendar (programas reais da antiga voltam à IA:
+  não voados → `planned` a partir da semana seguinte; em trânsito → `launched` com a data de chegada do jogador; voados → o resultado; os
+  `planned` da nova viram `player`) · budget (o governo/conselho cobre a dívida da antiga e o apoio volta a ≥ 30; livro-caixa do jogador
+  recomeça) · research (o que o jogador pesquisou vira a lista de rival da antiga; a nova traz a sua lista de rival, ou a concessão da
+  fundação; projetos abertos acabam) · crew (os vivos da antiga saem das listas, os mortos ficam no Memorial; a nova traz o elenco dos dados
+  ou um time procedural) · missions (missões da antiga saem das listas; contratos ganhos viram trabalho de IA da antiga, entregues fora da
+  tela até o prazo; lances abertos são retirados) · investors (cap table e mandatos recomeçam para o tipo da nova) · market (vendas de
+  lançamentos da antiga terminam) · launch (sem dia de lançamento, pool de Comando cheio) · narrative (continuações de cadeia caem).
+  Projetos do Hangar, ativos de infra e colônias ficam com o dono (`owner`/`ownerId`): os da antiga passam a ser geridos pela IA.
+- **Saves antigos**: `engine.deserialize` chama `director.reopen`: `gameOver {reason: 'fired'|'board'}` antes do fim da campanha vira
+  `ousted` (epílogo prematuro do Eco apagado). Saves novos nunca têm esse `gameOver`, então save/load continua idêntico.
+- **Fim**: só jan/3000 (ou a data final de um cenário curto) encerra a campanha; se acabar com a escolha pendente, `director.onGameEnd`
+  fecha o mandato. `director/tenures` (fechados + o atual) alimenta Anais › Direções, o resumo de fim de jogo e a linha `directors` do
+  legado do Eco (data/core/eco.json).
+- **UI**: `newgame.renderOusted` ("Você foi afastado da direção da …", resumo do mandato, "Assumir outra agência" → `renderTakePicker`,
+  "Fundar uma nova agência" → `found-agency.renderFoundWizard({midGame: true})`, "Ver o mundo antes de decidir"); com o mundo aberto o disco
+  vira "Escolher" (modo `ousted`) e reabre a escolha; recarregar o save volta direto à tela.
+- **Bots**: `tools/golden.mjs directorMove` (assume a agência mais forte; funda com `found: true` ou sem candidatas) roda no início de
+  `botStep` e de `bot-b.phaseBMoves`; `tools/campaign.mjs --fire-at <ano> [--found-on-fire]` força a demissão pelo caminho real.

@@ -90,18 +90,21 @@ test('year rollover closes the year, returns idle money, posts summary news', ()
   assert.match(n.body, /US\$/);
 });
 
-test('prolonged debt erodes support and gets the player fired', () => {
+test('prolonged debt erodes support and gets the player fired (the director, not the campaign)', () => {
   const s = fresh();
   s.actors.nasa.cash = -1e6;
   s.actors.nasa.support = 12;
   let t = 0;
-  while (!s.gameOver && t < 200) {
+  while (!s.director?.ousted && t < 200) {
     s.turn = t++;
     budget.tick(s, data, ctx);
   }
-  assert.equal(s.gameOver?.reason, 'fired');
+  assert.equal(s.gameOver, null, 'being fired never ends the campaign');
+  assert.equal(s.director?.ousted?.reason, 'fired');
+  assert.equal(s.director.ousted.actorId, 'nasa');
+  assert.match(s.director.ousted.summary, /semanas no vermelho/);
   assert.ok(s.finance.debtWeeks >= 8);
-  assert.ok(s.news.some((x) => x.tags.includes('gameover')));
+  assert.ok(s.news.some((x) => x.tags.includes('director')));
 });
 
 test('short debt with healthy support does not fire; leaving the red resets', () => {
@@ -109,6 +112,7 @@ test('short debt with healthy support does not fire; leaving the red resets', ()
   s.actors.nasa.cash = -50;
   for (let t = 1; t < 4; t++) { s.turn = t; budget.tick(s, data, ctx); }
   assert.equal(s.gameOver, null);
+  assert.ok(!s.director?.ousted);
   s.actors.nasa.cash = 1000;
   s.turn = 5;
   budget.tick(s, data, ctx);

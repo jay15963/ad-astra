@@ -756,6 +756,18 @@ export function compact(state, data) {
   for (const k of ['interest', 'trend', 'track', 'prices']) for (const vid of Object.keys(m[k] || {})) if (!live.has(vid)) delete m[k][vid];
 }
 
+/**
+ * A new director (src/sim/director.js): the launches the old agency sold were the player's business, and they end
+ * with the director (the buyers fly elsewhere); open offers go too. The interest rows follow the rockets on sale.
+ */
+export function onDirectorChange(state) {
+  const m = state?.market;
+  if (!isObj(m)) return;
+  for (const c of m.contracts || []) if (c.status === 'active') endContract(state, c, 'cancelled');
+  for (const o of m.offers || []) if (o.decisionId) removeDecision(state, o.decisionId);
+  m.offers = [];
+}
+
 /** A buyer leaves the world: a merge hands its contracts to the survivor; otherwise they end. */
 export function onActorGone(state, data, ctx, id, info = {}) {
   const m = state?.market;

@@ -2117,6 +2117,16 @@ export function addActor(state, data, def, ctx) {
 }
 
 /**
+ * A new director (src/sim/director.js): proposals between the player's old or new agency and anyone else were
+ * the player's to answer (cards already cleared by the engine), so they lapse; relations and treaties stay with the
+ * agencies, which keep their history.
+ */
+export function onDirectorChange(state, data, ctx, { from, to } = {}) {
+  if (!Array.isArray(state.proposals)) return;
+  state.proposals = state.proposals.filter((p) => ![from, to].includes(p.from) && ![from, to].includes(p.to));
+}
+
+/**
  * An actor leaves the world (dissolved, merged `into` another, never born): relation rows, bloc seats, open
  * proposals and its seat in treaties go (a treaty left with one party ends). A merge hands the absorbed actor's
  * partnerships to the survivor as trust. The actor leaves state.actors (lifecycle keeps its tombstone).

@@ -305,6 +305,9 @@ piece 2)), each with `eras`, `kind`, `weight`, `needs`, pt-BR name grammar, `sta
   a JAXA", `state.playerId` moves to the survivor; missions, crew, cash carried.
 - Non-rename real ops affecting the player's lineage (optional merge, privatization) become a **proposal** decision with
   the historical choice as default. The player's lineage is exempt from hazard dissolution (it ends only via gameOver).
+- v0.9.13: the player can leave the lifecycle's player seat without ending the campaign. Fired (budget) or removed by the board
+  (investors), the director chooses another live agency or founds one at today's date; the old agency stays in the world as an AI
+  actor (ARCHITECTURE.md "Demitido não é fim de jogo", src/sim/director.js).
 - `nationSplit` affecting the player: crisis card (budget shock from data, engineer emigration decision).
 - Lunar Race: `lifecycle: 'off'` → module is a no-op (golden unchanged).
 
@@ -399,7 +402,8 @@ state.mandates = [{ id, holderId, title, type, destination, count, deadlineTurn,
   the board cannot remove the director.
 - **Below 50%**: mandates are binding; a missed deadline costs mood −25 and the holder's penalty. If the
   pct-weighted mean mood < 20 at two consecutive rounds, the board removes the director:
-  `gameOver {reason: 'board'}` with a warning card one round before (same path as today's dismissal).
+  `gameOver {reason: 'board'}` with a warning card one round before (same path as today's dismissal). Since v0.9.13 both dismissals
+  remove only the director (`helpers.removeDirector`): the campaign goes on with another agency.
 - **Mandate share of the agenda.** `K` = mission slots per year (pads × crews × era tunable, ≥ 2). With
   `s = 1 − playerPct/100` (investor share):
   `M = min(K − 1, round(K · s^0.6))` mandated slots per year; own slots `= K − M` (always ≥ 1: "quase nenhum espaço").

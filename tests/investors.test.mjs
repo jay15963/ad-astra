@@ -451,13 +451,15 @@ test('board: weighted mood < 20 at two consecutive rounds below 50% removes the 
   assert.equal(s.gameOver, null);
   s.turn = 78;
   inv.tick(s, lunarInv, { ...ctxOf(s), prevTurn: 78, dt: 1 });
-  assert.equal(s.gameOver?.reason, 'board');
-  assert.match(s.gameOver.summary, /conselho/i);
+  assert.equal(s.gameOver, null, 'the board removes the director, not the campaign');
+  assert.equal(s.director?.ousted?.reason, 'board');
+  assert.match(s.director.ousted.summary, /conselho/i);
   // autonomous: never removed
   const a = fresh('isro', 9);
   a.cap.holders[0].mood = 0;
   for (const t of [26, 78, 130]) { a.turn = t; inv.tick(a, lunarInv, { ...ctxOf(a), prevTurn: t, dt: 1 }); }
   assert.equal(a.gameOver, null);
+  assert.ok(!a.director?.ousted);
   assert.equal(a.cap.lowRounds, 0);
 });
 

@@ -1,11 +1,13 @@
 // Anais (EXPANSION.md §12, drawer › Arquivo): the campaign's history in three views — headlines by year (state.annals,
 // compacted into decades/centuries by helpers.compactAnnals), the agencies' timeline (lifecycle/timeline: births,
 // renames, merges, ends) and the eras (state.eraHistory + the current one). Phase C adds content; this screen only reads.
+// v0.9.13: "Direções" lists every agency the player directed (director/tenures), once there is more than one.
 // annalsModel() is pure (tests).
 import { h, raw, chip, icon, ERA_NAMES } from './components.js';
 import { eraTable, yearOf } from '../core/time.js';
 import { emblemSVG } from './portrait.js';
 import { listRow, ensurePainelCss } from './decisions.js';
+import { tenureRow } from './newgame.js';
 import { screenHead, section, listCard, pills, note, countChip, rerender } from './screen-kit.js';
 
 const TRUTH = { fato: 'Fato', plano_oficial: 'Plano oficial', projecao: 'Projeção', especulacao: 'Especulação' };
@@ -32,7 +34,7 @@ const eraFrom = (data, id) => { const e = eraTable(data).eras.find((x) => x.id =
 /**
  * Pure model. q(name, fallback, ...args) = store.tryQuery.
  * {startYear, nowYear, years:[{key, label, lines:[{text, imp, turn}]}], agencies:[{year, month, op, opLabel, text, id, truth}],
- *  eras:[{id, n, name, fromYear, toYear, current, leader, firsts, headline}]}
+ *  eras:[{id, n, name, fromYear, toYear, current, leader, firsts, headline}], directors:[tenure]}
  */
 export function annalsModel(state, data, q = () => null) {
   const st = state || {};
@@ -62,7 +64,9 @@ export function annalsModel(state, data, q = () => null) {
   }
   eras.reverse();
   for (const e of eras) e.n = Number(String(e.id).replace(/\D/g, '')) || null;
-  return { startYear: sy, nowYear, years, agencies, eras };
+  const ten = q('director/tenures', []);
+  const directors = Array.isArray(ten) ? ten.filter(Boolean).slice().reverse() : [];
+  return { startYear: sy, nowYear, years, agencies, eras, directors };
 }
 
 let tab = 'manchetes';
@@ -77,7 +81,10 @@ export function render(container, store, route) {
   const redraw = () => rerender(container, render, store, route);
 
   let body;
-  if (tab === 'agencias') {
+  if (tab === 'direcoes' && m.directors.length < 2) tab = 'manchetes';
+  if (tab === 'direcoes') {
+    body = section('Suas direções', { right: countChip(m.directors.length) }, h('div', { class: 'list' }, m.directors.map((t) => tenureRow(st, t))));
+  } else if (tab === 'agencias') {
     body = m.agencies.length
       ? section('Agências', { right: countChip(m.agencies.length) }, listCard(m.agencies.slice(0, PAGE * pages).map((e) => listRow({
         lead: e.op === 'birth' || e.op === 'rename' ? raw(emblemSVG(actorOf(e.id), { size: 30 })) : icon(OP_ICON[e.op] || 'info', 18),
@@ -113,6 +120,7 @@ export function render(container, store, route) {
       { id: 'manchetes', label: 'Manchetes', count: m.years.length },
       { id: 'agencias', label: 'Agências', count: m.agencies.length },
       { id: 'eras', label: 'Eras', count: m.eras.length },
+      ...(m.directors.length > 1 ? [{ id: 'direcoes', label: 'Direções', count: m.directors.length }] : []),
     ], tab, (id) => { tab = id; pages = 1; redraw(); }, { label: 'Ver nos anais' }),
     body));
 }

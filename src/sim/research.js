@@ -341,6 +341,32 @@ export function resetPlayer(state, data, opts = {}) {
   startPlayer(state, data, opts);
 }
 
+/**
+ * A new director mid-game (src/sim/director.js; state.playerId is already the new agency). The old agency keeps what
+ * it researched as a rival (its open projects end with the director); the new one brings its own: the rival list it
+ * had (an agency taken over), or `grant` (a founded agency: initialFor + the "Tecnologia inicial" share at today's
+ * date, lifecycle.foundingTech). Science points start over like a new agency's.
+ */
+export function onDirectorChange(state, data, ctx, { from, to, grant = null } = {}) {
+  const r = ensure(state);
+  const mine = Array.isArray(r.unlocked) ? r.unlocked.slice() : [];
+  if (from && from !== to && state.actors?.[from]) r.rivals[from] = mine;
+  else if (from) delete r.rivals[from];
+  let next;
+  if (Array.isArray(grant)) next = [...new Set([...grant, ...initialNodes(state, data, to)])].sort();
+  else next = Array.isArray(r.rivals[to]) ? r.rivals[to].slice() : initialNodes(state, data, to);
+  delete r.rivals[to];
+  delete r.rivalProjects?.[to];
+  r.unlocked = next;
+  r.projects = [];
+  r.quality = {};
+  r.points = cfg(data).startPoints ?? 30;
+  delete r.needsRecompute;
+  ensureRivals(state, data);
+  recompute(state, data, to);
+  if (r.rivals[from]) recompute(state, data, from);
+}
+
 /** Rivals = every actor except the player. Added lazily so a late diplomacy init still works. */
 function ensureRivals(state, data) {
   const r = ensure(state);

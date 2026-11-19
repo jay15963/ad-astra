@@ -1146,6 +1146,11 @@ export function onYear(state, data, ctx) {
   quietNews(state, ctx);
 }
 
+/** A new director (src/sim/director.js): chain follow-ups were the old director's story; flags and history stay. */
+export function onDirectorChange(state) {
+  if (state.events && Array.isArray(state.events.scheduled)) state.events.scheduled = [];
+}
+
 export function onGameEnd(state, data, ctx) {
   ensure(state);
   const ranking = Object.values(state.actors || {}).sort((a, b) => (b.prestige || 0) - (a.prestige || 0));

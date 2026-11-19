@@ -6,6 +6,9 @@
 //            feats history saw before it); --money pouco|medio|muito and --tech pouca|media|muita = starting levels
 //   --min-pct  stake the bot keeps in investor rounds (Phase B; default 50 = autonomy)
 //   --keep-control  never sell below --min-pct, even when cash is tight (long runs that must reach an ending)
+//   --fire-at <year>  force the director out in that year (debt, no support: the real budget.js path) to prove the
+//                     campaign goes on: the bot takes the strongest agency (or founds one with --found-on-fire)
+//   --found-on-fire   when fired, found a new agency at today's date instead of taking an existing one
 // The bot is tools/bot-b.mjs (Phase B moves: investor rounds, mandates, Hangar designs and test flights) over the
 // shared golden bot; without investors.js/designs.js it plays exactly like the golden bot.
 //   --from   start at an era's first year (or a given year) with a scenario built from data (no simulated past)
@@ -85,7 +88,7 @@ function hasNaN(state) {
  * Play one campaign. Returns {state, eras: [{eraId, turns, ms, saveKB, core, minor, stops, births, merges, gone}],
  * ending, totalMs, errors}.
  */
-export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null, found = false, minPct = 50, keepControl = false, money = null, tech = null } = {}) {
+export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null, found = false, minPct = 50, keepControl = false, money = null, tech = null, fireAt = null, foundOnFire = false } = {}) {
   const errors = [];
   let state = engine.newGame(data, { seed, playerId });
   let founded = null;
@@ -142,8 +145,15 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
       if (!r.ok) { errors.push(`transição ${p.to}: ${r.error}`); break; }
       openEra();
     }
+    // --fire-at: the government loses patience that year (the real path: debt streak, no support, budget.js fires)
+    if (fireAt && !botMem.forcedFire && yearOf(state) >= fireAt && !state.director?.ousted) {
+      botMem.forcedFire = state.turn;
+      state.finance.debtWeeks = 400;
+      state.actors[state.playerId].cash = -Math.abs(state.actors[state.playerId].budget || 100) * 2;
+      state.actors[state.playerId].support = 0;
+    }
     try {
-      phaseBStep(state, data, engine, { schedule: !fast, minPct, keepControl }, botMem);
+      phaseBStep(state, data, engine, { schedule: !fast, minPct, keepControl, foundOnFire }, botMem);
     } catch (e) {
       errors.push(`bot t${state.turn}: ${e.message}`);
       break;
@@ -183,7 +193,8 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
   if (errs.length) errors.push(`erros no log: ${errs.slice(0, 3).join(' | ')}`);
   // founding refused is a note, not a failure (Phase B may not be integrated yet)
   const hard = errors.filter((e) => !e.startsWith('aviso:'));
-  return { state, eras, ending: state.gameOver?.ending ?? null, reason: state.gameOver?.reason ?? null, totalMs: Date.now() - t0, errors: hard, notes: errors.filter((e) => e.startsWith('aviso:')), founded, startTech, phaseB: phaseBStats(state) };
+  const tenures = (state.director?.tenures || []).map((t) => ({ id: t.actorId, short: t.short, from: t.fromTurn, to: t.toTurn, reason: t.reason }));
+  return { state, eras, ending: state.gameOver?.ending ?? null, reason: state.gameOver?.reason ?? null, totalMs: Date.now() - t0, errors: hard, notes: errors.filter((e) => e.startsWith('aviso:')), founded, startTech, phaseB: phaseBStats(state), fired: botMem.fired || 0, tenures };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -205,11 +216,13 @@ if (isMain) {
   const tech = opt('--tech');
   const minPct = Number(opt('--min-pct') ?? 50);
   const keepControl = flag('--keep-control');
+  const fireAt = opt('--fire-at') ? Number(opt('--fire-at')) : null;
+  const foundOnFire = flag('--found-on-fire');
   let failures = 0;
   for (let s = 1; s <= nSeeds; s++) {
     const seed = s * 7919;
     const res = runCampaign(data, {
-      seed, playerId, fast, toEra, found, minPct, keepControl, money, tech,
+      seed, playerId, fast, toEra, found, minPct, keepControl, money, tech, fireAt, foundOnFire,
       onEra: quiet ? null : (e, st) => console.log(
         `  ${e.eraId} até ${e.endYear}: ${e.turns} turnos, ${(e.ms / Math.max(1, e.turns)).toFixed(1)} ms/turno, save ${e.saveKB} KB, ` +
         `atores ${e.core} núcleo/${e.minor} menores, nasc ${e.births} ev ${e.events} fim ${e.gone}, paradas/turno ${(e.stops / Math.max(1, e.turns)).toFixed(2)} (sem lançamentos ${(e.cardStops / Math.max(1, e.turns)).toFixed(2)})` +
@@ -219,11 +232,16 @@ if (isMain) {
     const st = res.state;
     const reached = res.reason === 'ending' && engine.ENDINGS.includes(res.ending);
     const wantFull = !toEra;
-    const ok = !res.errors.length && (!wantFull || reached || res.reason === 'fired' || res.reason === 'bankrupt');
+    // v0.9.13: being fired is not an end any more (the bot takes another agency): a full run must reach jan/3000
+    const ok = !res.errors.length && (!wantFull || reached);
     if (!ok) failures++;
     console.log(`${ok ? 'ok' : 'FALHA'} ${playerId} seed=${seed} ${res.totalMs} ms, fim=${res.reason ?? '-'}${res.ending ? `/${res.ending}` : ''} ` +
       `em ${formatTurnEra(st.turn, st.startYear, st.clock?.stepWeeks ?? 1)} (turno ${st.turn}, era ${eraAt(data, yearOf(st))?.id})` +
       (res.errors.length ? `\n  ${res.errors.slice(0, 5).join('\n  ')}` : ''));
+    if (res.tenures.length) {
+      const fmt = (t) => formatTurnEra(t, st.startYear, 52);
+      console.log(`  direções: ${res.tenures.map((t) => `${t.short} (${fmt(t.from)} a ${fmt(t.to)}, ${t.reason})`).join(' → ')} → ${st.actors?.[st.playerId]?.short || st.playerId} (desde ${fmt(st.director?.since ?? 0)})`);
+    }
     const b = res.phaseB;
     if (!quiet && res.founded) {
       const a = st.actors?.[res.founded];

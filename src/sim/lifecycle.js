@@ -1457,8 +1457,8 @@ const hexLum = (c) => {
 };
 
 /** Actor definition of a founded agency (the shape addActor takes). */
-function foundDef(state, data, id, value) {
-  const pv = foundPreview(data, value);
+function foundDef(state, data, id, value, scenario = data?.scenario) {
+  const pv = foundPreview(data, value, scenario);
   const n = value.nation;
   const emblem = value.emblem || { shape: value.kind === 'company' ? 'wordmark' : 'roundel', field: '#13294b', glyph: 'rocket' };
   if (!emblem.label) emblem.label = value.short.slice(0, 6);
@@ -1521,6 +1521,44 @@ function foundAgency(state, data, action, ctx) {
   }, state.turn);
   emitSignal(state, 'agency/founded', { actorId: id, kind: value.kind, nation: value.nationId });
   return { ok: true, actorId: id };
+}
+
+/**
+ * Found an agency mid-game (src/sim/director.js, the player was fired): same validation, definition and addActor path
+ * as 'agency/found', at `scenario` (the campaign seen from today: start = the current date). Does not touch the
+ * player's records (the director module hands them over). → {ok, error?, actorId, value, grant}.
+ */
+export function foundNow(state, data, ctx, payload, scenario) {
+  const chk = validateFound(data, payload, scenario);
+  if (!chk.ok) return chk;
+  const value = chk.value;
+  const L = slice(state);
+  let id = customIdFor(value, hash32(state.seed >>> 0, state.turn | 0));
+  for (let i = 1; (state.actors?.[id] || L.tombstones?.[id]) && i < 8; i++) id = customIdFor(value, hash32(state.seed >>> 0, state.turn | 0, i));
+  if (state.actors?.[id] || L.tombstones?.[id]) return { ok: false, error: 'Esta agência já foi fundada.' };
+  const def = foundDef(state, data, id, value, scenario);
+  addActor(state, data, ctx, def, { reason: 'found' });
+  const a = state.actors[id];
+  if (!a) return { ok: false, error: 'Não foi possível fundar a agência.' };
+  a.custom = true;
+  a.tier = 'core';
+  a.lineage = id;
+  a.hq = def.hq ? clone(def.hq) : null;
+  const year = scenarioStart(scenario).year;
+  const tech = foundingTech(data, value.tech, year, scenario);
+  news(state, {
+    importance: 3, actorId: id,
+    headline: `Começa a operar ${value.name} (${value.short}), ${value.kind === 'company' ? 'nova empresa espacial' : 'nova agência espacial'} ${value.nation.of}`,
+    text: value.hq?.name ? `Sede em ${value.hq.name}.` : '',
+  }, state.turn);
+  emitSignal(state, 'agency/founded', { actorId: id, kind: value.kind, nation: value.nationId });
+  return { ok: true, actorId: id, value, grant: tech.ids };
+}
+
+/** A new director: the agency the player now runs is always a core actor (full AI rows, Tabela da Era). */
+export function onDirectorChange(state, data, ctx, { to } = {}) {
+  const a = to ? state.actors?.[to] : null;
+  if (a) a.tier = 'core';
 }
 
 /** Change the player's emblem (Identidade e logo): any time, free; map colour stays as it was. */

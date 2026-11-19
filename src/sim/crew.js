@@ -211,22 +211,48 @@ function rosterPerson(state, data, e, actorId) {
 
 export function init(state, data, ctx) {
   ensure(state);
-  const pid = state.playerId;
+  seedRoster(state, data, ctx, state.playerId, { note: 'Integra a agência no início da Corrida Lunar.' });
+}
+
+/**
+ * The starting team of `pid`: the data roster of the lineage, else a procedural founding team (3 engineers, 2 flight
+ * directors, 3 astronauts). Ids already in use (a roster person who died under an earlier director of the same
+ * agency) get the turn as suffix, so nobody in the Memorial is overwritten.
+ */
+function seedRoster(state, data, ctx, pid, { note, hiredTurn = 0, label = 'roster' } = {}) {
   const roster = crewData(data).roster?.[pid];
   const people = [];
+  const freeId = (id) => (state.crew[id] ? `${id}_t${state.turn}` : id);
   if (Array.isArray(roster) && roster.length) {
-    for (const e of roster) if (e?.id && e?.name) people.push(rosterPerson(state, data, e, pid));
+    for (const e of roster) if (e?.id && e?.name) people.push(rosterPerson(state, data, { ...e, id: freeId(e.id) }, pid));
   } else {
-    // fallback: procedural founding team (3 engineers, 2 flight directors, 3 astronauts)
-    const rng = ctx?.rng ? ctx.rng('roster') : rngFor(state.seed, 'crew-roster', pid);
+    const rng = ctx?.rng ? ctx.rng(label) : rngFor(state.seed, 'crew-roster', pid, ...(label === 'roster' ? [] : [label]));
     const roles = ['engineer', 'engineer', 'engineer', 'flight_director', 'flight_director', 'astronaut', 'astronaut', 'astronaut'];
-    roles.forEach((role, i) => people.push(genPerson(state, data, rng, { id: `${pid}_crew_${i + 1}`, actorId: pid, role })));
-    for (const p of people) p.hiredTurn = 0;
+    roles.forEach((role, i) => people.push(genPerson(state, data, rng, { id: freeId(`${pid}_crew_${i + 1}`), actorId: pid, role })));
+    for (const p of people) p.hiredTurn = hiredTurn;
   }
   for (const p of people) {
-    addHistory(state, p, 'Integra a agência no início da Corrida Lunar.');
+    if (hiredTurn && p.hiredTurn == null) p.hiredTurn = hiredTurn;
+    addHistory(state, p, note);
     state.crew[p.id] = p;
   }
+  return people;
+}
+
+/**
+ * A new director (src/sim/director.js): the old agency's team stays with it (the AI does not keep a roster: the
+ * living leave the player's lists; the fallen stay for the Memorial); the new agency brings its own team.
+ */
+export function onDirectorChange(state, data, ctx, { from, to } = {}) {
+  ensure(state);
+  const inMemorial = new Set((state.memorial || []).map((m) => m?.crewId).filter(Boolean));
+  for (const [id, p] of Object.entries(state.crew)) {
+    if (!p || p.actorId !== from || from === to) continue;
+    if (p.status === 'dead' || inMemorial.has(id)) continue;
+    delete state.crew[id];
+  }
+  const have = Object.values(state.crew).some((p) => p && p.actorId === to && p.status !== 'dead' && p.status !== 'left' && p.status !== 'retired');
+  if (!have) seedRoster(state, data, ctx, to, { note: 'Integra a equipe quando a nova direção assume.', hiredTurn: state.turn || 0, label: `roster:${to}` });
 }
 
 // ---------- hiring market ----------

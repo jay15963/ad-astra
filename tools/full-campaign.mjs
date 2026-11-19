@@ -160,6 +160,9 @@ async function main(argv) {
     const turns = r.eras.reduce((a, e) => a + e.turns, 0);
     console.log(`${r.errors.length ? 'FALHA' : 'ok'}: ${turns} turnos em ${(r.totalMs / 1000).toFixed(1)} s, ano ${yearOfState(s)}, fim ${end}, ` +
       `save final ${Math.round(r.hash.length / 1024)} KB, máx. ${r.maxPacks} pacotes de era na memória`);
+    // v0.9.13: fired is not an end; the bot takes the strongest agency and the run goes on to jan/3000
+    const ten = s.director?.tenures || [];
+    if (ten.length) console.log(`  direções: ${ten.map((t) => `${t.short} até ${s.startYear + Math.floor((t.toTurn ?? 0) / 52)} (${t.reason})`).join(' → ')} → ${s.actors?.[s.playerId]?.short || s.playerId}`);
     for (const e of r.errors.slice(0, 8)) console.log(`  - ${e}`);
     if (r.errors.length) failed = true;
   }

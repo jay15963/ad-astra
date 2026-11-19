@@ -1,7 +1,7 @@
 // Finances of the player and of AI actors (ARCHITECTURE "src/sim/budget.js"). US$ millions everywhere.
 // Slice: state.finance (player ledger + yearly totals + rival yearly totals). Actor cash changes via changeActor.
 
-import { addNews, changeActor, log, clamp, player } from '../core/helpers.js';
+import { addNews, changeActor, log, clamp, player, removeDirector, isOusted } from '../core/helpers.js';
 import { crossed, yearAt } from './simtime.js';
 
 export const CATEGORIES = ['missions', 'research', 'crew', 'facilities', 'contracts', 'diplomacy', 'grants', 'infra', 'market'];
@@ -465,10 +465,13 @@ function debtWeek(state) {
         addNews(state, { headline: pickV(DEBT_HEADLINES, f.debtCount - 1)(f.debtWeeks), body: 'Parlamentares pedem cortes e a imprensa fala em descontrole.', tags: ['budget', 'politics', 'debt'], actors: [state.playerId], importance: 3, icon: 'budget' });
       }
     }
-    if (f.debtWeeks >= FIRE_AFTER + slack && (me.support ?? 0) <= 0 && !state.gameOver) {
-      state.gameOver = { reason: 'fired', turn: state.turn, summary: `Depois de ${f.debtWeeks} semanas no vermelho, o governo perdeu a paciência e trocou a direção da agência.` };
-      addNews(state, { headline: 'Direção da agência é demitida', body: state.gameOver.summary, tags: ['budget', 'gameover'], actors: [state.playerId], importance: 3, icon: 'budget' });
-      log(state, 'budget: game over (fired)');
+    // the director is fired, not the campaign: the agency goes on under the AI and the player picks another one
+    // (helpers.removeDirector, src/sim/director.js)
+    if (f.debtWeeks >= FIRE_AFTER + slack && (me.support ?? 0) <= 0 && !state.gameOver && !isOusted(state)) {
+      const summary = `Depois de ${f.debtWeeks} semanas no vermelho, o ${me.kind === 'company' ? 'conselho' : 'governo'} perdeu a paciência e trocou a direção da agência.`;
+      removeDirector(state, 'fired', summary);
+      addNews(state, { headline: `Direção da ${me.short || me.name || 'agência'} é demitida`, body: summary, tags: ['budget', 'director'], actors: [state.playerId], importance: 3, icon: 'budget' });
+      log(state, 'budget: diretor demitido');
     }
   } else if (f.debtWeeks > 0) {
     if (f.debtWeeks >= grace && state.turn - (f.redNewsTurn ?? -99) >= 8 && state.turn - (f.outNewsTurn ?? -99) >= 26) {
@@ -602,6 +605,25 @@ export function onActorBorn(state, data, ctx, id) {
   if (!a) return;
   if (!Number.isFinite(a.cash)) a.cash = (a.budget || 0) * 0.25;
   if (!Number.isFinite(a.fixedCostShare)) a.fixedCostShare = DEFAULT_FIXED_SHARE;
+}
+
+/**
+ * A new director (src/sim/director.js). The agency left behind gets what a government or a board does when it
+ * replaces a director: the debt is covered and the new (AI) direction starts with some credit (support ≥ 30); the
+ * player's books (ledger, year, debt streak, emergency-funds cooldown, founded anchor) start over for the new agency.
+ */
+export function onDirectorChange(state, data, ctx, { from } = {}) {
+  const old = from ? state.actors?.[from] : null;
+  if (old) {
+    if ((old.cash || 0) < 0) changeActor(state, from, 'cash', -(old.cash || 0));
+    if ((old.support ?? 0) < 30) changeActor(state, from, 'support', 30 - (old.support ?? 0));
+  }
+  const f = fin(state);
+  const keep = { rivals: f.rivals || {}, rivalsLastYear: f.rivalsLastYear, programs: f.programs || {} };
+  delete keep.rivals[state.playerId];
+  if (keep.rivalsLastYear) delete keep.rivalsLastYear[state.playerId];
+  state.finance = { ledger: [], year: emptyYear(state), lastYear: null, debtWeeks: 0, history: [], lastFundsTurn: null, ...keep };
+  if (!keep.rivalsLastYear) delete state.finance.rivalsLastYear;
 }
 
 /** A dead actor leaves the rival totals (its money went with it, or to `into`). */

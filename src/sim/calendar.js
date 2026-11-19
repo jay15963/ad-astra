@@ -664,6 +664,44 @@ export function init(state, data, _ctx) {
   state.stats['calendar.slips'] = 0;
 }
 
+/**
+ * A new director (src/sim/director.js; state.missions still holds the old agency's missions, missions.js clears them
+ * after this hook). The old agency's real programs go back to the AI calendar: not flown yet → 'planned' (the AI
+ * flies them, no earlier than next week); in flight → 'launched' with the player's arrival date (the AI judges the
+ * arrival); flown → the result it had. The new agency's own planned programs become 'player' (story missions).
+ */
+export function onDirectorChange(state, data, ctx, { from, to } = {}) {
+  ensureSlices(state, data);
+  const OK = ['total', 'partial'];
+  const PRE = ['planning', 'scheduled', 'launch'];
+  for (const inst of state.calendar || []) {
+    const item = calendarItem(data, inst.id);
+    const owner = item?.owner ?? null;
+    if (inst.status === 'player' && owner !== to) {
+      const m = (state.missions || []).find((x) => x?.calendarId === inst.id && x.status !== 'cancelled') || null;
+      const r = m?.result || null;
+      if (!m || PRE.includes(m.status) || (!r && !m.inheritedTransit && m.status !== 'transit')) {
+        inst.status = 'planned';
+        inst.currentTurn = Math.max(Number(inst.currentTurn) || 0, state.turn + 1);
+        inst.outcome = null;
+      } else if (['transit', 'arrival'].includes(m.status) && (!r || OK.includes(r.outcome))) {
+        inst.status = 'launched';
+        inst.launchTurn = m.launchTurn ?? r?.launchedTurn ?? inst.launchTurn ?? state.turn;
+        inst.ascentLevel = r?.outcome || 'total';
+        inst.arrivalTurn = Math.max(state.turn + 1, Number(m.transit?.arriveTurn) || state.turn + 1);
+        inst.history = Array.isArray(inst.history) ? inst.history : [];
+      } else {
+        const lvl = r?.outcome || inst.outcome?.level || null;
+        inst.status = lvl === 'total' ? 'success' : lvl === 'partial' ? 'partial' : 'failed';
+        inst.resolvedTurn = r?.resolvedTurn ?? inst.resolvedTurn ?? state.turn;
+        if (lvl && !inst.outcome) inst.outcome = { level: lvl, failureType: r?.failureType ?? null, phase: r?.phase ?? null };
+      }
+    } else if (inst.status === 'planned' && owner === to && to) {
+      inst.status = 'player';
+    }
+  }
+}
+
 // ---------------------------------------------------------------- tick
 
 export function tick(state, data, ctx) {

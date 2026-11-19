@@ -9,7 +9,7 @@ import { h, raw, button, toast, fallbackPanel, closeAllModals, fmtDate, fmtMonth
 import { emblemSVG } from './portrait.js';
 import { useEmblemData } from './emblem.js';
 import { applySettings, render as renderSettings, APP_VERSION, BUILD_DATE } from './settings.js';
-import { renderTitle, renderGameOver } from './newgame.js';
+import { renderTitle, renderGameOver, renderOusted, renderTakePicker } from './newgame.js';
 import { openDecision, sortDecisions, closeDecision } from './decisions.js';
 import { screenById, bottomScreens, drawerSections, resolveRoute, bottomOwner, drawerCurrent, badgeOf, isAvailable } from './screens.js';
 import { createDrawer } from './drawer.js';
@@ -32,6 +32,9 @@ const HINT_KEY = 'adastra.hint.hold';
 const ui = {
   route: { tab: 'painel', sub: '' },
   lookingAfterEnd: false,
+  // fired (v0.9.13): the player looks at the world before choosing the next agency; the disc brings the choice back
+  browsingOusted: false,
+  ousted: null, // null | 'take' (agency picker) | 'found' (founding wizard at today's date)
   cleanup: null,
   shell: null,
   tickerTop: null,
@@ -156,6 +159,8 @@ function afterFirstPaint() {
 function showTitle() {
   ui.shell = null;
   ui.lookingAfterEnd = false;
+  ui.browsingOusted = false;
+  ui.ousted = null;
   closeDrawer({ restoreFocus: false });
   closeAllModals();
   closeLaunch();
@@ -232,6 +237,10 @@ function renderAll() {
     renderGameOver(appRoot, store, opts);
     return;
   }
+  if (st.director?.ousted && !ui.browsingOusted) {
+    renderOustedFlow();
+    return;
+  }
   ensureShell();
   renderHeader();
   renderTicker();
@@ -239,6 +248,54 @@ function renderAll() {
   renderView();
   renderDrawer();
   syncLaunch();
+}
+
+// ------------------------------------------------------------------ fired: the choice of the next agency
+
+/**
+ * "Você foi afastado" (v0.9.13): the summary and the choice, the agency picker or the founding wizard at today's
+ * date. Time waits (engine isBlocked 'ousted'); "Ver o mundo" opens the shell, and the disc brings this back.
+ */
+function renderOustedFlow() {
+  ui.shell = null;
+  closeDrawer({ restoreFocus: false });
+  closeAllModals();
+  closeLaunch();
+  document.body.classList.remove('in-shell');
+  const back = () => { ui.ousted = null; renderAll(); };
+  const browse = () => { ui.browsingOusted = true; ui.ousted = null; renderAll(); toast('Toque no disco para escolher a próxima agência.', 'info', 4200); };
+  if (ui.ousted === 'take') {
+    renderTakePicker(appRoot, store, { onTaken: (c) => afterNewDirection(`Você agora dirige a ${c.short || c.name}.`), onBack: back });
+    return;
+  }
+  if (ui.ousted === 'found') {
+    import('./found-agency.js').then((m) => {
+      if (ui.ousted !== 'found' || !store.state?.director?.ousted) return;
+      m.renderFoundWizard(appRoot, store, { midGame: true, onDone: (s) => afterNewDirection(`Você fundou a ${s?.actors?.[s.playerId]?.short || 'nova agência'}.`), onCancel: back });
+    }).catch((e) => { console.error(e); toast('Não foi possível abrir a fundação de agência.', 'bad'); back(); });
+    return;
+  }
+  if (!renderOusted(appRoot, store, {
+    onTake: () => { ui.ousted = 'take'; renderAll(); },
+    onFound: () => { ui.ousted = 'found'; renderAll(); },
+    onBrowse: browse,
+  })) { ui.browsingOusted = true; renderAll(); }
+}
+
+/** A new agency is the player's: back to the shell, on the Painel. */
+function afterNewDirection(msg) {
+  ui.browsingOusted = false;
+  ui.ousted = null;
+  navigate('painel');
+  renderAll();
+  if (msg) toast(msg, 'good', 3600);
+}
+
+/** The disc while the player looks at the world without an agency: back to the choice. */
+function showOusted() {
+  ui.browsingOusted = false;
+  ui.ousted = null;
+  renderAll();
 }
 
 // ------------------------------------------------------------------ shell
@@ -518,6 +575,7 @@ function onDiscClick() {
   // a run that just ended on its own: this tap was meant as "Parar", not as another turn
   if (mode === 'play' && now - (ui.runEndedAt || 0) < 300) return;
   if (mode === 'over' || d.mode === 'over') { showSummary(); return; }
+  if (mode === 'ousted' || d.mode === 'ousted') { showOusted(); return; }
   advance(1, false); // stopped clock: advance() opens the decision / the control room
   if (mode === 'play') maybeHint();
 }
@@ -534,6 +592,7 @@ function discState() {
   if (ui.run) return { mode: 'run', icon: 'carregando', label: 'Parar', aria: 'Avançando até o próximo evento. Toque para parar.' };
   if (!st || st.gameOver) return { mode: 'over', icon: 'trofeu', label: 'Resumo', aria: 'Campanha encerrada. Ver o resumo da campanha' };
   const b = store.blocked();
+  if (b === 'ousted') return { mode: 'ousted', icon: 'alerta', label: 'Escolher', aria: 'Você foi afastado da direção. Escolher a próxima agência' };
   if (b === 'decision' || b === 'era') {
     const dec = sortDecisions(st.decisions).find((x) => x.blocking);
     return { mode: 'decision', icon: 'alerta', label: 'Decidir', aria: `Tempo parado: ${dec?.title || 'decisão pendente'}. Abrir a decisão` };
@@ -632,6 +691,7 @@ function advance(turns, stopOnEvent) {
   if (!st || st.gameOver) return;
   if (ui.run) return; // a "Próximo evento" run owns the clock until it stops
   const b = store.blocked();
+  if (b === 'ousted') { showOusted(); return; }
   if (b === 'decision' || b === 'era') {
     const d = sortDecisions(st.decisions).find((x) => x.blocking);
     if (d) openDecision(store, d.id);

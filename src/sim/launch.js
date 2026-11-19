@@ -1169,6 +1169,13 @@ export function init(state, data, ctx) {
   state.commandPointsWeeks = 0;
 }
 
+/** A new director (src/sim/director.js): no launch day in progress, a full Command pool for the new team. */
+export function onDirectorChange(state, data) {
+  state.activeLaunch = null;
+  state.commandPoints = previewPoints(state, data);
+  state.commandPointsWeeks = 0;
+}
+
 /** Weekly refill of the Command pool: +1 every CP_REGEN_WEEKS weeks, never above the current cap. */
 function regenPool(state, data) {
   const cap = previewPoints(state, data);

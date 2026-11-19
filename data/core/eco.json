@@ -1437,6 +1437,9 @@
     },
     "gone": {
       "tpl": "A agência deixou o caminho em {ano}, mas a história seguiu sem ela."
+    },
+    "directors": {
+      "tpl": "Antes dela, a sua direção passou por {lista}."
     }
   },
   "milestoneLabels": {

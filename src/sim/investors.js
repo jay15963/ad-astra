@@ -19,7 +19,7 @@
 // Deterministic: ctx.rng / rngFor only, plain JSON state. dt-native (meta.maxDt 52).
 
 import {
-  addNews, changeActor, clamp, nextId, pushDecision, removeDecision, cadence, expiryIn, log, dueIn,
+  addNews, changeActor, clamp, nextId, pushDecision, removeDecision, cadence, expiryIn, log, dueIn, removeDirector, isOusted,
 } from '../core/helpers.js';
 import { rngFor, hash32 } from '../core/rng.js';
 import { turnToDate, WEEKS_PER_YEAR } from '../core/time.js';
@@ -214,6 +214,18 @@ export function setupCap(state, data, { kind } = {}) {
   return state.cap;
 }
 
+/**
+ * A new director (src/sim/director.js: the player took another agency or founded one mid-game): the old agency's
+ * cap table and mandates stay behind with it (AI actors have none); the new one starts from its kind's stakes.
+ */
+export function onDirectorChange(state, data) {
+  if (!scenarioUsesInvestors(data)) return;
+  for (const d of (state.decisions || []).filter((x) => String(x.kind || '').startsWith('investors/'))) removeDecision(state, d.id);
+  state.mandates = [];
+  state.cap = null;
+  setupCap(state, data);
+}
+
 /** Keep the cap table attached to the current player (founding at turn 0 rebuilds it; a merge carries it over). */
 function ensureCap(state, data) {
   if (!scenarioUsesInvestors(data)) return null;
@@ -249,7 +261,7 @@ export function postInit(state, data) {
 }
 
 export function tick(state, data, ctx) {
-  if (!scenarioUsesInvestors(data) || state.gameOver) return;
+  if (!scenarioUsesInvestors(data) || state.gameOver || isOusted(state)) return;
   const cap = ensureCap(state, data);
   if (!cap) return;
   syncCalendarMandates(state, data, ctx);
@@ -257,7 +269,7 @@ export function tick(state, data, ctx) {
   countLaunches(state, data);
   const t = tuning(data);
   if (yearAt(state) >= unlockYear(data) && roundDue(state, ctx, t)) fundingRound(state, data, ctx);
-  if (state.gameOver) return;
+  if (state.gameOver || isOusted(state)) return;
   termsDue(state, data, ctx);
   if (attentionNow(state, ctx)) showDeferredMandates(state, data, ctx);
 }
@@ -293,7 +305,7 @@ function showDeferredMandates(state, data, ctx) {
 
 /** Year boundary: close the year (history, veto, mood drift), then issue the new year's mandates. */
 export function onYear(state, data, ctx) {
-  if (!scenarioUsesInvestors(data) || state.gameOver) return;
+  if (!scenarioUsesInvestors(data) || state.gameOver || isOusted(state)) return;
   const cap = ensureCap(state, data);
   if (!cap) return;
   closeYear(state, data, ctx);
@@ -937,8 +949,9 @@ function boardReview(state, data) {
   cap.lowRounds = (cap.lowRounds || 0) + 1;
   if (cap.lowRounds >= (t.mood.boardRounds ?? 2)) {
     const summary = `O conselho de acionistas (${pctText(sumInvestors(cap))} das ações, humor ${mood}) votou pela troca da direção da agência.`;
-    state.gameOver = { reason: 'board', turn: state.turn, summary };
-    addNews(state, { headline: 'Conselho de acionistas destitui a direção da agência', body: summary, tags: ['investors', 'gameover'], actors: [state.playerId], importance: 3, icon: 'budget' });
+    // the director goes, the campaign does not: the agency carries on under the AI (src/sim/director.js)
+    removeDirector(state, 'board', summary);
+    addNews(state, { headline: 'Conselho de acionistas destitui a direção da agência', body: summary, tags: ['investors', 'director'], actors: [state.playerId], importance: 3, icon: 'budget' });
     return;
   }
   cap.warned = true;

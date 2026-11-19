@@ -5,7 +5,9 @@
 // Plus the logo editor used by the wizard and by Identidade e logo (openEmblemEditor, EXPANSION.md §5.4): live
 // preview at three sizes, Sortear, shape / symbol / field pattern / details, colours limited to curated palettes.
 // The UI only builds the payload; the sim validates it (lifecycle 'agency/found', 'agency/emblem').
-import { h, raw, chip, button, icon, fmtMoney, toast, openModal } from './components.js';
+// v0.9.13: the same wizard founds a new agency mid-game after the director was fired (opts.midGame): no era step,
+// the date is today (scenario seen from now, query 'director/foundScenario'), action 'director/found'.
+import { h, raw, chip, button, icon, fmtMoney, fmtMonth, toast, openModal } from './components.js';
 import {
   emblemSVG, normalizeSpec, compactSpec, specFromSeed, specForActor, palettes, partOptions, useEmblemData, shade, MAX_RING_TEXT,
 } from './emblem.js';
@@ -73,13 +75,16 @@ export function startEras(data) {
     .map((e) => ({ id: e.id, n: Number(String(e.id).slice(1)) || 0, name: e.name || e.id, year: yr(e.from), to: yr(e.to) ?? null }));
 }
 
-/** The wizard model: which steps are complete and the payload 'agency/found' gets. Pure. */
-export function wizardModel(data, draft) {
+/**
+ * The wizard model: which steps are complete and the payload 'agency/found' gets. Pure. `sc` = the scenario the
+ * founding happens in (mid-game: the scenario seen from today, so nations, levels and technology are those of now).
+ */
+export function wizardModel(data, draft, sc = undefined) {
   const d = draft || {};
-  const opts = foundingOptions(data);
+  const opts = foundingOptions(data, sc);
   const nation = opts.nations.find((n) => n.id === d.nationId) || null;
   const payload = { name: d.name, short: d.short, kind: d.kind, nationId: d.nationId, hq: d.hq, emblem: d.emblem, money: d.money, tech: d.tech };
-  const v = validateFound(data, payload);
+  const v = validateFound(data, payload, sc);
   const levels = opts.levels || { money: [], tech: [] };
   const steps = [
     { id: 'inicio', label: 'Início', done: (!d.money || levels.money.some((x) => x.id === d.money)) && (!d.tech || levels.tech.some((x) => x.id === d.tech)) },
@@ -88,7 +93,7 @@ export function wizardModel(data, draft) {
     { id: 'nome', label: 'Nome e logo', done: !!d.name && !!d.short && !!d.emblem && (v.ok || !/nome|sigla|logo/i.test(v.error || '')) },
     { id: 'resumo', label: 'Resumo', done: v.ok },
   ];
-  return { opts, nation, payload, valid: v, preview: v.ok ? foundPreview(data, v.value) : null, steps };
+  return { opts, nation, payload, valid: v, preview: v.ok ? foundPreview(data, v.value, sc) : null, steps };
 }
 
 // ------------------------------------------------------------------ world map (equirectangular-ish Natural Earth I)
@@ -325,18 +330,22 @@ export const openLogoEditor = openEmblemEditor;
 // ------------------------------------------------------------------ the wizard
 
 /**
- * Full-screen founding wizard (title-page look). opts: {seed, onDone(state), onCancel()}. Creates the game
- * (store.newGame with the founded id) and dispatches 'agency/found'.
+ * Full-screen founding wizard (title-page look). opts: {seed, onDone(state), onCancel(), midGame}. Creates the game
+ * (store.newGame with the founded id) and dispatches 'agency/found'; with `midGame` (the player was fired) it founds
+ * the agency in the running world at today's date ('director/found').
  */
-export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) {
+export function renderFoundWizard(root, store, { seed, onDone, onCancel, midGame = false } = {}) {
   ensureCss();
   useEmblemData(store.data);
   let data = store.data;
-  let opts = foundingOptions(data);
+  // mid-game: the scenario seen from today (start = the current date), so every rule reads the world of now
+  const sc = midGame ? (store.tryQuery?.('director/foundScenario', null) || undefined) : undefined;
+  let opts = foundingOptions(data, sc);
   const worldSeed = Number.isFinite(Number(seed)) ? Number(seed) >>> 0 : uiSeed() % 1000000;
   const nameSeed = uiSeed();
-  let era = store.data?.scenario?.snapshot || null;
-  const eras = startEras(data);
+  let era = midGame ? (store.state?.clock?.eraId || null) : store.data?.scenario?.snapshot || null;
+  const eras = midGame ? [] : startEras(data);
+  const today = midGame && store.state ? fmtMonth(store.state.turn, store.state.startYear) : null;
   const dflt = opts.levels?.default || {};
   const draft = {
     kind: 'agency', nationId: null, hq: null, name: '', short: '', emblem: null, nameTouched: false,
@@ -367,7 +376,7 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
   const head = (m) => h('div', { class: 'fa-head' },
     h('div', { class: 'fa-top' },
       h('button', { type: 'button', class: 'icon-btn', 'aria-label': step ? 'Voltar' : 'Sair', onclick: () => (step ? go(step - 1) : onCancel?.()) }, icon(step ? 'voltar' : 'fechar', 22)),
-      h('div', { class: 'fa-top-text' }, h('div', { class: 'mono-eyebrow' }, `Fundar a sua agência · ${opts.year}`), h('div', { class: 'fa-top-title' }, [eras.length ? 'Quando e como começar' : 'Como começar', 'Que tipo de organização?', 'País e sede', 'Nome e logo', 'Resumo'][step])),
+      h('div', { class: 'fa-top-text' }, h('div', { class: 'mono-eyebrow' }, midGame ? `Nova agência · ${today}` : `Fundar a sua agência · ${opts.year}`), h('div', { class: 'fa-top-title' }, [eras.length ? 'Quando e como começar' : 'Como começar', 'Que tipo de organização?', 'País e sede', 'Nome e logo', 'Resumo'][step])),
       h('span', { class: 'fa-count' }, `${step + 1}/${LAST + 1}`)),
     h('ol', { class: 'fa-steps', 'aria-label': 'Etapas' }, m.steps.map((s, i) => h('li', {
       class: [i === step && 'active', i < step && s.done && 'done'], 'aria-current': i === step ? 'step' : null,
@@ -393,7 +402,7 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
   };
 
   const stepInicio = () => {
-    const lv = foundingLevels(data, { kind: draft.kind, nationId: draft.nationId }) || { money: [], tech: [] };
+    const lv = foundingLevels(data, { kind: draft.kind, nationId: draft.nationId }, sc) || { money: [], tech: [] };
     const nation = opts.nations.find((n) => n.id === draft.nationId) || null;
     const who = `${draft.kind === 'company' ? 'Empresa privada' : 'Agência estatal'}${nation ? ` ${nation.of}` : ' de economia média'}`;
     const t0 = lv.tech[0];
@@ -403,9 +412,11 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
     }, h('span', { class: 'fa-level-title' }, title), h('span', { class: 'fa-level-v' }, value), sub ? h('span', { class: 'fa-level-sub' }, sub) : null,
     sub2 ? h('span', { class: 'fa-level-sub' }, sub2) : null);
     return h('div', { class: ['fa-body', loading && 'fa-busy'] },
-      h('p', { class: 'fa-lead' }, eras.length
-        ? 'Escolha em que era a sua agência entra na história e com quanto ela começa. A campanha vai até janeiro de 3000.'
-        : 'Escolha com quanto a sua agência começa.'),
+      h('p', { class: 'fa-lead' }, midGame
+        ? `A nova agência nasce hoje, ${today}, no mesmo mundo: as rivais, os tratados e a história seguem como estão. Escolha com quanto ela começa.`
+        : eras.length
+          ? 'Escolha em que era a sua agência entra na história e com quanto ela começa. A campanha vai até janeiro de 3000.'
+          : 'Escolha com quanto a sua agência começa.'),
       eras.length ? h('div', { class: 'fa-sec' }, 'Quando começar') : null,
       eras.length ? h('div', { class: 'fa-eras', role: 'radiogroup', 'aria-label': 'Era de início' }, eras.map((e) => {
         const sel = e.year === draft.startYear;
@@ -542,14 +553,21 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
   };
   const kpi = (l, v) => h('div', { class: 'go-kpi' }, h('div', { class: 'k-label' }, l), h('div', { class: 'k-value' }, v));
   const startLabel = () => {
+    if (midGame) return `Hoje · ${today}`;
     const e = eras.find((x) => x.year === opts.year) || eras.filter((x) => x.year <= opts.year).pop();
     return e ? `Era ${e.n} · ${e.name} · jan/${opts.year}` : `jan/${opts.year}`;
   };
   const kv = (l, v) => h('div', { class: 'kv-row' }, h('span', null, l), h('span', null, v));
 
   const found = () => {
-    const m = wizardModel(data, draft);
+    const m = wizardModel(data, draft, sc);
     if (!m.valid.ok) { error = m.valid.error; draw(); return; }
+    if (midGame) {
+      const res = store.dispatch({ type: 'director/found', ...m.payload });
+      if (!res?.ok) { error = res?.error || 'Não foi possível fundar a agência.'; draw(); return; }
+      onDone?.(store.state);
+      return;
+    }
     const id = customIdFor(m.payload, worldSeed);
     try {
       store.newGame({ playerId: id, seed: worldSeed, scenarioId: store.scenarioId?.() });
@@ -567,7 +585,7 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
     const can = !loading && (m.steps[step].done || (step === 3 && draft.name && draft.short));
     const next = step < LAST
       ? button('Continuar', () => {
-        if (step === 3) { const v = wizardModel(data, draft).valid; if (!v.ok && /nome|sigla|logo/i.test(v.error || '')) { error = v.error; draw(); return; } }
+        if (step === 3) { const v = wizardModel(data, draft, sc).valid; if (!v.ok && /nome|sigla|logo/i.test(v.error || '')) { error = v.error; draw(); return; } }
         go(step + 1);
       }, { kind: 'primary', big: true, disabled: !can, icon: 'avancar' })
       : button('Fundar agência', found, { kind: 'primary', big: true, disabled: !m.valid.ok, icon: 'check' });
@@ -577,7 +595,7 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
   };
 
   function draw() {
-    const m = wizardModel(data, draft);
+    const m = wizardModel(data, draft, sc);
     const body = [stepInicio, stepKind, stepSede, stepNome, stepResumo][step](m);
     page.innerHTML = '';
     page.append(h('div', { class: 'title-screen fa-screen' }, head(m), step !== LAST && error ? h('div', { class: 'aviso bad', role: 'alert' }, icon('alerta', 16), error) : null, body), footer(m));

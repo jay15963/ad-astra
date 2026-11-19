@@ -7,7 +7,7 @@
 //     while, and flies operational designs on its own missions when they fit.
 // Every Phase B action is optional: an engine without investors.js/designs.js answers "ação desconhecida" and the
 // bot carries on, so the same runs work before and after B1–B3 land.
-import { botStep, tenderMove } from './golden.mjs';
+import { botStep, tenderMove, directorMove } from './golden.mjs';
 import * as lifecycle from '../src/sim/lifecycle.js';
 import * as calendar from '../src/sim/calendar.js';
 
@@ -300,12 +300,17 @@ export function phaseBStep(state, data, engine, opts = {}, mem = {}) {
   phaseBMoves(state, data, engine, opts, mem);
   if (state.gameOver) return;
   // the tender bids were placed by phaseBMoves (with its long-step manifest rule)
-  botStep(state, data, engine, { schedule: opts.schedule !== false, tenders: false });
+  botStep(state, data, engine, { schedule: opts.schedule !== false, tenders: false, found: !!opts.foundOnFire });
 }
 
 /** The Phase B moves alone (for bots with their own scheduling loop: tools/smoke.mjs, tools/sim-campaign.mjs). */
 export function phaseBMoves(state, data, engine, opts = {}, mem = {}) {
   const o = { ...DEFAULTS, ...opts };
+  // fired (the campaign goes on): take the strongest agency, or found one (opts.foundOnFire)
+  if (state.director?.ousted) {
+    const id = directorMove(state, data, engine, { found: !!o.foundOnFire });
+    if (id) { mem.fired = (mem.fired || 0) + 1; mem.directed = [...(mem.directed || []), id]; }
+  }
   if (o.research) researchMove(state, data, engine, mem);
   for (const dec of state.decisions.slice()) {
     if (state.gameOver) return;

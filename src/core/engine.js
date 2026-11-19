@@ -26,6 +26,7 @@ import * as explore from '../sim/explore.js';
 import * as eco from '../sim/eco.js';
 import * as colonies from '../sim/colonies.js';
 import * as infra from '../sim/infra.js';
+import * as director from '../sim/director.js';
 
 // The lifecycle module (A2) is optional while it is being built: a missing file leaves the registry as in v0.5.
 // Any other failure (syntax error inside the module) is re-thrown so it is never hidden.
@@ -65,6 +66,7 @@ export const MODULES = [
   ['explore', explore],     // Phase B §8: fog of war of the space map (ids only)
   ['narrative', narrative],
   ['eco', eco],             // Phase C9 §9: the Eco mystery and the jan/3000 card (reads the step's firsts and news)
+  ['director', director],   // fired ≠ game over: tenures, the "Você foi afastado" choice (no tick)
 ];
 
 // the newest version this build writes: v2 plus every migration registered by the modules imported above
@@ -186,6 +188,8 @@ function makeHooks(state, data) {
   return {
     actorBorn: (id, info) => runHook(state, data, 'onActorBorn', id, info),
     actorGone: (id, info) => runHook(state, data, 'onActorGone', id, info),
+    // a new director (src/sim/director.js): each module hands the old agency's player-only records over
+    directorChanged: (info) => runHook(state, data, 'onDirectorChange', info),
   };
 }
 
@@ -342,6 +346,9 @@ export function tick(state, data) {
   if (!state.gameOver && clock.finalTurn != null && state.turn >= clock.finalTurn && !clock.endingPushed) pushEnding(state, data);
   if (clock.finalTurn == null && state.turn > state.endTurn && !state.gameOver) state.gameOver = { reason: 'end', turn: state.turn, summary: null };
   if (state.gameOver) endGame(state, data);
+  // the director was removed this step (fired, board): the world went on to the end of the step; now the clock waits
+  // for the player's next agency (isBlocked 'ousted'), with the old director's cards and launch day closed
+  else if (state.director?.ousted && !state.director.ousted.frozen) director.freeze(state, data);
   return state;
 }
 
@@ -495,13 +502,17 @@ export function endGame(state, data) {
 
 /** Actions that only read state; still allowed after the campaign is over. */
 const READ_ONLY_ACTIONS = new Set(['time/advance', 'mission/estimate']);
+/** What the player may do with no agency to direct (fired, choice pending): choose, or start the waiting era. */
+const OUSTED_ACTIONS = new Set(['director/take', 'director/found']);
 
 /**
- * True when time must not advance: 'gameOver' | 'launch' | 'needsData' (the next era's pack is not loaded) |
+ * True when time must not advance: 'gameOver' | 'ousted' (the player was fired and has not chosen the next agency) |
+ * 'launch' | 'needsData' (the next era's pack is not loaded) |
  * 'era' (pending era transition) | 'decision' (blocking card) | null.
  */
 export function isBlocked(state, data) {
   if (state.gameOver) return 'gameOver';
+  if (state.director?.ousted) return 'ousted';
   if (state.activeLaunch) return 'launch';
   const p = state.clock?.pendingEra;
   if (p) return data && !eraPackLoaded(data, p.to) ? 'needsData' : 'era';
@@ -531,6 +542,7 @@ export function advance(state, data, turns = 1, { stopOnEvent = false } = {}) {
     const newsBefore = state.news[0]?.id;
     tick(state, data);
     advanced++;
+    if (state.director?.ousted) return { advanced, weeks: state.turn - startTurn, stoppedBy: 'ousted' };
     if (stopOnEvent) {
       if (state.decisions.length > decBefore) return { advanced, weeks: state.turn - startTurn, stoppedBy: 'newDecision' };
       const top = state.news[0];
@@ -601,6 +613,10 @@ export function resolveDecision(state, data, decisionId, choiceId, opts = {}) {
 export function dispatch(state, data, action) {
   try {
     if (state.gameOver && !READ_ONLY_ACTIONS.has(action?.type)) return { ok: false, error: 'Campanha encerrada.' };
+    if (state.director?.ousted && !READ_ONLY_ACTIONS.has(action?.type) && !OUSTED_ACTIONS.has(action?.type)
+      && !(action?.type === 'decision/resolve' && state.decisions.find((d) => d.id === action.id)?.kind === 'era/transition')) {
+      return { ok: false, error: 'Você foi afastado da direção: assuma outra agência ou funde uma nova.' };
+    }
     if (action.type === 'time/advance') {
       const turns = action.turns ?? (action.weeks != null ? turnsForWeeks(state, data, action.weeks) : 1);
       return { ok: true, ...advance(state, data, turns, { stopOnEvent: action.stopOnEvent ?? true }) };
@@ -651,5 +667,8 @@ export function serialize(state) {
 
 /** Parse + migrate a save. Throws SaveError {code: 'newer'|'unreadable'|'scenario', message (pt-BR)}. */
 export function deserialize(json, data) {
-  return migrate(json, data);
+  const state = migrate(json, data);
+  // v0.9.13: a save that ended with the director fired before the campaign's end goes back to the choice
+  director.reopen(state, data);
+  return state;
 }

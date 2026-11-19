@@ -4441,6 +4441,30 @@ function slimResults(state, list = state.missions) {
   }
 }
 /**
+ * A new director (src/sim/director.js; the tenure record already counted these missions). The old agency's missions
+ * leave the player's lists: its real programs went back to the AI calendar (calendar.onDirectorChange), the rest end
+ * with the director. Contracts it won become AI jobs flown off-screen by the same agency before the deadline (like
+ * any rival's: delivery roll on its reliability, payment or fine); its open bids are withdrawn.
+ */
+export function onDirectorChange(state, data, ctx, { from } = {}) {
+  for (const c of state.contracts || []) {
+    if (PLAYER_CONTRACT.includes(c.status)) {
+      const span = Math.max(1, (c.deadlineTurn ?? state.turn + 26) - state.turn);
+      c.status = 'closed';
+      c.winner = from || c.winner;
+      c.missionId = null;
+      c.ai = { deliverTurn: state.turn + Math.max(1, Math.round(span * 0.5)), rel: 0.85, vehicleId: c.playerBid?.vehicleId || null, done: null, ok: null };
+      c.body = '';
+    } else if (isOpenTender(c) && (c.status === 'bidding' || c.playerBid)) {
+      c.status = 'open';
+      c.playerBid = null;
+    }
+  }
+  state.missions = [];
+  if (state.missionsArchive) state.missionsArchive = { stubs: [], byDest: {} };
+}
+
+/**
  * Caps: contracts keep ≤ 40 (resolved ones older than a year go first); missions done/cancelled more than 5 years
  * ago become a stub in state.missionsArchive (≤ 80 B each), stubs older than 50 years (8 in a long campaign) fold into
  * per-destination counts.

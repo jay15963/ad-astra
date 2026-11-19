@@ -176,6 +176,21 @@ export function player(state) {
   return state.actors[state.playerId];
 }
 
+/**
+ * The director leaves the agency (the government after weeks in the red, the shareholders' vote…). Never the end of
+ * the campaign: state.director.ousted = {reason, turn, summary, actorId} stops the clock ('ousted', engine.isBlocked)
+ * until the player takes another agency or founds one (src/sim/director.js). False when already out or the game is over.
+ */
+export function removeDirector(state, reason, summary = '') {
+  if (!state || state.gameOver || state.director?.ousted) return false;
+  if (!state.director || typeof state.director !== 'object') state.director = { since: null, tenures: [], ousted: null };
+  state.director.ousted = { reason: String(reason || 'fired'), turn: state.turn, summary: String(summary || ''), actorId: state.playerId };
+  return true;
+}
+
+/** True while the player has no agency (fired, choice pending). */
+export const isOusted = (state) => !!state?.director?.ousted;
+
 /** Share of the first-place prestige for repeating a feat history already saw ("primeiro do século"). */
 export const HISTORIC_FIRST_SHARE = 0.35;
 

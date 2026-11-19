@@ -73,8 +73,39 @@ export function tenderMove(state, data, { dispatch, query } = engine, { maxActiv
   return n;
 }
 
+/**
+ * Fired (v0.9.13: the campaign goes on): the bot takes the strongest agency it may direct (prestige, then budget), or
+ * founds one at today's date (`found: true`, or when no agency is available and the scenario allows founding).
+ * Returns the new player id, or null when nothing was pending (or nothing could be done).
+ */
+export function directorMove(state, data, { dispatch, query } = engine, { found = false, name = 'Agência Austral', short = 'AUSTR' } = {}) {
+  if (!state.director?.ousted || state.gameOver) return null;
+  const st = query(state, data, 'director/status');
+  if (!st) return null;
+  const best = (st.candidates || []).slice().sort((a, b) => b.prestige - a.prestige || b.budget - a.budget || (a.id < b.id ? -1 : 1))[0];
+  if (st.canFound && (found || !best)) {
+    const sc = query(state, data, 'director/foundScenario');
+    const opts = query(state, data, 'agency/foundingOptions', sc);
+    const nations = opts?.nations || [];
+    const nation = nations.find((n) => (n.sites || []).some((x) => x.launch)) || nations[0];
+    const site = (nation?.sites || []).find((x) => x.launch) || nation?.sites?.[0] || null;
+    const k = (state.director.tenures?.length || 0) + 1;
+    const r = nation ? dispatch(state, data, {
+      type: 'director/found', name: `${name} ${k}`, short: `${short.slice(0, 5)}${k}`.slice(0, 6), kind: 'agency', nationId: nation.id,
+      hq: site?.id ? { id: site.id } : undefined,
+      emblem: { shape: 'roundel', field: '#1f3a5f', field2: '#e2ad35', division: 'band', glyph: 'rocket', glyphColor: '#f7f1e3', stars: k % 7 },
+    }) : { ok: false };
+    if (r.ok) return r.actorId;
+  }
+  if (!best) return null;
+  const r = dispatch(state, data, { type: 'director/take', actorId: best.id });
+  if (!r.ok) throw new Error(`director/take: ${r.error}`);
+  return r.actorId;
+}
+
 /** Scripted bot step outside of time: decisions, launches, hardware choice, scheduling, tender bids. */
-export function botStep(state, data, { dispatch, query } = engine, { schedule = true, tenders = schedule } = {}) {
+export function botStep(state, data, { dispatch, query } = engine, { schedule = true, tenders = schedule, found = false } = {}) {
+  directorMove(state, data, { dispatch, query }, { found });
   for (const d of state.decisions.slice()) {
     if (state.gameOver) return; // a card ended the campaign (final event, director fired): nothing else to play
     const c = d.choices?.find((x) => !x.disabled) || d.choices?.[0];

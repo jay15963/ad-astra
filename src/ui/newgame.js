@@ -1,5 +1,5 @@
 // Title screen (continue / new game / pick agency) and the game over screen.
-import { h, raw, chip, flagPrefix, button, icon, fmtMoney, fmtDate, sectionTitle, confirmDialog, attempt, safePanel, toast, FIRST_LABELS } from './components.js';
+import { h, raw, chip, flagPrefix, button, icon, fmtMoney, fmtDate, fmtMonth, sectionTitle, confirmDialog, attempt, safePanel, toast, FIRST_LABELS } from './components.js';
 import { playableAtStart } from './store.js';
 import { emblemSVG } from './portrait.js';
 import { useEmblemData, emblemSVG as drawEmblem, specFromSeed } from './emblem.js';
@@ -274,6 +274,131 @@ function blocName(store, blocId) {
   return b?.name || blocId;
 }
 
+// ------------------------------------------------------------------ fired: the campaign goes on (v0.9.13)
+
+const OUST_TEXT = {
+  fired: 'O apoio chegou a zero depois de semanas no vermelho, e quem paga as contas trocou a direção.',
+  board: 'Os acionistas votaram pela troca da direção.',
+};
+
+const yearOfTurn = (st, t) => (st.startYear ?? 0) + Math.floor((Number(t) || 0) / 52);
+const yearsText = (n) => (n <= 0 ? 'menos de um ano' : n === 1 ? '1 ano' : `${n} anos`);
+
+/** One past or current tenure as a list row (Anais, game over, the fired screen). */
+export function tenureRow(st, t) {
+  const from = yearOfTurn(st, t.fromTurn);
+  const to = t.toTurn == null ? null : yearOfTurn(st, t.toTurn);
+  const why = t.reason === 'fired' ? 'demitido' : t.reason === 'board' ? 'destituído pelo conselho' : t.pending ? 'afastado' : null;
+  return h('div', { class: ['list-row', 'tenure-row', t.current && 'mine'] },
+    raw(emblemSVG({ id: t.actorId, name: t.name, short: t.short, emblem: t.emblem }, { size: 32 }), 'actor-emblem'),
+    h('div', { class: 'list-text' },
+      h('div', { class: 'list-title' }, `${t.flag ? `${t.flag} ` : ''}${t.name || t.short}`),
+      h('div', { class: 'list-sub' }, [`${from}–${to ?? 'hoje'}`, why, `${t.ok ?? 0}/${t.missions ?? 0} missões`, t.firsts ? `${t.firsts} primeiro${t.firsts === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ')),
+      t.highlights?.length ? h('div', { class: 'list-sub tenure-hl' }, t.highlights.join(' · ')) : null),
+    t.current ? chip('agora', 'accent') : null);
+}
+
+/**
+ * "Você foi afastado da direção da <agência>": the reason, the tenure, and the choice (another live agency, or a new
+ * one founded today). The world and the save go on; time waits for the choice. opts: {onTake, onFound, onBrowse}.
+ * Returns false when the player is not out (nothing drawn).
+ */
+export function renderOusted(root, store, { onTake, onFound, onBrowse } = {}) {
+  const st = store.state;
+  const s = store.tryQuery('director/status', null);
+  if (!st || !s) return false;
+  root.innerHTML = '';
+  useEmblemData(store.data);
+  ensureFoundCss();
+  const me = st.actors?.[s.actorId] || {};
+  const t = s.tenure || {};
+  const fromY = yearOfTurn(st, t.fromTurn);
+  const toY = yearOfTurn(st, s.turn);
+  const league = Object.values(st.actors || {}).sort((a, b) => (b.prestige || 0) - (a.prestige || 0));
+  const pos = league.findIndex((a) => a.id === s.actorId) + 1;
+  const name = me.short || me.name || s.short;
+  const screen = h('div', { class: 'title-screen gameover ousted' },
+    h('div', { class: 'brand' },
+      h('div', { class: 'brand-row' }, raw(emblemSVG(me, { size: 30 }), 'agency-emblem'), h('strong', { class: 'brand-name' }, name)),
+      h('div', { class: 'mono-eyebrow' }, `Fim da sua direção · ${fmtMonth(s.turn, st.startYear)}`)),
+    h('div', { class: 'opening' },
+      h('h1', null, `Você foi afastado da direção da ${name}`),
+      h('p', { class: 'tagline' }, s.summary || OUST_TEXT[s.reason] || s.reasonLabel)),
+    safePanel(() => h('div', { class: 'go-summary' },
+      sectionTitle(`Sua passagem pela ${name}`),
+      h('div', { class: 'go-kpis' },
+        stat('Período', `${fromY}–${toY}`),
+        stat('Duração', yearsText(toY - fromY)),
+        stat('Missões', `${t.ok ?? 0}/${t.missions ?? 0}`),
+        stat('Os Primeiros', String(t.firsts ?? 0)),
+        stat('Prestígio', String(t.prestige ?? Math.round(me.prestige || 0))),
+        stat('Posição na Tabela', pos ? `${pos}º de ${league.length}` : '—')),
+      t.highlights?.length ? h('div', null, sectionTitle('Destaques'),
+        h('div', { class: 'list' }, t.highlights.map((x) => h('div', { class: 'list-row' },
+          h('span', { class: 'list-lead needs' }, icon('trofeu', 18)),
+          h('div', { class: 'list-text' }, h('div', { class: 'list-title' }, x)))))) : null)),
+    s.past?.length ? h('div', null, sectionTitle('Direções anteriores'), h('div', { class: 'list' }, s.past.map((x) => tenureRow(st, x)))) : null,
+    h('div', { class: 'aviso ousted-note' }, icon('info', 16),
+      h('span', null, `O mundo continua: a ${name} segue com uma nova direção, e o seu save também. Escolha onde continuar a partir de ${fmtMonth(st.turn, st.startYear)}.`)),
+    h('div', { class: 'btn-col title-actions' },
+      s.candidates.length ? button('Assumir outra agência', () => onTake?.(), { kind: 'primary', icon: 'continuar', big: true }) : null,
+      s.canFound ? button('Fundar uma nova agência', () => onFound?.(), { icon: 'mais', big: true, kind: s.candidates.length ? undefined : 'primary' }) : null,
+      !s.candidates.length && !s.canFound ? h('div', { class: 'aviso warn' }, 'Nenhuma agência pode ser assumida agora.') : null,
+      onBrowse ? button('Ver o mundo antes de decidir', () => onBrowse(), { icon: 'mundo', big: true, kind: 'ghost' }) : null),
+    h('footer', { class: 'title-foot' }, `v${APP_VERSION} · Ad Astra`));
+  root.appendChild(h('div', { class: 'title-page' }, screen));
+  try { window.scrollTo?.(0, 0); } catch { /* Node */ }
+  return true;
+}
+
+/** "Assumir outra agência": the live agencies the player may direct from today (director/status candidates). */
+export function renderTakePicker(root, store, { onTaken, onBack } = {}) {
+  const st = store.state;
+  const s = store.tryQuery('director/status', null);
+  if (!st || !s) return false;
+  root.innerHTML = '';
+  useEmblemData(store.data);
+  ensureFoundCss();
+  const date = fmtMonth(st.turn, st.startYear);
+  const take = async (c) => {
+    const ok = await confirmDialog(`Você assume a direção da ${c.name} a partir de ${date}, com o caixa, a equipe e os programas que ela tem hoje.`, { okLabel: 'Assumir a direção', title: c.short || c.name });
+    if (!ok) return;
+    const res = store.dispatch({ type: 'director/take', actorId: c.id });
+    if (!res?.ok) { toast(res?.error || 'Não foi possível assumir esta agência.', 'bad'); return; }
+    onTaken?.(c);
+  };
+  const row = (c) => {
+    const warn = c.note === 'Caixa no vermelho' || c.note === 'Apoio baixo';
+    return h('button', { class: 'list-row actor-option', type: 'button', onclick: () => take(c) },
+      raw(emblemSVG(st.actors?.[c.id] || c, { size: 40 }), 'actor-emblem'),
+      h('div', { class: 'list-text' },
+        h('div', { class: 'actor-top' },
+          h('div', { class: 'list-title' }, `${flagPrefix(c)}${c.name}`),
+          chip(`${c.rank}º na Tabela`, c.rank <= 3 ? 'info' : 'muted')),
+        h('div', { class: 'list-sub' }, [c.country, c.kind === 'company' ? 'Empresa' : 'Agência', c.tier === 'minor' ? 'coadjuvante' : null].filter(Boolean).join(' · ')),
+        h('div', { class: 'chips' },
+          h('span', { class: 'selo' }, `${fmtMoney(c.budget)}/ano`),
+          h('span', { class: 'selo' }, `caixa ${fmtMoney(c.cash)}`),
+          h('span', { class: 'selo' }, `prestígio ${c.prestige}`),
+          chip(c.note, warn ? 'warn' : 'muted'),
+          c.crewed ? chip('voo tripulado', 'info') : null,
+          c.before ? chip('já dirigiu', 'muted') : null)),
+      icon('avancar', 16, 'list-chev'));
+  };
+  const screen = h('div', { class: 'title-screen fa-screen take-picker' },
+    h('div', { class: 'fa-head' },
+      h('div', { class: 'fa-top' },
+        h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Voltar', onclick: () => onBack?.() }, icon('voltar', 22)),
+        h('div', { class: 'fa-top-text' }, h('div', { class: 'mono-eyebrow' }, `Nova direção · ${date}`), h('div', { class: 'fa-top-title' }, 'Assumir outra agência')),
+        h('span', { class: 'fa-count' }, String(s.candidates.length)))),
+    h('p', { class: 'lead' }, 'As agências e empresas que existem hoje. Você chega com o que ela tem: verba, caixa, equipe, programas e rivais.'),
+    s.candidates.length ? h('div', { class: 'list actor-list' }, s.candidates.map(row)) : h('div', { class: 'aviso warn' }, 'Nenhuma agência pode ser assumida agora.'),
+    h('div', { class: 'btn-col title-actions' }, button('Voltar', () => onBack?.(), { big: true, kind: 'ghost' })));
+  root.appendChild(h('div', { class: 'title-page' }, screen));
+  try { window.scrollTo?.(0, 0); } catch { /* Node */ }
+  return true;
+}
+
 const REASONS = {
   end: ['Fim do cenário', 'A era continua, mas o placar desta corrida está fechado.'],
   fired: ['Você foi demitido', 'O apoio chegou a zero. O governo trocou a direção da agência.'],
@@ -308,6 +433,7 @@ export function renderGameOver(root, store, { onNewGame, onKeepLooking } = {}) {
   const missions = st.missions || [];
   const success = missions.filter((m) => m.result?.outcome === 'total' || m.result?.outcome === 'partial').length;
   const firsts = Object.entries(st.firsts || {}).filter(([, f]) => f.actorId === st.playerId);
+  const tenures = attempt(() => store.tryQuery('director/tenures', []), []);
 
   const screen = h('div', { class: 'title-screen gameover' },
     h('div', { class: 'brand' },
@@ -332,6 +458,7 @@ export function renderGameOver(root, store, { onNewGame, onKeepLooking } = {}) {
         h('span', { class: 'list-lead needs' }, icon('trofeu', 18)),
         h('div', { class: 'list-text' }, h('div', { class: 'list-title' }, milestoneLabel(store, id))))))) : null,
     go.summary && typeof go.summary === 'object' && go.summary.headline ? h('div', null, sectionTitle('Manchete final'), h('p', { class: 'go-headline' }, go.summary.headline)) : null,
+    tenures.length > 1 ? h('div', null, sectionTitle('Suas direções'), h('div', { class: 'list' }, tenures.map((x) => tenureRow(st, x)))) : null,
     h('div', { class: 'btn-col title-actions' },
       button('Nova campanha', async () => {
         if (await confirmDialog('Começar uma campanha nova apaga este save.', { okLabel: 'Começar', title: 'Nova campanha' })) {
