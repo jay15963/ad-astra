@@ -1782,11 +1782,15 @@ function hardwareSections(store, d, opts, set, sug = null, sorted = null) {
     sectionTitle(payloadKindOf(d) && payloadKindOf(d) !== 'client' ? 'Nave de carga' : 'Espaçonave'),
     opts.spacecraft.length ? h('div', { class: 'chips wrap ms-pills' },
       chip('Nenhuma', '', { class: !d.spacecraftId ? 'active' : null, 'aria-pressed': !d.spacecraftId ? 'true' : 'false', onclick: () => { ui.noCraft = true; set({ spacecraftId: null, secondarySpacecraftId: null }); } }),
-      opts.spacecraft.filter((s) => s.ok || s.id === d.spacecraftId || holdOf(s) != null).map((s) => {
+      // every craft of this mission type shows up: the ones that do not fit stay greyed with the reason (they used to
+      // be hidden, so a researched lander looked missing when the chosen rocket could not carry it)
+      opts.spacecraft.filter((s) => s.ok || s.id === d.spacecraftId || holdOf(s) != null || (s.reason && !/tipo incompat|não serve para este destino/i.test(s.reason)))
+        .sort((a, b) => (b.ok ? 1 : 0) - (a.ok ? 1 : 0)).map((s) => {
         const block = s.ok ? flightBlock(store, s.id, d.vehicleId) : null;
         const usable = s.ok && !block;
         const hold = usable ? null : holdOf(s);
-        return chip(`${s.name || s.id}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}${block ? ` · ${block}` : ''}${hold != null ? ` · leva só ${n1(hold)} t` : ''}${sug?.spacecraftId === s.id ? ' · sugestão' : ''}`,
+        const why = !usable && !block && hold == null ? (s.reason ? ` · ${shortWhy(s.reason)}` : ' · não serve') : '';
+        return chip(`${s.name || s.id}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}${block ? ` · ${block}` : ''}${hold != null ? ` · leva só ${n1(hold)} t` : ''}${why}${sug?.spacecraftId === s.id ? ' · sugestão' : ''}`,
           d.spacecraftId === s.id && !usable ? 'bad' : usable ? '' : 'muted',
           { class: [d.spacecraftId === s.id && usable ? 'active' : null, sug?.spacecraftId === s.id ? 'sugerido' : null].filter(Boolean).join(' ') || null, 'aria-pressed': d.spacecraftId === s.id ? 'true' : 'false', onclick: usable ? () => { ui.noCraft = false; set({ spacecraftId: s.id, secondarySpacecraftId: null }); } : () => toast(`${s.name}: ${block || s.reason || 'incompatível'}.`, 'warn'), title: block || s.reason || s.notes || '', 'aria-disabled': usable ? null : 'true' });
       }))
@@ -1798,6 +1802,11 @@ function hardwareSections(store, d, opts, set, sug = null, sorted = null) {
 // ------------------------------------------------------------------ crew certification + capacity help
 
 const pctTxt = (x) => `${Math.round((Number(x) || 0) * 100)}%`;
+/** A spacecraft's refusal reason, short enough for a chip (the full text goes to the toast/title). */
+function shortWhy(r) {
+  const t = String(r || '').replace(/.$/, '');
+  return t.length > 48 ? `${t.slice(0, 46)}…` : t;
+}
 const tTxt = (x) => String(Math.round((Number(x) || 0) * 10) / 10).replace('.', ',');
 
 /**
