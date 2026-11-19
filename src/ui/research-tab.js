@@ -784,8 +784,8 @@ function header(store, nodes) {
       : h('p', { class: 'rs-hint' }, 'Nenhum projeto em andamento. Toque num nó com contorno amarelo para começar.'),
     info.passiveLeft != null ? h('p', { class: ['rs-lab', info.passiveLeft === 0 && 'out'] },
       info.passiveLeft > 0
-        ? `Ciência de laboratório: ainda ${fmtNum(info.passiveLeft)} pontos nesta era (dá para as primeiras tecnologias). O resto vem de missões: satélites, sondas, voos tripulados e estações.`
-        : 'Ciência de laboratório esgotada nesta era: a próxima ciência vem de missões (satélites, sondas, voos tripulados, estações) e de eventos. Na próxima era os laboratórios rendem de novo.') : null);
+        ? `Ciência de laboratório: ainda ${fmtNum(info.passiveLeft)} pontos nesta era (dá para as primeiras tecnologias). O resto vem de missões (satélites, sondas, voos tripulados) e da ciência contínua de estações espaciais e bases de superfície, que não tem limite.`
+        : 'Ciência de laboratório esgotada nesta era: a próxima ciência vem de missões (satélites, sondas, voos tripulados) e das estações espaciais e bases de superfície, que rendem sem limite. Na próxima era os laboratórios rendem de novo.') : null);
 }
 
 function progressBar(store, n) {
