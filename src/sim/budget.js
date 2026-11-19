@@ -148,6 +148,19 @@ function record(state, actorId, amount, category, note) {
 }
 
 /** Pay `amount`. Returns false (and changes nothing) if it would exceed the credit line. */
+/**
+ * Charge a commitment already under way (research projects, rocket development): it is always paid, even if the
+ * cash goes negative. Being in the red only blocks STARTING new things (spend/canAfford); work in progress never stops.
+ */
+export function commit(state, actorId, amount, category = 'missions', note = '') {
+  const amt = Number(amount) || 0;
+  if (!state.actors?.[actorId]) return false;
+  if (amt <= 0) return true;
+  changeActor(state, actorId, 'cash', -amt);
+  record(state, actorId, -amt, category, note);
+  return true;
+}
+
 export function spend(state, actorId, amount, category = 'missions', note = '') {
   const amt = Number(amount) || 0;
   if (!state.actors?.[actorId]) return false;

@@ -1185,7 +1185,8 @@ export function tick(state, data, ctx) {
       const span = Math.min(ctx.dt, weeksLeft);
       const pay = remaining > 0 ? Math.min(remaining, (remaining / weeksLeft) * span) : 0;
       if (pay > 0.005) {
-        if (budget.spend(state, d.owner, pay, 'designs', `Desenvolvimento: ${d.name}`)) {
+        // development in progress never stops for lack of money (only new programs need cash to start)
+        if ((typeof budget.commit === 'function' ? budget.commit : budget.spend)(state, d.owner, pay, 'designs', `Desenvolvimento: ${d.name}`)) {
           pr.paidM = r2(num(pr.paidM, 0) + pay);
           if (pr.paused) pr.paused = false;
         } else {

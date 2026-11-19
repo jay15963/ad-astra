@@ -34,19 +34,18 @@ test('core data files for founding and emblems are loaded with the core pack', (
   for (const n of campaign.nations.nations) assert.ok(campaign.hqSites.sites.some((s) => s.nation === n.id), `nação sem sede sugerida: ${n.id}`);
 });
 
-test('founding options follow the start date: nations alive, private companies only from 1980', () => {
+test('founding options follow the start date: nations alive, private companies allowed from the start', () => {
   const o = foundingOptions(campaign);
   assert.equal(o.year, 1950);
   assert.equal(o.offered, true);
-  assert.equal(o.privateOk, false);
-  assert.match(o.privateNote, /anos 80/);
+  assert.equal(o.privateOk, true, 'o jogador pode fundar uma empresa privada desde 1950');
   const ids = o.nations.map((n) => n.id);
   assert.ok(ids.includes('ussr') && ids.includes('usa') && ids.includes('brazil'));
   assert.ok(!ids.includes('russia') && !ids.includes('uae') && !ids.includes('kazakhstan'), 'successor states do not exist in 1950');
   assert.ok(o.nations.find((n) => n.id === 'ussr').isos.includes('UKR'), 'the USSR covers Ukraine in 1950');
   assert.equal(foundingOptions(campaign, { ...campaign.scenario, start: { year: 1990, month: 0 } }).privateOk, true);
   assert.equal(foundingOptions(lunar).offered, false, 'Corrida Lunar does not offer founding');
-  assert.equal(validateFound(campaign, { ...PAY, kind: 'company' }).ok, false);
+  assert.equal(validateFound(campaign, { ...PAY, kind: 'company' }).ok, true, 'empresa privada em 1950');
 });
 
 test('validation messages (pt-BR) for bad payloads', () => {

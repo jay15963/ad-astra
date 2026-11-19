@@ -1,7 +1,7 @@
 {
   "note": "Sedes sugeridas para 'Fundar a sua agência' (docs/EXPANSION.md §5.3), por nação de core/nations.json. lat/lon aproximados (graus). 'launch': a cidade tem (ou pode ter) uma base de lançamento própria; a agência começa com ela em capabilities.launchSites. 'founding' guarda os números da fundação (verba anual em US$ milhões do jogo, valores constantes de 2026). Dono: B1.",
   "founding": {
-    "privateFromYear": 1980,
+    "privateFromYear": 1950,
     "stateBudget": { "large": 160, "medium": 85, "small": 60 },
     "privateBudget": 65,
     "cashYears": { "state": 0.35, "company": 1.4 },

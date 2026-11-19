@@ -401,7 +401,8 @@ function advanceProject(state, data, ctx, p, dt = 1) {
   // dt weeks of progress (and of spending) at once; the project stops at 100%
   const inc = Math.min(1 - p.progress, dt * weeklySpeed(state, data, p.approach) / Math.max(1, p.weeks || node.weeks || 10));
   const amount = round2((p.cost || 0) * inc);
-  if (!pay(state, state.playerId, amount, 'research', `P&D: ${node.name}`)) {
+  // a project in progress never stops for lack of money: it is charged even into the red (only new starts are blocked)
+  if (!(typeof budget.commit === 'function' ? budget.commit(state, state.playerId, amount, 'research', `P&D: ${node.name}`) : pay(state, state.playerId, amount, 'research', `P&D: ${node.name}`))) {
     if (!p.stalled) {
       p.stalled = true;
       addNews(state, { headline: `Pesquisa parada por falta de verba: ${node.name}`, tags: ['research', 'budget'], actors: [state.playerId], importance: 2, icon: '⏸️' });

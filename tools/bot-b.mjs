@@ -343,6 +343,14 @@ export function phaseBMoves(state, data, engine, opts = {}, mem = {}) {
 export function researchMove(state, data, engine, mem = {}) {
   // only where research gates the catalog (the Corrida Lunar keeps its v0.8 bot), and never with the money for flights
   if (state.gameOver || !state.research || !(data.scenario?.techGating ?? state.techGating)) return 0;
+  // research in progress never stops for lack of money (it is charged into the red): a sensible director in the
+  // red cancels the project furthest from done, one per check, so the agency is not fired for a lab bill
+  const cashNow = state.actors?.[state.playerId]?.cash ?? 0;
+  if (cashNow < 0 && (state.research.projects || []).length) {
+    const worst = [...state.research.projects].sort((a, b) => (a.progress || 0) - (b.progress || 0))[0];
+    if (worst && (worst.progress || 0) < 0.9) engine.dispatch(state, data, { type: 'research/cancel', nodeId: worst.nodeId });
+    return 0;
+  }
   if (Number.isFinite(mem.researchTurn) && state.turn - mem.researchTurn < 4) return 0;
   mem.researchTurn = state.turn;
   let tree = null;

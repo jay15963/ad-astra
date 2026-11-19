@@ -1197,7 +1197,7 @@ export const decisionHandlers = {
 // the new id). Numbers: data/core/hq-sites.json `founding`. 'agency/emblem' {emblem} changes the logo later.
 
 const FOUND_DEFAULTS = {
-  privateFromYear: 1980,
+  privateFromYear: 1950,
   stateBudget: { large: 160, medium: 85, small: 60 },
   privateBudget: 65,
   cashYears: { state: 0.35, company: 1.4 },
