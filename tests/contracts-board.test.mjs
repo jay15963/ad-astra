@@ -163,6 +163,8 @@ function awardedContract(s, data, { deadlineIn = 80 } = {}) {
   assert.ok(s.actors[s.playerId].cash > cash0 - 1e-9 + c.advancePaidM - 1, 'advance received');
   const m = s.missions.find((x) => x.id === c.missionId);
   assert.ok(m && m.source === 'contract' && m.vehicleId === null && m.suggestion?.vehicleId, 'mission without hardware, the bid rocket suggested');
+  const card = s.decisions.find((d) => d.kind === 'contract/won' && d.payload?.contractId === c.id);
+  assert.ok(card && card.blocking, 'a blocking "Contrato ganho" card tells the player');
   return { c, m };
 }
 
@@ -286,4 +288,14 @@ test('Contratos UI helpers and drawer badge', () => {
   st.contracts.push({ status: 'awarded', missionId: 'm1' });
   st.missions.push({ id: 'm1', status: 'planning', vehicleId: null });
   assert.equal(contractsBadge(st), true);
+});
+
+test('won contract card: "Preparar a missão agora" opens the contract mission', () => {
+  const { s, data } = play(1990, { steps: 10 });
+  const { c } = awardedContract(s, data, { deadlineIn: 80 });
+  const card = s.decisions.find((d) => d.kind === 'contract/won' && d.payload?.contractId === c.id);
+  const r = engine.dispatch(s, data, { type: 'decision/resolve', id: card.id, choiceId: 'prepare' });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.openBuilder, c.missionId);
+  assert.ok(!s.decisions.some((d) => d.id === card.id));
 });

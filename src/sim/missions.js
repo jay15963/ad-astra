@@ -3066,6 +3066,20 @@ function awardToPlayer(state, data, c, win = null) {
     tags: ['contract', 'win'], actors: [pid], importance: 2,
   });
   stat(state, 'contractsWon');
+  // a won bid must not go unnoticed (the player could lose it to the deadline): a blocking card that opens the mission
+  if (res.ok) {
+    pushDecision(state, {
+      kind: 'contract/won',
+      title: `Contrato ganho: ${c.title}`,
+      body: `${c.client} aceitou a sua proposta de ${fmtMoney(c.winningPrice)}${win?.p != null ? ` (${pct(win.p)} de chance)` : ''}. Você já recebeu ${fmtMoney(c.advancePaidM)} de adiantamento; o resto vem na entrega. Lançamento até ${fmtT(state, c.deadlineTurn)}: escolha o foguete e a nave e agende a missão, ou paga multa e perde reputação.`,
+      urgency: 3, blocking: true,
+      choices: [
+        { id: 'prepare', label: 'Preparar a missão agora', preview: 'Abre a missão do contrato em Missões para escolher foguete e nave.' },
+        { id: 'later', label: 'Depois', preview: 'A missão fica em Missões › Contratos. Atenção ao prazo.' },
+      ],
+      defaultChoice: 'later', payload: { contractId: c.id, missionId: res.missionId },
+    });
+  }
 }
 
 function defaultContract(state, data, contractId, why) {
@@ -4283,6 +4297,11 @@ const actionsRaw = {
 };
 
 const decisionHandlersRaw = {
+  'contract/won': (state, data, dec, choiceId) => {
+    const id = dec.payload?.missionId;
+    if (choiceId === 'prepare' && id && missionById(state, id)) return { ok: true, openBuilder: id, step: 2 };
+    return { ok: true, message: 'A missão do contrato está em Missões › Contratos.' };
+  },
   briefing: (state, data, dec, choiceId) => {
     if (dec.payload?.kind === 'calendar') return resolveCalendarBriefing(state, data, dec, choiceId);
     if (choiceId === 'accept' && dec.payload?.draft) {

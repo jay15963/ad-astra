@@ -1,6 +1,6 @@
 {
   "name": "ad-astra",
-  "version": "0.9.17",
+  "version": "0.9.18",
   "private": true,
   "type": "module",
   "description": "Ad Astra — manager de agência espacial para navegador (mobile-first).",
