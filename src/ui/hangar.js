@@ -180,6 +180,12 @@ const CSS = `
 .hg-prog { height: 4px; border-radius: 2px; background: var(--s4); overflow: hidden; }
 .hg-prog > i { display: block; height: 100%; background: var(--info); }
 .hg-tpl-grid { display: flex; flex-direction: column; gap: 8px; }
+.hg-block { border: 1px solid var(--red-line, var(--red)); background: var(--red-bg); color: var(--text); border-radius: var(--r); padding: 12px 14px; margin: 12px 0 4px; font-size: var(--t13); line-height: 1.45; }
+.hg-block-title { display: flex; align-items: center; gap: 6px; color: var(--red); font-size: var(--t13); margin-bottom: 6px; }
+.hg-block-sub { display: block; color: var(--red); font-weight: 600; font-size: var(--t12); margin-top: 8px; }
+.hg-block-list { margin: 4px 0 0; padding-left: 18px; }
+.hg-block-list li { margin: 2px 0; }
+.hg-block-tip .hg-block-sub { color: var(--text-2); }
 .hg-locked { align-items: flex-start; }
 .hg-locked .hg-mini { opacity: 0.5; }
 .hg-lock-reason { display: flex; align-items: center; gap: 4px; font-size: var(--t12); font-weight: 600; color: var(--amber, var(--yellow)); margin-top: 4px; }
@@ -542,8 +548,50 @@ function renderEditor(root, store, id) {
         if (result(store.dispatch({ type: 'design/retire', designId: d.id }), 'Projeto descartado')) nav(store);
       }, { kind: 'ghost', small: true }));
     }
+    // ---- why it cannot be developed yet (red, right above the buttons) + required parts not chosen
+    if (!d.program) {
+      const bl = blockers(pv);
+      if (bl.reasons.length || bl.missing.length) {
+        root.append(h('section', { class: 'hg-block', role: 'alert' },
+          h('b', { class: 'hg-block-title' }, icon('alerta', 16), ' Ainda não dá para desenvolver'),
+          bl.reasons.length ? h('ul', { class: 'hg-block-list' }, bl.reasons.map((t) => h('li', null, t))) : null,
+          bl.missing.length ? h('div', { class: 'hg-block-req' },
+            h('span', { class: 'hg-block-sub' }, 'Peças obrigatórias que faltam:'),
+            h('ul', { class: 'hg-block-list' }, bl.missing.map((t) => h('li', null, t)))) : null,
+          bl.tips.length ? h('div', { class: 'hg-block-tip' }, h('span', { class: 'hg-block-sub' }, 'Como resolver:'),
+            h('ul', { class: 'hg-block-list' }, bl.tips.map((t) => h('li', null, t)))) : null));
+      }
+    }
     // ---- action bar
     root.append(actionBar(pv, dirty));
+  }
+
+  /** {reasons, missing, tips} for the red box: what blocks "Desenvolver" and which required parts are not chosen. */
+  function blockers(pv) {
+    const reasons = [];
+    const missing = [];
+    const tips = [];
+    const spec = dr.spec || {};
+    const ord = (i) => `${i + 1}º estágio`;
+    (spec.stages || []).forEach((s, i) => {
+      if (s.moduleId) return;
+      if (!s.engineId) missing.push(`${ord(i)}: motor`);
+      else if (!(s.engines > 0)) missing.push(`${ord(i)}: quantidade de motores (pelo menos 1)`);
+      if (!s.tank) missing.push(`${ord(i)}: diâmetro do tanque`);
+      else if (!(s.size > 0)) missing.push(`${ord(i)}: tamanho do tanque (pelo menos 1)`);
+    });
+    if (!(spec.stages || []).length) missing.push('Pelo menos um estágio');
+    if (!spec.avionicsId) missing.push('Aviônica (o computador de bordo)');
+    for (const e of pv?.errors || []) reasons.push(e);
+    for (const l of pv?.locked || []) reasons.push(`${l.name}: ${l.reason}`);
+    const leo = pv?.derived?.capacity?.leo;
+    if (pv?.ok && !(leo > 0)) {
+      reasons.push('O foguete não chega à órbita: falta velocidade (Δv). O Hangar só desenvolve foguetes que cheguem pelo menos à órbita baixa.');
+      if ((spec.stages || []).length < 2) tips.push('Acrescente um estágio superior: dois estágios chegam muito mais longe que um.');
+      tips.push('Aumente o tanque ou use mais motores (sem deixar o empuxo ficar abaixo do peso).');
+      tips.push('Pesquise motores melhores (ex.: Motores a querosene) e a família Lançador orbital.');
+    }
+    return { reasons, missing, tips };
   }
 
   function kv(a, b) { return h('div', { class: 'hg-kv' }, h('span', null, a), h('span', null, b)); }
