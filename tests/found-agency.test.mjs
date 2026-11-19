@@ -137,8 +137,9 @@ test('difficulty is derived: a small company without a launch site is harder tha
 test('wizard model: steps, suggestions, default emblem, map inverse projection', () => {
   const draft = { kind: 'agency' };
   let m = wizardModel(campaign, draft);
-  assert.equal(m.steps[0].done, true);
-  assert.equal(m.steps[1].done, false);
+  assert.equal(m.steps[0].id, 'inicio');
+  assert.equal(m.steps[1].done, true);
+  assert.equal(m.steps[2].done, false);
   assert.equal(m.valid.ok, false);
   const nation = campaign.nations.nations.find((n) => n.id === 'brazil');
   const sug = suggestName(campaign, nation, 'agency', 0);

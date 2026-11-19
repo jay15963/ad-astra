@@ -222,6 +222,19 @@ export function createStore(data, { storage, loadScenario = null, reader = null 
       return true;
     },
 
+    /**
+     * Move the loaded scenario's start to January of `year` (founding "Quando começar"; null = the scenario's own
+     * start) and load that era's packs (data.ensureStartYear). Resolves to true when store.data describes it.
+     */
+    async useStart(year = null) {
+      if (typeof dataApi.ensureStartYear !== 'function') return year == null;
+      const rd = reader || (dataApi.browserReader ? dataApi.browserReader() : null);
+      const next = await dataApi.ensureStartYear(store.data, rd, Number.isFinite(year) ? year : null);
+      if (next && typeof next === 'object') store.data = next;
+      const sc = store.data?.scenario || {};
+      return year == null || (sc.start?.year ?? sc.startYear) === year;
+    },
+
     /** Load the data pack of an era (browser loads packs lazily; Node has them all). Resolves to true when present. */
     async ensureEra(eraId) {
       if (!eraId) return true;
@@ -312,6 +325,8 @@ export function createStore(data, { storage, loadScenario = null, reader = null 
           store.rejection = { code: 'scenario', message: SAVE_MESSAGES.scenario, slot: name, version: info.version };
           return false;
         }
+        // a campaign founded in a later era keeps its start (snapshot, packs of that era); others go back to theirs
+        await store.useStart(Number.isFinite(info.startYear) ? info.startYear : null);
         if (info.eraId) await store.ensureEra(info.eraId);
       } catch (e) {
         store.saveError = SAVE_MESSAGES.unreadable;

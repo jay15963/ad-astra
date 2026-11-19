@@ -280,14 +280,19 @@ function initialNodes(state, data, actorId, { secret = true } = {}) {
     && !(historical && gating.histYearOf(n) > year)).map((n) => n.id);
 }
 
-/** The player's starting research (initialFor + the §5.5 historical grant), keys recomputed. */
-function startPlayer(state, data) {
+/**
+ * The player's starting research (initialFor + the §5.5 historical grant), keys recomputed. `grant` (node ids, the
+ * founding "Tecnologia inicial" level from lifecycle) replaces the historical grant of a gated scenario.
+ */
+function startPlayer(state, data, { grant = null } = {}) {
   const r = ensure(state);
   r.unlocked = initialNodes(state, data, state.playerId);
   // MISSIONS-V2 §5.5: a gated scenario starts the player with what history had by the start year (histYear ≤
   // start: the 1950 campaign gets the sounding rockets and their roots; same rule as the v3 → v4 migration)
   if (data?.scenario?.techStart === 'historical') {
-    r.unlocked = gating.historicalGrant(data, (state.startYear ?? yearAt(state)) + 1, { have: r.unlocked });
+    r.unlocked = Array.isArray(grant)
+      ? [...new Set([...grant, ...r.unlocked])].sort()
+      : gating.historicalGrant(data, (state.startYear ?? yearAt(state)) + 1, { have: r.unlocked });
   }
   ensureRivals(state, data);
   recompute(state, data, state.playerId);
@@ -302,13 +307,14 @@ export function init(state, data, ctx) {
 
 /**
  * The player became another actor before the first turn (agency/found on a game created for someone else): its
- * research starts over as a new agency's would (§5.5), and the old actor joins the rivals.
+ * research starts over as a new agency's would (§5.5), and the old actor joins the rivals. opts.grant = the node ids
+ * of the founding "Tecnologia inicial" level (gating.foundingGrant).
  */
-export function resetPlayer(state, data) {
+export function resetPlayer(state, data, opts = {}) {
   if (!state.research) return;
   const r = state.research;
   delete r.rivals?.[state.playerId];
-  startPlayer(state, data);
+  startPlayer(state, data, opts);
 }
 
 /** Rivals = every actor except the player. Added lazily so a late diplomacy init still works. */

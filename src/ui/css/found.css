@@ -9,7 +9,7 @@
 .fa-top-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .fa-top-title { font-size: var(--t18); font-weight: 650; letter-spacing: -0.02em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fa-count { font: 600 var(--t11)/1 var(--mono); color: var(--text-3); flex: none; }
-.fa-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.fa-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .fa-steps li { display: flex; flex-direction: column; gap: 5px; min-width: 0; color: var(--text-3); font-size: var(--t10); }
 .fa-bar { display: block; height: 3px; border-radius: 2px; background: var(--s4); }
 .fa-steps li.active .fa-bar { background: var(--yellow); }
@@ -37,6 +37,33 @@
 .fa-kind-sub { font-size: var(--t11); color: var(--text-3); line-height: 1.5; }
 .fa-radio { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line-strong); }
 .fa-kind.selected .fa-radio { border-color: var(--yellow); box-shadow: inset 0 0 0 4px var(--s2); background: var(--yellow); }
+
+/* step 0 (Início): era list + starting levels */
+.fa-eras { display: flex; flex-direction: column; gap: 6px; }
+.fa-era {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 12px; text-align: left;
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); color: var(--text); cursor: pointer; font: inherit;
+}
+.fa-era:active { transform: scale(.99); }
+.fa-era.selected { border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow-line); background: var(--s2); }
+.fa-era-n { flex: none; width: 34px; font: 600 var(--t11)/1.2 var(--mono); color: var(--text-3); text-align: center; }
+.fa-era.selected .fa-era-n { color: var(--yellow); }
+.fa-era-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fa-era-title { font-size: var(--t13); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-era-sub { font-size: var(--t11); color: var(--text-3); }
+.fa-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.fa-level {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; min-height: 84px; padding: 10px; text-align: left;
+  background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); color: var(--text); cursor: pointer; font: inherit;
+}
+.fa-level:active { transform: scale(.98); }
+.fa-level.selected { border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow-line); background: var(--s2); }
+.fa-level-title { font-size: var(--t13); font-weight: 650; }
+.fa-level.selected .fa-level-title { color: var(--yellow); }
+.fa-level-v { font: 600 var(--t11)/1.35 var(--mono); color: var(--text); overflow-wrap: anywhere; }
+.fa-level-sub { font-size: var(--t10); color: var(--text-3); line-height: 1.4; }
+.fa-hint { margin: -4px 2px 0; font-size: var(--t10); color: var(--text-3); line-height: 1.5; }
+.fa-busy { opacity: .55; pointer-events: none; }
 
 /* step 2: map + sites */
 .fa-map { position: relative; width: 100%; aspect-ratio: 1.6; background: var(--s1); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }

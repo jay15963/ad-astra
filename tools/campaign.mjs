@@ -1,7 +1,9 @@
 // Headless campaign 1950 → 3000 (EXPANSION.md §13.10).
-// Usage: node tools/campaign.mjs [seeds=1] [--fast] [--from e1|<year>] [--to e7] [--actor nasa] [--found] [--min-pct 50] [--quiet]
+// Usage: node tools/campaign.mjs [seeds=1] [--fast] [--from e1|<year>] [--to e7] [--actor nasa] [--found] [--money medio] [--tech muita] [--min-pct 50] [--quiet]
 //   --fast   the bot only resolves cards and plays launches (no own missions): measures the engine and the world
-//   --found  the bot founds its own agency at turn 0 (agency/found, Phase B) instead of directing --actor
+//   --found  the bot founds its own agency at turn 0 (agency/found, Phase B) instead of directing --actor; with --from
+//            the campaign starts like the wizard's "Quando começar" (data.ensureStartYear: that era's snapshot and the
+//            feats history saw before it); --money pouco|medio|muito and --tech pouca|media|muita = starting levels
 //   --min-pct  stake the bot keeps in investor rounds (Phase B; default 50 = autonomy)
 //   --keep-control  never sell below --min-pct, even when cash is tight (long runs that must reach an ending)
 // The bot is tools/bot-b.mjs (Phase B moves: investor rounds, mandates, Hangar designs and test flights) over the
@@ -13,11 +15,11 @@
 // each era boundary, and a full run reaches jan/3000 with one of the 3 endings.
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { loadDataNode } from '../src/core/data.js';
+import { loadDataNode, ensureStartYear, nodeReader } from '../src/core/data.js';
 import * as engine from '../src/core/engine.js';
 import { eraAt, eraById, formatTurnEra, yearOf } from '../src/core/time.js';
 import { NEWS_CAP, LOG_CAP } from '../src/core/helpers.js';
-import { phaseBStep, phaseBStats, foundAgency } from './bot-b.mjs';
+import { phaseBStep, phaseBStats, foundAgency, foundingPayload } from './bot-b.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -31,6 +33,16 @@ export function dataStartingAt(data, year) {
   if (!year || year === (data.scenario?.start?.year ?? data.scenario?.startYear)) return data;
   const scenario = { ...data.scenario, start: { year, month: 0 }, startYear: year };
   return { ...data, scenario };
+}
+
+/**
+ * Fresh campaign data whose start the founding wizard moved to `year` ("Quando começar", data.ensureStartYear): the
+ * era's snapshot and historicalFirsts, every era pack loaded (Node). year = 1950 or null = the campaign as it is.
+ */
+export async function dataFoundedAt(year) {
+  const data = await loadCampaignData();
+  if (!year) return data;
+  return ensureStartYear(data, await nodeReader(root), year, { eras: 'all' });
 }
 
 const yearArg = (data, v) => {
@@ -59,14 +71,20 @@ function hasNaN(state) {
  * Play one campaign. Returns {state, eras: [{eraId, turns, ms, saveKB, core, minor, stops, births, merges, gone}],
  * ending, totalMs, errors}.
  */
-export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null, found = false, minPct = 50, keepControl = false } = {}) {
+export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, toEra = null, maxTurns = Infinity, onEra = null, found = false, minPct = 50, keepControl = false, money = null, tech = null } = {}) {
   const errors = [];
   let state = engine.newGame(data, { seed, playerId });
   let founded = null;
-  if (found) {
+  if (found && (money || tech)) {
+    // starting levels of the wizard (agency/found money/tech): the bot's payload plus the levels
+    const r = engine.dispatch(state, data, { ...foundingPayload(state, data, { seed }), ...(money ? { money } : {}), ...(tech ? { tech } : {}) });
+    founded = r?.ok ? (r.actorId || state.playerId) : null;
+    if (!founded) errors.push(`aviso: agency/found recusado (${r?.error || '?'}); seguindo com o ator escolhido`);
+  } else if (found) {
     founded = foundAgency(state, data, engine, { seed });
     if (!founded) errors.push('aviso: agency/found indisponível ou recusado; seguindo com o ator escolhido');
   }
+  const startTech = state.research?.unlocked?.length ?? 0;
   const botMem = {};
   const eras = [];
   let cur = null;
@@ -147,7 +165,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
   if (errs.length) errors.push(`erros no log: ${errs.slice(0, 3).join(' | ')}`);
   // founding refused is a note, not a failure (Phase B may not be integrated yet)
   const hard = errors.filter((e) => !e.startsWith('aviso:'));
-  return { state, eras, ending: state.gameOver?.ending ?? null, reason: state.gameOver?.reason ?? null, totalMs: Date.now() - t0, errors: hard, notes: errors.filter((e) => e.startsWith('aviso:')), founded, phaseB: phaseBStats(state) };
+  return { state, eras, ending: state.gameOver?.ending ?? null, reason: state.gameOver?.reason ?? null, totalMs: Date.now() - t0, errors: hard, notes: errors.filter((e) => e.startsWith('aviso:')), founded, startTech, phaseB: phaseBStats(state) };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -161,17 +179,19 @@ if (isMain) {
   let data = await loadCampaignData();
   if (data.scenario?.id !== 'campaign') console.warn('aviso: o carregador não conhece a campanha; usando os dados do cenário padrão');
   const from = yearArg(data, opt('--from'));
-  data = dataStartingAt(data, from);
+  const found = flag('--found');
+  data = found && from ? await dataFoundedAt(from) : dataStartingAt(data, from);
   const toEra = opt('--to');
   const playerId = opt('--actor') || 'nasa';
-  const found = flag('--found');
+  const money = opt('--money');
+  const tech = opt('--tech');
   const minPct = Number(opt('--min-pct') ?? 50);
   const keepControl = flag('--keep-control');
   let failures = 0;
   for (let s = 1; s <= nSeeds; s++) {
     const seed = s * 7919;
     const res = runCampaign(data, {
-      seed, playerId, fast, toEra, found, minPct, keepControl,
+      seed, playerId, fast, toEra, found, minPct, keepControl, money, tech,
       onEra: quiet ? null : (e, st) => console.log(
         `  ${e.eraId} até ${e.endYear}: ${e.turns} turnos, ${(e.ms / Math.max(1, e.turns)).toFixed(1)} ms/turno, save ${e.saveKB} KB, ` +
         `atores ${e.core} núcleo/${e.minor} menores, nasc ${e.births} ev ${e.events} fim ${e.gone}, paradas/turno ${(e.stops / Math.max(1, e.turns)).toFixed(2)} (sem lançamentos ${(e.cardStops / Math.max(1, e.turns)).toFixed(2)})` +
@@ -186,6 +206,11 @@ if (isMain) {
       `em ${formatTurnEra(st.turn, st.startYear, st.clock?.stepWeeks ?? 1)} (turno ${st.turn}, era ${eraAt(data, yearOf(st))?.id})` +
       (res.errors.length ? `\n  ${res.errors.slice(0, 5).join('\n  ')}` : ''));
     const b = res.phaseB;
+    if (!quiet && res.founded) {
+      const a = st.actors?.[res.founded];
+      console.log(`  fundada em ${st.startYear} (${data.scenario?.snapshot}): dinheiro ${money || 'padrão'}, tecnologia ${tech || 'padrão'}; ` +
+        `pesquisa ${res.startTech} nós no início e ${st.research?.unlocked?.length ?? 0} no fim, ${a ? `caixa final ${Math.round(a.cash)}, verba ${Math.round(a.budget)}` : 'agência extinta'}`);
+    }
     if (!quiet) console.log(`  fase B: ${res.founded ? `agência fundada ${res.founded}, ` : ''}${b.playerPct != null ? `fatia ${Math.round(b.playerPct)}% (${b.holders} acionistas), ` : 'sem acionistas, '}` +
       `mandatos ${b.mandates} (${b.mandateMissions} missões, ${b.programMandates} programas), projetos ${b.designs} (${b.operational} operacionais), voos de teste ${b.testFlights}, voos em projeto próprio ${b.designFlights}` +
       (res.notes.length ? `\n  ${res.notes.join('\n  ')}` : ''));

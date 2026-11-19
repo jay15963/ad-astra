@@ -374,6 +374,27 @@ export function historicalGrant(data, year, { have = [] } = {}) {
   return [...out].sort();
 }
 
+/**
+ * foundingGrant(data, year, share, {baseYear, have}) → sorted node ids a founded agency starts with ("Tecnologia
+ * inicial", EXPANSION.md §5.3): the base set (historicalGrant at baseYear: the 1950 sounding rockets, enough for a
+ * suborbital rocket in the Hangar) plus the oldest unlock nodes history had before `year` (histYear, then id, each
+ * with its requires closure) until `share` of historicalGrant(data, year) is held. share ≥ 1 = historicalGrant.
+ */
+export function foundingGrant(data, year, share = 1, { baseYear = 1951, have = [] } = {}) {
+  if (!(share < 1)) return historicalGrant(data, year, { have });
+  const full = historicalGrant(data, year);
+  const out = new Set(historicalGrant(data, Math.min(baseYear, year)));
+  const target = Math.max(out.size, Math.round(full.length * Math.max(0, share)));
+  const roots = nodesOf(data).filter((n) => n?.id && !n.secret && nodeKind(n) === 'unlock' && histYearOf(n) < year && !out.has(n.id))
+    .sort((a, b) => histYearOf(a) - histYearOf(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const n of roots) {
+    if (out.size >= target) break;
+    for (const id of requiresClosure(data, [n.id])) out.add(id);
+  }
+  for (const id of have || []) out.add(id);
+  return [...out].sort();
+}
+
 // ------------------------------------------------------------------ what a key unlocks (UI)
 
 const TARGETS = new WeakMap();

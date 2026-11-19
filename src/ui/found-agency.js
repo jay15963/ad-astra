@@ -1,4 +1,5 @@
-// "Fundar a sua agência" (docs/EXPANSION.md §5.3): a 4-step wizard, one decision per screen —
+// "Fundar a sua agência" (docs/EXPANSION.md §5.3): a 5-step wizard, one decision per screen —
+//   0 Início (campaign only: the era to start in; always: Dinheiro inicial and Tecnologia inicial levels),
 //   1 Tipo (agência estatal / empresa privada, with the era rule), 2 País e sede (list + world map, tap to place the
 //   HQ), 3 Nome, sigla e logo (live logo editor), 4 Resumo (derived difficulty) -> "Fundar agência".
 // Plus the logo editor used by the wizard and by Identidade e logo (openEmblemEditor, EXPANSION.md §5.4): live
@@ -16,6 +17,7 @@ const foundingOptions = (data, sc) => q(data, 'agency/foundingOptions', sc);
 const validateFound = (data, payload, sc) => q(data, 'agency/validateFound', payload, sc);
 const foundPreview = (data, value, sc) => q(data, 'agency/previewValue', value, sc);
 const customIdFor = (payload, seed) => q(null, 'agency/customId', payload, seed);
+const foundingLevels = (data, draft, sc) => q(data, 'agency/foundingLevels', draft, sc);
 
 // ------------------------------------------------------------------ styles (one stylesheet, linked once)
 
@@ -58,14 +60,29 @@ export function defaultEmblem(seed, { kind = 'agency', short = '', era } = {}) {
   return compactSpec(specFromSeed(`found-${seed}`, { kind: kind === 'company' ? 'company' : 'agency', label: short, era }));
 }
 
+/**
+ * Eras a founded campaign may start in ("Quando começar"): [{id, n, name, year, to}] from data/core/eras.json, only
+ * for a campaign (a short scenario keeps its own date). Pure.
+ */
+export function startEras(data) {
+  const sc = data?.scenario || {};
+  if (sc.kind !== 'campaign') return [];
+  const allowed = Array.isArray(sc.eras) && sc.eras.length ? new Set(sc.eras) : null;
+  const yr = (d) => (typeof d === 'number' ? d : d?.year);
+  return (data?.eras?.eras || []).filter((e) => e?.id && (!allowed || allowed.has(e.id)) && Number.isFinite(yr(e.from)))
+    .map((e) => ({ id: e.id, n: Number(String(e.id).slice(1)) || 0, name: e.name || e.id, year: yr(e.from), to: yr(e.to) ?? null }));
+}
+
 /** The wizard model: which steps are complete and the payload 'agency/found' gets. Pure. */
 export function wizardModel(data, draft) {
   const d = draft || {};
   const opts = foundingOptions(data);
   const nation = opts.nations.find((n) => n.id === d.nationId) || null;
-  const payload = { name: d.name, short: d.short, kind: d.kind, nationId: d.nationId, hq: d.hq, emblem: d.emblem };
+  const payload = { name: d.name, short: d.short, kind: d.kind, nationId: d.nationId, hq: d.hq, emblem: d.emblem, money: d.money, tech: d.tech };
   const v = validateFound(data, payload);
+  const levels = opts.levels || { money: [], tech: [] };
   const steps = [
+    { id: 'inicio', label: 'Início', done: (!d.money || levels.money.some((x) => x.id === d.money)) && (!d.tech || levels.tech.some((x) => x.id === d.tech)) },
     { id: 'tipo', label: 'Tipo', done: d.kind === 'agency' || (d.kind === 'company' && opts.privateOk) },
     { id: 'sede', label: 'País e sede', done: !!nation && !!d.hq },
     { id: 'nome', label: 'Nome e logo', done: !!d.name && !!d.short && !!d.emblem && (v.ok || !/nome|sigla|logo/i.test(v.error || '')) },
@@ -314,20 +331,29 @@ export const openLogoEditor = openEmblemEditor;
 export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) {
   ensureCss();
   useEmblemData(store.data);
-  const data = store.data;
-  const opts = foundingOptions(data);
+  let data = store.data;
+  let opts = foundingOptions(data);
   const worldSeed = Number.isFinite(Number(seed)) ? Number(seed) >>> 0 : uiSeed() % 1000000;
   const nameSeed = uiSeed();
-  const era = store.data?.scenario?.snapshot || null;
-  const draft = { kind: 'agency', nationId: null, hq: null, name: '', short: '', emblem: null, nameTouched: false };
+  let era = store.data?.scenario?.snapshot || null;
+  const eras = startEras(data);
+  const dflt = opts.levels?.default || {};
+  const draft = {
+    kind: 'agency', nationId: null, hq: null, name: '', short: '', emblem: null, nameTouched: false,
+    startYear: opts.year, money: 'medio', tech: 'media',
+  };
+  if (!(opts.levels?.money || []).some((x) => x.id === draft.money)) draft.money = dflt.money;
+  if (!(opts.levels?.tech || []).some((x) => x.id === draft.tech)) draft.tech = dflt.tech;
+  const LAST = 4;
   let step = 0;
   let error = '';
+  let loading = false;
 
   const page = h('div', { class: 'title-page fa-page' });
   root.innerHTML = '';
   root.appendChild(page);
 
-  const go = (i) => { step = Math.max(0, Math.min(3, i)); error = ''; draw(); try { page.scrollIntoView?.({ block: 'start' }); window.scrollTo?.(0, 0); } catch { /* */ } };
+  const go = (i) => { step = Math.max(0, Math.min(LAST, i)); error = ''; draw(); try { page.scrollIntoView?.({ block: 'start' }); window.scrollTo?.(0, 0); } catch { /* */ } };
   const ensureName = () => {
     const nation = opts.nations.find((n) => n.id === draft.nationId);
     if (!draft.nameTouched && nation) {
@@ -341,11 +367,65 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
   const head = (m) => h('div', { class: 'fa-head' },
     h('div', { class: 'fa-top' },
       h('button', { type: 'button', class: 'icon-btn', 'aria-label': step ? 'Voltar' : 'Sair', onclick: () => (step ? go(step - 1) : onCancel?.()) }, icon(step ? 'voltar' : 'fechar', 22)),
-      h('div', { class: 'fa-top-text' }, h('div', { class: 'mono-eyebrow' }, `Fundar a sua agência · ${opts.year}`), h('div', { class: 'fa-top-title' }, ['Que tipo de organização?', 'País e sede', 'Nome e logo', 'Resumo'][step])),
-      h('span', { class: 'fa-count' }, `${step + 1}/4`)),
+      h('div', { class: 'fa-top-text' }, h('div', { class: 'mono-eyebrow' }, `Fundar a sua agência · ${opts.year}`), h('div', { class: 'fa-top-title' }, [eras.length ? 'Quando e como começar' : 'Como começar', 'Que tipo de organização?', 'País e sede', 'Nome e logo', 'Resumo'][step])),
+      h('span', { class: 'fa-count' }, `${step + 1}/${LAST + 1}`)),
     h('ol', { class: 'fa-steps', 'aria-label': 'Etapas' }, m.steps.map((s, i) => h('li', {
       class: [i === step && 'active', i < step && s.done && 'done'], 'aria-current': i === step ? 'step' : null,
     }, h('span', { class: 'fa-bar' }), h('span', { class: 'fa-step-name' }, s.label)))));
+
+  // ---- step 0: when (campaign era) and how (money, technology)
+  const pickEra = async (e) => {
+    if (loading || e.year === draft.startYear) return;
+    loading = true; error = ''; draw();
+    let ok = false;
+    try { ok = await store.useStart(e.year); } catch (err) { console.error(err); }
+    loading = false;
+    if (!ok) { error = 'Não foi possível carregar esta era. Verifique a conexão e tente de novo.'; draw(); return; }
+    data = store.data;
+    opts = foundingOptions(data);
+    era = data?.scenario?.snapshot || null;
+    draft.startYear = opts.year;
+    // the world of the new date: a nation that does not exist then, or a company before its time, starts over
+    if (draft.nationId && !opts.nations.some((n) => n.id === draft.nationId)) { draft.nationId = null; draft.hq = null; if (!draft.nameTouched) { draft.name = ''; draft.short = ''; } }
+    if (draft.kind === 'company' && !opts.privateOk) draft.kind = 'agency';
+    if (!draft.nameTouched) draft.emblem = null;
+    draw();
+  };
+
+  const stepInicio = () => {
+    const lv = foundingLevels(data, { kind: draft.kind, nationId: draft.nationId }) || { money: [], tech: [] };
+    const nation = opts.nations.find((n) => n.id === draft.nationId) || null;
+    const who = `${draft.kind === 'company' ? 'Empresa privada' : 'Agência estatal'}${nation ? ` ${nation.of}` : ' de economia média'}`;
+    const t0 = lv.tech[0];
+    const same = lv.tech.length && lv.tech.every((t) => t.count === t0.count);
+    const level = (row, sel, title, value, sub, onClick, sub2 = null) => h('button', {
+      type: 'button', class: ['fa-level', sel && 'selected'], 'aria-pressed': sel ? 'true' : 'false', onclick: onClick,
+    }, h('span', { class: 'fa-level-title' }, title), h('span', { class: 'fa-level-v' }, value), sub ? h('span', { class: 'fa-level-sub' }, sub) : null,
+    sub2 ? h('span', { class: 'fa-level-sub' }, sub2) : null);
+    return h('div', { class: ['fa-body', loading && 'fa-busy'] },
+      h('p', { class: 'fa-lead' }, eras.length
+        ? 'Escolha em que era a sua agência entra na história e com quanto ela começa. A campanha vai até janeiro de 3000.'
+        : 'Escolha com quanto a sua agência começa.'),
+      eras.length ? h('div', { class: 'fa-sec' }, 'Quando começar') : null,
+      eras.length ? h('div', { class: 'fa-eras', role: 'radiogroup', 'aria-label': 'Era de início' }, eras.map((e) => {
+        const sel = e.year === draft.startYear;
+        return h('button', {
+          type: 'button', class: ['fa-era', sel && 'selected'], role: 'radio', 'aria-checked': sel ? 'true' : 'false', onclick: () => pickEra(e),
+        },
+        h('span', { class: 'fa-era-n' }, `Era ${e.n}`),
+        h('span', { class: 'fa-era-text' }, h('span', { class: 'fa-era-title' }, e.name), h('span', { class: 'fa-era-sub' }, `Começa em jan/${e.year}${e.to ? ` · era até ${e.to}` : ''}`)),
+        h('span', { class: 'fa-radio', 'aria-hidden': 'true' }));
+      })) : null,
+      loading ? h('div', { class: 'loading' }, 'Carregando a era…') : null,
+      h('div', { class: 'fa-sec' }, 'Dinheiro inicial'),
+      h('div', { class: 'fa-levels' }, lv.money.map((x) => level(x, draft.money === x.id, x.label, fmtMoney(x.budget), 'por ano', () => { draft.money = x.id; draw(); }, `caixa ${fmtMoney(x.cash)}`))),
+      h('p', { class: 'fa-hint' }, `${who} em ${opts.year}: verba por ano e caixa inicial. O país e o tipo mudam os números.`),
+      h('div', { class: 'fa-sec' }, 'Tecnologia inicial'),
+      h('div', { class: 'fa-levels' }, lv.tech.map((x) => level(x, draft.tech === x.id, x.label, `${x.count} de ${x.total}`, x.share >= 1 ? 'tudo o que a história tinha' : `${Math.round(x.share * 100)}% das mais antigas`, () => { draft.tech = x.id; draw(); }))),
+      h('p', { class: 'fa-hint' }, same
+        ? `Em ${opts.year} a história só tem os foguetes de sondagem: os três níveis começam iguais.`
+        : `Tecnologias que a história tinha em ${opts.year}. Sempre com os foguetes de sondagem (dá para fazer um foguete suborbital); o resto se pesquisa.`));
+  };
 
   const stepKind = () => h('div', { class: 'fa-body' },
     h('p', { class: 'fa-lead' }, 'Uma agência estatal vive da verba do governo e do apoio político. Uma empresa vive de contratos, clientes e investidores.'),
@@ -441,7 +521,7 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
         h('div', { class: 'fa-hero-text' },
           h('div', { class: 'fa-hero-name' }, val.name),
           h('div', { class: 'fa-hero-sub' }, `${val.short} · ${KIND_LABEL[val.kind]} · ${val.nation.name}`),
-          h('div', { class: 'chips' }, chip(`Dificuldade: ${pv.difficulty.label}`, pv.difficulty.id === 'media' ? 'info' : pv.difficulty.id === 'dificil' ? 'warn' : 'bad')))),
+          h('div', { class: 'chips' }, chip(`Dificuldade: ${pv.difficulty.label}`, pv.difficulty.id === 'facil' || pv.difficulty.id === 'media' ? 'info' : pv.difficulty.id === 'dificil' ? 'warn' : 'bad')))),
       h('div', { class: 'fa-kpis' },
         kpi(val.kind === 'company' ? 'Receita/ano' : 'Verba/ano', fmtMoney(pv.budget)),
         kpi('Caixa inicial', fmtMoney(pv.cash)),
@@ -449,6 +529,9 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
         kpi('Reputação', String(pv.reputation))),
       h('div', { class: 'card fa-card' },
         h('div', { class: 'kv' },
+          kv('Início', startLabel()),
+          kv('Dinheiro inicial', `${pv.money?.label || '—'}${pv.money && pv.money.mult !== 1 ? ` (${String(pv.money.mult).replace('.', ',')}×)` : ''}`),
+          kv('Tecnologia inicial', pv.tech ? `${pv.tech.label} · ${pv.tech.count} de ${pv.tech.total}` : '—'),
           kv('Sede', val.hq?.name || '—'),
           kv('Coordenadas', val.hq ? coordText(val.hq) : '—'),
           kv('Base de lançamento', pv.launchSites.length ? pv.launchSites[0] : 'Nenhuma (aluga de outros)'),
@@ -458,6 +541,10 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
       error ? h('div', { class: 'aviso bad', role: 'alert' }, icon('alerta', 16), error) : null);
   };
   const kpi = (l, v) => h('div', { class: 'go-kpi' }, h('div', { class: 'k-label' }, l), h('div', { class: 'k-value' }, v));
+  const startLabel = () => {
+    const e = eras.find((x) => x.year === opts.year) || eras.filter((x) => x.year <= opts.year).pop();
+    return e ? `Era ${e.n} · ${e.name} · jan/${opts.year}` : `jan/${opts.year}`;
+  };
   const kv = (l, v) => h('div', { class: 'kv-row' }, h('span', null, l), h('span', null, v));
 
   const found = () => {
@@ -477,10 +564,10 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
   };
 
   const footer = (m) => {
-    const can = m.steps[step].done || (step === 2 && draft.name && draft.short);
-    const next = step < 3
+    const can = !loading && (m.steps[step].done || (step === 3 && draft.name && draft.short));
+    const next = step < LAST
       ? button('Continuar', () => {
-        if (step === 2) { const v = wizardModel(data, draft).valid; if (!v.ok && /nome|sigla|logo/i.test(v.error || '')) { error = v.error; draw(); return; } }
+        if (step === 3) { const v = wizardModel(data, draft).valid; if (!v.ok && /nome|sigla|logo/i.test(v.error || '')) { error = v.error; draw(); return; } }
         go(step + 1);
       }, { kind: 'primary', big: true, disabled: !can, icon: 'avancar' })
       : button('Fundar agência', found, { kind: 'primary', big: true, disabled: !m.valid.ok, icon: 'check' });
@@ -491,11 +578,13 @@ export function renderFoundWizard(root, store, { seed, onDone, onCancel } = {}) 
 
   function draw() {
     const m = wizardModel(data, draft);
-    const body = [stepKind, stepSede, stepNome, stepResumo][step](m);
+    const body = [stepInicio, stepKind, stepSede, stepNome, stepResumo][step](m);
     page.innerHTML = '';
-    page.append(h('div', { class: 'title-screen fa-screen' }, head(m), step !== 3 && error ? h('div', { class: 'aviso bad', role: 'alert' }, icon('alerta', 16), error) : null, body), footer(m));
+    page.append(h('div', { class: 'title-screen fa-screen' }, head(m), step !== LAST && error ? h('div', { class: 'aviso bad', role: 'alert' }, icon('alerta', 16), error) : null, body), footer(m));
   }
   draw();
+  // the title page may have been scrolled down to the founding entry: the wizard starts at its top
+  try { page.scrollIntoView?.({ block: 'start' }); window.scrollTo?.(0, 0); } catch { /* */ }
   return { go, draft };
 }
 

@@ -160,7 +160,8 @@ export function renderTitle(root, store, { onStart, onSettings } = {}) {
     picker.innerHTML = '';
     picker.append(h('div', { class: 'loading' }, `Preparando ${sc.name || 'o cenário'}…`));
     let ok = false;
-    try { ok = await store.useScenario(sc.id); } catch (e) { console.error(e); }
+    // a founding wizard visited before may have moved the campaign start ("Quando começar"): back to the scenario's own
+    try { ok = await store.useScenario(sc.id); if (ok) await store.useStart?.(null); } catch (e) { console.error(e); }
     busy = false;
     if (!ok) {
       picker.classList.add('hidden');

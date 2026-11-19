@@ -10,7 +10,22 @@
       "state": { "support": 55, "reputation": 35, "culture": 0, "fixedCostShare": 0.35 },
       "company": { "support": 45, "reputation": 30, "culture": 50, "fixedCostShare": 0.3 }
     },
-    "launchSiteBonus": { "reputation": 5 }
+    "launchSiteBonus": { "reputation": 5 },
+    "levels": {
+      "note": "Níveis iniciais escolhidos no assistente ('Dinheiro inicial', 'Tecnologia inicial'). money.mult multiplica a verba anual e o caixa da fundação. tech.share = fatia das tecnologias que a história tinha na data de início (as mais antigas primeiro, com os pré-requisitos), sempre com o conjunto de techBaseYear (foguetes de sondagem: dá para fazer um foguete suborbital).",
+      "money": [
+        { "id": "pouco", "label": "Pouco", "mult": 0.5 },
+        { "id": "medio", "label": "Médio", "mult": 1 },
+        { "id": "muito", "label": "Muito", "mult": 2 }
+      ],
+      "tech": [
+        { "id": "pouca", "label": "Pouca", "share": 0.25 },
+        { "id": "media", "label": "Média", "share": 0.6 },
+        { "id": "muita", "label": "Muita", "share": 1 }
+      ],
+      "techBaseYear": 1950,
+      "default": { "money": "medio", "tech": "muita" }
+    }
   },
   "sites": [
     { "id": "usa_washington", "nation": "usa", "name": "Washington", "lat": 38.9, "lon": -77.04 },

@@ -177,6 +177,74 @@ export async function ensurePacks(data, reader, eraIdsWanted, { prune = false } 
   return rebuild(data, st);
 }
 
+/**
+ * Feats history already saw before `year` (state.firstsHistory of a campaign that starts later): the union of the
+ * scenarios' historicalFirsts dated before it, the earliest of each id. Pure.
+ */
+export function firstsBefore(scenarios, year) {
+  const out = {};
+  for (const sc of scenarios || []) {
+    for (const [id, f] of Object.entries(sc?.historicalFirsts || {})) {
+      if (!f || !Number.isFinite(f.year) || f.year >= year) continue;
+      if (!out[id] || f.year < out[id].year) out[id] = JSON.parse(JSON.stringify(f));
+    }
+  }
+  return Object.fromEntries(Object.keys(out).sort().map((k) => [k, out[k]]));
+}
+
+/**
+ * The raw scenario moved to start at January of `year` (founding wizard "Quando começar"; EXPANSION.md §2.1): same
+ * id, end and ending; the snapshot of the era of that year; `firsts` as historicalFirsts. Pure; the start year of
+ * `raw` itself (or no year) returns `raw` unchanged.
+ */
+export function scenarioStartingAt(raw, year, manifest = DEFAULT_MANIFEST, firsts = null) {
+  const y0 = raw?.start?.year ?? raw?.startYear;
+  if (!raw || !Number.isFinite(year) || year === y0) return raw;
+  const era = eraOfYear(manifest, year);
+  const end = raw.end?.year ?? raw.endYear;
+  return {
+    ...raw, start: { year, month: 0 }, startYear: year, ...(era ? { snapshot: era } : {}),
+    ...(end ? { subtitle: `${year} a ${end}` } : {}),
+    historicalFirsts: firsts && Object.keys(firsts).length ? firsts : (raw.historicalFirsts ?? null),
+  };
+}
+
+/**
+ * Move the loaded scenario's start to `year` (null = its own start), reloading the era packs of the new start (the
+ * packs of other eras are dropped: no 1950 content in 2200). Used by the founding wizard before the game is created
+ * and by loadSlot for a save that started later. Resolves to the same data object.
+ */
+export async function ensureStartYear(data, reader, year = null, { eras = 'auto' } = {}) {
+  const st = storeOf(data);
+  if (!st) return data; // hand-made data (tests): nothing to move
+  st.baseScenarioRaw ||= st.scenarioRaw;
+  const base = st.baseScenarioRaw;
+  const y0 = base?.start?.year ?? base?.startYear;
+  let next = base;
+  if (Number.isFinite(year) && year !== y0) {
+    st.firstsCache ||= {};
+    if (!st.firstsCache[year]) {
+      const files = Object.entries(st.manifest.scenarios || {}).filter(([id]) => id !== st.scenarioId).map(([, f]) => f);
+      const raws = await Promise.all(files.map((f) => tryRead(reader, stripJson(f))));
+      st.firstsCache[year] = firstsBefore(raws.filter(Boolean), year);
+    }
+    next = scenarioStartingAt(base, year, st.manifest, st.firstsCache[year]);
+  }
+  if (next === st.scenarioRaw) return data;
+  st.scenarioRaw = next;
+  const scenario = normalizeScenario(next, st.scenarioId);
+  st.eras = new Set(resolveEras(eras, scenario, st.manifest));
+  for (const p of eraPacks(st.manifest)) if (!st.eras.has(p.era)) { delete st.raw[p.id]; st.partial?.delete(p.id); }
+  await loadPacks(st, reader, activeIds(st.manifest, st.eras));
+  return rebuild(data, st);
+}
+
+/** Start year of the scenario as its file has it (before any ensureStartYear). */
+export const baseStartYear = (data) => {
+  const raw = storeOf(data)?.baseScenarioRaw || storeOf(data)?.scenarioRaw || data?.scenario;
+  return raw?.start?.year ?? raw?.startYear ?? null;
+};
+
 /** Switch the scenario of an already loaded data object (new game from the title screen). */
 export async function ensureScenario(data, reader, scenarioId, { eras = 'auto' } = {}) {
   const st = storeOf(data);
@@ -185,6 +253,8 @@ export async function ensureScenario(data, reader, scenarioId, { eras = 'auto' }
   const file = st.manifest.scenarios?.[scenarioId];
   if (!file) throw new Error(`Cenário desconhecido: ${scenarioId}`);
   st.scenarioRaw = await reader(stripJson(file));
+  st.baseScenarioRaw = null;
+  st.firstsCache = null;
   st.scenarioId = scenarioId;
   const scenario = normalizeScenario(st.scenarioRaw, scenarioId);
   st.eras = new Set(resolveEras(eras, scenario, st.manifest));

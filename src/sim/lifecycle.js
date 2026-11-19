@@ -18,6 +18,7 @@ import { dateToTurn, turnToDate, eraAt, WEEKS_PER_YEAR } from '../core/time.js';
 import * as diplomacy from './diplomacy.js';
 import * as politics from './politics.js';
 import * as research from './research.js';
+import { foundingGrant, historicalGrant } from '../core/gating.js';
 
 /** Converted to variable steps: yearly logic reads the window, dated events apply in the tick that contains them. */
 export const meta = { maxDt: 52 };
@@ -1190,7 +1191,10 @@ export const decisionHandlers = {
 
 // ---------------------------------------------------------------- founding an agency (Phase B, B1: EXPANSION.md §5.3)
 //
-// Action 'agency/found' {name, short, kind: 'agency'|'company', nationId, hq: {id} | {lat, lon, name?}, emblem}.
+// Action 'agency/found' {name, short, kind: 'agency'|'company', nationId, hq: {id} | {lat, lon, name?}, emblem,
+// money?: 'pouco'|'medio'|'muito', tech?: 'pouca'|'media'|'muita'} (starting levels, `founding.levels`; absent =
+// `levels.default`, today's numbers). The start date itself is the scenario's: the wizard's "Quando começar" moves
+// the campaign start before the game is created (data.js ensureStartYear).
 // Valid only at the start of a game (no step taken). The UI creates the new game with playerId = customIdFor(payload,
 // seed), then this action brings the actor to life through the same addActor path as every birth: tier core,
 // `custom: true`, lineage = its own id. A game created for another player id is re-keyed (crew and missions follow
@@ -1207,6 +1211,12 @@ const FOUND_DEFAULTS = {
     company: { support: 45, reputation: 30, culture: 50, fixedCostShare: 0.3 },
   },
   launchSiteBonus: { reputation: 5 },
+  levels: {
+    money: [{ id: 'pouco', label: 'Pouco', mult: 0.5 }, { id: 'medio', label: 'Médio', mult: 1 }, { id: 'muito', label: 'Muito', mult: 2 }],
+    tech: [{ id: 'pouca', label: 'Pouca', share: 0.25 }, { id: 'media', label: 'Média', share: 0.6 }, { id: 'muita', label: 'Muita', share: 1 }],
+    techBaseYear: 1950,
+    default: { money: 'medio', tech: 'muita' },
+  },
 };
 const EMBLEM_SHAPES = ['roundel', 'shield', 'hex', 'chevron', 'wing', 'star', 'wordmark'];
 const EMBLEM_DIVISIONS = ['none', 'half', 'band', 'chevron', 'quarter'];
@@ -1216,6 +1226,39 @@ const strip = (s, max) => String(s ?? '').replace(/[<>&"'`\\{}]/g, '').replace(/
 const shortOf = (s) => strip(s, 12).toUpperCase().replace(/[^\p{L}\p{N}-]/gu, '');
 
 const foundCfg = (data) => ({ ...FOUND_DEFAULTS, ...(data?.hqSites?.founding || {}) });
+/** Starting-level tables {money: [{id, label, mult}], tech: [{id, label, share}], techBaseYear, default}. */
+function levelsOf(cfg) {
+  const L = { ...FOUND_DEFAULTS.levels, ...(cfg.levels || {}) };
+  const rows = (list, dflt, key) => (Array.isArray(list) && list.length ? list : dflt).filter((x) => x?.id && Number.isFinite(Number(x[key])));
+  return {
+    money: rows(L.money, FOUND_DEFAULTS.levels.money, 'mult'), tech: rows(L.tech, FOUND_DEFAULTS.levels.tech, 'share'),
+    techBaseYear: Number.isFinite(L.techBaseYear) ? L.techBaseYear : 1950,
+    default: { ...FOUND_DEFAULTS.levels.default, ...(L.default || {}) },
+  };
+}
+/** Level row by id (null for an unknown id; the default row when id is absent). */
+function levelRow(list, id, dflt) {
+  if (id == null || id === '') return list.find((x) => x.id === dflt) || list[Math.floor(list.length / 2)] || null;
+  return list.find((x) => x.id === id) || null;
+}
+/** Is the scenario's research gated by history (techStart 'historical')? Only there the tech level means anything. */
+const historicalTech = (scenario) => scenario?.techStart === 'historical';
+
+/**
+ * Technologies a founded agency starts with at `year` for tech level `techId` (pure): {ids, count, total, base,
+ * share}. total = what history had (historicalGrant), base = the 1950 founding set (always held). ids = null where
+ * the scenario's research is not historical (the level changes nothing there).
+ */
+export function foundingTech(data, techId, year, scenario = data?.scenario) {
+  const L = levelsOf(foundCfg(data));
+  const row = levelRow(L.tech, techId, L.default.tech) || { share: 1 };
+  if (!historicalTech(scenario)) return { ids: null, count: 0, total: 0, base: 0, share: row.share };
+  const baseYear = Math.min(L.techBaseYear, year) + 1;
+  const ids = foundingGrant(data, year + 1, row.share, { baseYear });
+  const total = historicalGrant(data, year + 1).length;
+  const base = historicalGrant(data, baseYear).length;
+  return { ids, count: ids.length, total, base, share: row.share };
+}
 const hqSitesOf = (data) => listOf(data?.hqSites, 'sites');
 
 /**
@@ -1275,8 +1318,10 @@ export function foundingOptions(data, scenario = data?.scenario) {
     sites: sites.filter((s) => s.nation === n.id),
   })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const privateOk = year >= cfg.privateFromYear;
+  const L = levelsOf(cfg);
   return {
     offered, year, privateFrom: cfg.privateFromYear, privateOk,
+    levels: { money: L.money.map((x) => ({ ...x })), tech: L.tech.map((x) => ({ ...x })), default: { ...L.default } },
     privateNote: privateOk ? null : 'Empresas privadas de lançamento só surgem nos anos 80.',
     nations,
   };
@@ -1317,7 +1362,12 @@ export function validateFound(data, payload, scenario = data?.scenario) {
   }
   const emblem = sanitizeEmblem(p.emblem, data);
   if (p.emblem && !emblem) return { ok: false, error: 'O logo não é válido. Sorteie outro ou ajuste as cores.' };
-  return { ok: true, value: { name, short, kind, nationId: nation.id, nation, hq, emblem } };
+  const L = levelsOf(foundCfg(data));
+  const money = levelRow(L.money, p.money, L.default.money);
+  if (!money) return { ok: false, error: 'Escolha quanto dinheiro a agência tem no início.' };
+  const tech = levelRow(L.tech, p.tech, L.default.tech);
+  if (!tech) return { ok: false, error: 'Escolha quanta tecnologia a agência tem no início.' };
+  return { ok: true, value: { name, short, kind, nationId: nation.id, nation, hq, emblem, money: money.id, tech: tech.id } };
 }
 
 function scaleAt(cfg, year) {
@@ -1340,28 +1390,65 @@ export function foundPreview(data, value, scenario = data?.scenario) {
   const eco = v.nation?.economy || nationsOf(data).find((n) => n.id === v.nationId)?.economy || 'medium';
   const company = v.kind === 'company';
   const scale = scaleAt(cfg, year);
-  const budget = Math.max(5, Math.round((company ? cfg.privateBudget : (cfg.stateBudget?.[eco] ?? 40)) * scale));
+  const L = levelsOf(cfg);
+  const money = levelRow(L.money, v.money, L.default.money) || { id: 'medio', label: 'Médio', mult: 1 };
+  const techRow = levelRow(L.tech, v.tech, L.default.tech) || { id: 'muita', label: 'Muita', share: 1 };
+  const tech = foundingTech(data, techRow.id, year, scenario);
+  const budget = Math.max(5, Math.round((company ? cfg.privateBudget : (cfg.stateBudget?.[eco] ?? 40)) * scale * money.mult));
   const cash = Math.round(budget * (company ? cfg.cashYears?.company ?? 1.4 : cfg.cashYears?.state ?? 0.35));
   const st = { ...(company ? cfg.start?.company : cfg.start?.state) };
   const launchSites = v.hq?.launch ? [v.hq.name] : [];
   if (launchSites.length) st.reputation = (st.reputation ?? 35) + (cfg.launchSiteBonus?.reputation ?? 0);
-  // difficulty: this budget against the biggest live rival at the date, plus the handicaps
+  // difficulty: the medium-level budget against the biggest live rival at the date (10× smaller than the leader = +2,
+  // the most it weighs: a later era's leader is 50× bigger and the starting levels must still move the label), then
+  // the money level (½× = +0.6, 2× = −0.6) and the handicaps
   const t0 = dateToTurn(year, 0, year);
   const ref = lineagesOf(data).filter((l) => aliveAt(data, l.id, t0, year)).map((l) => budgetAt(l, year) || 0);
-  const top = Math.max(budget, ...ref);
-  let score = Math.log10(top / budget) * 2; // 10× smaller than the leader = +2
+  const budget1 = Math.max(5, Math.round((company ? cfg.privateBudget : (cfg.stateBudget?.[eco] ?? 40)) * scale));
+  const top = Math.max(budget1, ...ref);
+  let score = Math.min(2, Math.log10(top / budget1) * 2) - Math.log10(money.mult > 0 ? money.mult : 1) * 2;
   const notes = [];
   if (company) { score += 0.8; notes.push('Empresa: a receita vem de contratos e investidores, não do governo.'); }
   else notes.push(`Verba do governo ${v.nation?.of || ''}, economia ${eco === 'large' ? 'grande' : eco === 'small' ? 'pequena' : 'média'}.`.replace('  ', ' '));
   if (!launchSites.length) { score += 0.6; notes.push('Sem base de lançamento própria: vai depender de bases de outros.'); }
   else notes.push(`Base de lançamento própria em ${v.hq.name}.`);
-  notes.push('Agência nova: sem tecnologias iniciais e sem histórico de voos.');
-  const id = score < 1.2 ? 'media' : score < 2.4 ? 'dificil' : 'muito_dificil';
-  const label = { media: 'Média', dificil: 'Difícil', muito_dificil: 'Muito difícil' }[id];
+  if (money.mult !== 1) notes.push(`Dinheiro inicial ${money.label.toLowerCase()}: ${String(money.mult).replace('.', ',')}× a verba e o caixa de uma agência nova.`);
+  // technology: the share of what history had that the agency does not hold weighs like a handicap (none in 1950)
+  const extra = Math.max(0, tech.total - tech.base);
+  const missing = extra ? (tech.total - tech.count) / extra : 0;
+  score += missing * 0.9;
+  if (!tech.total) notes.push('Agência nova: sem tecnologias iniciais e sem histórico de voos.');
+  else if (!extra || tech.count >= tech.total) notes.push(`Começa com as ${tech.count} tecnologias que a história tinha em ${year}; sem histórico de voos.`);
+  else notes.push(`Tecnologia inicial ${techRow.label.toLowerCase()}: ${tech.count} das ${tech.total} tecnologias que a história tinha em ${year}; o resto se pesquisa.`);
+  const id = score < 0.5 ? 'facil' : score < 1.2 ? 'media' : score < 2.4 ? 'dificil' : 'muito_dificil';
+  const label = { facil: 'Fácil', media: 'Média', dificil: 'Difícil', muito_dificil: 'Muito difícil' }[id];
   return {
     budget, cash, support: st.support ?? 55, reputation: st.reputation ?? 35, culture: st.culture ?? 0,
-    fixedCostShare: st.fixedCostShare ?? 0.5, launchSites, difficulty: { id, label, score: Math.round(score * 100) / 100, notes },
+    fixedCostShare: st.fixedCostShare ?? 0.5, launchSites, year,
+    money: { id: money.id, label: money.label, mult: money.mult },
+    tech: { id: techRow.id, label: techRow.label, share: techRow.share, count: tech.count, total: tech.total, base: tech.base },
+    difficulty: { id, label, score: Math.round(score * 100) / 100, notes },
   };
+}
+
+/**
+ * What each starting level means for a draft {kind, nationId} at the scenario start (the wizard's "Quando começar"
+ * cards; pure): {year, money: [{id, label, mult, budget, cash}], tech: [{id, label, share, count, total}]}. Without a
+ * nation the numbers are those of a medium economy.
+ */
+export function foundingLevels(data, draft = {}, scenario = data?.scenario) {
+  const L = levelsOf(foundCfg(data));
+  const { year } = foundingStart(data, scenario);
+  const base = { kind: draft?.kind === 'company' ? 'company' : 'agency', nationId: draft?.nationId || null };
+  const money = L.money.map((m) => {
+    const pv = foundPreview(data, { ...base, money: m.id, tech: L.tech[L.tech.length - 1]?.id }, scenario);
+    return { id: m.id, label: m.label, mult: m.mult, budget: pv.budget, cash: pv.cash };
+  });
+  const tech = L.tech.map((t) => {
+    const g = foundingTech(data, t.id, year, scenario);
+    return { id: t.id, label: t.label, share: t.share, count: g.count, total: g.total };
+  });
+  return { year, money, tech, default: { ...L.default } };
 }
 
 const hexLum = (c) => {
@@ -1416,8 +1503,12 @@ function foundAgency(state, data, action, ctx) {
   state.playerId = id;
   const def = foundDef(state, data, id, value);
   addActor(state, data, ctx, def, { reason: 'found' });
-  // the founded agency starts its research like a new agency (initialFor + §5.5 historical grant, keys recomputed)
-  if (old && old !== id && state.research) research.resetPlayer(state, data);
+  // the founded agency starts its research like a new agency: initialFor + the "Tecnologia inicial" share of the
+  // §5.5 historical grant (keys recomputed)
+  if (state.research) {
+    const tech = foundingTech(data, value.tech, state.startYear ?? foundingStart(data).year);
+    research.resetPlayer(state, data, tech.ids ? { grant: tech.ids } : {});
+  }
   const a = state.actors[id];
   a.custom = true;
   a.tier = 'core';
@@ -1539,6 +1630,7 @@ export const queries = {
   'agency/validateFound': (state, data, payload, scenario) => validateFound(data, payload, scenario || data?.scenario),
   'agency/previewValue': (state, data, value, scenario) => foundPreview(data, value, scenario || data?.scenario),
   'agency/customId': (state, data, payload, seed) => customIdFor(payload, seed),
+  'agency/foundingLevels': (state, data, draft, scenario) => foundingLevels(data, draft, scenario || data?.scenario),
   'lifecycle/info': (state, data, id) => {
     const live = state.actors?.[id] || state.actors?.[state.lifecycle?.aliases?.[id]];
     return live || state.lifecycle?.tombstones?.[id] || null;
