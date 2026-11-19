@@ -566,6 +566,59 @@ export function computeFog(state, data, vis = visits(state, data)) {
   return { bodies, dests };
 }
 
+// ---- crewed-landing flags: a flag on a body only after a crewed surface mission succeeded there, in the colours of
+// the country where the agency has its HQ
+const ISO2 = { USA: 'US', RUS: 'RU', UKR: 'UA', KAZ: 'KZ', CHN: 'CN', IND: 'IN', JPN: 'JP', FRA: 'FR', DEU: 'DE', GBR: 'GB', ITA: 'IT', CAN: 'CA', ISR: 'IL', KOR: 'KR', BRA: 'BR', ARE: 'AE', AUS: 'AU', NZL: 'NZ', IDN: 'ID', NGA: 'NG', MEX: 'MX', TUR: 'TR', SAU: 'SA', ARG: 'AR', ZAF: 'ZA', VNM: 'VN', POL: 'PL', EGY: 'EG', PHL: 'PH', CHL: 'CL', KEN: 'KE', MYS: 'MY', THA: 'TH', COL: 'CO' };
+const regional = (cc) => (cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1F1E6 + c.charCodeAt(0) - 65)) : '');
+const NATION_OF_ACTOR = { nasa: 'usa', abma: 'usa', spacex: 'usa', blueorigin: 'usa', ula: 'usa', roscosmos: 'ussr', cnsa: 'china', isro: 'india', esa: 'europe', jaxa: 'japan' };
+
+/** {emoji, code, color, nationId} of the country an actor has its HQ in (USSR / Europe get their own marks). */
+export function hqFlag(state, data, actorId) {
+  const a = state?.actors?.[actorId] || data?.index?.actors?.[actorId] || {};
+  const nations = arr(data?.nations?.nations || data?.nations);
+  let nid = a.nation || a.nationId || a.hq?.nation || NATION_OF_ACTOR[actorId] || null;
+  const year = (state?.startYear ?? 1950) + Math.floor((state?.turn ?? 0) / 52);
+  if (nid === 'ussr' && year > 1991) nid = 'russia';
+  if (nid === 'russia' && year <= 1991) nid = 'ussr';
+  const n = nations.find((x) => x.id === nid);
+  if (nid === 'ussr') return { emoji: '', code: 'URSS', color: '#cc1f1f', nationId: nid };
+  if (nid === 'europe') return { emoji: regional('EU'), code: 'EU', color: '#1f3fa6', nationId: nid };
+  const iso3 = arr(n?.isos).find((x) => (x.from ?? -Infinity) <= year && (x.to == null || year <= x.to))?.iso || arr(n?.isos)[0]?.iso;
+  const cc = ISO2[iso3] || '';
+  return { emoji: a.flag && !cc ? a.flag : regional(cc), code: cc || String(a.short || actorId).slice(0, 3).toUpperCase(), color: actorInfo(state, data, actorId).color, nationId: nid };
+}
+
+/** Bodies with a completed crewed surface landing: {bodyId: [{actorId, turn}]} (player missions, history, firsts). */
+export function crewedLandings(state, data) {
+  const out = {};
+  const add = (bodyId, actorId, turn) => {
+    if (!bodyId || bodyId === 'earth' || !actorId) return;
+    const l = (out[bodyId] ||= []);
+    const e = l.find((x) => x.actorId === actorId);
+    if (e) e.turn = Math.min(e.turn, turn); else l.push({ actorId, turn });
+  };
+  const isSurface = (destId) => destById(data, destId)?.kind === 'surface';
+  const turn = state?.turn ?? 0;
+  for (const m of arr(state?.missions)) {
+    if (!playerReached(m) || !isSurface(m.destination)) continue;
+    if (!(m.type === 'crewed' || m.crewed || arr(m.crew).length)) continue;
+    add(destBodyId(data, m.destination), state.playerId, m.result?.resolvedTurn ?? m.launchTurn ?? 0);
+  }
+  for (const inst of arr(state?.calendar)) {
+    if (!CAL_OK.includes(inst?.status)) continue;
+    const def = calDef(data, inst.id);
+    if (!def?.destination || !isSurface(def.destination) || !(def.type === 'crewed' || def.crewed)) continue;
+    if (calArrival(data, inst, def) > turn) continue;
+    add(destBodyId(data, def.destination), def.owner, inst.resolvedTurn ?? inst.currentTurn ?? inst.plannedTurn ?? 0);
+  }
+  for (const [mid, f] of Object.entries(state?.firsts || {})) {
+    if (!/crewed/.test(mid) || !/landing|surface/.test(mid) || !f?.actorId) continue;
+    add(milestoneBody(data, mid), f.actorId, f.turn ?? 0);
+  }
+  for (const l of Object.values(out)) l.sort((a, b) => a.turn - b.turn);
+  return out;
+}
+
 /** Actors present on each body (excluding Earth, where everyone is). */
 export function presence(state, data, vis = visits(state, data)) {
   const out = {};
@@ -735,6 +788,7 @@ export function buildModel(state, data, q) {
     playerId: state?.playerId,
     fog: computeFog(state, data, vis),
     presence: presence(state, data, vis),
+    landings: crewedLandings(state, data),
     transits: activeTransits(state, data),
     windows: windowSummaries(state, data, q),
     warnings: windowWarnings(state, data, q),
@@ -1479,9 +1533,9 @@ export function render(container, store) {
       });
     }
 
-    // presence flags (satellites too small to see hand their flags to the planet)
+    // flags only where a crew walked (crewed surface landing completed), in the HQ country's colours
     const flagMap = {};
-    for (const [bodyId, list] of Object.entries(model.presence)) {
+    for (const [bodyId, list] of Object.entries(model.landings || {})) {
       let p = scr[bodyId];
       let target = bodyId;
       if (p && p.vis < 0.5) {
@@ -1499,7 +1553,7 @@ export function render(container, store) {
         const a = actorInfo(state, data, actorId);
         const fx = p.x + Math.max(p.R * 0.6, 3) + i * (cb ? 11 : 8);
         const fy = p.y - Math.max(p.R * 0.75, 4) - 6;
-        drawFlag(g, fx, fy, a.color, actorId === state.playerId, cb ? a.short.slice(0, 1) : '');
+        drawCountryFlag(g, fx, fy, hqFlag(state, data, actorId), actorId === state.playerId);
         obstacles.push({ id: bodyId, x: fx + 3, y: fy, r: 5 });
       });
     }
@@ -1866,6 +1920,35 @@ export function render(container, store) {
     }
   }
 
+  /** Flag pole with the country's emoji flag (when the device draws flag emoji) or a coloured pennant with its code. */
+  function drawCountryFlag(g, x, y, f, mine) {
+    g.strokeStyle = 'rgba(230,236,250,0.9)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x, y + 9);
+    g.lineTo(x, y - 6);
+    g.stroke();
+    if (f.emoji && hasFlagEmoji()) {
+      g.font = '10px sans-serif';
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      g.fillText(f.emoji, x + 0.5, y - 1.5);
+    } else {
+      g.fillStyle = f.color || '#ccc';
+      g.fillRect(x + 0.5, y - 6, 12, 8);
+      g.fillStyle = '#fff';
+      g.font = `700 5px ${FONT}`;
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      g.fillText(String(f.code || '').slice(0, 4), x + 1.5, y - 2);
+    }
+    if (mine) {
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 1;
+      g.strokeRect(x + 0.5, y - 6.5, 13, 9);
+    }
+  }
+
   function drawFlag(g, x, y, color, mine, letter) {
     g.strokeStyle = 'rgba(230,236,250,0.85)';
     g.lineWidth = 1;
@@ -2215,7 +2298,7 @@ export function render(container, store) {
     return `<div class="map-legend__card">
       <div><span class="lg-dot" style="background:${esc(me.color)}"></span> Sua missão (círculo, rastro contínuo)</div>
       <div><span class="lg-dia"></span> Missão rival (losango, cor da agência)</div>
-      <div><span class="lg-flag"></span> Bandeira: quem já chegou lá</div>
+      <div><span class="lg-flag"></span> Bandeira: pouso tripulado concluído (país da sede)</div>
       <div><span class="lg-fog"></span> Não mapeado: só uma missão sua revela</div>
       <div><span class="lg-mk lg-mk--p"></span> Destino visitado por você · <span class="lg-mk lg-mk--r"></span> por rivais</div>
       <div><span class="lg-win"></span> Arco azul: janela aberta · amarelo: em breve</div>
