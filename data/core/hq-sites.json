@@ -5,7 +5,7 @@
     "stateBudget": { "large": 160, "medium": 85, "small": 60 },
     "privateBudget": 65,
     "cashYears": { "state": 0.35, "company": 1.4 },
-    "scale": [[1950, 1], [1960, 2], [1975, 2.5], [2000, 3], [2026, 4], [2051, 6], [2200, 10], [2600, 16]],
+    "scale": [[1950, 1], [1960, 2], [1975, 3.4], [1990, 4.2], [2000, 5], [2026, 6.5], [2051, 9], [2200, 14], [2600, 20]],
     "start": {
       "state": { "support": 55, "reputation": 35, "culture": 0, "fixedCostShare": 0.35 },
       "company": { "support": 45, "reputation": 30, "culture": 50, "fixedCostShare": 0.3 }

@@ -5091,6 +5091,9 @@
         "d": 1
       }
     },
+    "generic_microsat": { "name": "Microssatélite / CubeSat", "template": "probe", "heightM": 0.4, "widthM": 1.2, "bus": { "w": 0.3, "h": 0.4, "mat": "white_paint" }, "arrays": { "type": "wing", "spanM": 1.2, "panels": 2 } },
+    "e2_smallsat": { "name": "Satélite pequeno nacional", "template": "probe", "heightM": 1.2, "widthM": 4, "bus": { "w": 1, "h": 1.2, "mat": "gold_foil" }, "arrays": { "type": "wing", "spanM": 4, "panels": 2 } },
+    "e2_smallprobe": { "name": "Sonda lunar pequena", "template": "probe", "heightM": 1.4, "widthM": 4, "bus": { "w": 1.2, "h": 1.4, "mat": "gold_foil" }, "arrays": { "type": "wing", "spanM": 4, "panels": 2 }, "hga": { "d": 0.8 } },
     "generic_sat": {
       "name": "Satélite (genérico)",
       "template": "probe",
