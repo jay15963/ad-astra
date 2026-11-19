@@ -673,8 +673,24 @@ function scOkForType(sc, type, crewed, data = null) {
   if (crewed) return (sc.crew || 0) > 0;
   return (data ? scKindsFor(data, type) : SC_KINDS[type] || []).includes(sc.kind);
 }
-function scOkForDest(sc, destId) {
-  return !Array.isArray(sc?.destinations) || sc.destinations.length === 0 || sc.destinations.includes(destId);
+/**
+ * Can this craft fly to destId? Historical craft keep their own list. Generic craft (generic / access 'generic')
+ * also go to the neighbours of what they list: the same kind of place on the same body (a lunar lander lands at
+ * the south pole or the far side too), satellites to any orbit of the Earth or the Moon, probes to the same kind of
+ * place anywhere (the rocket's capacity decides if it gets there).
+ */
+function scOkForDest(sc, destId, data = null) {
+  if (!Array.isArray(sc?.destinations) || sc.destinations.length === 0 || sc.destinations.includes(destId)) return true;
+  if (!data || !(sc.generic || sc.access === 'generic')) return false;
+  const dest = destDef(data, destId);
+  if (!dest) return false;
+  const listed = sc.destinations.map((id) => destDef(data, id)).filter(Boolean);
+  // a surface needs something that lands (an impactor listing lunar_impact is not a lander)
+  const lands = ['lander', 'rover', 'cargo'].includes(sc.kind);
+  if ((dest.kind !== 'surface' || lands) && listed.some((x) => x.kind === dest.kind && x.body === dest.body)) return true;
+  if (sc.kind === 'satellite' && dest.kind === 'orbit' && ['earth', 'moon'].includes(dest.body) && listed.some((x) => x.kind === 'orbit')) return true;
+  if (sc.kind === 'probe' && ['orbit', 'flyby', 'atmosphere', 'rendezvous'].includes(dest.kind) && dest.body !== 'earth' && listed.some((x) => x.kind === dest.kind)) return true;
+  return false;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -690,14 +706,14 @@ const isCrewLander = (s) => s && s.kind === 'lander' && (s.crew || 0) > 0;
 /** Where a companion must be able to go: the destination itself, or lunar orbit for a lunar surface rendezvous. */
 function companionOk(data, s, destId) {
   if (!s) return false;
-  if (scOkForDest(s, destId)) return true;
+  if (scOkForDest(s, destId, data)) return true;
   const dest = destDef(data, destId);
-  return dest?.body === 'moon' && scOkForDest(s, 'lunar_orbit');
+  return dest?.body === 'moon' && scOkForDest(s, 'lunar_orbit', data);
 }
 /** Crewed landers the agency can use for this draft, best first (own hardware, reliability, cost). */
 function landerChoices(state, data, d) {
   return spacecraftFor(state, data)
-    .filter((s) => isCrewLander(s) && s.id !== d.spacecraftId && scOkForDest(s, d.destination))
+    .filter((s) => isCrewLander(s) && s.id !== d.spacecraftId && scOkForDest(s, d.destination, data))
     .map((s) => ({ s, rel: spacecraftReliability(state, data, s.id).mean }))
     .sort((a, b) => ((b.s.operator === state.playerId) - (a.s.operator === state.playerId)) || (b.rel - a.rel) || ((a.s.costM || 0) - (b.s.costM || 0)))
     .map((x) => x.s);
@@ -712,7 +728,7 @@ export function companionOf(state, data, d) {
 function companionLaunch(state, data, s, destId) {
   if (!s) return null;
   const dest = destDef(data, destId);
-  const target = scOkForDest(s, destId) ? destId : dest?.body === 'moon' ? 'lunar_orbit' : destId;
+  const target = scOkForDest(s, destId, data) ? destId : dest?.body === 'moon' ? 'lunar_orbit' : destId;
   let best = null;
   for (const v of vehiclesFor(state, data)) {
     if (capacityTo(data, v.id, target) < (s.massT || 0)) continue;
@@ -991,12 +1007,12 @@ function validate(state, data, d, opts = {}) {
     if (!spacecraftFor(state, data).some((s) => s.id === sc.id) && !keepsBooking(state, data, sc, opts)) errors.push(`${sc.name} não está disponível para a agência agora.`);
     if (d.type && d.source !== 'calendar' && !scOkForType(sc, d.type, d.crewed, data)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
     else if (d.type && d.source !== 'calendar' && v2.sub && !scOkForSub(data, sc, d.type, v2.sub)) errors.push(`${sc.name} não é ${(subtypeOf(data, d.type, v2.sub)?.label || v2.sub).toLowerCase()}.`);
-    if (dest && !scOkForDest(sc, dest.id)) errors.push(`${sc.name} não foi projetada para ${dest.name}.`);
+    if (dest && !scOkForDest(sc, dest.id, data)) errors.push(`${sc.name} não foi projetada para ${dest.name}.`);
     // carriers (§1.4): the craft must hold what it carries; surface deliveries need a cargo lander
     if (v2.carried) {
       const cap = cargoCapacityOf(data, sc);
       if (v2.cargoT > cap + 1e-9) errors.push(`A ${sc.name} leva no máximo ${fmtTons(cap)} t de carga.`);
-      if (dest && SURFACE_KINDS.includes(dest.kind) && !(sc.kind === 'lander' || (sc.kind === 'cargo' && scOkForDest(sc, dest.id) && Array.isArray(sc.destinations) && sc.destinations.includes(dest.id)))) {
+      if (dest && SURFACE_KINDS.includes(dest.kind) && !(sc.kind === 'lander' || (sc.kind === 'cargo' && scOkForDest(sc, dest.id, data) && Array.isArray(sc.destinations) && sc.destinations.includes(dest.id)))) {
         errors.push('Carga na superfície precisa de um módulo de pouso de carga.');
       }
     }
@@ -1369,7 +1385,7 @@ export function costRange(state, data, draftIn = {}) {
   if (!base.type || !destDef(data, base.destination)) return { minM: null, maxM: null, options: 0 };
   const own = draftIn.spacecraftId || draftIn.suggestion?.spacecraftId || null;
   const scs = base.clientPayload ? [null]
-    : spacecraftFor(state, data).filter((s) => (s.id === own || scOkForType(s, base.type, base.crewed)) && scOkForDest(s, base.destination));
+    : spacecraftFor(state, data).filter((s) => (s.id === own || scOkForType(s, base.type, base.crewed)) && scOkForDest(s, base.destination, data));
   const vs = vehiclesFor(state, data).filter((v) => !base.crewed || crewRatedV(state, data, v));
   const bonus = 1 + techBonus(state, 'payload');
   let minM = Infinity;
@@ -1414,7 +1430,7 @@ function pickConfig(state, data, { type, sub = null, destination, crewed = type 
   let scs = clientPayload || noCraft
     ? [null]
     : spacecraftFor(state, data, actorId).filter((s) => (scKinds ? scKinds.includes(s.kind) && (!crewed || s.crew > 0) : scOkForType(s, type, crewed, data))
-      && scOkForDest(s, destination) && (!sub || scOkForSub(data, s, type, sub)) && carrierOk(s));
+      && scOkForDest(s, destination, data) && (!sub || scOkForSub(data, s, type, sub)) && carrierOk(s));
   if (!clientPayload && !noCraft && scs.length === 0) return null;
   // own spacecraft first, then cheaper
   scs = scs.slice().sort((a, b) => ((b?.operator === actorId) - (a?.operator === actorId)) || ((a?.costM || 0) - (b?.costM || 0)));
@@ -2455,7 +2471,7 @@ function marketCost(state, data, c) {
   else if (!c.clientPayload) {
     const cargoT = contractCargoT(data, c);
     const surface = SURFACE_KINDS.includes(dest.kind);
-    const scs = (data.spacecraft?.spacecraft || []).filter((s) => availableByDate(state, s) && scKindsFor(data, type).includes(s.kind) && scOkForDest(s, c.destination)
+    const scs = (data.spacecraft?.spacecraft || []).filter((s) => availableByDate(state, s) && scKindsFor(data, type).includes(s.kind) && scOkForDest(s, c.destination, data)
       && (!crewed || (s.crew || 0) > 0) && (cargoT <= 0 || (cargoCapacityOf(data, s) >= cargoT && (!surface || s.kind === 'lander' || s.kind === 'cargo'))));
     if (!scs.length) return null;
     const cheapest = scs.reduce((a, b) => ((a.costM || 0) <= (b.costM || 0) ? a : b));
@@ -2719,7 +2735,7 @@ function hardwareWhy(state, data, c) {
   let need = spec.payloadOverride ?? null;
   if (need == null) {
     const surface = SURFACE_KINDS.includes(dest?.kind);
-    const fits = (s) => scOkForType(s, type, crewed, data) && scOkForDest(s, c.destination) && (!c.sub || scOkForSub(data, s, type, c.sub))
+    const fits = (s) => scOkForType(s, type, crewed, data) && scOkForDest(s, c.destination, data) && (!c.sub || scOkForSub(data, s, type, c.sub))
       && (spec.cargoT <= 0 || (cargoCapacityOf(data, s) + 1e-9 >= spec.cargoT && (!surface || s.kind === 'lander' || (s.kind === 'cargo' && (s.destinations || []).includes(c.destination)))));
     const mine = spacecraftFor(state, data, pid).filter(fits);
     if (!mine.length) {
@@ -3969,7 +3985,7 @@ export function draftOptions(state, data, draftIn = {}) {
     if (v2.carried && v2.cargoT > cargoCapT + 1e-9) reasons.push(`Leva no máximo ${fmtTons(cargoCapT)} t de carga.`);
     const destX = destDef(data, d.destination);
     if (v2.carried && destX && SURFACE_KINDS.includes(destX.kind) && s.kind !== 'lander' && !(s.kind === 'cargo' && (s.destinations || []).includes(destX.id))) reasons.push('Carga na superfície precisa de um módulo de pouso de carga.');
-    if (d.destination && !scOkForDest(s, d.destination)) reasons.push('Não serve para este destino.');
+    if (d.destination && !scOkForDest(s, d.destination, data)) reasons.push('Não serve para este destino.');
     if (d.vehicleId && Array.isArray(s.compatibleVehicles) && s.compatibleVehicles.length && !s.compatibleVehicles.includes(d.vehicleId)) {
       const names = s.compatibleVehicles.map((id) => vehicleDef(data, id)?.name || id);
       reasons.push(`Só voa no ${names.join(' ou ')}.`);
