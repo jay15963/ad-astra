@@ -7,7 +7,7 @@
 //     while, and flies operational designs on its own missions when they fit.
 // Every Phase B action is optional: an engine without investors.js/designs.js answers "ação desconhecida" and the
 // bot carries on, so the same runs work before and after B1–B3 land.
-import { botStep } from './golden.mjs';
+import { botStep, tenderMove } from './golden.mjs';
 import * as lifecycle from '../src/sim/lifecycle.js';
 import * as calendar from '../src/sim/calendar.js';
 
@@ -299,7 +299,8 @@ function accessMove(state, data, engine, mem) {
 export function phaseBStep(state, data, engine, opts = {}, mem = {}) {
   phaseBMoves(state, data, engine, opts, mem);
   if (state.gameOver) return;
-  botStep(state, data, engine, { schedule: opts.schedule !== false });
+  // the tender bids were placed by phaseBMoves (with its long-step manifest rule)
+  botStep(state, data, engine, { schedule: opts.schedule !== false, tenders: false });
 }
 
 /** The Phase B moves alone (for bots with their own scheduling loop: tools/smoke.mjs, tools/sim-campaign.mjs). */
@@ -309,12 +310,11 @@ export function phaseBMoves(state, data, engine, opts = {}, mem = {}) {
   for (const dec of state.decisions.slice()) {
     if (state.gameOver) return;
     if (dec.kind === 'investors/round') answerRound(state, data, engine, dec, o);
-    // long steps (eras 5–7): a director with a full launch manifest lets the contract pass (the golden bot bids on
-    // every one: a rich founded agency flew ~17 contracts a year in era 7 and the run went past 16 000 turns)
-    else if (dec.kind === 'contract/offer' && o.schedule !== false && (state.clock?.stepWeeks ?? 1) >= 13 && busyManifest(state) >= o.maxManifest) {
-      const pass = (dec.choices || []).find((c) => c.id === 'pass' && !c.disabled);
-      if (pass) engine.dispatch(state, data, { type: 'decision/resolve', id: dec.id, choiceId: pass.id });
-    }
+  }
+  // tender board: bid on deliverable jobs; in long steps (eras 5–7) a director with a full launch manifest lets them
+  // pass (a rich founded agency that took every contract flew ~17 a year in era 7 and the run went past 16 000 turns)
+  if (o.schedule !== false && o.tenders !== false && !((state.clock?.stepWeeks ?? 1) >= 13 && busyManifest(state) >= o.maxManifest)) {
+    tenderMove(state, data, engine);
   }
   buybackMove(state, data, engine, o, mem);
   for (const md of o.schedule !== false && Array.isArray(state.mandates) ? state.mandates : []) {

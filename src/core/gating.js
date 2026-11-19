@@ -320,8 +320,9 @@ export function resolveType(type, sub = null) {
 export function missionGate(state, data, spec = {}, actorId = state?.playerId) {
   const { type, sub } = resolveType(spec.type, spec.sub);
   const checks = [];
-  if (type) checks.push([`missionType:${type}`, TYPE_LABELS[type] || type]);
   const sr = subRow(data, type, sub);
+  // a subtype may stand for its type's key (`typeKey`): a suborbital sounding flight needs sounding rockets, not probes
+  if (type) checks.push(sr?.typeKey ? [sr.typeKey, sr.label || sub] : [`missionType:${type}`, TYPE_LABELS[type] || type]);
   if (sr?.key) checks.push([sr.key, sr.label || sub]);
   if (spec.payloadKind) {
     const pr = subRow(data, 'cargo', spec.payloadKind);

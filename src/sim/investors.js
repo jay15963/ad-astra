@@ -543,15 +543,21 @@ function countLaunches(state) {
   const mandatedIds = new Set();
   for (const md of state.mandates) { for (const id of md.missionIds || []) mandatedIds.add(id); for (const id of md.credited || []) mandatedIds.add(id); }
   const calMandates = new Set(state.mandates.filter((m) => m.calendarId).map((m) => m.calendarId));
+  // contracts already counted (a mission seen earlier carried them)
+  const ownContracts = new Set((state.missions || []).filter((m) => m.source === 'contract' && m.contractId && seen.has(m.id)).map((m) => m.contractId));
   for (const m of state.missions || []) {
     if (seen.has(m.id) || !(m.attempts > 0) || m.source === 'cert' || m.source === 'test') continue;
     seen.add(m.id);
     cap.seen.push(m.id);
     const mandated = m.mandateId || mandatedIds.has(m.id) || (m.calendarId && calMandates.has(m.calendarId)) || m.holderId;
     if (mandated) cap.year.mandated = (cap.year.mandated || 0) + 1;
-    // own = the player's own pick (source 'custom'), the same missions the agenda of missions.js counts; paid
-    // launch contracts and story items are not own flights, so they never trigger the board's veto
-    else if (m.source === 'custom') cap.year.own = (cap.year.own || 0) + 1;
+    // own = the player's own pick (source 'custom') and the contracts won on the tender board (one per contract: a
+    // second attempt after a failure is the same job), the same missions the agenda of missions.js counts; story
+    // items and mandates are not own flights
+    else if (m.source === 'custom' || (m.source === 'contract' && m.contractId && !ownContracts.has(m.contractId))) {
+      if (m.source === 'contract') ownContracts.add(m.contractId);
+      cap.year.own = (cap.year.own || 0) + 1;
+    }
   }
 }
 

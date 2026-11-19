@@ -8,6 +8,8 @@ import {
 import { portraitSVG, emblemSVG } from './portrait.js';
 import * as portraitNs from './portrait.js';
 import { decisionRow, sortDecisions } from './decisions.js';
+import { renderBoard } from './contracts.js';
+import { contractsBadge } from './screens.js';
 
 // Missões styles (docs/DESIGN.md §5, Builder "missões"): one stylesheet linked once, after styles.css so it wins
 // on equal specificity. Linked when the module loads (app.js imports it at boot): no unstyled first visit.
@@ -663,18 +665,19 @@ export function render(container, store) {
   const rerender = () => { container.innerHTML = ''; render(container, store); };
 
   const contracts = getContracts(store);
-  const offers = (st.decisions || []).filter((d) => String(d.kind).startsWith('contract'));
+  const nContracts = contracts.filter((c) => c.status === 'awarded' || c.status === 'late').length;
+  const offers = contractsBadge(st);
   ensureCss();
   const all = Array.isArray(st.missions) ? st.missions : [];
   const flying = all.filter((m) => ['launch', 'transit', 'arrival', 'operations'].includes(m.status)).length;
   const sched = all.filter((m) => m.status === 'scheduled').length;
-  const lead = [`${flying} em voo`, `${sched} agendada${sched === 1 ? '' : 's'}`, contracts.length ? `${contracts.length} contrato${contracts.length === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
+  const lead = [`${flying} em voo`, `${sched} agendada${sched === 1 ? '' : 's'}`, nContracts ? `${nContracts} contrato${nContracts === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
   const root = h('div', { class: 'view-pad missions' },
     viewHead('Programa espacial', { lead }),
     segmented([
       { id: 'lista', label: 'Programa' },
       { id: 'nova', label: 'Montar' },
-      { id: 'contratos', label: 'Contratos', badge: offers.length || null },
+      { id: 'contratos', label: 'Contratos', badge: offers === true ? '!' : offers || null },
       { id: 'frota', label: 'Frota' },
     ], ui.seg, go, { cls: 'tabs' }));
   container.appendChild(root);
@@ -689,7 +692,7 @@ export function render(container, store) {
     return;
   }
   if (ui.seg === 'nova') root.appendChild(safePanel(() => builder(store, rerender), 'A montagem de missões ainda está em construção.'));
-  else if (ui.seg === 'contratos') root.appendChild(safePanel(() => contractsView(store, contracts, offers, go), 'Contratos indisponíveis por enquanto.'));
+  else if (ui.seg === 'contratos') root.appendChild(safePanel(() => contractsView(store, rerender), 'Contratos indisponíveis por enquanto.'));
   else if (ui.seg === 'frota') root.appendChild(safePanel(() => fleetView(store, rerender), 'A frota não pôde ser exibida.'));
   else root.appendChild(safePanel(() => listView(store, go), 'A lista de missões não pôde ser exibida.'));
 
@@ -2239,53 +2242,10 @@ function getContracts(store) {
   return Array.isArray(store.state.contracts) ? store.state.contracts : [];
 }
 
-function contractsView(store, contracts, offers, go) {
-  const st = store.state;
-  const idx = store.data?.index || {};
-  const out = h('div');
-  if (offers.length) out.append(sectionTitle('Ofertas na mesa'), h('div', { class: 'decision-list' }, sortDecisions(offers).map((d) => decisionRow(store, d))));
-  const OPEN = ['open', 'bidding', 'awarded', 'late', 'offered', 'accepted', 'won'];
-  const open = contracts.filter((c) => OPEN.includes(c.status));
-  const closed = contracts.filter((c) => !open.includes(c));
-  if (!contracts.length && !offers.length) {
-    out.append(emptyState('Nenhum contrato agora. Reputação alta atrai clientes e leilões melhores.', 'transferir'));
-    return out;
-  }
-  const row = (c) => {
-    const client = st.actors?.[c.clientId || c.client || c.from] || null;
-    const clientName = client ? (client.short || client.name) : (typeof c.client === 'string' ? c.client : null);
-    const dest = idx.destinations?.[c.destination]?.name || c.destination;
-    const deadline = c.deadlineTurn ?? c.dueTurn ?? c.expiresTurn;
-    const mine = c.winner === st.playerId || c.awardedTo === st.playerId || ['won', 'awarded', 'accepted', 'late', 'delivered'].includes(c.status);
-    const hasMission = !!c.missionId || (st.missions || []).some((m) => m.contractId === c.id && m.status !== 'cancelled');
-    return card({
-      cls: ['contract-card', mine && 'mine'].filter(Boolean).join(' '), icon: client ? raw(emblemSVG(client, { size: 36 })) : icon('transferir', 18),
-      title: c.title || c.name || 'Contrato', subtitle: [clientName, typeSubLabel(c.type, c.sub), dest].filter(Boolean).join(' · '),
-      right: chip(contractStatus(c), mine ? 'good' : 'muted'),
-    },
-    c.description || c.body ? h('p', { class: 'ms-body' }, c.description || c.body) : null,
-    h('div', { class: 'chips' },
-      (c.winningPrice ?? c.reward ?? c.valueM) != null ? chip(fmtMoney(c.winningPrice ?? c.reward ?? c.valueM), 'good', { class: 'ms-date' }) : null,
-      c.playerBid && c.status === 'bidding' ? chip(`seu lance ${fmtMoney(c.playerBid.price)}`, 'accent') : null,
-      c.winner && !mine ? chip(`vencedor: ${st.actors?.[c.winner]?.short || c.winner}`, 'muted') : null,
-      c.payloadT ? chip(`${c.payloadT} t`, 'muted') : null,
-      deadline != null ? chip(`prazo ${fmtMonth(deadline, st.startYear)}`, deadline - st.turn < 8 ? 'warn' : 'muted') : null,
-      c.penalty ? chip(`multa ${fmtMoney(c.penalty)}`, 'bad') : null),
-    mine && hasMission && c.missionId ? button('Ver missão', () => openMission(store, c.missionId), { small: true, icon: 'seta', iconSize: 14 }) : null,
-    mine && !hasMission ? button('Montar missão do contrato', () => {
-      const type = missionTypeOf(c.type) || null;
-      const sub = c.sub || (c.type === 'lander' ? 'lander' : null);
-      const pk = c.payloadKind || payloadKindOf({ type, sub });
-      ui.draft = newDraft({ source: 'contract', contractId: c.id, type, sub, destination: c.destination || null, config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: c.payloadT ?? null },
-        payload: pk || c.targetAssetId ? { ...emptyPayload(pk), ...(c.payload || {}), targetAssetId: c.targetAssetId || c.payload?.targetAssetId || null } : null });
-      ui.subAuto = !sub; ui.destOpen = false;
-      // asset contracts still need the module/target choice on step 1
-      ui.step = type && c.destination && !needsTarget({ type, sub }) ? 2 : 1;
-      go('nova');
-    }, { kind: 'primary', small: true, icon: 'editar', iconSize: 16 }) : null);
-  };
-  if (open.length) out.append(sectionTitle('Em aberto'), ...open.map(row));
-  if (closed.length) out.append(sectionTitle('Encerrados'), ...closed.slice(-6).reverse().map(row));
+/** Missões › Contratos: the tender board of the drawer's Contratos screen, embedded (src/ui/contracts.js). */
+function contractsView(store, rerender) {
+  const out = h('div', { class: 'ms-contratos' });
+  renderBoard(out, store, rerender, { embedded: true });
   return out;
 }
 

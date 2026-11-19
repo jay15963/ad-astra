@@ -1,6 +1,6 @@
 // Missions module [missions]: the player's mission lifecycle.
 //   briefing → planning → scheduled → launch → (transit → arrival) → operations → done | cancelled
-// Also: contract offers + auctions against rival AIs, opportunity briefings, the 3-step builder
+// Also: the contract tender board (bids against rival AIs, tela Contratos), opportunity briefings, the 3-step builder
 // (query 'missions/draftOptions') and the impact of each result (prestige, "Os Primeiros", science,
 // support/reputation, news, signals). Pure JS, deterministic, JSON state. Player text in pt-BR.
 //
@@ -1406,7 +1406,7 @@ function costRangeText(state, data, draft, fallbackM) {
  * Missões v2: `sub` filters satellites/rovers by subtype; `cargoT` (> 0) needs a carrier that holds it (a cargo
  * lander on a surface); `noCraft` prices a station module that flies itself (payloadOverride = its mass).
  */
-function pickConfig(state, data, { type, sub = null, destination, crewed = type === 'crewed', extraPayload = 0, payloadOverride = null, clientPayload = false, scKinds = null, actorId = state.playerId, cargoT = 0, noCraft = false }) {
+function pickConfig(state, data, { type, sub = null, destination, crewed = type === 'crewed', extraPayload = 0, payloadOverride = null, clientPayload = false, scKinds = null, actorId = state.playerId, cargoT = 0, noCraft = false, onlyVehicleId = null }) {
   const dest = destDef(data, destination);
   if (!dest || !destOpenNow(state, dest)) return null;
   const surface = SURFACE_KINDS.includes(dest.kind);
@@ -1423,6 +1423,7 @@ function pickConfig(state, data, { type, sub = null, destination, crewed = type 
   for (const sc of scs.slice(0, 6)) {
     const payload = payloadOverride ?? ((sc?.massT ?? 1) + extraPayload);
     for (const v of vehicles) {
+      if (onlyVehicleId && v.id !== onlyVehicleId) continue;
       if (crewed && !crewRatedV(state, data, v)) continue;
       const cap = capacityTo(data, v.id, destination) * (1 + techBonus(state, 'payload')) * 0.9;
       if (cap < payload) continue;
@@ -1653,6 +1654,10 @@ function updateMission(state, data, m, patch = {}) {
       return { ok: false, error: 'O voo de teste leva lastro no próprio projeto: foguete, destino e tipo são fixos.' };
     }
   }
+  // a won contract fixes what is delivered and where (tender board): only the hardware, crew and plan change
+  if (m.contractId && (('type' in patch && patch.type !== m.type) || ('destination' in patch && patch.destination !== m.destination) || ('clientPayload' in patch && !!patch.clientPayload !== !!m.clientPayload))) {
+    return { ok: false, error: 'O contrato fixa a carga e o destino: escolha só o foguete, a nave e o plano.' };
+  }
   const merged = {
     ...m,
     ...Object.fromEntries(PATCH_KEYS.filter((k) => k in patch && k !== 'crew' && k !== 'config').map((k) => [k, patch[k]])),
@@ -1667,7 +1672,7 @@ function updateMission(state, data, m, patch = {}) {
   if (!('payload' in patch) && 'type' in patch && patch.type !== m.type) merged.payload = null;
   else if ('payload' in patch) merged.payload = { ...(m.payload || {}), ...(patch.payload || {}) };
   // a contract fixes what is delivered and where; a client payload is never something the player can ask for
-  if (m.contractId) { merged.payload = m.payload || null; merged.sub = m.sub || null; }
+  if (m.contractId) { merged.payload = m.payload || null; merged.sub = m.sub || null; if (m.config?.payloadT) merged.config.payloadT = m.config.payloadT; }
   if (merged.payload?.kind === 'client' && m.payload?.kind !== 'client') merged.payload = { ...merged.payload, kind: null };
   // taking the engineers' craft also takes the companion they planned with it (program landers)
   if (!('secondarySpacecraftId' in patch) && m.suggestion?.secondarySpacecraftId && merged.spacecraftId === m.suggestion.spacecraftId
@@ -2062,7 +2067,7 @@ function assetMatches(state, data, t, a, caps) {
  * Is a contract/opportunity row eligible now? (§2 rules 1–5) → {ok, why}. `asset`: the concrete asset of a target
  * row (rule 3); rows with a target and no asset are never eligible ("carga para a Lua" needs someone there first).
  */
-export function contractEligible(state, data, row, { asset = null } = {}) {
+export function contractEligible(state, data, row, { asset = null, world = false, colony = false } = {}) {
   if (!row) return { ok: false, why: 'row' };
   const n = row.needs || {};
   const y = yearAt(state);
@@ -2071,15 +2076,20 @@ export function contractEligible(state, data, row, { asset = null } = {}) {
   if (Number.isFinite(from) && y < from) return { ok: false, why: 'date' };
   if (Number.isFinite(until) && y > until) return { ok: false, why: 'date' };
   for (const id of n.firstsAny || []) if (!achievedAny(state, id)) return { ok: false, why: `firsts:${id}` };
-  const rr = rowResearch(state, data, row);
-  if (!rr.ok) return { ok: false, why: 'research', nodeId: rr.nodeId || null };
-  if (row.target) {
+  // the board's view (world: true) lists what anyone could fly; the player's research is the card's feasibility check
+  if (!world) {
+    const rr = rowResearch(state, data, row);
+    if (!rr.ok) return { ok: false, why: 'research', nodeId: rr.nodeId || null };
+  }
+  if (row.colony) {
+    if (!colony) return { ok: false, why: 'colony' };
+  } else if (row.target) {
     if (!asset) return { ok: false, why: 'target' };
     if (!assetMatches(state, data, row.target, asset, contractCaps(data))) return { ok: false, why: 'asset' };
     const owner = asset.ownerId;
     if (owner && owner !== state.playerId) {
-      if (Number.isFinite(n.relation?.minTrust) && trustBetween(state, state.playerId, owner) < n.relation.minTrust) return { ok: false, why: 'relation' };
-      if (Number.isFinite(n.noTensionAbove) && tensionBetween(state, state.playerId, owner) > n.noTensionAbove) return { ok: false, why: 'tension' };
+      if (!world && Number.isFinite(n.relation?.minTrust) && trustBetween(state, state.playerId, owner) < n.relation.minTrust) return { ok: false, why: 'relation' };
+      if (!world && Number.isFinite(n.noTensionAbove) && tensionBetween(state, state.playerId, owner) > n.noTensionAbove) return { ok: false, why: 'tension' };
       if (!state.actors?.[owner] || state.actors[owner].dead || state.actors[owner].status === 'gone') return { ok: false, why: 'owner' };
     }
   } else if (!rowDestinations(state, data, row).length) return { ok: false, why: 'destination' };
@@ -2103,17 +2113,21 @@ function rowDestinations(state, data, row) {
   });
 }
 
-/** Every eligible (row, asset|null, destination) a contract could be made of now, in a stable order. */
-export function contractCandidates(state, data) {
+/**
+ * Every eligible (row, asset|null, destination) a contract could be made of now, in a stable order. `world`: the
+ * board's view (no player research or relation check; colony rows are added by tenderCandidates).
+ */
+export function contractCandidates(state, data, { world = false } = {}) {
   const out = [];
   const listAssets = peerFn('infra', 'listAssets');
   for (const row of contractRows(data)) {
+    if (row.colony) continue;
     if (row.target) {
       if (!listAssets) continue;
       let list = [];
       try { list = listAssets(state, { kind: row.target.assetKind }) || []; } catch { list = []; }
-      for (const a of list) if (contractEligible(state, data, row, { asset: a }).ok) out.push({ row, asset: a, destination: a.site });
-    } else if (contractEligible(state, data, row).ok) {
+      for (const a of list) if (contractEligible(state, data, row, { asset: a, world }).ok) out.push({ row, asset: a, destination: a.site });
+    } else if (contractEligible(state, data, row, { world }).ok) {
       for (const id of rowDestinations(state, data, row)) out.push({ row, asset: null, destination: id });
     }
   }
@@ -2302,8 +2316,89 @@ function followUp(state, data, m, success) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Contracts and auctions
+// Contracts: the tender board (tela Contratos)
 // ---------------------------------------------------------------------------------------------
+// Clients publish tenders on a public board (state.contracts, status 'open'): a payload of some kind and mass to a
+// destination, a reference price (what the client is ready to pay), the date bidding closes and a launch deadline.
+// Every agency that can fly the job may bid a price between 60% and 140% of the reference; when bidding closes one
+// winner is drawn with the odds the board shows (softmax of a score: price against the reference, reputation,
+// reliability of the rocket the bidder plans to use and its record of delivered/failed contracts). The reference
+// price is always well above the typical cost of flying the job, so even a low winning bid pays more than it costs.
+// The player bids from the Contratos screen (actions contract/bid, contract/withdraw), never from a card; rival
+// bids are rolled when the tender opens (cost of their cheapest capable hardware × need for work). A tender won by
+// a rival is flown off-screen (a delivery date inside the deadline, one roll on the rocket's reliability, news).
+// Tunables: data/core/contracts.json "board" (defaults below). Slice state.tenders = {next, record: {actorId: {won,
+// ok, bad}}}: when the next tender may open and each agency's contract record.
+
+export const BOARD_DEFAULTS = Object.freeze({
+  openMax: 5, // open tenders on the board at once
+  gapWeeks: [3, 7], // weeks between two new tenders
+  startBurst: 3, // tenders that open together on a new board
+  bidWeeks: [10, 24], // bidding window (never closes before the player's next stop)
+  bidRange: [0.6, 1.4], // allowed bid / reference price
+  refMult: [1.8, 2.2], // reference price / typical cost of flying the job
+  advance: 0.3, // share paid on signing (the rest on delivery)
+  finePct: 0.25, // fine on a missed deadline or a failure with no time to fly again (share of the price)
+  lateCut: 0.3, // pay cut of a late delivery
+  graceWeeks: 13, // a late contract is called off this long after the deadline (× step scale)
+  rivalsMax: 4,
+  sizes: { small: { w: 3, f: [0.08, 0.35] }, medium: { w: 2, f: [0.35, 0.65] }, large: { w: 1, f: [0.65, 0.95] } },
+  chance: { price: 60, rep: 0.35, rel: 40, record: 2, recordMin: -12, recordMax: 10, temp: 10 },
+  rival: { margin: 1.45, needSpan: 0.45, aggression: 0.2, jitter: 0.05, bidP: 0.6, needP: 0.35 },
+  rep: { win: 1, deliver: 2, late: -3, default: -8, fail: -5, retry: -2, rivalFail: -4 },
+});
+const TUNED = new WeakMap();
+/** Board tunables: BOARD_DEFAULTS merged with data.contracts.board (one level deep). */
+export function boardTuning(data) {
+  const src = data?.contracts?.board;
+  if (!src || typeof src !== 'object') return BOARD_DEFAULTS;
+  let t = TUNED.get(src);
+  if (!t) {
+    t = { ...BOARD_DEFAULTS };
+    for (const [k, v] of Object.entries(src)) {
+      if (k.startsWith('_')) continue;
+      t[k] = v && typeof v === 'object' && !Array.isArray(v) && BOARD_DEFAULTS[k] && typeof BOARD_DEFAULTS[k] === 'object' && !Array.isArray(BOARD_DEFAULTS[k]) ? { ...BOARD_DEFAULTS[k], ...v } : v;
+    }
+    TUNED.set(src, t);
+  }
+  return t;
+}
+
+const OPEN_TENDER = ['open', 'bidding'];
+const isOpenTender = (c) => OPEN_TENDER.includes(c?.status);
+const PLAYER_CONTRACT = ['awarded', 'late'];
+/** Long steps (eras 5–7) stretch deadlines: a 13-week step gets 3.25× the weeks, capped at 6×. */
+const stepScale = (state) => clamp((Number(state?.clock?.stepWeeks) || 1) / 4, 1, 6);
+const roundT = (t) => (t < 1 ? Math.round(t * 100) / 100 : round1(t));
+/** "350 kg" / "2,5 t" */
+export const tonsText = (t) => (Number(t) < 1 ? `${Math.round((Number(t) || 0) * 1000)} kg` : `${fmtTons(t)} t`);
+export const SIZE_LABELS = { small: 'Pequeno', medium: 'Médio', large: 'Grande' };
+export const CLIENT_KIND_LABELS = { governo: 'Governo', empresa: 'Empresa', instituto: 'Instituto científico', colonia: 'Colônia', agencia: 'Agência espacial' };
+export const SUGGEST_BID = 'Foguete da proposta';
+const toWhere = (dest, id) => dest?.toLabel || (dest?.name ? `a ${dest.name}` : id);
+
+function tendersSlice(state) {
+  const t = state.tenders && typeof state.tenders === 'object' ? state.tenders : (state.tenders = {});
+  if (!Number.isFinite(t.next)) t.next = null;
+  if (!t.record || typeof t.record !== 'object') t.record = {};
+  return t;
+}
+/** An agency's contract record: {won, ok, bad} (bad = failed or defaulted). */
+export function recordOf(state, id) {
+  const r = state?.tenders?.record?.[id];
+  return { won: r?.won || 0, ok: r?.ok || 0, bad: r?.bad || 0 };
+}
+function recordBump(state, id, key) {
+  if (!id) return;
+  const rec = tendersSlice(state).record;
+  const r = rec[id] || (rec[id] = { won: 0, ok: 0, bad: 0 });
+  r[key] = (r[key] || 0) + 1;
+}
+function recordBonus(state, data, id) {
+  const T = boardTuning(data).chance;
+  const r = recordOf(state, id);
+  return clamp(T.record * (r.ok - 2 * r.bad), T.recordMin, T.recordMax);
+}
 
 /** What a contract asks the carrier to hold (t): its tonnes, a module, a repair kit; 0 for crew and client payloads. */
 function contractCargoT(data, c) {
@@ -2316,15 +2411,33 @@ function contractCargoT(data, c) {
   }
 }
 /** A contract as a mission spec for pickConfig (§1.4: carrier, module that flies itself, client payload). */
-function contractSpec(state, data, c, actorId = state.playerId) {
+function contractSpec(state, data, c, actorId = state.playerId, onlyVehicleId = null) {
   const type = missionTypeOf(c.type, c.sub).type;
   const mod = c.payloadKind === 'station_module' ? moduleDef(data, c.moduleId) : null;
   const cargoT = contractCargoT(data, c);
   return {
     type, sub: c.sub || null, destination: c.destination, crewed: type === 'crewed', clientPayload: !!c.clientPayload, actorId,
     noCraft: !!mod, cargoT, extraPayload: c.clientPayload ? 0 : cargoT,
-    payloadOverride: c.clientPayload ? c.payloadT : mod ? mod.massT || 1 : null,
+    payloadOverride: c.clientPayload ? c.payloadT : mod ? mod.massT || 1 : null, onlyVehicleId,
   };
+}
+
+/** Goods the job buys besides the flight: a module, tonnes of supplies or propellant, a repair kit (US$ mi). */
+function contractGoodsM(state, data, c) {
+  const mod = c.moduleId ? moduleDef(data, c.moduleId) : null;
+  if ((c.payloadKind === 'station_module' || c.payloadKind === 'base_module') && mod) return Number(mod.costM) || 0;
+  if (c.payloadKind === 'supply' || c.payloadKind === 'propellant') return supplyCostPerT(state, data) * (c.payloadT || 0) * (c.payloadKind === 'propellant' ? 0.5 : 1);
+  if (c.payloadKind === 'servicing') return supplyCostPerT(state, data) * 4;
+  return 0;
+}
+/** Cost of flying the job with a config (rocket + craft from pickConfig): hardware, operations, goods, crew. */
+function contractCostOf(state, data, c, cfg) {
+  if (!cfg) return null;
+  const dest = destDef(data, c.destination);
+  const ops = dest?.opsCostM ?? OPS_COST_BY_KEY[dest?.capacityKey] ?? 10;
+  const crewed = missionTypeOf(c.type).type === 'crewed';
+  const seats = crewed ? spacecraftDef(data, cfg.spacecraftId, state)?.crew || 2 : 0;
+  return round1((cfg.cost || 0) + ops + contractGoodsM(state, data, c) + seats * CREW_COST_PER_PERSON);
 }
 
 /** Rough market cost of fulfilling a contract (cheapest capable hardware across the catalog, any operator). */
@@ -2337,12 +2450,9 @@ function marketCost(state, data, c) {
   const vehicles = (data.vehicles?.vehicles || []).filter((v) => availableByDate(state, v) && (!crewed || v.crewRated));
   let scCost = 0;
   let need = c.payloadT || 0;
-  let goods = 0;
   const mod = c.moduleId ? moduleDef(data, c.moduleId) : null;
-  if (c.payloadKind === 'station_module' && mod) {
-    need = mod.massT || 1;
-    goods = Number(mod.costM) || 0;
-  } else if (!c.clientPayload) {
+  if (c.payloadKind === 'station_module' && mod) need = mod.massT || 1;
+  else if (!c.clientPayload) {
     const cargoT = contractCargoT(data, c);
     const surface = SURFACE_KINDS.includes(dest.kind);
     const scs = (data.spacecraft?.spacecraft || []).filter((s) => availableByDate(state, s) && scKindsFor(data, type).includes(s.kind) && scOkForDest(s, c.destination)
@@ -2351,114 +2461,552 @@ function marketCost(state, data, c) {
     const cheapest = scs.reduce((a, b) => ((a.costM || 0) <= (b.costM || 0) ? a : b));
     scCost = cheapest.costM || 0;
     need = (cheapest.massT || 0) + cargoT;
-    if (c.payloadKind === 'base_module' && mod) goods = Number(mod.costM) || 0;
-    if (c.payloadKind === 'supply' || c.payloadKind === 'propellant') goods = supplyCostPerT(state, data) * (c.payloadT || 0) * (c.payloadKind === 'propellant' ? 0.5 : 1);
   }
   const caps = vehicles.filter((v) => capacityTo(data, v.id, c.destination) * 0.9 >= need);
   if (!caps.length) return null;
   const vc = Math.min(...caps.map((v) => v.costM || 0));
-  return vc + scCost + ops + goods + (crewed ? 2 * CREW_COST_PER_PERSON : 0);
+  return vc + scCost + ops + contractGoodsM(state, data, c) + (crewed ? 2 * CREW_COST_PER_PERSON : 0);
 }
 
-/** Can this actor fly the contract? Returns best vehicle reliability or 0. */
-function actorCapability(state, data, actorId, c) {
-  const cfg = pickConfig(state, data, contractSpec(state, data, c, actorId));
-  if (!cfg) return 0;
-  const crewed = missionTypeOf(c.type).type === 'crewed';
+/** Most the world's rockets lift to a destination today (any live agency, the player's designs included), t. */
+function worldLift(state, data, destId) {
   let best = 0;
-  for (const v of vehiclesFor(state, data, actorId)) {
-    if (crewed && !crewRatedV(state, data, v)) continue;
-    if (capacityTo(data, v.id, c.destination) * 0.9 < cfg.payloadT) continue;
-    best = Math.max(best, vehicleReliability(state, data, v.id).mean);
+  for (const id of liveActorIds(state, { tier: 'core' })) {
+    for (const v of vehiclesFor(state, data, id)) best = Math.max(best, capacityTo(data, v.id, destId) * 0.9);
   }
   return best;
 }
 
-function bidScore(c, price, reputation, reliability, noise) {
-  return 60 * (c.valueM / Math.max(1, price)) + 0.35 * (reputation ?? 50) + 40 * (reliability - 0.8) + noise;
-}
-
-const BID_LEVELS = { bid_low: 0.85, bid_mid: 1.0, bid_high: 1.15 };
-const BID_LABELS = { bid_low: 'Preço baixo', bid_mid: 'Preço médio', bid_high: 'Preço alto' };
-
-/** Monte-Carlo estimate of the player's win chance per bid level (shown in the card: visible probabilities). */
-function winChances(state, c, playerRel) {
-  const rng = rngFor(state.seed, 'missions', 'contractEst', c.id);
-  const rep = state.actors?.[state.playerId]?.reputation ?? 50;
-  const out = {};
-  const N = 300;
-  const wins = { bid_low: 0, bid_mid: 0, bid_high: 0 };
-  for (let i = 0; i < N; i++) {
-    let bestRival = -Infinity;
-    for (const r of c.rivals) {
-      const a = state.actors?.[r.actorId];
-      const price = c.valueM * (0.8 + rng.next() * 0.38 - 0.12 * (a?.ai?.aggression ?? 0.5));
-      bestRival = Math.max(bestRival, bidScore(c, price, a?.reputation, r.reliability, rng.range(-5, 5)));
-    }
-    const myNoise = rng.range(-5, 5);
-    for (const [k, f] of Object.entries(BID_LEVELS)) {
-      if (bidScore(c, c.valueM * f, rep, playerRel, myNoise) > bestRival) wins[k]++;
-    }
+/** Every agency able to fly the job now: [{actorId, cfg, rel, costM}] (the client never bids on its own job). */
+function capableField(state, data, c) {
+  const out = [];
+  for (const id of liveActorIds(state, { tier: 'core' })) {
+    const a = state.actors?.[id];
+    if (!a || a.dead || a.status === 'gone' || id === c.clientActorId) continue;
+    if (id === state.playerId && !rowResearch(state, data, contractRowOf(data, c) || c).ok) continue;
+    const cfg = pickConfig(state, data, contractSpec(state, data, c, id));
+    if (!cfg) continue;
+    out.push({ actorId: id, cfg, rel: Number.isFinite(cfg.rel) ? cfg.rel : 0.85, costM: contractCostOf(state, data, c, cfg) });
   }
-  for (const k of Object.keys(wins)) out[k] = wins[k] / N;
   return out;
 }
 
-const fillAsset = (t, vars) => String(t || '').replace(/\{(asset|owner)\}/g, (_, k) => vars[k] ?? '');
+const contractRowOf = (data, c) => contractRows(data).find((r) => (r.kind || r.id) === c?.kind) || null;
 
-/**
- * A new contract from the eligible candidates (§2): rows without a target at an open destination, rows with a
- * target once per concrete asset (its site, its owner as client). null when nothing is eligible.
- */
-function makeContract(state, data, rng, stepEnd = state.turn + 1) {
-  const cands = contractCandidates(state, data);
-  if (!cands.length) return null;
-  // a row's weight is shared by its candidates (ten stations do not make supply contracts ten times likelier)
-  const perRow = new Map();
-  for (const x of cands) perRow.set(x.row, (perRow.get(x.row) || 0) + 1);
-  const pick = rng.weighted(cands.map((x) => ({ ...x, weight: (Number(x.row.weight) || 1) / perRow.get(x.row) })));
-  if (!pick) return null;
-  const { row: k, asset } = pick;
+/** A rival's sealed bid: its cost × (margin, less when it needs the work or bids aggressively), inside the range. */
+function rivalPrice(c, a, costM, rng, T) {
+  const budgetM = Math.max(1, Number(a?.budget) || 100);
+  const need = clamp(1 - (Number(a?.cash) || 0) / (budgetM * 0.5), 0, 1);
+  const r = T.rival;
+  const mult = r.margin + r.needSpan * (1 - need) - r.aggression * (a?.ai?.aggression ?? 0.5);
+  const raw = (costM || c.costM || 1) * mult * rng.range(1 - r.jitter, 1 + r.jitter);
+  return { price: Math.round(clamp(raw, c.valueM * T.bidRange[0], c.valueM * T.bidRange[1])), need };
+}
+
+/** Settled colonies (era 5+) as clients: pseudo-assets {id, name, ownerId, site, kind: 'colony'}. */
+function colonyClients(state, data) {
+  const list = Array.isArray(state.colonies?.list) ? state.colonies.list : [];
+  const sites = Array.isArray(data?.colonies?.sites) ? data.colonies.sites : [];
+  const out = [];
+  for (const col of list) {
+    if (!col || !['active', 'allied', 'independent'].includes(col.status)) continue;
+    if (col.ownerId === state.playerId && col.status === 'active') continue; // the agency's own colony does not tender
+    const site = sites.find((s) => s.id === col.siteId);
+    const destId = site?.destination || null;
+    if (!destId || !destDef(data, destId)) continue;
+    out.push({ id: col.id, name: col.name || site.name || col.siteId, ownerId: col.status === 'independent' ? null : col.ownerId || null, site: destId, kind: 'colony' });
+  }
+  return out;
+}
+
+/** Eligible (row, client asset|colony|null, destination) for the board, the world's view (no player research). */
+function tenderCandidates(state, data) {
+  const out = contractCandidates(state, data, { world: true });
+  const caps = contractCaps(data);
+  const cols = colonyClients(state, data);
+  for (const row of contractRows(data)) {
+    if (!row.colony) continue;
+    if (!contractEligible(state, data, row, { world: true, colony: true }).ok) continue;
+    for (const col of cols) {
+      if ((state.contracts || []).some((c) => c.colonyId === col.id && state.turn - (c.createdTurn ?? -999) < caps.perAssetWeeks)) continue;
+      const dest = destDef(data, col.site);
+      if (!destOpenNow(state, dest) || !destOkForType(dest, missionTypeOf(row.type).type)) continue;
+      out.push({ row, asset: col, destination: col.site });
+    }
+  }
+  return out;
+}
+
+/** Sizes to try for a tender: the drawn one first, then the smaller ones (a job nobody can fly shrinks). */
+function sizeOrder(rng, T) {
+  const ids = Object.keys(T.sizes);
+  const first = rng.weighted(ids, (id) => Number(T.sizes[id]?.w) || 0) || ids[0];
+  return [first, ...ids.slice(0, ids.indexOf(first)).reverse()];
+}
+
+/** A tender from a candidate, or null when nobody in the world can fly it (at any size) or the dates do not fit. */
+function buildTender(state, data, rng, pick, stepEnd, T) {
+  const { row: k, asset, destination } = pick;
+  const pid = state.playerId;
   const type = missionTypeOf(k.type, k.sub);
-  const sub = type.sub || resolveSub(state, data, { type: type.type, destination: pick.destination, clientPayload: !!k.clientPayload });
+  const sub = type.sub || resolveSub(state, data, { type: type.type, destination, clientPayload: !!k.clientPayload });
   const payloadKind = payloadKindOf(data, { type: type.type, clientPayload: !!k.clientPayload }, sub);
-  const range = Array.isArray(k.payload) ? k.payload : [0, 0];
-  let payloadT = round1(rng.range(range[0], range[1]));
   let moduleId = null;
+  let fixedT = null;
   if (payloadKind === 'station_module' || payloadKind === 'base_module') {
+    if (asset?.kind === 'colony') return null;
     moduleId = nextModuleFor(data, asset, payloadKind === 'station_module' ? 'station' : 'base');
     if (!moduleId) return null;
-    payloadT = round1(moduleDef(data, moduleId)?.massT || 0);
-  } else if (payloadKind === 'servicing') payloadT = SERVICING_KIT_T;
-  const ownerName = asset ? actorName(state, asset.ownerId) : '';
-  const vars = { asset: asset?.name || destDef(data, pick.destination)?.name || '', owner: ownerName };
-  const c = {
-    id: nextId(state, 'ctr'),
-    kind: k.kind || k.id, title: fillAsset(k.title, vars).slice(0, 80), client: fillAsset(rng.pick(k.clients || ['Cliente']), vars), body: fillAsset(k.body, vars),
-    type: type.type, sub, payloadKind, destination: pick.destination, payloadT, clientPayload: !!k.clientPayload,
-    ...(moduleId ? { moduleId } : {}), ...(asset ? { targetAssetId: asset.id, clientActorId: asset.ownerId } : {}),
-    valueM: 0,
-    // bids stay open 4 weeks, and never close before the player has seen the card (a 13-week step creates offers in
-    // its weekly substeps: closing them inside the same step showed cards for contracts already awarded)
-    createdTurn: state.turn, closeTurn: Math.max(state.turn + 4, stepEnd), deadlineTurn: 0,
-    status: 'open', rivals: [], playerBid: null, winner: null, winningPrice: null, missionId: null,
-    advancePaidM: 0, late: false,
+    fixedT = round1(moduleDef(data, moduleId)?.massT || 0);
+  } else if (payloadKind === 'servicing') fixedT = SERVICING_KIT_T;
+  else if (type.type === 'crewed' || !(Array.isArray(k.payload) && k.payload[1] > 0)) fixedT = 0;
+  const colony = asset?.kind === 'colony' ? asset : null;
+  const ownerName = colony ? colony.name : asset ? actorName(state, asset.ownerId) : '';
+  const vars = { asset: asset?.name || destDef(data, destination)?.name || '', owner: ownerName };
+  const ownerKind = asset?.ownerId ? state.actors?.[asset.ownerId]?.kind : null;
+  const base = {
+    id: null, kind: k.kind || k.id, title: fillAsset(k.title, vars).slice(0, 80), client: fillAsset(rng.pick(k.clients || ['Cliente']), vars), body: fillAsset(k.body, vars),
+    clientKind: colony ? 'colonia' : asset ? (ownerKind === 'company' ? 'empresa' : 'agencia') : k.clientKind || 'empresa',
+    type: type.type, sub, payloadKind, destination, payloadT: 0, clientPayload: !!k.clientPayload, size: k.size || 'medium',
+    ...(moduleId ? { moduleId } : {}), ...(asset && !colony ? { targetAssetId: asset.id, clientActorId: asset.ownerId } : {}),
+    ...(colony ? { colonyId: colony.id, ...(colony.ownerId ? { clientActorId: colony.ownerId } : {}) } : {}),
+    valueM: 0, costM: 0, createdTurn: state.turn, closeTurn: 0, deadlineTurn: 0,
+    status: 'open', rivals: [], playerBid: null, winner: null, winningPrice: null, missionId: null, advancePaidM: 0, late: false,
   };
-  const base = marketCost(state, data, c);
-  if (!base) return null;
-  const vm = Array.isArray(k.valueMult) ? k.valueMult : [1.25, 1.6];
-  c.valueM = Math.round(base * rng.range(vm[0], vm[1]));
-  const dl = Array.isArray(k.deadline) ? k.deadline : [30, 56];
-  c.deadlineTurn = Math.min(c.closeTurn - 4 + rng.int(dl[0], dl[1]), state.endTurn);
-  // rival bidders: capable actors, hidden bids rolled now (deterministic); the asset's owner is the client, not a bidder
-  const bidRng = rngFor(state.seed, 'missions', 'contractBids', c.id);
-  const pool = liveActorIds(state, { tier: 'core' }).map((id) => state.actors[id]).filter((a) => a && a.id !== state.playerId && a.id !== c.clientActorId);
-  const capable = pool.map((a) => ({ a, rel: actorCapability(state, data, a.id, c) })).filter((x) => x.rel > 0);
-  for (const { a, rel } of bidRng.shuffle(capable).slice(0, 3)) {
-    const price = Math.round(c.valueM * (0.8 + bidRng.next() * 0.38 - 0.12 * (a.ai?.aggression ?? 0.5)));
-    c.rivals.push({ actorId: a.id, price, reliability: rel, noise: bidRng.range(-5, 5) });
+  const range = Array.isArray(k.payload) ? k.payload : [0, 0];
+  const lift = fixedT == null && k.clientPayload ? worldLift(state, data, destination) : Infinity;
+  for (const size of fixedT == null ? sizeOrder(rng, T) : [base.size]) {
+    let payloadT = fixedT;
+    if (payloadT == null) {
+      const lo = range[0];
+      const hi = Math.min(range[1], lift);
+      if (!(hi >= lo)) return null;
+      const f = T.sizes[size]?.f || [0.3, 0.6];
+      payloadT = roundT(lo + rng.range(f[0], f[1]) * (hi - lo));
+    }
+    const c = { ...base, size, payloadT };
+    const field = capableField(state, data, c);
+    if (!field.length) continue;
+    // reference price: the typical cost of flying it (the mean of the capable agencies, never below the open market)
+    const typical = field.reduce((s, x) => s + (x.costM || 0), 0) / field.length;
+    c.costM = round1(Math.max(typical, marketCost(state, data, c) || 0));
+    if (!(c.costM > 0)) return null;
+    c.valueM = Math.max(2, Math.round(c.costM * rng.range(T.refMult[0], T.refMult[1]) * (Number(k.refMult) || 1)));
+    c.closeTurn = Math.max(state.turn + rng.int(T.bidWeeks[0], T.bidWeeks[1]), stepEnd + 1);
+    const dl = Array.isArray(k.deadline) ? k.deadline : [30, 56];
+    let weeks = Math.round(rng.int(dl[0], dl[1]) * stepScale(state));
+    // a destination with launch windows: the first window after the preparation must fit before the deadline
+    const w = windowFor(state, data, destination, c.closeTurn + (LEAD_BY_SOURCE.contract || 4));
+    if (Number.isFinite(w?.openTurn)) weeks = Math.max(weeks, w.openTurn - c.closeTurn + 8);
+    c.deadlineTurn = Math.min(c.closeTurn + weeks, state.endTurn);
+    if (c.deadlineTurn - c.closeTurn < 8) return null;
+    // sealed rival bids (deterministic per tender); each capable agency bids unless it has no need for the work
+    const bidRng = rngFor(state.seed, 'tenders', 'bids', state.turn, c.title, c.destination);
+    const rivals = bidRng.shuffle(field.filter((x) => x.actorId !== pid));
+    for (const x of rivals) {
+      if (c.rivals.length >= T.rivalsMax) break;
+      const a = state.actors[x.actorId];
+      const { price, need } = rivalPrice(c, a, x.costM, bidRng, T);
+      if (c.rivals.length && !bidRng.chance(T.rival.bidP + T.rival.needP * need)) continue;
+      c.rivals.push({ actorId: x.actorId, price, reliability: round1(x.rel * 1000) / 1000, vehicleId: x.cfg.vehicleId, costM: x.costM });
+    }
+    c.feasAtCreate = field.some((x) => x.actorId === pid);
+    c.id = nextId(state, 'ctr');
+    return c;
   }
-  return c;
+  return null;
+}
+
+/** A new tender for the board, or null (nothing eligible, or nobody can fly what is). */
+function makeTender(state, data, rng, stepEnd) {
+  const T = boardTuning(data);
+  const open = (state.contracts || []).filter(isOpenTender);
+  const same = (x, c) => c.kind === (x.row.kind || x.row.id) && c.destination === x.destination && (c.targetAssetId || c.colonyId || null) === (x.asset?.id || null);
+  let cands = tenderCandidates(state, data).filter((x) => !open.some((c) => same(x, c)));
+  for (let attempt = 0; attempt < 4 && cands.length; attempt++) {
+    // a row's weight is shared by its candidates (ten stations do not make supply contracts ten times likelier)
+    const perRow = new Map();
+    for (const x of cands) perRow.set(x.row, (perRow.get(x.row) || 0) + 1);
+    const pick = rng.weighted(cands, (x) => (Number(x.row.weight) || 1) / perRow.get(x.row));
+    if (!pick) return null;
+    const c = buildTender(state, data, rng, pick, stepEnd, T);
+    if (c) return c;
+    cands = cands.filter((x) => x !== pick);
+  }
+  return null;
+}
+
+/** Board refresh: new tenders every few weeks while there is room (no card: the board is a screen). */
+function tenderBoard(state, data, ctx) {
+  const T = boardTuning(data);
+  const tn = tendersSlice(state);
+  if (Number.isFinite(state.endTurn) && state.turn > state.endTurn - 20) return;
+  if (tn.next != null && state.turn < tn.next) return;
+  const stepEnd = Number.isFinite(ctx?.stepEnd) ? ctx.stepEnd : state.turn + 1;
+  const burst = tn.next == null ? Math.max(1, T.startBurst) : 1;
+  for (let i = 0; i < burst; i++) {
+    if ((state.contracts || []).filter(isOpenTender).length >= T.openMax) break;
+    const c = makeTender(state, data, ctx.rng(`tender:${i}`), stepEnd);
+    if (!c) break;
+    state.contracts.push(c);
+    stat(state, 'contractsOffered');
+  }
+  const gap = Array.isArray(T.gapWeeks) ? T.gapWeeks : [3, 7];
+  tn.next = state.turn + ctx.rng('tender:gap').int(gap[0], gap[1]);
+}
+
+/** Old saves: the bid cards of the push-offer system are gone (their contracts stay on the board as tenders). */
+function retireOfferCards(state) {
+  if (!(state.decisions || []).some((d) => d.kind === 'contract/offer')) return;
+  state.decisions = state.decisions.filter((d) => d.kind !== 'contract/offer');
+}
+
+// --- the player's side: feasibility, rockets, odds ---
+
+/** The player's config for a tender with a given rocket (null = the engineers' pick), or null. */
+function playerConfig(state, data, c, vehicleId = null) {
+  return pickConfig(state, data, contractSpec(state, data, c, state.playerId, vehicleId || null));
+}
+
+/** A contract as the draft of its mission (used for the bill, the research gate and the launch date). */
+function contractDraft(state, data, c, cfg = null) {
+  const type = missionTypeOf(c.type, c.sub);
+  const crewed = type.type === 'crewed';
+  const sc = spacecraftDef(data, cfg?.spacecraftId, state);
+  const payload = contractPayload(data, c);
+  // v0.8 contracts (and client payloads) carry the total mass in config.payloadT; v2 cargo carries its tonnes in payload
+  const legacyMass = c.clientPayload || !c.payloadKind;
+  return {
+    name: c.title, source: 'contract', contractId: c.id,
+    type: type.type, sub: c.sub || type.sub || null, ...(payload ? { payload } : {}), destination: c.destination,
+    vehicleId: cfg?.vehicleId || null, spacecraftId: cfg?.spacecraftId || null, clientPayload: !!c.clientPayload, crewed,
+    crew: autoCrew(state, data, crewed ? sc?.crew || 0 : 0),
+    config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: legacyMass ? cfg?.payloadT ?? c.payloadT : null },
+    deadlineTurn: c.deadlineTurn,
+  };
+}
+
+/** The bill of the job for the player with a config (computeCost, crew seats included). */
+function playerCostOf(state, data, c, cfg) {
+  if (!cfg) return null;
+  const d = normalizeDraft(contractDraft(state, data, c, cfg));
+  let total = computeCost(state, data, d).total;
+  if (d.crewed && !crewIdsOf(d).length) total += (spacecraftDef(data, cfg.spacecraftId, state)?.crew || 2) * CREW_COST_PER_PERSON;
+  return round1(total);
+}
+
+/** Every rocket of the player that flies the job: [{vehicleId, name, rel, capT, costM, cfg}] (cheapest score first). */
+function playerVehicleOptions(state, data, c) {
+  const out = [];
+  const crewed = missionTypeOf(c.type).type === 'crewed';
+  for (const v of vehiclesFor(state, data, state.playerId)) {
+    if (crewed && !crewRatedV(state, data, v)) continue;
+    const cfg = playerConfig(state, data, c, v.id);
+    if (!cfg) continue;
+    out.push({ vehicleId: v.id, name: v.name || v.id, scName: cfg.spacecraftId ? spacecraftDef(data, cfg.spacecraftId, state)?.name || null : null, rel: cfg.rel, capT: round1(capacityTo(data, v.id, c.destination) * (1 + techBonus(state, 'payload')) * 0.9), needT: roundT(cfg.payloadT || 0), costM: playerCostOf(state, data, c, cfg), cfg, score: cfg.score });
+  }
+  return out.sort((a, b) => a.score - b.score || a.costM - b.costM);
+}
+
+/** Why the player has no rocket/craft for a job, with what would open one (research, market, Hangar). */
+function hardwareWhy(state, data, c) {
+  const pid = state.playerId;
+  const type = missionTypeOf(c.type).type;
+  const crewed = type === 'crewed';
+  const dest = destDef(data, c.destination);
+  const to = toWhere(dest, c.destination);
+  const spec = contractSpec(state, data, c, pid);
+  let need = spec.payloadOverride ?? null;
+  if (need == null) {
+    const surface = SURFACE_KINDS.includes(dest?.kind);
+    const fits = (s) => scOkForType(s, type, crewed, data) && scOkForDest(s, c.destination) && (!c.sub || scOkForSub(data, s, type, c.sub))
+      && (spec.cargoT <= 0 || (cargoCapacityOf(data, s) + 1e-9 >= spec.cargoT && (!surface || s.kind === 'lander' || (s.kind === 'cargo' && (s.destinations || []).includes(c.destination)))));
+    const mine = spacecraftFor(state, data, pid).filter(fits);
+    if (!mine.length) {
+      let locked = null;
+      try { locked = (fn(calendar, 'availableSpacecraft')?.(state, data, pid, { withLocked: true }) || []).find((x) => !x.ok && fits(x.item)) || null; } catch { locked = null; }
+      const what = spec.cargoT > 0 ? `leva ${tonsText(spec.cargoT)} de carga ${to}` : crewed ? `leva tripulação ${to}` : `serve para esta missão ${to}`;
+      return `Nenhuma nave sua ${what}${locked?.reason ? `; ${lowerFirst(locked.reason)}` : ''}.`;
+    }
+    need = Math.min(...mine.map((s) => s.massT ?? 1)) + spec.extraPayload;
+  }
+  const bonus = 1 + techBonus(state, 'payload');
+  const vs = vehiclesFor(state, data, pid).filter((v) => !crewed || crewRatedV(state, data, v));
+  const maxLift = vs.reduce((m, v) => Math.max(m, capacityTo(data, v.id, c.destination) * bonus * 0.9), 0);
+  let text = `Nenhum foguete seu${crewed ? ' certificado para tripulação' : ''} leva ${tonsText(need)} ${to}${maxLift > 0 ? ` (o maior leva ${tonsText(maxLift)})` : ''}`;
+  let locked = [];
+  try { locked = (fn(calendar, 'availableVehicles')?.(state, data, pid, { withLocked: true, crewed }) || []).filter((x) => !x.ok && capacityTo(data, x.item.id, c.destination) * bonus * 0.9 >= need); } catch { locked = []; }
+  const research = locked.find((x) => x.nodeId && /^Pesquise /.test(x.reason || ''));
+  // a rocket of another operator that a launch agreement could open (not one kept for its own use, embargoed or blocked)
+  const market = locked.find((x) => !x.nodeId && x.item.access !== 'own' && !/Embargo|tensão|Sonda única/i.test(x.reason || ''));
+  const hints = [];
+  if (research) hints.push(lowerFirst(research.reason));
+  if (market) hints.push(`contrate um lançador (${market.item.name}${market.item.operator ? `, de ${actorName(state, market.item.operator)}` : ''})`);
+  if (!hints.length) hints.push('projete um foguete maior no Hangar');
+  text += `; ${hints.join(' ou ')}.`;
+  return text;
+}
+const fillAsset = (t, vars) => String(t || '').replace(/\{(asset|owner)\}/g, (_, k) => vars[k] ?? '');
+const lowerFirst = (s) => (s ? String(s).charAt(0).toLowerCase() + String(s).slice(1) : '');
+const upperFirst = (s) => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '');
+const relText = (p) => { const x = (Number(p) || 0) * 100; return x >= 95 ? `${(Math.floor(x * 10) / 10).toFixed(1).replace('.', ',')}%` : `${Math.round(x)}%`; };
+
+/** Bids of the player still waiting (they take an own-mission slot of the year if they win). */
+const pendingBids = (state, exceptId = null) => (state.contracts || []).filter((x) => x.id !== exceptId && x.status === 'bidding' && x.playerBid).length;
+
+/**
+ * "Você consegue entregar?" → {level: 'ok'|'warn'|'bad', text, reasons: [{level, text}], vehicles, vehicleId, rel,
+ * costM, earliestTurn}. Research, the client's trust, a rocket (and craft) that carries it, time before the
+ * deadline, the investors' agenda; warnings for a shaky rocket, a cost that eats the margin and a short cash.
+ */
+export function tenderFeasibility(state, data, c, vehicleId = null) {
+  syncDesignCatalog(state, data);
+  const pid = state.playerId;
+  const T = boardTuning(data);
+  const reasons = [];
+  const bad = (text) => reasons.push({ level: 'bad', text });
+  const warn = (text) => reasons.push({ level: 'warn', text });
+  const dest = destDef(data, c.destination);
+  const row = contractRowOf(data, c);
+  // research: the same gate the mission will meet (type, subtype, payload, docking), plus the row's own keys
+  const d = normalizeDraft(contractDraft(state, data, c, null));
+  const sub = resolveSub(state, data, d);
+  const target = c.targetAssetId ? assetOf(state, c.targetAssetId) : null;
+  const mg = peerFn('gating', 'missionGate');
+  let g = null;
+  try { g = mg ? mg(state, data, gateSpecOf(state, data, d, sub, payloadKindOf(data, d, sub), target, dest), pid) : null; } catch { g = null; }
+  if (g && g.ok === false) bad(g.reason || 'Falta pesquisa para esta missão.');
+  else {
+    for (const k of row?.needs?.playerKeys || []) {
+      if (playerHolds(state, data, k)) continue;
+      let r = null;
+      try { r = peerFn('gating', 'firstMissing')?.(state, data, [k], pid) || null; } catch { r = null; }
+      bad(r?.reason ? `${r.reason}.` : 'Falta pesquisa para esta missão.');
+      break;
+    }
+  }
+  // the client's trust (stations, bases, colonies of another owner)
+  const owner = c.clientActorId && c.clientActorId !== pid ? c.clientActorId : null;
+  if (owner && row?.needs) {
+    const n = row.needs;
+    const trust = trustBetween(state, pid, owner);
+    if (Number.isFinite(n.relation?.minTrust) && trust < n.relation.minTrust) bad(`${actorName(state, owner)} não confia na agência o bastante para contratá-la (confiança ${Math.round(trust)}, precisa de ${n.relation.minTrust}).`);
+    if (Number.isFinite(n.noTensionAbove) && tensionBetween(state, pid, owner) > n.noTensionAbove) bad(`A tensão com ${actorName(state, owner)} impede o contrato.`);
+  }
+  // hardware
+  const vehicles = playerVehicleOptions(state, data, c);
+  const chosen = (vehicleId && vehicles.find((v) => v.vehicleId === vehicleId)) || vehicles[0] || null;
+  if (!vehicles.length) bad(hardwareWhy(state, data, c));
+  else if (vehicleId && chosen.vehicleId !== vehicleId) warn('O foguete escolhido não leva esta carga: a estimativa usa o melhor que você tem.');
+  // time: the mission opens when bidding closes; preparation + launch window must fit before the deadline
+  let earliestTurn = null;
+  if (chosen) {
+    const from = Math.max(state.turn, c.closeTurn || state.turn) + (LEAD_BY_SOURCE.contract || 4);
+    const w = windowFor(state, data, c.destination, from);
+    earliestTurn = Math.max(from, Number.isFinite(w?.openTurn) ? w.openTurn : from);
+    const pq = productionQueueFor(state, data, { vehicleId: chosen.vehicleId }, null);
+    if (pq && Number.isFinite(pq.nextFreeTurn)) earliestTurn = Math.max(earliestTurn, pq.nextFreeTurn);
+    if (earliestTurn > c.deadlineTurn) bad(`Não dá tempo: o primeiro lançamento possível é ${fmtT(state, earliestTurn)}, depois do prazo (${fmtT(state, c.deadlineTurn)}).`);
+    else if (c.deadlineTurn - earliestTurn < 6) warn(`Prazo apertado: o primeiro lançamento possível é ${fmtT(state, earliestTurn)} e o prazo acaba em ${fmtT(state, c.deadlineTurn)}.`);
+    if (chosen.rel < 0.85) warn(`${chosen.name} ainda é pouco confiável (${relText(chosen.rel)}): sem tempo para repetir, uma falha custa multa de ${pct(T.finePct)} do preço.`);
+    if (chosen.costM > c.valueM * T.bidRange[0]) warn(`Seu custo provável com o ${chosen.name} (${fmtMoney(chosen.costM)}) passa de ${pct(T.bidRange[0])} do valor de referência: lances baixos dão prejuízo.`);
+    const cash = state.actors?.[pid]?.cash ?? 0;
+    if (cash + c.valueM * T.advance < chosen.costM) warn(`Caixa curto: o voo custa ${fmtMoney(chosen.costM)} e você tem ${fmtMoney(cash)}.`);
+  }
+  // the investors' agenda: a won contract is one of the agency's own missions of the year (EXPANSION.md §5.2)
+  const ag = agendaOf(state, data);
+  if (ag?.enforced && ag.left - pendingBids(state, c.id) <= 0) bad(agendaFullText(ag));
+  const level = reasons.some((r) => r.level === 'bad') ? 'bad' : reasons.some((r) => r.level === 'warn') ? 'warn' : 'ok';
+  const first = reasons.find((r) => r.level === level);
+  const text = level === 'ok'
+    ? (c.clientPayload || !chosen.scName
+      ? `Sim: o ${chosen.name} leva ${tonsText(chosen.needT)} ${toWhere(dest, c.destination)} (até ${tonsText(chosen.capT)}), confiabilidade ${relText(chosen.rel)}.`
+      : `Sim: o ${chosen.name} leva a ${chosen.scName} ${toWhere(dest, c.destination)} (${tonsText(chosen.needT)} com a carga, até ${tonsText(chosen.capT)}), confiabilidade ${relText(chosen.rel)}.`)
+    : first.text;
+  return {
+    level, text, reasons, earliestTurn,
+    vehicles: vehicles.map((v) => ({ vehicleId: v.vehicleId, name: v.name, scName: v.scName, rel: v.rel, capT: v.capT, needT: v.needT, costM: v.costM })),
+    vehicleId: chosen?.vehicleId || null, vehicleName: chosen?.name || null, rel: chosen?.rel ?? null, costM: chosen?.costM ?? null,
+  };
+}
+
+/** The tender's bidders with their win odds: rivals' sealed bids plus the player's (price, rocket) when given. */
+function tenderField(state, data, c, { price = null, vehicleId = null } = {}) {
+  const T = boardTuning(data).chance;
+  const pid = state.playerId;
+  const out = [];
+  for (const r of c.rivals || []) {
+    const a = state.actors?.[r.actorId];
+    if (!a || a.dead || a.status === 'gone') continue;
+    out.push({ actorId: r.actorId, price: r.price, rel: Number.isFinite(r.reliability) ? r.reliability : 0.85, rep: a.reputation ?? 50 });
+  }
+  if (Number.isFinite(price) && price > 0) {
+    const cfg = playerConfig(state, data, c, vehicleId) || (vehicleId ? playerConfig(state, data, c, null) : null);
+    if (cfg) out.push({ actorId: pid, price, rel: Number.isFinite(cfg.rel) ? cfg.rel : 0.85, rep: state.actors?.[pid]?.reputation ?? 50, player: true, vehicleId: cfg.vehicleId });
+  }
+  for (const e of out) e.score = T.price * (c.valueM / Math.max(1, e.price)) + T.rep * e.rep + T.rel * (e.rel - 0.8) + recordBonus(state, data, e.actorId);
+  const top = Math.max(...out.map((e) => e.score));
+  let sum = 0;
+  for (const e of out) sum += (e.w = Math.exp((e.score - top) / Math.max(0.5, T.temp)));
+  for (const e of out) e.p = sum > 0 ? e.w / sum : 0;
+  return out;
+}
+
+/**
+ * The bid sheet's live numbers for a price and a rocket: {price, chance, field: [{actorId, name, p, player}],
+ * favourite, costM, marginM, marginPct, advanceM, fineM, bidMin, bidMax, rel, vehicleId}. Rival prices stay sealed.
+ */
+export function tenderOdds(state, data, c, price, vehicleId = null) {
+  syncDesignCatalog(state, data);
+  const T = boardTuning(data);
+  const bidMin = Math.ceil(c.valueM * T.bidRange[0]);
+  const bidMax = Math.floor(c.valueM * T.bidRange[1]);
+  const p = clamp(Math.round(Number.isFinite(Number(price)) ? Number(price) : c.valueM), bidMin, bidMax);
+  const field = tenderField(state, data, c, { price: p, vehicleId });
+  const me = field.find((e) => e.player) || null;
+  const fav = field.reduce((b, e) => (!b || e.p > b.p ? e : b), null);
+  const cfg = me ? playerConfig(state, data, c, me.vehicleId) : null;
+  const costM = cfg ? playerCostOf(state, data, c, cfg) : null;
+  return {
+    price: p, chance: me ? me.p : 0, bidMin, bidMax, rel: me?.rel ?? null, vehicleId: me?.vehicleId || null,
+    field: field.map((e) => ({ actorId: e.actorId, name: e.player ? 'Sua agência' : actorName(state, e.actorId), p: e.p, player: !!e.player })).sort((a, b) => b.p - a.p),
+    favourite: fav ? { actorId: fav.actorId, name: fav.player ? 'Sua agência' : actorName(state, fav.actorId), p: fav.p, player: !!fav.player } : null,
+    costM, marginM: costM != null ? round1(p - costM) : null, marginPct: costM ? (p - costM) / costM : null,
+    advanceM: Math.round(p * T.advance), fineM: Math.round(p * T.finePct),
+  };
+}
+
+/** Place or change the player's sealed bid. */
+function placeBid(state, data, contractId, price, vehicleId = null) {
+  const c = (state.contracts || []).find((x) => x.id === contractId);
+  if (!c || !isOpenTender(c) || state.turn > c.closeTurn) return { ok: false, status: 'gone', error: 'Esta concorrência já foi encerrada.' };
+  const T = boardTuning(data);
+  const f = tenderFeasibility(state, data, c, vehicleId || null);
+  if (f.level === 'bad') return { ok: false, error: f.text };
+  if (vehicleId && !f.vehicles.some((v) => v.vehicleId === vehicleId)) return { ok: false, error: 'Este foguete não leva a carga deste contrato.' };
+  const p = Math.round(Number(price));
+  const lo = Math.ceil(c.valueM * T.bidRange[0]);
+  const hi = Math.floor(c.valueM * T.bidRange[1]);
+  if (!Number.isFinite(p) || p < lo || p > hi) return { ok: false, error: `O lance precisa ficar entre ${fmtMoney(lo)} e ${fmtMoney(hi)}.` };
+  const first = !c.playerBid;
+  c.playerBid = { price: p, vehicleId: vehicleId || null, turn: state.turn };
+  c.status = 'bidding';
+  if (first) stat(state, 'contractsBid');
+  const odds = tenderOdds(state, data, c, p, vehicleId || null);
+  return { ok: true, contractId: c.id, price: p, chance: odds.chance };
+}
+
+function withdrawBid(state, data, contractId) {
+  const c = (state.contracts || []).find((x) => x.id === contractId);
+  if (!c || !isOpenTender(c) || state.turn > c.closeTurn) return { ok: false, status: 'gone', error: 'Esta concorrência já foi encerrada.' };
+  if (!c.playerBid) return { ok: false, error: 'Você não tem lance neste contrato.' };
+  c.playerBid = null;
+  c.status = 'open';
+  return { ok: true, contractId: c.id };
+}
+
+// --- old push-offer cards (saves before v0.9.12): a stale card still answers, as a bid at its level ---
+const BID_LEVELS = { bid_low: 0.85, bid_mid: 1.0, bid_high: 1.15 };
+function resolveContractOffer(state, data, dec, choiceId) {
+  const c = (state.contracts || []).find((x) => x.id === dec.payload?.contractId);
+  if (!c || !isOpenTender(c)) return { ok: true, status: 'gone', message: 'Este contrato já foi decidido.' };
+  if (BID_LEVELS[choiceId]) {
+    const r = placeBid(state, data, c.id, c.valueM * BID_LEVELS[choiceId]);
+    if (!r.ok) return { ok: true, status: 'refused', message: r.error };
+  }
+  return { ok: true, contractId: c.id };
+}
+
+// --- closing, awarding, flying ---
+
+/** Close the tenders whose bidding ended: one winner drawn with the board's odds. */
+function closeTenders(state, data) {
+  const pid = state.playerId;
+  for (const c of state.contracts || []) {
+    if (!isOpenTender(c) || state.turn < c.closeTurn) continue;
+    for (const d of (state.decisions || []).filter((x) => x.kind === 'contract/offer' && x.payload?.contractId === c.id)) removeDecision(state, d.id);
+    const field = tenderField(state, data, c, { price: c.playerBid?.price ?? null, vehicleId: c.playerBid?.vehicleId ?? null });
+    if (c.playerBid && !field.some((e) => e.player)) {
+      addNews(state, {
+        headline: `Proposta da ${actorName(state, pid)} desclassificada: ${lowerFirst(c.title)}`,
+        body: `${c.client} não aceitou a proposta: a agência não tem mais um foguete capaz para a entrega.`,
+        tags: ['contract'], actors: [pid], importance: 1,
+      });
+    }
+    if (!field.length) { c.status = 'expired'; c.resolvedTurn = state.turn; c.body = ''; continue; }
+    let r = rngFor(state.seed, 'tenders', 'award', c.id).next();
+    let win = field[field.length - 1];
+    for (const e of field) { r -= e.p; if (r < 0) { win = e; break; } }
+    c.field = field.map((e) => ({ actorId: e.actorId, price: e.price, p: Math.round(e.p * 1000) / 1000 }));
+    c.winner = win.actorId;
+    c.winningPrice = win.price;
+    emitSignal(state, 'contract/awarded', { contractId: c.id, winner: win.actorId });
+    if (win.player) awardToPlayer(state, data, c, win);
+    else awardToRival(state, data, c, win);
+  }
+}
+
+function awardToRival(state, data, c, win) {
+  const T = boardTuning(data);
+  const pid = state.playerId;
+  const r = (c.rivals || []).find((x) => x.actorId === win.actorId) || {};
+  c.status = 'closed';
+  c.advancePaidM = Math.round(win.price * T.advance);
+  receive(state, win.actorId, c.advancePaidM, 'contracts', c.title);
+  changeActor(state, win.actorId, 'reputation', T.rep.win);
+  recordBump(state, win.actorId, 'won');
+  // flown off-screen: a delivery date inside the deadline, one roll on the rocket's reliability at that date
+  const span = Math.max(1, c.deadlineTurn - state.turn);
+  c.ai = { deliverTurn: state.turn + Math.max(1, Math.round(span * rngFor(state.seed, 'tenders', 'aiDate', c.id).range(0.2, 0.6))), rel: win.rel, vehicleId: r.vehicleId || null, done: null, ok: null };
+  // the save keeps what the board shows of a rival's job: who bid what, the odds, the delivery roll (no pitch text)
+  c.body = '';
+  c.rivals = (c.rivals || []).map((x) => ({ actorId: x.actorId, price: x.price }));
+  const mine = c.field?.find((e) => e.actorId === pid);
+  if (c.playerBid || c.size === 'large') {
+    addNews(state, {
+      headline: `${actorName(state, win.actorId)} vence a concorrência: ${lowerFirst(c.title)}`,
+      body: c.playerBid
+        ? `A proposta da ${actorName(state, pid)} (${fmtMoney(c.playerBid.price)}, ${pct(mine?.p ?? 0)} de chance) perdeu para ${fmtMoney(win.price)}.`
+        : `${c.client} fecha por ${fmtMoney(win.price)}.`,
+      tags: ['contract'], actors: [win.actorId], importance: c.playerBid ? 2 : 1,
+    });
+  }
+}
+
+/** Rival contracts reach their delivery date: success pays the rest, failure costs the fine and reputation. */
+function rivalDeliveries(state, data) {
+  const T = boardTuning(data);
+  for (const c of state.contracts || []) {
+    if (c.status !== 'closed' || !c.ai || c.ai.done != null || state.turn < c.ai.deliverTurn) continue;
+    c.ai.done = state.turn;
+    c.resolvedTurn = state.turn;
+    const a = state.actors?.[c.winner];
+    if (!a || a.dead || a.status === 'gone') { c.ai.ok = false; continue; }
+    const ok = rngFor(state.seed, 'tenders', 'aiFlight', c.id).next() < clamp(c.ai.rel ?? 0.85, 0.5, 0.995) * 0.98;
+    c.ai.ok = ok;
+    const vName = vehicleDef(data, c.ai.vehicleId, state)?.name || null;
+    if (ok) {
+      receive(state, c.winner, Math.max(0, (c.winningPrice || 0) - (c.advancePaidM || 0)), 'contracts', c.title);
+      recordBump(state, c.winner, 'ok');
+      if (c.size === 'large' || c.playerBid) {
+        addNews(state, {
+          headline: `${actorName(state, c.winner)} entrega para ${c.client}`,
+          body: `${upperFirst(contractWhatText(state, data, c))}${vName ? ` Voou num ${vName}.` : ''}`,
+          tags: ['contract'], actors: [c.winner], importance: 1,
+        });
+      }
+    } else {
+      const fine = Math.round((c.winningPrice || 0) * T.finePct);
+      changeActor(state, c.winner, 'cash', -fine);
+      changeActor(state, c.winner, 'reputation', T.rep.rivalFail);
+      recordBump(state, c.winner, 'bad');
+      addNews(state, {
+        headline: `Falha da ${actorName(state, c.winner)}: ${c.client} perde a carga`,
+        body: `${vName ? `O ${vName} falhou. ` : ''}A agência paga multa de ${fmtMoney(fine)} e o contrato vai para a lista negra dos clientes.`,
+        tags: ['contract', 'failure'], actors: [c.winner], importance: 1,
+      });
+    }
+  }
 }
 
 /** "Carga: 2,5 t até a ISS" / "Módulo Laboratório para a Mir" / "Tripulação para a ISS" (contract card line). */
@@ -2467,107 +3015,11 @@ function contractWhatText(state, data, c) {
   const where = dest?.name || c.destination;
   const asset = c.targetAssetId ? assetOf(state, c.targetAssetId) : null;
   const to = asset?.name || where;
-  if (c.payloadKind === 'station_module' || c.payloadKind === 'base_module') return `Módulo ${moduleLabel(moduleDef(data, c.moduleId))} (${fmtTons(c.payloadT)} t) para ${to}.`;
+  if (c.payloadKind === 'station_module' || c.payloadKind === 'base_module') return `Módulo ${moduleLabel(moduleDef(data, c.moduleId))} (${tonsText(c.payloadT)}) para ${to}.`;
   if (c.type === 'crewed') return c.sub === 'tourism' ? `Turistas em ${where}.` : `Tripulação para ${to}.`;
   if (c.payloadKind === 'servicing') return `Kit de reparo para ${to}.`;
-  return `Carga: ${fmtTons(c.payloadT)} t até ${to}.`;
-}
-
-function offerContract(state, data, c) {
-  const playerRel = actorCapability(state, data, state.playerId, c);
-  const chances = playerRel > 0 ? winChances(state, c, playerRel) : {};
-  const why = 'A agência não tem veículo e nave capazes para esta entrega.';
-  const choices = Object.entries(BID_LEVELS).map(([id, f]) => ({
-    id, label: `${BID_LABELS[id]} · ${fmtMoney(c.valueM * f)}`,
-    preview: playerRel > 0 ? `≈ ${pct(chances[id])} de vencer. ${id === 'bid_low' ? 'Margem apertada.' : id === 'bid_high' ? 'Lucro maior, se ganhar.' : 'Equilíbrio entre preço e lucro.'}` : why,
-    disabled: playerRel <= 0, reason: playerRel <= 0 ? why : undefined,
-  }));
-  choices.push({ id: 'pass', label: 'Não participar', preview: 'Os rivais disputam sozinhos.' });
-  const rivals = c.rivals.map((r) => actorName(state, r.actorId)).join(', ') || 'nenhum rival declarado';
-  pushDecision(state, {
-    kind: 'contract/offer',
-    title: `Contrato: ${c.title}`,
-    body: `${c.client}. ${c.body}\n${contractWhatText(state, data, c)} Prazo: ${fmtT(state, c.deadlineTurn)}. Valor de referência: ${fmtMoney(c.valueM)}.\nConcorrentes: ${rivals}. Preço, prazo e reputação decidem.`,
-    portrait: null,
-    urgency: 1,
-    expiresTurn: c.closeTurn,
-    defaultChoice: 'pass',
-    payload: { contractId: c.id },
-    choices,
-  });
-}
-
-function contractOffers(state, data, ctx) {
-  state.contracts = state.contracts || [];
-  const open = state.contracts.filter((c) => c.status === 'open' || c.status === 'bidding').length;
-  const caps = contractCaps(data);
-  if (open >= caps.openOffers) return;
-  // long steps (D1, eras 5–7): new contracts arrive only in the attention step of budget.js (they all show in the
-  // same stop); the weekly chance inside that step is unchanged
-  if (typeof budget.attentionStep === 'function' && !budget.attentionStep(state, ctx)) return;
-  const last = state.contracts.reduce((mx, c) => Math.max(mx, c.createdTurn), -99);
-  const rng = ctx.rng('contract');
-  if (state.turn - last < caps.minGapWeeks || !rng.chance(state.turn < 8 ? 0.35 : 0.22)) return;
-  if (state.turn > state.endTurn - 20) return;
-  const c = makeContract(state, data, rng, Number.isFinite(ctx?.stepEnd) ? ctx.stepEnd : state.turn + 1);
-  if (!c) return;
-  state.contracts.push(c);
-  offerContract(state, data, c);
-  stat(state, 'contractsOffered');
-  // keep the slice small
-  if (state.contracts.length > 40) {
-    const keep = state.contracts.filter((x) => ['open', 'bidding', 'awarded', 'late'].includes(x.status));
-    const old = state.contracts.filter((x) => !keep.includes(x)).slice(-20);
-    state.contracts = [...old, ...keep];
-  }
-}
-
-function resolveContractOffer(state, data, dec, choiceId) {
-  const c = (state.contracts || []).find((x) => x.id === dec.payload?.contractId);
-  if (!c || c.status !== 'open') return { ok: true, status: 'gone', message: 'Este contrato já foi decidido.' };
-  if (BID_LEVELS[choiceId]) {
-    c.playerBid = { level: choiceId, price: Math.round(c.valueM * BID_LEVELS[choiceId]) };
-    c.status = 'bidding';
-  }
-  return { ok: true, contractId: c.id };
-}
-
-/** Close auctions whose time has come. */
-function closeAuctions(state, data) {
-  const pid = state.playerId;
-  for (const c of state.contracts || []) {
-    if (!['open', 'bidding'].includes(c.status) || state.turn < c.closeTurn) continue;
-    const entries = c.rivals.map((r) => ({
-      actorId: r.actorId, price: r.price,
-      score: bidScore(c, r.price, state.actors?.[r.actorId]?.reputation, r.reliability, r.noise),
-    }));
-    if (c.playerBid) {
-      const rel = actorCapability(state, data, pid, c);
-      if (rel > 0) {
-        const noise = rngFor(state.seed, 'missions', 'contractPlayer', c.id).range(-5, 5);
-        entries.push({ actorId: pid, price: c.playerBid.price, score: bidScore(c, c.playerBid.price, state.actors?.[pid]?.reputation, rel, noise) });
-      }
-    }
-    entries.sort((a, b) => b.score - a.score);
-    // the bid card goes with the auction (never shown for a contract that is already decided)
-    for (const d of (state.decisions || []).filter((x) => x.kind === 'contract/offer' && x.payload?.contractId === c.id)) removeDecision(state, d.id);
-    const win = entries[0];
-    if (!win) { c.status = 'expired'; continue; }
-    c.winner = win.actorId;
-    c.winningPrice = win.price;
-    emitSignal(state, 'contract/awarded', { contractId: c.id, winner: win.actorId });
-    if (win.actorId === pid) awardToPlayer(state, data, c);
-    else {
-      c.status = 'closed';
-      receive(state, win.actorId, Math.round(win.price * 0.25), 'contracts', c.title);
-      changeActor(state, win.actorId, 'reputation', 1);
-      addNews(state, {
-        headline: `${actorName(state, win.actorId)} vence contrato: ${c.title.charAt(0).toLowerCase() + c.title.slice(1)}`,
-        body: c.playerBid ? `A proposta da ${actorName(state, pid)} (${fmtMoney(c.playerBid.price)}) perdeu para ${fmtMoney(win.price)}.` : `Valor: ${fmtMoney(win.price)}.`,
-        tags: ['contract'], actors: [win.actorId], importance: c.playerBid ? 2 : 1,
-      });
-    }
-  }
+  if (c.clientPayload) return `Carga do cliente: ${tonsText(c.payloadT)} ${toWhere(dest, c.destination)}.`;
+  return `Carga: ${tonsText(c.payloadT)} até ${to}.`;
 }
 
 /** The mission payload a contract asks for (§1.4): tonnes, module, kit, client mass; with its target asset. */
@@ -2581,33 +3033,36 @@ function contractPayload(data, c) {
   return p;
 }
 
-function awardToPlayer(state, data, c) {
+/**
+ * The mission of a player contract, without hardware (item 9): the rocket of the bid (or the engineers' pick) is
+ * only a suggestion. `retry`: the second attempt after a failed launch.
+ */
+function contractMission(state, data, c, { retry = false } = {}) {
+  const vid = c.playerBid?.vehicleId || null;
+  const own = vid ? playerConfig(state, data, c, vid) : null;
+  const cfg = own || playerConfig(state, data, c, null);
+  const draft = contractDraft(state, data, c, cfg);
+  const n = (state.stats?.['missions.contractsWon'] || 0) + (retry ? 0 : 1);
+  draft.name = (retry ? `${c.title} (2ª tentativa)` : `Contrato ${n}: ${c.title}`).slice(0, 60);
+  const res = createMission(state, data, withoutHardware(draft, own ? SUGGEST_BID : SUGGEST_CHEAPEST));
+  if (res.ok) c.missionId = res.missionId;
+  return res;
+}
+
+function awardToPlayer(state, data, c, win = null) {
+  const T = boardTuning(data);
   const pid = state.playerId;
   c.status = 'awarded';
-  const type = missionTypeOf(c.type, c.sub);
-  const cfg = pickConfig(state, data, contractSpec(state, data, c, pid));
-  const crewed = type.type === 'crewed';
-  const sc = spacecraftDef(data, cfg?.spacecraftId);
-  const payload = contractPayload(data, c);
-  // v0.8 contracts (and client payloads) carry the total mass in config.payloadT; v2 cargo carries its tonnes in payload
-  const legacyMass = c.clientPayload || !c.payloadKind;
-  const draft = {
-    name: `Contrato ${(state.stats?.["missions.contractsWon"] || 0) + 1}: ${c.title}`.slice(0, 60), source: 'contract', contractId: c.id,
-    type: type.type, sub: c.sub || type.sub || null, ...(payload ? { payload } : {}), destination: c.destination,
-    vehicleId: cfg?.vehicleId || null, spacecraftId: cfg?.spacecraftId || null, clientPayload: c.clientPayload, crewed,
-    crew: autoCrew(state, data, crewed ? sc?.crew || 0 : 0),
-    config: { strategy: 'balanced', fuelMargin: 0.1, payloadT: legacyMass ? cfg?.payloadT ?? c.payloadT : null },
-    deadlineTurn: c.deadlineTurn,
-  };
-  // the bid estimate used the cheapest capable hardware; the player now picks the real one (a pricier rocket eats the margin)
-  const res = createMission(state, data, withoutHardware(draft, SUGGEST_CHEAPEST));
-  if (res.ok) c.missionId = res.missionId;
-  c.advancePaidM = Math.round(c.winningPrice * 0.2);
+  recordBump(state, pid, 'won');
+  const res = contractMission(state, data, c);
+  c.advancePaidM = Math.round(c.winningPrice * T.advance);
   receive(state, pid, c.advancePaidM, 'contracts', `Adiantamento: ${c.title}`);
-  changeActor(state, pid, 'reputation', 1);
+  stat(state, 'contractsIncomeM', c.advancePaidM);
+  changeActor(state, pid, 'reputation', T.rep.win);
+  const cost = res.ok ? missionById(state, res.missionId) : null;
   addNews(state, {
-    headline: `${actorName(state, pid)} vence o contrato: ${c.title.charAt(0).toLowerCase() + c.title.slice(1)}`,
-    body: `${fmtMoney(c.winningPrice)}, com ${fmtMoney(c.advancePaidM)} adiantados. Lançamento até ${fmtT(state, c.deadlineTurn)}.`,
+    headline: `${actorName(state, pid)} vence o contrato: ${lowerFirst(c.title)}`,
+    body: `${fmtMoney(c.winningPrice)}${win?.p != null ? ` (a proposta tinha ${pct(win.p)} de chance)` : ''}, com ${fmtMoney(c.advancePaidM)} adiantados. Lançamento até ${fmtT(state, c.deadlineTurn)}.${cost ? ' Escolha o foguete e agende a missão.' : ''}`,
     tags: ['contract', 'win'], actors: [pid], importance: 2,
   });
   stat(state, 'contractsWon');
@@ -2615,13 +3070,19 @@ function awardToPlayer(state, data, c) {
 
 function defaultContract(state, data, contractId, why) {
   const c = (state.contracts || []).find((x) => x.id === contractId);
-  if (!c || !['awarded', 'late'].includes(c.status)) return;
+  if (!c || !PLAYER_CONTRACT.includes(c.status)) return;
+  const T = boardTuning(data);
   const pid = state.playerId;
   c.status = 'defaulted';
-  const penalty = Math.round((c.winningPrice || c.valueM) * 0.15);
+  c.resolvedTurn = state.turn;
+  const penalty = Math.round((c.winningPrice || c.valueM) * T.finePct);
+  c.fineM = penalty;
   pay(state, penalty, `Multa contratual: ${c.title}`);
-  changeActor(state, pid, 'reputation', -8);
+  stat(state, 'contractsFinesM', penalty);
+  changeActor(state, pid, 'reputation', T.rep.default);
   changeActor(state, pid, 'support', -2);
+  recordBump(state, pid, 'bad');
+  stat(state, 'contractsDefaulted');
   addNews(state, {
     headline: `${actorName(state, pid)} rompe contrato e paga multa de ${fmtMoney(penalty)}`,
     body: why === 'cancel' ? `${c.client} procura outro fornecedor.` : `Prazo estourado. ${c.client} cancela a encomenda.`,
@@ -2629,24 +3090,26 @@ function defaultContract(state, data, contractId, why) {
   });
 }
 
-/** Deadlines of contracts the player must fly. */
+/** Deadlines of contracts the player must fly: late (pay cut) at the deadline, called off (fine) after the grace. */
 function contractDeadlines(state, data) {
+  const T = boardTuning(data);
   const pid = state.playerId;
+  const grace = Math.round(T.graceWeeks * stepScale(state));
   for (const c of state.contracts || []) {
-    if (!['awarded', 'late'].includes(c.status)) continue;
+    if (!PLAYER_CONTRACT.includes(c.status)) continue;
     const m = missionById(state, c.missionId);
     const flown = m && !['planning', 'scheduled', 'launch', 'cancelled'].includes(m.status);
     if (flown) continue;
     if (c.status === 'awarded' && state.turn > c.deadlineTurn) {
       c.status = 'late';
       c.late = true;
-      changeActor(state, pid, 'reputation', -3);
+      changeActor(state, pid, 'reputation', T.rep.late);
       addNews(state, {
         headline: `${c.client} reclama do atraso da ${actorName(state, pid)}`,
-        body: 'A receita cai 30% e a paciência do cliente acaba em três meses.',
+        body: `O pagamento cai ${pct(T.lateCut)}; sem lançamento até ${fmtT(state, c.deadlineTurn + grace)}, o contrato acaba com multa de ${fmtMoney(Math.round((c.winningPrice || c.valueM) * T.finePct))}.`,
         tags: ['contract', 'late'], actors: [pid], importance: 1,
       });
-    } else if (c.status === 'late' && state.turn > c.deadlineTurn + 13) {
+    } else if (c.status === 'late' && state.turn > c.deadlineTurn + grace) {
       if (m && ['planning', 'scheduled', 'launch'].includes(m.status)) {
         m.contractId = null; // the mission itself is gone with the contract
         cancelMission(state, data, m, { reason: 'contract' });
@@ -2656,25 +3119,131 @@ function contractDeadlines(state, data) {
   }
 }
 
-/** Settle a player contract when its mission reaches a final result. */
+/** Settle a player contract when its mission reaches a final result (a failure with time left gets one retry). */
 function settleContract(state, data, m, level) {
   const c = (state.contracts || []).find((x) => x.id === m.contractId);
-  if (!c || !['awarded', 'late'].includes(c.status)) return 0;
+  if (!c || !PLAYER_CONTRACT.includes(c.status)) return 0;
+  const T = boardTuning(data);
   const pid = state.playerId;
   const remaining = Math.max(0, (c.winningPrice || c.valueM) - c.advancePaidM);
-  const lateF = c.late ? 0.7 : 1;
+  const lateF = c.late ? 1 - T.lateCut : 1;
   let paid = 0;
   if (level === 'total' || level === 'partial') {
     paid = Math.round(remaining * lateF * (level === 'total' ? 1 : 0.5));
     receive(state, pid, paid, 'contracts', `Entrega: ${c.title}`);
+    stat(state, 'contractsIncomeM', paid);
     c.status = 'delivered';
-    changeActor(state, pid, 'reputation', level === 'total' ? 2 : 0);
-  } else {
-    c.status = 'failed';
-    changeActor(state, pid, 'reputation', -5);
+    c.paidM = (c.advancePaidM || 0) + paid;
+    changeActor(state, pid, 'reputation', level === 'total' ? T.rep.deliver : 0);
+    recordBump(state, pid, 'ok');
+    stat(state, 'contractsDelivered');
+    c.resolvedTurn = state.turn;
+    return paid;
   }
+  // a failed launch: the client accepts one more try when there is time to prepare it before the deadline
+  const lead = (LEAD_BY_SOURCE.contract || 4) + 2;
+  if (!(c.failures > 0) && c.status === 'awarded' && c.deadlineTurn - state.turn >= lead) {
+    c.failures = 1;
+    c.missionId = null;
+    changeActor(state, pid, 'reputation', T.rep.retry);
+    contractMission(state, data, c, { retry: true });
+    addNews(state, {
+      headline: `${c.client} dá à ${actorName(state, pid)} uma segunda chance`,
+      body: `A carga se perdeu, mas o cliente aceita nova tentativa até ${fmtT(state, c.deadlineTurn)}. Outra falha custa multa de ${fmtMoney(Math.round((c.winningPrice || c.valueM) * T.finePct))}.`,
+      tags: ['contract'], actors: [pid], importance: 2,
+    });
+    stat(state, 'contractsRetried');
+    return 0;
+  }
+  c.status = 'failed';
   c.resolvedTurn = state.turn;
-  return paid;
+  const fine = Math.round((c.winningPrice || c.valueM) * T.finePct);
+  c.fineM = fine;
+  pay(state, fine, `Multa contratual: ${c.title}`);
+  stat(state, 'contractsFinesM', fine);
+  changeActor(state, pid, 'reputation', T.rep.fail);
+  recordBump(state, pid, 'bad');
+  stat(state, 'contractsFailed');
+  addNews(state, {
+    headline: `${actorName(state, pid)} perde a carga de ${c.client} e paga multa`,
+    body: `Sem tempo para outra tentativa antes do prazo: multa de ${fmtMoney(fine)} e a reputação cai.`,
+    tags: ['contract', 'failure'], actors: [pid], importance: 2,
+  });
+  return 0;
+}
+
+/** The player's contracts: a mission for an awarded contract that has none alive (e.g. after a cancel failed). */
+function missionForContract(state, data, contractId) {
+  const c = (state.contracts || []).find((x) => x.id === contractId);
+  if (!c || !PLAYER_CONTRACT.includes(c.status)) return { ok: false, error: 'Contrato não encontrado.' };
+  const m = missionById(state, c.missionId);
+  if (m && m.status !== 'cancelled') return { ok: true, missionId: m.id, existing: true };
+  const res = contractMission(state, data, c, { retry: (c.failures || 0) > 0 });
+  return res.ok ? { ok: true, missionId: res.missionId } : res;
+}
+
+// --- views (Contratos screen) ---
+
+function tenderView(state, data, c) {
+  const T = boardTuning(data);
+  const dest = destDef(data, c.destination);
+  const feas = tenderFeasibility(state, data, c, c.playerBid?.vehicleId || null);
+  const odds = tenderOdds(state, data, c, c.playerBid?.price ?? null, c.playerBid?.vehicleId || null);
+  const rivalsOnly = tenderField(state, data, c, {});
+  const favRival = rivalsOnly.reduce((b, e) => (!b || e.p > b.p ? e : b), null);
+  return {
+    id: c.id, kind: c.kind, title: c.title, client: c.client, clientKind: c.clientKind || 'empresa', clientKindLabel: CLIENT_KIND_LABELS[c.clientKind] || 'Cliente',
+    clientActorId: c.clientActorId || null, body: c.body, what: contractWhatText(state, data, c), type: c.type, sub: c.sub, typeLabel: TYPE_LABELS[c.type] || c.type,
+    subLabel: subtypeOf(data, c.type, c.sub)?.label || null, destination: c.destination, destName: dest?.name || c.destination, payloadT: c.payloadT, payloadText: c.payloadT > 0 ? tonsText(c.payloadT) : null,
+    size: c.size || 'medium', sizeLabel: SIZE_LABELS[c.size] || 'Médio', refM: c.valueM, costM: c.costM || null,
+    bidMin: Math.ceil(c.valueM * T.bidRange[0]), bidMax: Math.floor(c.valueM * T.bidRange[1]), advance: T.advance, finePct: T.finePct,
+    closeTurn: c.closeTurn, closeText: fmtT(state, c.closeTurn), closeWeeks: Math.max(0, c.closeTurn - state.turn),
+    deadlineTurn: c.deadlineTurn, deadlineText: fmtT(state, c.deadlineTurn), status: c.status,
+    playerBid: c.playerBid ? { ...c.playerBid, chance: odds.chance, vehicleName: odds.vehicleId ? vehicleDef(data, odds.vehicleId, state)?.name || null : null } : null,
+    rivalsN: (c.rivals || []).filter((r) => state.actors?.[r.actorId]).length,
+    rivals: rivalsOnly.map((e) => ({ actorId: e.actorId, name: actorName(state, e.actorId) })),
+    favourite: c.playerBid ? odds.favourite : favRival ? { actorId: favRival.actorId, name: actorName(state, favRival.actorId), p: favRival.p, player: false } : null,
+    feas,
+  };
+}
+
+function contractView(state, data, c) {
+  const T = boardTuning(data);
+  const m = missionById(state, c.missionId);
+  const dest = destDef(data, c.destination);
+  return {
+    id: c.id, title: c.title, client: c.client, clientKind: c.clientKind || null, clientKindLabel: CLIENT_KIND_LABELS[c.clientKind] || null, status: c.status,
+    what: contractWhatText(state, data, c), destName: dest?.name || c.destination, winner: c.winner, winnerName: c.winner ? actorName(state, c.winner) : 'Outro fornecedor',
+    mine: c.winner === state.playerId, price: c.winningPrice ?? null, refM: c.valueM, advanceM: c.advancePaidM || 0, paidM: c.paidM ?? null, fineM: c.fineM ?? Math.round((c.winningPrice || c.valueM) * T.finePct),
+    deadlineTurn: c.deadlineTurn, deadlineText: fmtT(state, c.deadlineTurn), graceText: fmtT(state, c.deadlineTurn + Math.round(T.graceWeeks * stepScale(state))), late: !!c.late,
+    failures: c.failures || 0, missionId: m && m.status !== 'cancelled' ? m.id : null, missionName: m?.name || null, missionStatus: m?.status || null,
+    needsHardware: !!m && m.status === 'planning' && needsHardware(m), launchText: m?.launchTurn != null ? fmtT(state, m.launchTurn) : null,
+    playerBid: c.playerBid ? { price: c.playerBid.price } : null, playerChance: c.field?.find((e) => e.actorId === state.playerId)?.p ?? null,
+    bidders: (c.field || []).length, resolvedTurn: c.resolvedTurn ?? c.closeTurn, resolvedText: fmtT(state, c.resolvedTurn ?? c.closeTurn),
+    ai: c.ai ? { done: c.ai.done != null, ok: c.ai.ok } : null,
+  };
+}
+
+/** The Contratos screen: open tenders, the player's contracts, recent results and the record. */
+function boardView(state, data) {
+  const T = boardTuning(data);
+  const pid = state.playerId;
+  const all = state.contracts || [];
+  const open = all.filter(isOpenTender).sort((a, b) => a.closeTurn - b.closeTurn || (a.id < b.id ? -1 : 1));
+  const mine = all.filter((c) => PLAYER_CONTRACT.includes(c.status));
+  const done = all.filter((c) => !isOpenTender(c) && !PLAYER_CONTRACT.includes(c.status))
+    .sort((a, b) => (b.resolvedTurn ?? b.closeTurn ?? 0) - (a.resolvedTurn ?? a.closeTurn ?? 0)).slice(0, 10);
+  const st = state.stats || {};
+  return {
+    open: open.map((c) => tenderView(state, data, c)),
+    mine: mine.map((c) => contractView(state, data, c)),
+    results: done.map((c) => contractView(state, data, c)),
+    record: recordOf(state, pid),
+    stats: { won: st['missions.contractsWon'] || 0, delivered: st['missions.contractsDelivered'] || 0, failed: st['missions.contractsFailed'] || 0, defaulted: st['missions.contractsDefaulted'] || 0, bids: st['missions.contractsBid'] || 0 },
+    reputation: state.actors?.[pid]?.reputation ?? 50,
+    bidRange: T.bidRange, advance: T.advance, finePct: T.finePct, lateCut: T.lateCut, openMax: T.openMax,
+    agenda: agendaOf(state, data),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -3529,8 +4098,10 @@ export function tick(state, data, ctx) {
   syncDesignCatalog(state, data);
   normalizeLegacyTypes(state);
   treatyEnded(state, data);
+  retireOfferCards(state);
   contractDeadlines(state, data);
-  closeAuctions(state, data);
+  closeTenders(state, data);
+  rivalDeliveries(state, data);
   adoptTransitPrograms(state, data);
   launchTick(state, data);
   transitTick(state, data, ctx);
@@ -3541,7 +4112,7 @@ export function tick(state, data, ctx) {
   if (crossed(state, ctx, 13, 0)) obsoletePrograms(state, data);
   if (Number.isFinite(state.endTurn) && state.endTurn > 10 * 52 && crossed(state, ctx, 13, 7)) slimResults(state);
   opportunities(state, data, ctx);
-  contractOffers(state, data, ctx);
+  tenderBoard(state, data, ctx);
   // keep estimates fresh (research, crew and reliability change over time)
   if (crossed(state, ctx, 4, 0)) {
     for (const m of state.missions) if (m.status === 'planning' || m.status === 'scheduled') m.estimate = estimateOf(riskFor(state, data, m, m.launchTurn ?? undefined));
@@ -3700,6 +4271,10 @@ const actionsRaw = {
     return err || cancelMission(state, data, m);
   },
   'vehicle/certify': (state, data, action) => certifyVehicle(state, data, action.vehicleId),
+  // tela Contratos: sealed bid (price, rocket) on an open tender, withdraw it, open the mission of a won contract
+  'contract/bid': (state, data, action) => placeBid(state, data, action.contractId, action.price, action.vehicleId || null),
+  'contract/withdraw': (state, data, action) => withdrawBid(state, data, action.contractId),
+  'contract/mission': (state, data, action) => missionForContract(state, data, action.contractId),
   'mission/estimate': (state, data, action) => {
     const d = { ...normalizeDraft(action.draft || {}), riskMod: 0 };
     const r = riskFor(state, data, d, action.draft?.launchTurn);
@@ -3805,12 +4380,22 @@ const queriesRaw = {
     list.sort((a, b) => a.openTurn - b.openTurn || a.arrivalTurn - b.arrivalTurn);
     return list.find((w) => !w.late) || list[0] || null;
   },
+  // tela Contratos: the board, the live odds of a bid (price, rocket) and the feasibility check of a tender
+  'contracts/board': (state, data) => boardView(state, data),
+  'contracts/odds': (state, data, id, price, vehicleId) => {
+    const c = (state.contracts || []).find((x) => x.id === id);
+    return c ? tenderOdds(state, data, c, price, vehicleId || null) : null;
+  },
+  'contracts/feasibility': (state, data, id, vehicleId) => {
+    const c = (state.contracts || []).find((x) => x.id === id);
+    return c ? tenderFeasibility(state, data, c, vehicleId || null) : null;
+  },
   'missions/contracts': (state) =>
     (state.contracts || []).slice().reverse().map((c) => {
       const closed = !['open', 'bidding'].includes(c.status);
       return {
         ...c,
-        rivals: c.rivals.map((r) => ({ actorId: r.actorId, name: actorName(state, r.actorId), price: closed ? r.price : null })),
+        rivals: (c.rivals || []).map((r) => ({ actorId: r.actorId, name: actorName(state, r.actorId), price: closed ? r.price : null })),
         deadline: fmtT(state, c.deadlineTurn),
       };
     }),
@@ -3862,19 +4447,26 @@ function slimResults(state, list = state.missions) {
  */
 export function compact(state) {
   const live = ['open', 'bidding', 'awarded', 'late'];
+  // a rival's contract still to be flown (tender board) stays until its delivery date
+  const alive = (c) => live.includes(c.status) || (c.status === 'closed' && c.ai && c.ai.done == null);
   // a 1950–3000 campaign keeps less history in full (the save budget is 400 KB): resolved missions older than a
   // year, beyond the 8 most recent, become stubs; contracts keep 12. The Corrida Lunar (5 years) is unchanged.
   const long = Number.isFinite(state.endTurn) && state.endTurn > 10 * 52;
   const cCap = long ? 12 : 40;
   if (Array.isArray(state.contracts) && state.contracts.length > cCap) {
-    state.contracts = state.contracts.filter((c) => live.includes(c.status) || state.turn - (c.createdTurn ?? 0) < 52);
-    if (state.contracts.length > cCap) state.contracts = state.contracts.slice(-cCap);
+    state.contracts = state.contracts.filter((c) => alive(c) || state.turn - (c.createdTurn ?? 0) < 52);
+    if (state.contracts.length > cCap) {
+      const keep = state.contracts.filter(alive);
+      const old = state.contracts.filter((c) => !alive(c)).slice(-Math.max(0, cCap - keep.length));
+      state.contracts = state.contracts.filter((c) => keep.includes(c) || old.includes(c));
+    }
   }
   // resolved auctions of a long campaign keep who won, the bids and the price; the pitch text goes after half a year
   if (long) {
     for (const c of state.contracts || []) {
-      if (live.includes(c.status) || state.turn - (c.createdTurn ?? state.turn) <= 26) continue;
+      if (alive(c) || state.turn - (c.createdTurn ?? state.turn) <= 26) continue;
       if (c.body) c.body = '';
+      if (c.rivals?.length) c.rivals = c.rivals.map((r) => ({ actorId: r.actorId, price: r.price }));
     }
   }
   if (!Array.isArray(state.missions)) return;
@@ -3932,12 +4524,13 @@ export function compact(state) {
   }
 }
 
-/** A dead rival leaves the open auctions (its sealed bid goes with it). */
+/** A dead rival leaves the open tenders (its sealed bid goes with it) and the board's record. */
 export function onActorGone(state, data, ctx, id) {
   for (const c of state.contracts || []) {
     if (!['open', 'bidding'].includes(c.status) || !Array.isArray(c.rivals)) continue;
     c.rivals = c.rivals.filter((r) => r.actorId !== id);
   }
+  if (state.tenders?.record?.[id] && id !== state.playerId) delete state.tenders.record[id];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -4007,8 +4600,11 @@ export function agendaOf(state, data) {
   }
   const own = Math.max(minOwn, K - M);
   const year = yearAt(state);
-  const created = (state.missions || []).filter((m) => m.source === 'custom' && !m.mandateId && !m.holderId && Number.isFinite(m.createdTurn)
-    && turnToDate(m.createdTurn, state.startYear).year === year && !(m.status === 'cancelled' && !m.paid)).length;
+  // own missions of the year: the player's own picks and the contracts won on the board (one per contract, a second
+  // attempt after a failure is the same job), never the mandates (EXPANSION.md §5.2: mandates and contracts never clash)
+  const ofYear = (m) => !m.mandateId && !m.holderId && Number.isFinite(m.createdTurn) && turnToDate(m.createdTurn, state.startYear).year === year && !(m.status === 'cancelled' && !m.paid);
+  const mine = (state.missions || []).filter(ofYear);
+  const created = mine.filter((m) => m.source === 'custom').length + new Set(mine.filter((m) => m.source === 'contract' && m.contractId).map((m) => m.contractId)).size;
   const used = Math.max(created, peerUsed);
   // with autonomy (≥ 50%) the board does not veto own missions (B2 'investors/canFlyOwn'): the agenda only informs
   return { K, M, own, used, left: Math.max(0, own - used), playerPct, binding: !autonomous, enforced: !autonomous, year };

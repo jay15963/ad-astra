@@ -120,7 +120,7 @@ export const SUB_LABELS = {
     interstellar_relay: 'Retransmissor interestelar', power_swarm: 'Segmento de enxame solar',
   },
   probe: {
-    flyby: 'Sobrevoo', orbiter: 'Orbitador', impactor: 'Impactador', lander: 'Pouso de sonda', atmospheric: 'Sonda atmosférica',
+    sounding: 'Sondagem suborbital', flyby: 'Sobrevoo', orbiter: 'Orbitador', impactor: 'Impactador', lander: 'Pouso de sonda', atmospheric: 'Sonda atmosférica',
     sample_return: 'Retorno de amostras', small_body: 'Asteroides e cometas', interstellar_precursor: 'Precursora interestelar',
     interstellar: 'Sonda interestelar', beamed_sail: 'Vela a laser',
   },
@@ -142,7 +142,7 @@ export const SUB_LABELS = {
 /** Year each subtype becomes historically possible (fallback lock text when the sim gives none; §1.2). */
 export const SUB_YEARS = {
   satellite: { science: 1958, weather: 1960, navigation: 1960, comms: 1962, earth_obs: 1972, observatory: 1968, deep_observatory: 2021, relay: 2018, constellation: 2019, power: 2045, gravity_lens: 2200, interstellar_relay: 2350, power_swarm: 2650 },
-  probe: { flyby: 1959, orbiter: 1959, impactor: 1959, lander: 1966, atmospheric: 1967, sample_return: 1970, small_body: 1996, interstellar_precursor: 2080, interstellar: 2250, beamed_sail: 2300 },
+  probe: { sounding: 1946, flyby: 1959, orbiter: 1959, impactor: 1959, lander: 1966, atmospheric: 1967, sample_return: 1970, small_body: 1996, interstellar_precursor: 2080, interstellar: 2250, beamed_sail: 2300 },
   rover: { light: 1970, micro: 1997, medium: 2004, heavy: 2012, rotorcraft: 2021, swarm: 2070, cryobot: 2120, submarine: 2150 },
   crewed: { orbital: 1961, rotation: 1971, flyby: 1968, landing: 1969, servicing: 1984, tourism: 2001 },
   cargo: { supply: 1978, experiments: 1978, base_module: 2028, base_vehicle: 2028, propellant: 2035, servicing: 2030, client: 1965 },

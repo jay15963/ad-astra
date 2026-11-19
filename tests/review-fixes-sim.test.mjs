@@ -12,6 +12,7 @@ import { loadDataNode } from '../src/core/data.js';
 import * as engine from '../src/core/engine.js';
 import * as infra from '../src/sim/infra.js';
 import * as market from '../src/sim/market.js';
+import * as missions from '../src/sim/missions.js';
 import { histYearOf } from '../src/core/gating.js';
 import { packState, unpackState } from '../src/core/savepack.js';
 import { dropEarlyStartNodes } from '../src/core/migrations/v4.js';
@@ -91,7 +92,7 @@ test('the 1950 campaign gives nobody the 2026 start set (initialFor of later yea
   assert.deepEqual(dropEarlyStartNodes(campaign, ['en_solar'], 2030), ['en_solar']);
 });
 
-test('contract offers in 13-week steps: every card on the table is for an open auction', () => {
+test('tenders in 13-week steps: every open tender on the board is still biddable at the player stop', () => {
   const f = join(ROOT, 'tools/_scratch/ref/saves/y2150.json');
   if (!existsSync(f)) return;
   const data = campaign;
@@ -99,7 +100,7 @@ test('contract offers in 13-week steps: every card on the table is for an open a
   assert.equal(engine.stepInfo(s, data).dt, 13);
   let seen = 0;
   for (let i = 0; i < 16 && !s.gameOver; i++) {
-    for (const d of s.decisions.slice()) if (d.kind !== 'contract/offer') {
+    for (const d of s.decisions.slice()) {
       const c = d.choices?.find((x) => !x.disabled) || d.choices?.[0];
       engine.dispatch(s, data, { type: 'decision/resolve', id: d.id, choiceId: c?.id });
     }
@@ -113,14 +114,16 @@ test('contract offers in 13-week steps: every card on the table is for an open a
       else engine.dispatch(s, data, { type: 'launch/step' });
     }
     engine.dispatch(s, data, { type: 'time/advance', turns: 1 });
-    for (const d of s.decisions.filter((x) => x.kind === 'contract/offer')) {
-      const c = s.contracts.find((x) => x.id === d.payload.contractId);
-      assert.equal(c?.status, 'open', `${d.title} t${s.turn}`);
-      assert.ok(d.expiresTurn >= s.turn, `${d.title} expires ${d.expiresTurn} at t${s.turn}`);
+    assert.ok(!s.decisions.some((d) => d.kind === 'contract/offer'), 'no push cards');
+    for (const c of s.contracts.filter((x) => x.status === 'open' || x.status === 'bidding')) {
+      // bidding closes in the tick of its close turn: at a stop on that turn the player can still bid
+      assert.ok(c.closeTurn >= s.turn, `${c.title} closes ${c.closeTurn} at t${s.turn}`);
+      assert.ok(missions.tenderOdds(s, data, c, c.valueM).bidMin > 0);
+      assert.ok(c.deadlineTurn > c.closeTurn);
       seen++;
     }
   }
-  assert.ok(seen > 0, 'some offers were made');
+  assert.ok(seen > 0, 'some tenders were open');
 });
 
 test('colony-fed bases are supplied by their colony: no cargo reminder, site named in pt-BR', () => {

@@ -51,8 +51,30 @@ export function hashProjection(state) {
   return { all: hash32(JSON.stringify(p)), perKey };
 }
 
-/** Scripted bot step outside of time: decisions, launches, hardware choice, scheduling. */
-export function botStep(state, data, { dispatch, query } = engine, { schedule = true } = {}) {
+/**
+ * Tender board (tela Contratos, v0.9.12): a prudent director bids on what the agency can deliver at a profit, at 80%
+ * of the client's reference price, with the rocket of the feasibility check; at most `maxActive` jobs at a time.
+ */
+export function tenderMove(state, data, { dispatch, query } = engine, { maxActive = 3, bid = 0.8 } = {}) {
+  const board = query(state, data, 'contracts/board');
+  if (!board?.open) return 0;
+  let active = board.mine.length + board.open.filter((t) => t.playerBid).length;
+  let n = 0;
+  for (const t of board.open) {
+    if (active >= maxActive) break;
+    if (t.playerBid || t.feas.level === 'bad') continue;
+    const price = Math.round(t.refM * bid);
+    const cost = t.feas.costM ?? 0;
+    if (cost >= price * 0.9) continue; // no margin with this rocket
+    if ((state.actors[state.playerId]?.cash ?? 0) < cost * 0.5) continue;
+    const r = dispatch(state, data, { type: 'contract/bid', contractId: t.id, price, vehicleId: t.feas.vehicleId });
+    if (r.ok) { active++; n++; }
+  }
+  return n;
+}
+
+/** Scripted bot step outside of time: decisions, launches, hardware choice, scheduling, tender bids. */
+export function botStep(state, data, { dispatch, query } = engine, { schedule = true, tenders = schedule } = {}) {
   for (const d of state.decisions.slice()) {
     if (state.gameOver) return; // a card ended the campaign (final event, director fired): nothing else to play
     const c = d.choices?.find((x) => !x.disabled) || d.choices?.[0];
@@ -79,6 +101,7 @@ export function botStep(state, data, { dispatch, query } = engine, { schedule = 
   }
   if (state.activeLaunch) throw new Error('launch never finished');
   if (!schedule) return; // fast mode (tools/campaign.mjs): only decisions and launches, no new player launches
+  if (tenders) tenderMove(state, data, { dispatch, query });
   for (const m of state.missions.filter((x) => x.status === 'planning')) {
     // item 9: the player (here, the bot) picks the hardware; the bot takes the engineers' suggestion
     if ((m.vehicleId == null || m.spacecraftId == null) && m.suggestion) {

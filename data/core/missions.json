@@ -14,7 +14,7 @@
     "landing": {"type":"probe","sub":"lander","label":"Pouso de sonda (antigo)"}
   },
   "derive": {
-    "probe": {"byKind":{"surface":"lander","atmosphere":"atmospheric","flyby":"flyby","orbit":"orbiter","rendezvous":"small_body","interstellar":"interstellar","station":"orbiter"},"byId":{"lunar_impact":"impactor","dimorphos_impact":"impactor","neo_sample_return":"sample_return","interstellar_medium":"interstellar_precursor","kuiper":"flyby"},"byCapacityKey":{"interstellar":"interstellar"},"default":"orbiter"},
+    "probe": {"byKind":{"suborbital":"sounding","surface":"lander","atmosphere":"atmospheric","flyby":"flyby","orbit":"orbiter","rendezvous":"small_body","interstellar":"interstellar","station":"orbiter"},"byId":{"lunar_impact":"impactor","dimorphos_impact":"impactor","neo_sample_return":"sample_return","interstellar_medium":"interstellar_precursor","kuiper":"flyby"},"byCapacityKey":{"interstellar":"interstellar"},"default":"orbiter"},
     "satellite": {"bySc":true,"byKind":{"orbit":"science"},"default":"science"},
     "rover": {"bySc":true,"default":"medium"},
     "crewed": {"byKind":{"station":"rotation","surface":"landing"},"otherBody":"flyby","default":"orbital"},
@@ -35,6 +35,7 @@
     {"id":"gravity_lens","type":"satellite","label":"Telescópio de lente solar","key":"satellite:gravity_lens","histYear":2200,"dest":{"ids":["solar_gravity_lens"],"kinds":["interstellar"]},"asset":{"kind":"satellite","lifeYears":40},"yield":{"scienceYr":120,"supportYr":1,"refT":20},"science":{"onArrival":40}},
     {"id":"interstellar_relay","type":"satellite","label":"Retransmissor interestelar","key":"satellite:interstellar_relay","histYear":2350,"dest":{"kinds":["interstellar","flyby"],"capacityKeys":["outer","interstellar"]},"asset":{"kind":"satellite","lifeYears":60},"yield":{"scienceYr":6,"refT":20},"science":{"onArrival":8}},
     {"id":"power_swarm","type":"satellite","label":"Segmento de enxame solar","key":"satellite:power_swarm","histYear":2650,"genericOk":true,"dest":{"kinds":["orbit"],"bodies":["sun","mercury","venus"]},"asset":{"kind":"satellite","lifeYears":100},"yield":{"revenueMYr":400,"refT":40},"science":{"onArrival":4}},
+    {"id":"sounding","type":"probe","label":"Sondagem suborbital","key":null,"typeKey":"vehicle:sounding","histYear":1946,"dest":{"kinds":["suborbital"]},"opsWeeks":0},
     {"id":"flyby","type":"probe","label":"Sobrevoo","key":null,"dest":{"kinds":["flyby","interstellar"]}},
     {"id":"orbiter","type":"probe","label":"Orbitador","key":null,"dest":{"kinds":["orbit","station"]}},
     {"id":"impactor","type":"probe","label":"Impactador","key":"probe:impactor","histYear":1959,"dest":{"kinds":["surface","rendezvous"]},"opsWeeks":0},

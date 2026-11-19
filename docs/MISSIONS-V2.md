@@ -212,6 +212,49 @@ life < 30%) · `orbital_tourism` (crewed/tourism, 2001, first_space_tourist) · 
 first_orbital_refueling, asset station with module depot). The old `clps` becomes `lunar_delivery`
 (type cargo/experiments, carrier lander).
 
+### 2.1 The tender board (tela Contratos, v0.9.12)
+
+Contracts are no longer pushed as `contract/offer` cards: clients publish **tenders** on a public board (drawer ›
+Operações › Contratos, also Missões › Contratos). Numbers live in `contracts.json` `board` (defaults in
+`missions.BOARD_DEFAULTS`); slice `state.tenders = {next, record: {actorId: {won, ok, bad}}}`.
+
+- **Supply**: a new tender every `gapWeeks` 3–7 weeks (3 at once on a new board) while fewer than `openMax` 5 are open;
+  bidding stays open `bidWeeks` 10–24 weeks and never closes before the player's next stop. Candidates follow §2 rules
+  1–3 in the *world's* view (`contractEligible(…, {world: true})`: no player research or relation check — the card shows
+  them instead) plus colony clients (`colony: true` rows, one per settled colony of another owner, era 5+). Era rows:
+  sounding experiments (1950–1990, probe `sounding`, suborbital), science/weather/navigation satellites (1958/1961/1964),
+  GTO comms (1965), SSO (1972), foreign science probes (1985), constellations (2019), station/base/lunar/Mars jobs (§2),
+  solar power modules (2045), outer-planet probes (2060), colony equipment (2051), interstellar probes (2250).
+- **Size and feasibility**: a size (small/medium/large, weights 3/2/1) picks the payload inside the row's range; client
+  payloads are capped by the biggest rocket in the world at that date. A tender exists only if some live agency (the
+  player included) can fly it now (`pickConfig` per actor); otherwise smaller sizes are tried, then another row.
+- **Price**: `costM` = mean cost of flying it over the capable agencies (rocket + craft + operations + goods + crew), never
+  below the open market (`marketCost`); reference `valueM = costM × U(1.8, 2.2)`. Bids are 60–140% of the reference, so
+  even the lowest bid pays ≥ 1.08× the typical cost. The bid sheet shows the player's own probable cost with the rocket
+  chosen (`computeCost`) and the margin; a rocket that costs more than 60% of the reference gets an amber warning.
+- **Rivals**: every capable agency (not the client) may bid (first always; others with p = 0.6 + 0.35·need); price =
+  own cost × (1.45 + 0.45·(1 − need) − 0.2·aggression) × U(0.95, 1.05), clamped to the range; need = 1 − cash/(budget/2).
+- **Chance**: score = 60·(ref/price) + 0.35·reputation + 40·(reliability − 0.8) + clamp(2·(delivered − 2·failed), −12, 10);
+  P(win) = softmax(score / 10) over the bidders. The board shows the live chance for any price and rocket
+  (`contracts/odds`), the competitor count and the favourite; at the close one winner is drawn with exactly those odds
+  (`rngFor(seed, 'tenders', 'award', id)`). Rival prices stay sealed until the close.
+- **Feasibility** (`tenderFeasibility`, "Você consegue entregar?"): red for missing research (the mission's own gate),
+  a client that does not trust the agency, no rocket/craft that carries it ("Nenhum foguete seu leva 3 t à órbita de
+  transferência (o maior leva 1,2 t); pesquise X ou contrate um lançador (Y, de Z)"), no time before the deadline, or a
+  binding investors' agenda with no own slot left; amber for a shaky rocket (< 85%), a cost above 60% of the reference,
+  a tight deadline or short cash. Red tenders take no bids.
+- **Award**: 30% on signing, the rest on delivery; the mission is created without hardware (item 9), the rocket of the
+  bid suggested (`Foguete da proposta`). A contract counts as one own mission of the year for the investors' agenda.
+  Late launch: −30% pay; no launch 13 weeks (× step scale) after the deadline: default, fine 25% of the price, −8
+  reputation. A failed launch with ≥ 6 weeks to the deadline gets one more attempt (new mission, −2 reputation); a
+  second failure, or one with no time left, fails the contract: fine 25%, −5 reputation. Deadlines scale with long steps
+  (× stepWeeks/4, max 6) and always fit the next launch window of the destination.
+- **Rivals fly theirs** off-screen: delivery at 30–85% of the time to the deadline, one roll on the bid rocket's
+  reliability; success pays the rest, failure costs the fine and −4 reputation; both update the record and make news
+  (successes only for large jobs or tenders the player bid on).
+- **Old saves**: pending `contract/offer` cards are removed on the first tick (a stale card still resolves as a bid at
+  85/100/115% of the reference); their contracts stay on the board as tenders.
+
 ---
 
 ## 3. Infrastructure: assets (R3, R5, R6)

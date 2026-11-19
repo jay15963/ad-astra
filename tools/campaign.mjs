@@ -58,6 +58,20 @@ function actorCounts(state) {
   return { core, minor };
 }
 
+/** Contract counters of the tender board (missions.contracts* stats) and the contract income so far. */
+const CT_KEYS = ['Offered', 'Bid', 'Won', 'Delivered', 'Failed', 'Defaulted', 'Retried', 'IncomeM', 'FinesM'];
+function contractCounts(state) {
+  const st = state.stats || {};
+  return Object.fromEntries(CT_KEYS.map((k) => [k, st[`missions.contracts${k}`] || 0]));
+}
+/** "contratos: 31 abertos, 9 lances, 4 ganhos, 3 entregues, 0 falhas, 1 rompido, +US$ 420 mi (5% da verba)" */
+function contractLine(e) {
+  const d = Object.fromEntries(CT_KEYS.map((k) => [k, (e.ct1?.[k] || 0) - (e.ct0?.[k] || 0)]));
+  const years = Math.max(1, (e.turns ? e.weeks : 0) / 52);
+  const share = e.budgetSum > 0 ? ` (${Math.round((d.IncomeM / e.budgetSum) * 100)}% da verba da era)` : '';
+  return `contratos: ${d.Offered} abertos (${(d.Offered / years).toFixed(1)}/ano), ${d.Bid} lances, ${d.Won} ganhos, ${d.Delivered} entregues, ${d.Failed} falhas, ${d.Defaulted} rompidos, ${d.Retried} 2ª tentativa; receita US$ ${Math.round(d.IncomeM)} mi, multas US$ ${Math.round(d.FinesM)} mi${share}`;
+}
+
 function hasNaN(state) {
   for (const [id, a] of Object.entries(state.actors || {})) {
     for (const k of ['cash', 'budget', 'prestige', 'support', 'reputation']) {
@@ -93,6 +107,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
     cur = {
       eraId: state.clock.eraId, startTurn: state.turn, turns: 0, ms: 0, stops: 0, cardStops: 0, saveKB: 0,
       births0: lc.births ?? 0, applied0: Object.keys(lc.applied || {}).length, gone0: Object.keys(lc.tombstones || {}).length,
+      ct0: contractCounts(state),
     };
   };
   const closeEra = () => {
@@ -104,6 +119,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
       events: Object.keys(lc.applied || {}).length - cur.applied0,
       gone: Object.keys(lc.tombstones || {}).length - cur.gone0,
       endYear: yearOf(state),
+      ct1: contractCounts(state), weeks: state.turn - cur.startTurn,
     });
     eras.push(cur);
     onEra?.(cur, state);
@@ -138,11 +154,13 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
     const idsBefore = new Set(state.decisions.map((d) => d.id));
     const newsBefore = state.news[0]?.id;
     const ts = Date.now();
+    const tBefore = state.turn;
     const r = engine.dispatch(state, data, { type: 'time/advance', turns: 1, stopOnEvent: false });
     cur.ms += Date.now() - ts;
     if (!r.ok) { errors.push(`advance t${state.turn}: ${r.error}`); break; }
     if (r.advanced) {
       cur.turns++;
+      cur.budgetSum = (cur.budgetSum || 0) + (state.actors[state.playerId]?.budget || 0) * (state.turn - tBefore) / 52;
       const top = state.news[0];
       if (state.decisions.length > decBefore || state.activeLaunch || (top && top.id !== newsBefore && top.importance >= 3)) cur.stops++;
       // D1: the same without the player's own launch days (a director who flies a lot stops at every launch, with
@@ -195,7 +213,8 @@ if (isMain) {
       onEra: quiet ? null : (e, st) => console.log(
         `  ${e.eraId} até ${e.endYear}: ${e.turns} turnos, ${(e.ms / Math.max(1, e.turns)).toFixed(1)} ms/turno, save ${e.saveKB} KB, ` +
         `atores ${e.core} núcleo/${e.minor} menores, nasc ${e.births} ev ${e.events} fim ${e.gone}, paradas/turno ${(e.stops / Math.max(1, e.turns)).toFixed(2)} (sem lançamentos ${(e.cardStops / Math.max(1, e.turns)).toFixed(2)})` +
-        ` (${formatTurnEra(st.turn, st.startYear, st.clock.stepWeeks)})`),
+        ` (${formatTurnEra(st.turn, st.startYear, st.clock.stepWeeks)})
+    ${contractLine(e)}`),
     });
     const st = res.state;
     const reached = res.reason === 'ending' && engine.ENDINGS.includes(res.ending);

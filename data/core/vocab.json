@@ -556,6 +556,7 @@
       "power_swarm": { "label": "Segmento de enxame solar", "era": "e7", "key": "satellite:power_swarm", "histYear": 2650 }
     },
     "probe": {
+      "sounding": { "label": "Sondagem suborbital", "era": "e1", "key": null, "histYear": 1946 },
       "flyby": { "label": "Sobrevoo", "era": "e1", "key": null, "histYear": 1959 },
       "orbiter": { "label": "Orbitador", "era": "e1", "key": null, "histYear": 1959 },
       "impactor": { "label": "Impactador", "era": "e1", "key": "probe:impactor", "histYear": 1959 },

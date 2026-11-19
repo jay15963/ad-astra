@@ -160,6 +160,17 @@ export function boardPending(st, data) {
   if (!data?.scenario?.unlocks?.investors || !st?.playerId) return false;
   return !!st.actors?.[st.playerId]?.custom || String(st.playerId).startsWith('custom_');
 }
+/**
+ * Contratos badge (tender board, MISSIONS-V2 §2.1): amber when a won contract still has no rocket or is late; else the
+ * open tenders the agency could fly when they opened and has not bid on yet. Reads the raw slice (no query).
+ */
+export function contractsBadge(st) {
+  const list = Array.isArray(st?.contracts) ? st.contracts : [];
+  const ms = Array.isArray(st?.missions) ? st.missions : [];
+  const urgent = list.some((c) => c && (c.status === 'late' || (c.status === 'awarded' && !ms.some((m) => m.id === c.missionId && m.status !== 'cancelled' && (m.status !== 'planning' || m.vehicleId)))));
+  if (urgent) return true;
+  return list.filter((c) => c && c.status === 'open' && c.feasAtCreate && !c.playerBid).length;
+}
 /** Rocket designs of the player waiting for their test flights (Phase B builder, state.designs). */
 const designsInTest = (st) => (Array.isArray(st?.designs) ? st.designs : Object.values(st?.designs || {})).filter((d) => d && (!d.owner || d.owner === st.playerId) && d.program?.phase === 'testFlights');
 
@@ -187,6 +198,7 @@ registerScreen({ id: 'hangar', title: 'Hangar (construtor)', short: 'Hangar', ic
     },
   })),
   badge: (st) => (designsInTest(st).length ? true : 0) });
+registerScreen({ id: 'contratos', title: 'Contratos', icon: 'transferir', group: 'operacoes', order: 15, load: () => import('./contracts.js'), badge: (st) => contractsBadge(st) });
 registerScreen({ id: 'infra', title: 'Infraestrutura', icon: 'estacao', group: 'operacoes', order: 25, load: () => import('./infra-tab.js'), badge: (st, store) => infraAlerts(st, store) || decisionsOf(st, /^infra\//).length });
 registerScreen({ id: 'mercado', title: 'Mercado de foguetes', short: 'Mercado', icon: 'foguete', group: 'operacoes', order: 40, available: (st) => !!st?.market, load: orStub(() => import('./market.js')), badge: (st) => decisionsOf(st, /^market\/offer/).length });
 registerScreen({ id: 'lancamentos', title: 'Calendário de lançamentos', short: 'Calendário', icon: 'calendario', group: 'operacoes', order: 30, load: () => import('./lancamentos.js'), badge: (st) => mandatesDueSoon(st).length });

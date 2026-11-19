@@ -164,7 +164,8 @@ launch.js   ← risk.js, missions.js, crew.js, research.js, helpers, rng
 | `crew` | crew | `{[crewId]: Person}` |
 | `memorial` | crew | `[{crewId, name, role, turn, missionId, cause}]` |
 | `missions` | missions | `[Mission]` missões do jogador |
-| `contracts` | missions | `[Contract]` ofertas/leilões (criar o slice no init de missions) |
+| `contracts` | missions | `[Contract]` concorrências do quadro (tela Contratos) e contratos ganhos (criar o slice no init de missions) |
+| `tenders` | missions | `{next, record: {actorId: {won, ok, bad}}}` quando abre a próxima concorrência e o histórico de contratos de cada agência |
 | `activeLaunch`, `commandPoints` | launch | ver Dia de Lançamento |
 | `events` | narrative | `{history: {[eventId]: {count, lastTurn}}, flags: {}, chains: {[chainId]: step}, scheduled: [{eventId, turn, context}]}` |
 | `album` | narrative | `[{id, turn, title, headline, kind, missionId?, crewIds?, rarity}]` |
@@ -366,14 +367,17 @@ o programa do jogador dono daquela demo.
 - `onLaunchResolved(state, data, missionId, phase, outcome)` — chamado pelo launch ao fim de cada cena. Aplica: status (transit/operations/done),
   `recordFlight`, `applyMissionToCrew`, prestígio/`claimFirst`, reputação/apoio, ciência (`addSciencePoints`), notícias, sinal `mission/resolved`.
 - `estimateFor(state, data, missionId)` → recalcula `mission.estimate` via `risk.missionRisk`.
-- tick: briefings de itens do calendário do jogador (decisão `briefing`), ofertas de contrato (decisão `contract/offer`, leilão contra rivais),
+- tick: briefings de itens do calendário do jogador (decisão `briefing`), quadro de concorrências (sem carta: tela Contratos, MISSIONS-V2 §2.1;
+  fechamento por sorteio com as chances mostradas, rivais voam os seus fora de cena; cartas `contract/offer` de saves antigos são retiradas),
   missões `scheduled` cujo `launchTurn` chegou → decisão **blocking** `launch/ready` (payload `{missionId, phase:'ascent'}`),
   missões em trânsito: eventos de operação via `narrative.pickOperationEvent`, chegada → `launch/ready` com `phase:'arrival'` se o destino tem `arrivalMilestones`,
   senão resolve direto.
 - actions: `'mission/create' {draft}` → `{ok, missionId}`, `'mission/update' {missionId, patch}`, `'mission/schedule' {missionId, launchTurn}`
   (cobra o custo via `budget.spend`), `'mission/cancel' {missionId}`, `'mission/estimate' {draft}` → `{estimate}` (não muta).
 - queries: `'missions/list'`, `'missions/get' (id)`, `'missions/draftOptions' (draft)` → veículos/naves/destinos válidos, custo, janela e chance (passo 3 do resumo),
-  `'missions/nextWindow' (destId?, fromTurn?)`, `'missions/contracts'`. `nextWindow` traz `{destination, name, openTurn, closeTurn, weeks,
+  `'missions/nextWindow' (destId?, fromTurn?)`, `'missions/contracts'`, `'contracts/board'`, `'contracts/odds' (id, price, vehicleId)`,
+  `'contracts/feasibility' (id, vehicleId)`; actions `'contract/bid' {contractId, price, vehicleId}`, `'contract/withdraw' {contractId}`,
+  `'contract/mission' {contractId}`. `nextWindow` traz `{destination, name, openTurn, closeTurn, weeks,
   open, launchTurn, arrivalTurn, late, lateText}`; sem destino devolve a janela mais cedo que ainda chega antes do fim (ou a mais cedo,
   marcada `late`). `lateText` é o aviso pt-BR ("Não dá para chegar antes do fim de 2030: …").
 
@@ -707,8 +711,9 @@ Contrato em [docs/EXPANSION.md](docs/EXPANSION.md) §5–§8 e §12. Módulos no
   `gameOver {reason: 'board'}`. Vagas por ano `K` (por era), mandatadas `M = min(K−1, round(K·s^0,6))`. Rodada anual
   (`investors/round`), recompra 1,15× (`investors/buyback {holderId, pct}`), dividendos, fim de prazo (`investors/term`).
   Itens de programa do calendário viram mandatos do acionista âncora (governo 40% para agências nacionais, fundadores 30% para
-  empresas; agência fundada começa com 100%). "Voo próprio" (cota e veto) = missão `source: 'custom'` sem mandato, a mesma
-  conta da agenda de `missions.agendaOf`; contratos pagos e itens de programa não contam. Mandato encerrado sem voo fecha os
+  empresas; agência fundada começa com 100%). "Voo próprio" (cota e veto) = missão `source: 'custom'` sem mandato ou contrato
+  ganho no quadro (um por contrato; a 2ª tentativa não conta de novo), a mesma conta da agenda de `missions.agendaOf`; itens de
+  programa não contam. Com a agenda obrigatória cheia, o quadro recusa lances (mandatos e contratos nunca disputam a mesma vaga). Mandato encerrado sem voo fecha os
   rascunhos em planejamento (`missions.closeMandateMissions`). Migração v2 → v3 em `src/core/migrations/v3.js`.
 - **Missões com mandato** (`missions.js`): `createMandateMission`, `mission/fromMandate`, selo do acionista, prazo e
   penalidade na lista e no detalhe; `mission/create` e "Aceitar" de oportunidade recusam com a agenda cheia (abaixo de 50%).

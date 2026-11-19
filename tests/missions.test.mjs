@@ -407,24 +407,27 @@ test('briefing cancel marks the calendar item cancelled', () => {
   assert.equal(state.decisions.filter((x) => x.payload?.calendarId === 't_cal_lander').length, 0);
 });
 
-test('contracts: offer, bid, auction, award, delivery pays revenue', () => {
+test('contracts: tender board, bid, award, delivery pays revenue', () => {
   const { data, state } = setup();
-  let offer = null;
-  for (let i = 0; i < 80 && !offer; i++) {
+  let tender = null;
+  for (let i = 0; i < 80 && !tender; i++) {
     missions.tick(state, data, ctxFor(state, data));
-    offer = state.decisions.find((x) => x.kind === 'contract/offer');
-    if (!offer) state.turn++;
+    tender = state.contracts.find((x) => x.status === 'open' && missions.tenderFeasibility(state, data, x).level !== 'bad');
+    if (!tender) state.turn++;
   }
-  assert.ok(offer, 'a contract offer appeared');
-  assert.deepEqual(offer.choices.map((c) => c.id), ['bid_low', 'bid_mid', 'bid_high', 'pass']);
-  const c = state.contracts.find((x) => x.id === offer.payload.contractId);
-  assert.ok(c.valueM > 0 && c.deadlineTurn > state.turn);
-  assert.ok(offer.choices[0].preview.includes('%') || offer.choices[0].disabled);
-  if (offer.choices[0].disabled) return; // no capable hardware in this fixture for this kind
-  resolveDecision(state, data, offer.id, 'bid_low');
+  assert.ok(tender, 'a tender the agency can deliver appeared on the board');
+  assert.ok(!state.decisions.some((x) => x.kind === 'contract/offer'), 'no push card: the board is a screen');
+  const c = tender;
+  assert.ok(c.valueM > 0 && c.deadlineTurn > c.closeTurn && c.closeTurn > state.turn);
+  const board = q(state, data, 'contracts/board');
+  assert.ok(board.open.some((x) => x.id === c.id && x.feas.level !== 'bad'));
+  const lo = Math.ceil(c.valueM * 0.6);
+  assert.equal(dispatch(state, data, { type: 'contract/bid', contractId: c.id, price: lo - 5 }).ok, false, 'below the range');
+  const r = dispatch(state, data, { type: 'contract/bid', contractId: c.id, price: lo });
+  assert.equal(r.ok, true, r.error);
+  assert.ok(r.chance > 0 && r.chance <= 1);
   assert.equal(c.status, 'bidding');
   c.rivals = []; // force the win
-  state.decisions = state.decisions.filter((x) => x.kind !== 'contract/offer');
   state.turn = c.closeTurn;
   const cash0 = state.actors[PID].cash;
   missions.tick(state, data, ctxFor(state, data));
@@ -444,6 +447,7 @@ test('contracts: offer, bid, auction, award, delivery pays revenue', () => {
   if (m.status === 'transit') { m.status = 'arrival'; missions.onLaunchResolved(state, data, m.id, 'arrival', { level: 'total' }); }
   assert.equal(c.status, 'delivered');
   assert.ok(state.actors[PID].cash > cash1);
+  assert.equal(missions.recordOf(state, PID).ok, 1);
 });
 
 test('contract default after the deadline costs reputation', () => {

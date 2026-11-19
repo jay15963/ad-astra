@@ -1,0 +1,77 @@
+/* Contratos (src/ui/contracts.js; docs/MISSIONS-V2.md §2.1). DESIGN.md tokens only: grey interface, colour for
+   meaning (green = you can deliver / margin up, red = blocking / loss, amber = your agency's bid and the main action).
+   Every row fits 320 px: flex + min-width 0; buttons and steppers are 44 px. */
+
+.ct-card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ct-card.mine{border-color:var(--yellow-line)}
+.tela-sec>.ct-card+.ct-card,.tela-sec>.ct-card+.tela-filtros+.ct-card{margin-top:10px}
+.tela-filtros+.ct-card{margin-top:4px}
+.ct-card-topo{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.ct-emb{flex:none;line-height:0}
+.ct-card-nome{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ct-card-nome b{font-size:var(--t13);font-weight:600;line-height:1.3}
+.ct-card-nome span:last-child{font-size:var(--t11);color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-card-num{flex:none;text-align:right;display:flex;flex-direction:column;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.ct-card-num b{font-size:var(--t15);font-weight:600}
+.ct-card-num span{font-size:var(--t10);color:var(--text-3)}
+.ct-eyebrow{font-size:var(--t10);text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
+.ct-texto{margin:0;font-size:var(--t11);color:var(--text-2);line-height:1.45}
+.ct-muted{color:var(--text-3)}
+.ct-chips{display:flex;flex-wrap:wrap;gap:6px}
+
+.ct-dados{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0}
+.ct-dados div{min-width:0;background:var(--s2);border-radius:var(--r-sm, 6px);padding:6px 8px;display:flex;flex-direction:column;gap:1px}
+.ct-dados dt{font-size:var(--t10);color:var(--text-3)}
+.ct-dados dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--t12);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.ct-feas{border-radius:var(--r-sm, 6px);padding:8px 10px;display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);background:var(--s2)}
+.ct-feas-title{font-size:var(--t12);font-weight:600}
+.ct-feas-text{margin:0;font-size:var(--t11);line-height:1.45;color:var(--text-2)}
+.ct-feas-ok{border-color:var(--green-line);background:var(--green-bg)}
+.ct-feas-ok .ct-feas-title{color:var(--green)}
+.ct-feas-warn{border-color:var(--yellow-line);background:var(--yellow-bg)}
+.ct-feas-warn .ct-feas-title{color:var(--yellow)}
+.ct-feas-bad{border-color:var(--red-line);background:var(--red-bg)}
+.ct-feas-bad .ct-feas-title{color:var(--red)}
+.ct-feas-more{margin:4px 0 0;padding-left:16px;font-size:var(--t11);color:var(--text-2);line-height:1.4}
+.ct-feas-li-bad::marker{color:var(--red)}
+.ct-feas-li-warn::marker{color:var(--yellow)}
+
+.ct-lance{display:grid;grid-template-columns:auto 1fr;align-items:baseline;gap:2px 10px;min-width:0}
+.ct-lance .ct-eyebrow{grid-column:1/-1}
+.ct-lance b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--t15);color:var(--yellow)}
+.ct-lance span:not(.ct-eyebrow){font-size:var(--t11);color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-lance .bar{grid-column:1/-1}
+.ct-botoes{display:flex;gap:8px;flex-wrap:wrap}
+.ct-botoes .btn{flex:1 1 120px;min-height:44px}
+
+/* bid sheet */
+.ct-folha{display:flex;flex-direction:column;gap:14px}
+.ct-escolha{display:flex;flex-direction:column;gap:6px}
+.ct-opcao{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:8px 12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);color:var(--text);font:inherit;text-align:left;cursor:pointer;min-width:0}
+.ct-opcao.ativa{border-color:var(--text-2);background:var(--s3)}
+.ct-opcao-nome{font-size:var(--t12);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-opcao-num{flex:none;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--t11);color:var(--text-3)}
+.ct-preco{display:flex;flex-direction:column;gap:8px}
+.ct-preco-linha{display:flex;align-items:center;gap:8px;min-width:0}
+.ct-preco-linha .btn{flex:none;min-width:44px;min-height:44px;padding:0;justify-content:center}
+.ct-preco-txt{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.ct-preco-val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--t22);font-weight:600;color:var(--yellow)}
+.ct-preco-ref{font-size:var(--t11);color:var(--text-3)}
+.ct-range{width:100%;min-height:32px;accent-color:var(--text-2)}
+.ct-range-marcas{display:flex;justify-content:space-between;font-family:var(--mono);font-size:var(--t10);color:var(--text-3)}
+.ct-live{display:flex;flex-direction:column;gap:10px}
+.ct-chance{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px}
+.ct-chance .bar{grid-column:1/-1;height:8px}
+.ct-chance-val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--t24);font-weight:600;color:var(--yellow)}
+.ct-campo{display:flex;flex-direction:column;gap:6px}
+.ct-campo-linha{display:grid;grid-template-columns:minmax(0,38%) 1fr 48px;align-items:center;gap:8px;font-size:var(--t11);color:var(--text-2)}
+.ct-campo-linha.mine{color:var(--yellow)}
+.ct-campo-nome{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-campo-num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.ct-resumo{display:grid;grid-template-columns:1fr auto;gap:6px 12px;margin:0;padding:10px 12px;background:var(--s2);border-radius:var(--r-sm, 6px);font-size:var(--t12)}
+.ct-resumo dt{color:var(--text-2);min-width:0}
+.ct-resumo dd{margin:0;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.ct-resumo dd.ct-pos{color:var(--green)}
+.ct-resumo dd.ct-neg{color:var(--red)}
+.ct-folha .ct-botoes .btn{flex:1 1 140px}
