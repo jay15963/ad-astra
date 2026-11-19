@@ -6,7 +6,7 @@
 // dynamic imports, found by following the import statements — the game data and the icons), so the app
 // opens offline from the second visit on, including screens never opened online (Mapa, Dia de Lançamento).
 // Keep SW_VERSION equal to APP_VERSION in src/ui/settings.js (tests/sw.test.mjs checks it).
-const SW_VERSION = '0.9.20';
+const SW_VERSION = '0.9.21';
 const CACHE = `adastra-${SW_VERSION}`;
 
 // entry points of the crawl; everything they import or link is added (same origin only)

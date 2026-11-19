@@ -18,6 +18,7 @@ import { clamp, nextId, addNews, pushDecision, removeDecision, emitSignal, claim
 import { rngFor } from '../core/rng.js';
 import { destPrestige as outcomeDestPrestige, missionPrestige } from '../core/outcome.js';
 import { turnToDate, formatTurn, weeksToText } from '../core/time.js';
+import { craftFitsDestination } from '../core/catalog.js';
 import { vehicleDef as catalogVehicle, spacecraftDef as catalogCraft } from '../core/catalog.js';
 import { crossed, yearAt, destinationOpen, liveActorIds } from './simtime.js';
 
@@ -680,17 +681,7 @@ function scOkForType(sc, type, crewed, data = null) {
  * place anywhere (the rocket's capacity decides if it gets there).
  */
 function scOkForDest(sc, destId, data = null) {
-  if (!Array.isArray(sc?.destinations) || sc.destinations.length === 0 || sc.destinations.includes(destId)) return true;
-  if (!data || !(sc.generic || sc.access === 'generic')) return false;
-  const dest = destDef(data, destId);
-  if (!dest) return false;
-  const listed = sc.destinations.map((id) => destDef(data, id)).filter(Boolean);
-  // a surface needs something that lands (an impactor listing lunar_impact is not a lander)
-  const lands = ['lander', 'rover', 'cargo'].includes(sc.kind);
-  if ((dest.kind !== 'surface' || lands) && listed.some((x) => x.kind === dest.kind && x.body === dest.body)) return true;
-  if (sc.kind === 'satellite' && dest.kind === 'orbit' && ['earth', 'moon'].includes(dest.body) && listed.some((x) => x.kind === 'orbit')) return true;
-  if (sc.kind === 'probe' && ['orbit', 'flyby', 'atmosphere', 'rendezvous'].includes(dest.kind) && dest.body !== 'earth' && listed.some((x) => x.kind === dest.kind)) return true;
-  return false;
+  return craftFitsDestination(data, sc, destId);
 }
 
 // ---------------------------------------------------------------------------------------------

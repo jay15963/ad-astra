@@ -4,6 +4,7 @@
 // Imports only via namespaces so stub modules (missing exports) never break linking.
 
 import * as calendar from './calendar.js';
+import { craftFitsDestination } from '../core/catalog.js';
 import * as research from './research.js';
 import * as crew from './crew.js';
 import * as politics from './politics.js';
@@ -524,7 +525,7 @@ export function missionRisk(state, data, plan = {}) {
     errors.push(`${sc.name || sc.id} precisa de um módulo de pouso tripulado para ${dest.name || dest.id}.`);
   }
 
-  if (sc && dest && Array.isArray(sc.destinations) && sc.destinations.length && !sc.destinations.includes(dest.id)) {
+  if (sc && dest && !craftFitsDestination(data, sc, dest.id)) {
     errors.push(`${sc.name || sc.id} não foi feita para ${dest.name || dest.id}.`);
   }
   if (sc && vehicle && Array.isArray(sc.compatibleVehicles) && sc.compatibleVehicles.length && !sc.compatibleVehicles.includes(vehicle.id)) {

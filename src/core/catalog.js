@@ -112,3 +112,23 @@ export function listSpacecraft(data, state, { turn, actorId, gated = false } = {
     && (!gated || researchGateOf(data, state, 'spacecraft', v, actorId).ok));
   return catalog.concat(designList(state, actorId, asCraft).filter((v) => itemAvailable(data, state, v, t)));
 }
+
+/**
+ * Can this craft fly to destId? Historical craft keep their own list. Generic craft (generic / access 'generic')
+ * also go to the neighbours of what they list: the same kind of place on the same body (a lunar lander lands at the
+ * south pole or the far side too; a surface needs something that lands), satellites to any orbit of the Earth or the
+ * Moon, probes to the same kind of place anywhere (the rocket's capacity decides if it gets there).
+ */
+export function craftFitsDestination(data, sc, destId) {
+  if (!Array.isArray(sc?.destinations) || sc.destinations.length === 0 || sc.destinations.includes(destId)) return true;
+  if (!data || !(sc.generic || sc.access === 'generic')) return false;
+  const find = (id) => (id ? data.index?.destinations?.[id] ?? data.destinations?.destinations?.find((v) => v.id === id) ?? null : null);
+  const dest = find(destId);
+  if (!dest) return false;
+  const listed = sc.destinations.map(find).filter(Boolean);
+  const lands = ['lander', 'rover', 'cargo'].includes(sc.kind);
+  if ((dest.kind !== 'surface' || lands) && listed.some((x) => x.kind === dest.kind && x.body === dest.body)) return true;
+  if (sc.kind === 'satellite' && dest.kind === 'orbit' && ['earth', 'moon'].includes(dest.body) && listed.some((x) => x.kind === 'orbit')) return true;
+  if (sc.kind === 'probe' && ['orbit', 'flyby', 'atmosphere', 'rendezvous'].includes(dest.kind) && dest.body !== 'earth' && listed.some((x) => x.kind === dest.kind)) return true;
+  return false;
+}
