@@ -341,7 +341,12 @@ function closeDrawer(opts) {
 /** A drawer item: a screen, a shortcut into a sub-view (go), or a shell action. */
 function pickDrawerItem(d) {
   if (d.action === 'resign') {
-    closeDrawer({ restoreFocus: false });
+    // close the drawer WITHOUT history.back(): the back's popstate would also close the confirm sheet opened next
+    if (ui.drawerEntry) {
+      ui.drawerEntry = false;
+      closeDrawer({ restoreFocus: false });
+      try { history.replaceState(null, '', location.hash || '#painel'); } catch { /* old browsers */ }
+    } else closeDrawer({ restoreFocus: false });
     const a = store.state?.actors?.[store.state?.playerId] || {};
     confirmDialog(`Deixar a direção da ${a.short || a.name || 'agência'}? O mundo continua: ela segue com a IA, e você escolhe outra agência, funda uma nova ou volta a ela depois (como uma segunda chance).`, { title: 'Pedir demissão', okLabel: 'Pedir demissão', danger: true }).then((ok) => {
       if (!ok) return;
