@@ -53,9 +53,9 @@ test('fired in the Corrida Lunar: no game over, the clock waits, only the choice
   assert.equal(st.actorId, 'nasa');
   assert.equal(st.canFound, false, 'the Corrida Lunar does not offer founding');
   const ids = st.candidates.map((c) => c.id);
-  assert.ok(!ids.includes('nasa'), 'not the agency that fired the director');
+  assert.equal(st.candidates[0].id, 'nasa', 'the agency that fired the director comes first');
+  assert.equal(st.candidates[0].self, true, 'and is marked as a second chance');
   for (const id of ids) assert.ok(lunar.scenario.playableActors.includes(id), `${id} is a playable actor of the scenario`);
-  assert.equal(dispatch(s, lunar, { type: 'director/take', actorId: 'nasa' }).ok, false);
   assert.ok(st.tenure.fromTurn === 0 && st.tenure.toTurn >= 20);
 });
 
@@ -176,7 +176,7 @@ test('tenure history: every agency the player directed, in order; the epilogue m
   steps(s, campaign, 20);
   fire(s, campaign);
   assert.equal(s.director.ousted?.actorId, first);
-  assert.ok(!query(s, campaign, 'director/candidates').some((c) => c.id === first));
+  assert.ok(query(s, campaign, 'director/candidates').find((c) => c.id === first)?.self, 'the agency that fired you is offered as a second chance');
   const second = directorMove(s, campaign, engine, { found: true });
   assert.ok(second.startsWith('custom_'));
   const ten = query(s, campaign, 'director/tenures');
@@ -216,4 +216,26 @@ test('the shared bot handles the choice and the run goes on (golden bot + Phase 
   assert.equal(directorMove(s, lunar, engine), best.id, 'the strongest agency left');
   assert.equal(s.playerId, best.id);
   assert.equal(directorMove(s, lunar, engine), null, 'nothing pending any more');
+});
+
+test('second chance: the player goes back to the agency that fired them, with debt covered and nothing handed over', () => {
+  const s = newGame(lunar, { seed: 11, playerId: 'nasa' });
+  steps(s, lunar, 20);
+  const missions = s.missions.length;
+  fire(s, lunar);
+  assert.equal(s.director.ousted?.actorId, 'nasa');
+  const r = dispatch(s, lunar, { type: 'director/take', actorId: 'nasa' });
+  assert.ok(r.ok && r.retake, JSON.stringify(r));
+  assert.equal(s.playerId, 'nasa');
+  assert.equal(s.director.ousted, null);
+  assert.ok(s.actors.nasa.cash >= 0, 'debt covered');
+  assert.ok(s.actors.nasa.support >= 30, 'support back to 30');
+  assert.equal(s.finance.debtWeeks, 0);
+  assert.equal(s.missions.length, missions, 'missions stay with the player');
+  assert.equal(s.director.tenures.length, 1, 'the first tenure is recorded');
+  const turn = s.turn;
+  steps(s, lunar, 3);
+  assert.ok(s.turn > turn, 'time moves again');
+  const back = deserialize(serialize(s));
+  assert.deepEqual(back, deserialize(serialize(back)));
 });

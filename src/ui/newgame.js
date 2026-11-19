@@ -341,7 +341,7 @@ export function renderOusted(root, store, { onTake, onFound, onBrowse } = {}) {
     h('div', { class: 'aviso ousted-note' }, icon('info', 16),
       h('span', null, `O mundo continua: a ${name} segue com uma nova direção, e o seu save também. Escolha onde continuar a partir de ${fmtMonth(st.turn, st.startYear)}.`)),
     h('div', { class: 'btn-col title-actions' },
-      s.candidates.length ? button('Assumir outra agência', () => onTake?.(), { kind: 'primary', icon: 'continuar', big: true }) : null,
+      s.candidates.length ? button('Escolher uma agência', () => onTake?.(), { kind: 'primary', icon: 'continuar', big: true }) : null,
       s.canFound ? button('Fundar uma nova agência', () => onFound?.(), { icon: 'mais', big: true, kind: s.candidates.length ? undefined : 'primary' }) : null,
       !s.candidates.length && !s.canFound ? h('div', { class: 'aviso warn' }, 'Nenhuma agência pode ser assumida agora.') : null,
       onBrowse ? button('Ver o mundo antes de decidir', () => onBrowse(), { icon: 'mundo', big: true, kind: 'ghost' }) : null),
@@ -361,7 +361,9 @@ export function renderTakePicker(root, store, { onTaken, onBack } = {}) {
   ensureFoundCss();
   const date = fmtMonth(st.turn, st.startYear);
   const take = async (c) => {
-    const ok = await confirmDialog(`Você assume a direção da ${c.name} a partir de ${date}, com o caixa, a equipe e os programas que ela tem hoje.`, { okLabel: 'Assumir a direção', title: c.short || c.name });
+    const ok = await confirmDialog(c.self
+      ? `Você volta à direção da ${c.name} a partir de ${date}: uma segunda chance. ${s.reason === 'board' ? 'Os acionistas voltam a um humor neutro' : 'O governo cobra as dívidas e o apoio volta a 30'}; missões, equipe, foguetes e pesquisa continuam como estão. Se a situação não mudar, você pode ser afastado de novo.`
+      : `Você assume a direção da ${c.name} a partir de ${date}, com o caixa, a equipe e os programas que ela tem hoje.`, { okLabel: c.self ? 'Voltar à direção' : 'Assumir a direção', title: c.short || c.name });
     if (!ok) return;
     const res = store.dispatch({ type: 'director/take', actorId: c.id });
     if (!res?.ok) { toast(res?.error || 'Não foi possível assumir esta agência.', 'bad'); return; }
@@ -382,16 +384,16 @@ export function renderTakePicker(root, store, { onTaken, onBack } = {}) {
           h('span', { class: 'selo' }, `prestígio ${c.prestige}`),
           chip(c.note, warn ? 'warn' : 'muted'),
           c.crewed ? chip('voo tripulado', 'info') : null,
-          c.before ? chip('já dirigiu', 'muted') : null)),
+          c.self ? chip('voltar à direção · 2ª chance', 'info') : c.before ? chip('já dirigiu', 'muted') : null)),
       icon('avancar', 16, 'list-chev'));
   };
   const screen = h('div', { class: 'title-screen fa-screen take-picker' },
     h('div', { class: 'fa-head' },
       h('div', { class: 'fa-top' },
         h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Voltar', onclick: () => onBack?.() }, icon('voltar', 22)),
-        h('div', { class: 'fa-top-text' }, h('div', { class: 'mono-eyebrow' }, `Nova direção · ${date}`), h('div', { class: 'fa-top-title' }, 'Assumir outra agência')),
+        h('div', { class: 'fa-top-text' }, h('div', { class: 'mono-eyebrow' }, `Nova direção · ${date}`), h('div', { class: 'fa-top-title' }, 'Escolher uma agência')),
         h('span', { class: 'fa-count' }, String(s.candidates.length)))),
-    h('p', { class: 'lead' }, 'As agências e empresas que existem hoje. Você chega com o que ela tem: verba, caixa, equipe, programas e rivais.'),
+    h('p', { class: 'lead' }, 'A sua própria agência (uma segunda chance) e as outras agências e empresas que existem hoje. Você chega com o que ela tem: verba, caixa, equipe, programas e rivais.'),
     s.candidates.length ? h('div', { class: 'list actor-list' }, s.candidates.map(row)) : h('div', { class: 'aviso warn' }, 'Nenhuma agência pode ser assumida agora.'),
     h('div', { class: 'btn-col title-actions' }, button('Voltar', () => onBack?.(), { big: true, kind: 'ghost' })));
   root.appendChild(h('div', { class: 'title-page' }, screen));

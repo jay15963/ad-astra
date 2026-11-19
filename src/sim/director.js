@@ -12,7 +12,7 @@
 // Old saves that ended with gameOver 'fired' / 'board' before the campaign's end are reopened on load (reopen()).
 // Deterministic, plain JSON, no DOM.
 
-import { addNews, emitSignal, log } from '../core/helpers.js';
+import { addNews, emitSignal, log, changeActor } from '../core/helpers.js';
 import { turnToDate, dateToTurn } from '../core/time.js';
 import * as lifecycle from './lifecycle.js';
 
@@ -157,20 +157,21 @@ function noteOf(a) {
  * fixed list (Corrida Lunar, rule 'list') keeps to its playable actors. Core first, then by prestige.
  */
 export function candidates(state, data) {
-  const exclude = state.director?.ousted?.actorId ?? null;
+  const ousted = state.director?.ousted?.actorId ?? null;
   const sc = data?.scenario || {};
   const rule = sc.lifecycle === 'on' ? (sc.playable?.rule || 'alive') : 'list';
   const listed = sc.playable?.actors || sc.playableActors || [];
   const all = Object.values(state.actors || {}).filter((a) => a && a.id);
   const ranked = all.slice().sort((x, y) => (y.prestige || 0) - (x.prestige || 0) || (x.id < y.id ? -1 : 1)).map((a) => a.id);
-  return all.filter((a) => a.id !== exclude && (rule !== 'list' || listed.includes(a.id))).map((a) => ({
+  return all.filter((a) => a.id === ousted || (rule !== 'list' || listed.includes(a.id))).map((a) => ({
     id: a.id, name: a.name || a.id, short: a.short || a.id, flag: a.flag || '', country: a.country || '', kind: a.kind || 'agency',
     tier: a.tier || 'core', emblem: a.emblem ?? null, color: a.color ?? null, generated: !!a.generated, custom: !!a.custom,
     budget: Math.round(a.budget || 0), cash: Math.round(a.cash || 0), prestige: Math.round(a.prestige || 0),
     support: Math.round(a.support ?? 0), reputation: Math.round(a.reputation ?? 0), crewed: !!a.capabilities?.crewed,
     rank: ranked.indexOf(a.id) + 1, of: ranked.length, note: noteOf(a),
     before: (state.director?.tenures || []).some((t) => t.actorId === a.id),
-  })).sort((x, y) => (x.tier === y.tier ? 0 : x.tier === 'core' ? -1 : 1) || y.prestige - x.prestige || (x.id < y.id ? -1 : 1));
+    self: a.id === ousted, // the agency that just removed the director: "Voltar à direção" (a second chance)
+  })).sort((x, y) => (x.self === y.self ? 0 : x.self ? -1 : 1) || (x.tier === y.tier ? 0 : x.tier === 'core' ? -1 : 1) || y.prestige - x.prestige || (x.id < y.id ? -1 : 1));
 }
 
 /** What the "Você foi afastado" screen shows (null while the player still directs an agency). */
@@ -213,9 +214,42 @@ function handOver(state, data, ctx, to, { mode, grant = null } = {}) {
   return { ok: true, actorId: to, from };
 }
 
+/**
+ * Back to the agency that just removed the director: a second chance, not a hand-over. The world, the missions, the
+ * crew, the designs and the research stay as they are; the government/board give breathing room (debt covered,
+ * support at least 30, the weeks-in-the-red count and the board's bad rounds restart) so the director is not removed
+ * again the next week.
+ */
+function retake(state, data, ctx) {
+  const d = ensure(state, data);
+  const o = d.ousted;
+  const pid = state.playerId;
+  d.tenures.push(currentTenure(state, data, { toTurn: o?.turn ?? state.turn, reason: o?.reason ?? null, summary: o?.summary ?? '' }));
+  if (d.tenures.length > TENURE_CAP) d.tenures.splice(0, d.tenures.length - TENURE_CAP);
+  const a = state.actors?.[pid] || {};
+  if ((a.cash || 0) < 0) changeActor(state, pid, 'cash', -(a.cash || 0));
+  if ((a.support ?? 0) < 30) changeActor(state, pid, 'support', 30 - (a.support ?? 0));
+  if (state.finance) state.finance.debtWeeks = 0;
+  if (state.cap) {
+    state.cap.lowRounds = 0;
+    state.cap.warned = false;
+    for (const h of state.cap.holders || []) if ((h.mood ?? 50) < 45) h.mood = 45;
+  }
+  d.since = state.turn;
+  d.ousted = null;
+  addNews(state, {
+    headline: `O diretor afastado volta ao comando da ${a.short || a.name || pid}`,
+    body: o?.reason === 'board' ? 'Os acionistas aceitam uma segunda chance, com metas mais curtas.' : 'O governo cobre as dívidas e dá uma segunda chance à antiga direção.',
+    tags: ['director'], actors: [pid], importance: 3, icon: 'agency',
+  });
+  emitSignal(state, 'director/changed', { from: pid, to: pid, mode: 'retake' });
+  return { ok: true, actorId: pid, from: pid, retake: true };
+}
+
 function take(state, data, action, ctx) {
   if (!isOusted(state)) return { ok: false, error: 'Você ainda dirige a sua agência.' };
   const id = action?.actorId;
+  if (id && id === state.director?.ousted?.actorId && id === state.playerId) return retake(state, data, ctx);
   if (!candidates(state, data).some((c) => c.id === id)) return { ok: false, error: 'Esta agência não pode ser assumida agora.' };
   return handOver(state, data, ctx, id, { mode: 'take' });
 }

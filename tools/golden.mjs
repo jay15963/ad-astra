@@ -82,7 +82,8 @@ export function directorMove(state, data, { dispatch, query } = engine, { found 
   if (!state.director?.ousted || state.gameOver) return null;
   const st = query(state, data, 'director/status');
   if (!st) return null;
-  const best = (st.candidates || []).slice().sort((a, b) => b.prestige - a.prestige || b.budget - a.budget || (a.id < b.id ? -1 : 1))[0];
+  // the bot moves on (another agency); a human may also go back to the agency that fired them (c.self)
+  const best = (st.candidates || []).filter((c) => !c.self).sort((a, b) => b.prestige - a.prestige || b.budget - a.budget || (a.id < b.id ? -1 : 1))[0];
   if (st.canFound && (found || !best)) {
     const sc = query(state, data, 'director/foundScenario');
     const opts = query(state, data, 'agency/foundingOptions', sc);
