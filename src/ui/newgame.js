@@ -279,6 +279,7 @@ function blocName(store, blocId) {
 const OUST_TEXT = {
   fired: 'O apoio chegou a zero depois de semanas no vermelho, e quem paga as contas trocou a direção.',
   board: 'Os acionistas votaram pela troca da direção.',
+  resigned: 'Você pediu demissão. A agência segue com uma nova direção.',
 };
 
 const yearOfTurn = (st, t) => (st.startYear ?? 0) + Math.floor((Number(t) || 0) / 52);
@@ -322,7 +323,7 @@ export function renderOusted(root, store, { onTake, onFound, onBrowse } = {}) {
       h('div', { class: 'brand-row' }, raw(emblemSVG(me, { size: 30 }), 'agency-emblem'), h('strong', { class: 'brand-name' }, name)),
       h('div', { class: 'mono-eyebrow' }, `Fim da sua direção · ${fmtMonth(s.turn, st.startYear)}`)),
     h('div', { class: 'opening' },
-      h('h1', null, `Você foi afastado da direção da ${name}`),
+      h('h1', null, s.reason === 'resigned' ? `Você deixou a direção da ${name}` : `Você foi afastado da direção da ${name}`),
       h('p', { class: 'tagline' }, s.summary || OUST_TEXT[s.reason] || s.reasonLabel)),
     safePanel(() => h('div', { class: 'go-summary' },
       sectionTitle(`Sua passagem pela ${name}`),

@@ -5,6 +5,7 @@
 import { loadData, browserReader } from '../core/data.js';
 import * as time from '../core/time.js';
 import { createStore } from './store.js';
+import { confirmDialog } from './components.js';
 import { h, raw, button, toast, fallbackPanel, closeAllModals, fmtDate, fmtMonth, chip, openModal, fmtBand, esc, iconSVG, cleanFlags, eraInfo, passedText } from './components.js';
 import { emblemSVG } from './portrait.js';
 import { useEmblemData } from './emblem.js';
@@ -339,6 +340,17 @@ function closeDrawer(opts) {
 
 /** A drawer item: a screen, a shortcut into a sub-view (go), or a shell action. */
 function pickDrawerItem(d) {
+  if (d.action === 'resign') {
+    closeDrawer({ restoreFocus: false });
+    const a = store.state?.actors?.[store.state?.playerId] || {};
+    confirmDialog(`Deixar a direção da ${a.short || a.name || 'agência'}? O mundo continua: ela segue com a IA, e você escolhe outra agência, funda uma nova ou volta a ela depois (como uma segunda chance).`, { title: 'Pedir demissão', okLabel: 'Pedir demissão', danger: true }).then((ok) => {
+      if (!ok) return;
+      const res = store.dispatch({ type: 'director/resign' });
+      if (!res?.ok) { toast(res?.error || 'Não foi possível sair da direção agora.', 'bad'); return; }
+      renderAll();
+    });
+    return;
+  }
   if (d.action === 'title') {
     closeDrawer({ restoreFocus: false });
     // the game is saved after every action: leaving only unloads it (Continuar brings it back)

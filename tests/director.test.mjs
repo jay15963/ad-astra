@@ -239,3 +239,18 @@ test('second chance: the player goes back to the agency that fired them, with de
   const back = deserialize(serialize(s));
   assert.deepEqual(back, deserialize(serialize(back)));
 });
+
+test('resign: the drawer action leaves the direction and opens the same choice (own agency first)', () => {
+  const s = newGame(lunar, { seed: 13, playerId: 'nasa' });
+  steps(s, lunar, 5);
+  const r = dispatch(s, lunar, { type: 'director/resign' });
+  assert.ok(r.ok, JSON.stringify(r));
+  assert.equal(s.director.ousted?.reason, 'resigned');
+  assert.equal(isBlocked(s, lunar), 'ousted');
+  const st = query(s, lunar, 'director/status');
+  assert.equal(st.candidates[0].id, 'nasa');
+  assert.equal(dispatch(s, lunar, { type: 'director/resign' }).ok, false, 'already out');
+  const other = st.candidates.find((c) => !c.self).id;
+  assert.ok(dispatch(s, lunar, { type: 'director/take', actorId: other }).ok);
+  assert.equal(s.playerId, other);
+});

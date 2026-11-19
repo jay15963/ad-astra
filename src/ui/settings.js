@@ -1,9 +1,9 @@
 // Settings / accessibility screen + app version (so players know the phone has the latest build).
 import { h, card, button, segmented, toast, confirmDialog, sectionTitle, viewHead, eraInfo } from './components.js';
 
-export const APP_VERSION = '0.9.14';          // keep in sync with package.json "version"
+export const APP_VERSION = '0.9.15';          // keep in sync with package.json "version"
 export const BUILD_DATE = '2026-11-19';      // bump on every deploy
-export const BUILD = '2026.11.20-4';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
+export const BUILD = '2026.11.20-5';        // build id shown in Ajustes (bump with BUILD_DATE; keep sw.js SW_VERSION = APP_VERSION)
 
 /** Apply settings to the document (text scale, motion, colorblind palette). */
 export function applySettings(settings) {

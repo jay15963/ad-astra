@@ -90,6 +90,7 @@
   font: 700 var(--t10)/18px var(--mono); text-align: center;
 }
 .gaveta-item.acao { color: var(--text-3); }
+.gaveta-item[data-screen="demissao"] { color: var(--red); }
 body.reduce-motion .gaveta, body.reduce-motion .gaveta.aberta, body.reduce-motion .veu { transition: none; }
 @media (prefers-reduced-motion: reduce) { .gaveta, .gaveta.aberta, .veu { transition: none; } }
 

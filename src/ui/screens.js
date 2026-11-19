@@ -184,6 +184,7 @@ registerScreen({ id: 'mundo', title: 'Mundo', icon: 'mundo', nav: 'bottom', orde
 registerScreen({ id: 'equipe', title: 'Equipe', icon: 'equipe', group: 'agencia', order: 10, load: () => import('./crew-view.js') });
 registerScreen({ id: 'conselho', title: 'Conselho e investidores', short: 'Conselho', icon: 'acoes', group: 'agencia', order: 20, available: (st, data) => !!st?.cap || boardPending(st, data), load: orStub(() => import('./board.js')), badge: (st) => decisionsOf(st, /^(investors|mandate)/).length || (mandatesDueSoon(st).length ? true : 0) });
 registerScreen({ id: 'identidade', title: 'Identidade e logo', short: 'Identidade', icon: 'editar', group: 'agencia', order: 30, load: () => import('./identidade.js') });
+registerScreen({ id: 'demissao', title: 'Pedir demissão (trocar de agência)', short: 'Pedir demissão', icon: 'sair', group: 'agencia', order: 90, action: 'resign', available: (st) => !!st && !st.gameOver && !st.director?.ousted });
 registerScreen({ id: 'financas', title: 'Finanças', icon: 'caixa', group: 'agencia', order: 40, load: () => import('./financas.js'), badge: (st) => ((st?.actors?.[st.playerId]?.cash ?? 0) < 0 ? true : 0) });
 
 registerScreen({ id: 'pesquisa', title: 'Pesquisa', icon: 'pesquisa', group: 'operacoes', order: 10, load: () => import('./research-tab.js') });

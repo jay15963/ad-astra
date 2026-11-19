@@ -12,7 +12,7 @@
 // Old saves that ended with gameOver 'fired' / 'board' before the campaign's end are reopened on load (reopen()).
 // Deterministic, plain JSON, no DOM.
 
-import { addNews, emitSignal, log, changeActor } from '../core/helpers.js';
+import { addNews, emitSignal, log, changeActor, removeDirector } from '../core/helpers.js';
 import { turnToDate, dateToTurn } from '../core/time.js';
 import * as lifecycle from './lifecycle.js';
 
@@ -25,6 +25,7 @@ const OUST_REASONS = ['fired', 'board'];
 export const REASON_LABELS = {
   fired: 'Demitido depois de semanas no vermelho',
   board: 'Destituído pelo conselho de acionistas',
+  resigned: 'Pediu demissão',
   ending: 'Até o fim da campanha',
   end: 'Até o fim do cenário',
 };
@@ -274,7 +275,18 @@ export function onGameEnd(state, data) {
   d.closed = true;
 }
 
+/** The player leaves the direction on their own (drawer › "Pedir demissão"): same choice screen as being fired. */
+function resign(state, data) {
+  if (state.gameOver) return { ok: false, error: 'A campanha já terminou.' };
+  if (isOusted(state)) return { ok: false, error: 'Você já está fora da direção.' };
+  const a = state.actors?.[state.playerId] || {};
+  if (!removeDirector(state, 'resigned', `Você pediu demissão da direção da ${a.short || a.name || 'agência'}.`)) return { ok: false, error: 'Não foi possível sair da direção agora.' };
+  addNews(state, { headline: `Diretor da ${a.short || a.name || 'agência'} pede demissão`, tags: ['director'], actors: [state.playerId], importance: 2, icon: 'agency' });
+  return { ok: true };
+}
+
 export const actions = {
+  'director/resign': resign,
   'director/take': take,
   'director/found': found,
 };
