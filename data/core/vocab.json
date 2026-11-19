@@ -427,6 +427,20 @@
     "sail": { "label": "Vela", "era": "e6", "status": "reserved", "needs": "construtor de naves (§6)" }
   },
 
+  "craftPartKinds": {
+    "bus": { "label": "Estrutura" }, "power": { "label": "Energia" }, "comms": { "label": "Comunicações" },
+    "instrument": { "label": "Instrumento" }, "engine": { "label": "Propulsão" }, "entry": { "label": "Entrada na atmosfera" },
+    "landing": { "label": "Pouso" }, "mobility": { "label": "Rodas" }, "crew": { "label": "Assento" },
+    "life": { "label": "Suporte de vida" }, "escape": { "label": "Escape" }, "docking": { "label": "Acoplagem" },
+    "arm": { "label": "Braço" }, "cargo": { "label": "Compartimento de carga" }
+  },
+
+  "craftRoles": {
+    "satellite": { "label": "Satélite" }, "probe": { "label": "Sonda" }, "lander": { "label": "Pousador" },
+    "rover": { "label": "Rover" }, "capsule": { "label": "Cápsula tripulada" }, "cargo": { "label": "Cargueiro" },
+    "module": { "label": "Módulo de estação" }
+  },
+
   "partFamilies": {
     "generico": { "era": "e1", "label": "Genérico" },
     "redstone": { "era": "e1" }, "r7": { "era": "e1" }, "atlas": { "era": "e1" }, "saturn": { "era": "e1" },

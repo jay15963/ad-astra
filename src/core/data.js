@@ -79,7 +79,7 @@ function resolveEras(eras, scenario, manifest) {
  * places, hardware, parts, tech, lineages and the lifecycle rows (plus the pack's patches) are referenced for
  * centuries (GEO, a Soyuz, an agency born in 2087), while calendar, events, crew and snapshot are dated content.
  */
-export const CATALOG_FILES = ['lineages', 'lifecycle', 'parts', 'vehicles', 'spacecraft', 'destinations', 'bodies', 'tech', 'investors', 'patches'];
+export const CATALOG_FILES = ['lineages', 'lifecycle', 'parts', 'craft-parts', 'vehicles', 'spacecraft', 'destinations', 'bodies', 'tech', 'investors', 'patches'];
 
 /** Era packs before the latest loaded era that are not loaded in full: merged with their catalog files only. */
 function catalogIds(manifest, eraSet) {

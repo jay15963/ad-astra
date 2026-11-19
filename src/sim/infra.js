@@ -31,6 +31,14 @@ import * as research from './research.js';
 import * as budget from './budget.js';
 import * as colonies from './colonies.js';
 import { budgetPressure, tensionOf } from './diplomacy.js';
+import { fitDest } from '../core/craftfit.js';
+
+/** Life (years) of a craft designed in the Estaleiro at a site (its own structure, power and nights), else null. */
+function designLifeYears(data, sc, site) {
+  if (!sc?.craftFit) return null;
+  const f = fitDest(data, sc.craftFit, site);
+  return Number.isFinite(f.lifeYears) && f.lifeYears > 0 ? f.lifeYears : Number.isFinite(sc.design?.lifeYears) ? sc.design.lifeYears : null;
+}
 
 export const meta = { maxDt: 13 };
 
@@ -568,9 +576,10 @@ function deliverSatellite(state, data, actorId, mission, level) {
     a = newAsset(state, data, { kind: 'satellite', sub, name: sc?.name || subLabel(data, 'satellite', sub), ownerId: actorId, site });
     created = true;
   }
-  const life = Math.max(0.25, num(y.lifeYears, 5) * (1 + tb(state, actorId, 'lifetime')) * (level === 'partial' ? 0.6 : 1));
+  const life = Math.max(0.25, num(designLifeYears(data, sc, site) ?? y.lifeYears, 5) * (1 + tb(state, actorId, 'lifetime')) * (level === 'partial' ? 0.6 : 1));
   const endTurn = state.turn + Math.round(life * W);
-  const k = r2(clamp(num(sc?.massT, y.refT || 1) / Math.max(0.01, num(y.refT, 1)), 0.5, 3) ** 0.6);
+  // a designed satellite yields by its instruments (Estaleiro), a catalog one by its size
+  const k = Number.isFinite(sc?.design?.yieldK) ? sc.design.yieldK : r2(clamp(num(sc?.massT, y.refT || 1) / Math.max(0.01, num(y.refT, 1)), 0.5, 3) ** 0.6);
   const bucket = Math.max(1, T.caps.fleetBucketWeeks);
   let u = a.units.find((x) => Math.floor(x.endTurn / bucket) === Math.floor(endTurn / bucket));
   if (!u && a.units.length >= T.caps.fleetRows) u = a.units.slice().sort((p, q) => Math.abs(p.endTurn - endTurn) - Math.abs(q.endTurn - endTurn))[0];
@@ -601,7 +610,7 @@ function deliverRover(state, data, actorId, mission, level) {
   const sub = mission.sub && mission.sub !== 'lander' ? mission.sub : roverSubFor(data, sc, site);
   if (!canCreate(state, data, actorId, 'rover')) return null;
   const y = subYield(data, 'rover', sub);
-  const life = Math.max(0.1, num(y.lifeYears, 1) * (1 + tb(state, actorId, 'lifetime')) * (level === 'partial' ? 0.6 : 1));
+  const life = Math.max(0.04, num(designLifeYears(data, sc, site) ?? y.lifeYears, 1) * (1 + tb(state, actorId, 'lifetime')) * (level === 'partial' ? 0.6 : 1));
   const a = newAsset(state, data, { kind: 'rover', sub, name: sc?.name || mission.name || 'Rover', ownerId: actorId, site });
   a.lifeEndTurn = state.turn + Math.max(1, Math.round(life * W));
   a.units = [];

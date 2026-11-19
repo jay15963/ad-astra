@@ -19,6 +19,7 @@ import { rngFor } from '../core/rng.js';
 import { destPrestige as outcomeDestPrestige, missionPrestige } from '../core/outcome.js';
 import { turnToDate, formatTurn, weeksToText } from '../core/time.js';
 import { craftFitsDestination } from '../core/catalog.js';
+import { fitDest } from '../core/craftfit.js';
 import { vehicleDef as catalogVehicle, spacecraftDef as catalogCraft } from '../core/catalog.js';
 import { crossed, yearAt, destinationOpen, liveActorIds } from './simtime.js';
 
@@ -275,6 +276,7 @@ const INJECTED = new WeakMap(); // data.index.vehicles table -> Set of design id
 export function syncDesignCatalog(state, data) {
   const idx = data?.index;
   if (!idx || typeof idx !== 'object') return;
+  syncCraftCatalog(state, data);
   const list = playerDesignVehicles(state);
   let mine = idx.vehicles ? INJECTED.get(idx.vehicles) : null;
   if (!list.length && !mine?.size) return;
@@ -287,6 +289,55 @@ export function syncDesignCatalog(state, data) {
     table[def.id] = def;
     mine.add(def.id);
   }
+}
+
+// --- player craft designs (Estaleiro, src/sim/craftdesigns.js, state.craftDesigns) as spacecraft --------------------
+// Same idea as the rockets: each design's `asSpacecraft` is published into data.index.spacecraft (risk.js, launch.js,
+// infra.js and the launch scene resolve it by id) and operational ones join the player's craft list.
+
+/** Player craft designs with their spacecraft view: [{design, def}] (retired ones left out). */
+export function playerCraftDesigns(state) {
+  const pid = state?.playerId;
+  const out = [];
+  for (const d of Object.values(state?.craftDesigns || {})) {
+    if (!d || typeof d !== 'object' || d.retired || (d.owner && d.owner !== pid)) continue;
+    const def = d.asSpacecraft && typeof d.asSpacecraft === 'object' ? d.asSpacecraft : null;
+    if (def?.id) out.push({ design: d, def });
+  }
+  return out;
+}
+const craftPhase = (d) => d?.program?.phase || null;
+
+const INJECTED_SC = new WeakMap(); // data.index.spacecraft table -> Set of craft design ids this module put there
+
+/** Publish the player's craft designs into data.index.spacecraft (and drop the ones no longer in state). */
+export function syncCraftCatalog(state, data) {
+  const idx = data?.index;
+  if (!idx || typeof idx !== 'object') return;
+  const list = playerCraftDesigns(state);
+  let mine = idx.spacecraft ? INJECTED_SC.get(idx.spacecraft) : null;
+  if (!list.length && !mine?.size) return;
+  const table = idx.spacecraft || (idx.spacecraft = {});
+  if (!mine) INJECTED_SC.set(table, (mine = new Set()));
+  const want = new Set(list.map((x) => x.def.id));
+  for (const id of [...mine]) if (!want.has(id)) { delete table[id]; mine.delete(id); }
+  for (const { def } of list) {
+    if (table[def.id] && !mine.has(def.id)) continue; // a real catalog entry wins
+    table[def.id] = def;
+    mine.add(def.id);
+  }
+}
+
+/** Operational craft designs of the player (in-service spacecraft entries). */
+function operationalCraft(state) {
+  return playerCraftDesigns(state).filter((x) => craftPhase(x.design) === 'operational').map((x) => ({ ...x.def, retired: false }));
+}
+
+/** First reason (pt-BR) a designed craft cannot fly to a destination, or null (Estaleiro fit rules). */
+function craftFitReason(data, sc, destId) {
+  if (!sc?.craftFit || !destId) return null;
+  const f = fitDest(data, sc.craftFit, destId);
+  return f.ok ? null : f.reasons[0]?.text || 'Não serve para este destino.';
 }
 
 /** Operational designs of the player: they join the vehicle list of every mission. */
@@ -581,8 +632,11 @@ function vehiclesFor(state, data, actorId = state.playerId) {
 function spacecraftFor(state, data, actorId = state.playerId) {
   const f = fn(calendar, 'availableSpacecraft');
   const r = f ? f(state, data, actorId) : null;
-  if (Array.isArray(r)) return r;
-  return (data.spacecraft?.spacecraft || []).filter((s) => availableByDate(state, s));
+  const base = Array.isArray(r) ? r : (data.spacecraft?.spacecraft || []).filter((s) => availableByDate(state, s));
+  if (actorId !== state.playerId) return base;
+  // the Estaleiro's operational designs fly like catalog craft (the AI never gets them)
+  const own = operationalCraft(state).filter((s) => !base.some((x) => x.id === s.id));
+  return own.length ? base.concat(own) : base;
 }
 function capacityTo(data, vehicleId, destId) {
   const f = fn(calendar, 'capacityTo');
@@ -671,7 +725,8 @@ function destOkForType(dest, type) {
 }
 function scOkForType(sc, type, crewed, data = null) {
   if (!sc) return false;
-  if (crewed) return (sc.crew || 0) > 0;
+  // a designed crewed lander (Estaleiro) only flies as the companion of a capsule
+  if (crewed) return (sc.crew || 0) > 0 && !sc.companionOnly;
   return (data ? scKindsFor(data, type) : SC_KINDS[type] || []).includes(sc.kind);
 }
 /**
@@ -998,7 +1053,7 @@ function validate(state, data, d, opts = {}) {
     if (!spacecraftFor(state, data).some((s) => s.id === sc.id) && !keepsBooking(state, data, sc, opts)) errors.push(`${sc.name} não está disponível para a agência agora.`);
     if (d.type && d.source !== 'calendar' && !scOkForType(sc, d.type, d.crewed, data)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
     else if (d.type && d.source !== 'calendar' && v2.sub && !scOkForSub(data, sc, d.type, v2.sub)) errors.push(`${sc.name} não é ${(subtypeOf(data, d.type, v2.sub)?.label || v2.sub).toLowerCase()}.`);
-    if (dest && !scOkForDest(sc, dest.id, data)) errors.push(`${sc.name} não foi projetada para ${dest.name}.`);
+    if (dest && !scOkForDest(sc, dest.id, data)) errors.push(sc.craftFit ? `${sc.name}: ${craftFitReason(data, sc, dest.id)}` : `${sc.name} não foi projetada para ${dest.name}.`);
     // carriers (§1.4): the craft must hold what it carries; surface deliveries need a cargo lander
     if (v2.carried) {
       const cap = cargoCapacityOf(data, sc);
@@ -3976,7 +4031,7 @@ export function draftOptions(state, data, draftIn = {}) {
     if (v2.carried && v2.cargoT > cargoCapT + 1e-9) reasons.push(`Leva no máximo ${fmtTons(cargoCapT)} t de carga.`);
     const destX = destDef(data, d.destination);
     if (v2.carried && destX && SURFACE_KINDS.includes(destX.kind) && s.kind !== 'lander' && !(s.kind === 'cargo' && (s.destinations || []).includes(destX.id))) reasons.push('Carga na superfície precisa de um módulo de pouso de carga.');
-    if (d.destination && !scOkForDest(s, d.destination, data)) reasons.push('Não serve para este destino.');
+    if (d.destination && !scOkForDest(s, d.destination, data)) reasons.push(s.craftFit ? craftFitReason(data, s, d.destination) : 'Não serve para este destino.');
     if (d.vehicleId && Array.isArray(s.compatibleVehicles) && s.compatibleVehicles.length && !s.compatibleVehicles.includes(d.vehicleId)) {
       const names = s.compatibleVehicles.map((id) => vehicleDef(data, id)?.name || id);
       reasons.push(`Só voa no ${names.join(' ou ')}.`);
@@ -3986,8 +4041,22 @@ export function draftOptions(state, data, draftIn = {}) {
       id: s.id, name: s.name, operator: s.operator, kind: s.kind, crew: s.crew || 0, massT: s.massT ?? null, costM: s.costM || 0, sub: s.sub || null, cargoT: cargoCapT,
       reliability: { mean: rel.mean, low: rel.low, high: rel.high }, truthLayer: s.truthLayer,
       valid: reasons.length === 0, reasons, selected: s.id === d.spacecraftId,
+      ...(s.craftDesign ? { design: true, designPhase: 'operational' } : {}),
     };
   }).sort((a, b) => (b.valid - a.valid) || (a.costM - b.costM));
+  // craft designs still in the Estaleiro are listed (blocked) so the builder says when they can fly
+  for (const { design: dz, def } of playerCraftDesigns(state)) {
+    const ph = craftPhase(dz);
+    if (ph === 'operational' || spacecraft.some((x) => x.id === def.id)) continue;
+    if (d.type && !scOkForType(def, d.type, d.crewed, data)) continue;
+    const p = dz.program || {};
+    const why = ph === 'work' ? `Em desenvolvimento no Estaleiro${Number.isFinite(p.readyTurn) ? `: pronta em ${fmtT(state, p.readyTurn)}` : ''}.` : 'Projeto salvo no Estaleiro: falta desenvolver.';
+    spacecraft.push({
+      id: def.id, name: def.name, operator: def.operator, kind: def.kind, crew: def.crew || 0, massT: def.massT ?? null, costM: def.costM || 0, sub: def.sub || null, cargoT: def.cargoT || 0,
+      reliability: { mean: def.estimatedReliability, low: clamp(def.estimatedReliability - 0.12, 0, 1), high: clamp(def.estimatedReliability + 0.04, 0, 1) }, truthLayer: 'projeto',
+      valid: false, reasons: [why], selected: def.id === d.spacecraftId, design: true, designPhase: ph || 'draft',
+    });
+  }
 
   const companionId = companionOf(state, data, d);
   const landers = needsLander(data, d) || d.secondarySpacecraftId

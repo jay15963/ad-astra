@@ -173,7 +173,9 @@ export function checkTechTree(ctx) {
     });
   }
   for (const [kind, k] of Object.entries(tt?.payloadKeys || {})) need(k, 'core', `${TT_PATH}#payloadKeys.${kind}`);
-  const itemFiles = { vehicles: 'vehicles', spacecraft: 'spacecraft', parts: 'parts' };
+  const itemFiles = { vehicles: 'vehicles', spacecraft: 'spacecraft', parts: 'parts', 'craft-parts': 'parts' };
+  for (const p of packDefs) for (const r of packs[p.id]?.['craft-parts']?.roles || []) for (const k of r?.gate || []) need(k, p.id, `${packPath(p, 'craft-parts')}#roles.${r.id}.gate`);
+  for (const p of packDefs) for (const [, k] of packs[p.id]?.['craft-parts']?.rules?.seatKeys || []) need(k, p.id, `${packPath(p, 'craft-parts')}#rules.seatKeys`);
   for (const p of packDefs) {
     for (const [file, lk] of Object.entries(itemFiles)) {
       for (const it of packs[p.id]?.[file]?.[lk] || []) {

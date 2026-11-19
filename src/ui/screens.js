@@ -199,6 +199,16 @@ registerScreen({ id: 'hangar', title: 'Hangar (construtor)', short: 'Hangar', ic
     },
   })),
   badge: (st) => (designsInTest(st).length ? true : 0) });
+registerScreen({ id: 'estaleiro', title: 'Estaleiro (espaçonaves)', short: 'Estaleiro', icon: 'satelite', group: 'operacoes', order: 21,
+  // sibling of the Hangar: same scenario unlock (unlocks.craftBuilder, else unlocks.builder)
+  lockedText: (st, data) => { const k = data?.scenario?.unlocks?.craftBuilder ? 'craftBuilder' : 'builder'; return unlocked(st, data, k) ? null : `a partir de ${data.scenario.unlocks[k].fromYear}`; },
+  load: () => orStub(() => import('./estaleiro.js'))().then((m) => ({
+    render(container, store, route) {
+      const lt = screenById('estaleiro')?.lockedText?.(store.state, store.data);
+      if (lt) return views().then((v) => v.lockedPanel(container, store, 'estaleiro', lt));
+      return m.render(container, store, route);
+    },
+  })) });
 registerScreen({ id: 'contratos', title: 'Contratos', icon: 'transferir', group: 'operacoes', order: 15, load: () => import('./contracts.js'), badge: (st) => contractsBadge(st) });
 registerScreen({ id: 'infra', title: 'Infraestrutura', icon: 'estacao', group: 'operacoes', order: 25, load: () => import('./infra-tab.js'), badge: (st, store) => infraAlerts(st, store) || decisionsOf(st, /^infra\//).length });
 registerScreen({ id: 'mercado', title: 'Mercado de foguetes', short: 'Mercado', icon: 'foguete', group: 'operacoes', order: 40, available: (st) => !!st?.market, load: orStub(() => import('./market.js')), badge: (st) => decisionsOf(st, /^market\/offer/).length });

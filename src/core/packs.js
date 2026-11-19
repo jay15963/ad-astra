@@ -42,6 +42,7 @@ export const LIST_KEYS = {
   actors: 'actors', vehicles: 'vehicles', spacecraft: 'spacecraft', destinations: 'destinations',
   calendar: 'missions', tech: 'nodes', events: 'events', bodies: 'bodies',
   lineages: 'lineages', lifecycle: 'events', nations: 'nations', investors: 'investors', parts: 'parts',
+  'craft-parts': 'parts', // Estaleiro (src/sim/craftdesigns.js): era packs may add craft parts by id
 };
 
 /** data.index key -> [data key, list key]. The first eight are today's index (unchanged). */
@@ -53,7 +54,7 @@ const INDEX_LISTS = {
 const INDEX_EXTRA = { lineages: ['lineages', 'lineages'], nations: ['nations', 'nations'] };
 
 /** Kinds whose entities are stamped with era/fromYear when they come from an era pack. */
-const STAMP_KINDS = new Set(['vehicles', 'spacecraft', 'destinations', 'calendar', 'tech', 'events', 'investors', 'parts']);
+const STAMP_KINDS = new Set(['vehicles', 'spacecraft', 'destinations', 'calendar', 'tech', 'events', 'investors', 'parts', 'craft-parts']);
 
 /** core file name -> data key ('actor-gen' -> actorGen). */
 export const dataKey = (file) => file.replace(/-([a-z])/g, (_, c) => c.toUpperCase());

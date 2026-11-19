@@ -3,7 +3,7 @@
 // moment, then drawn once (or animated live with anim=1). Screenshots are reproducible.
 
 import { createLaunchRenderer, loadVehicleArt, descentCraftId } from '../src/ui/launch-render/index.js';
-import { resolveStack, paintVehicle, paintCraft, craftArt, listVehicleArtIds, listCraftArtIds } from '../src/ui/launch-render/vehicles.js';
+import { resolveStack, paintVehicle, paintCraft, craftArt, listVehicleArtIds, listCraftArtIds, setCraftResolver } from '../src/ui/launch-render/vehicles.js';
 import { BODY_LOOK, SITE_STYLE, SUN, drawPlanetDisc, drawSky, drawTerrain, drawLaunchSite, drawStarfield, hash } from '../src/ui/launch-render/textures.js';
 import { drawPlume, PROPELLANT } from '../src/ui/launch-render/fx.js';
 import { buildProfile, telemetryAt, metAt, infraTimeline } from '../src/ui/launch-scene.js';
@@ -379,6 +379,15 @@ async function main() {
     crewed: Q.has('crewed') ? Q.get('crewed') === '1' : undefined, site: Q.get('site') || null, weather: num('weather', 20),
     gallery: gal, bench: num('bench', 0),
   };
+  // ?craftDesign=<JSON {name, geometry}> : a spacecraft designed in the Estaleiro (src/sim/craftdesigns.js geometry)
+  if (Q.has('craftDesign')) {
+    try {
+      const cdz = JSON.parse(Q.get('craftDesign'));
+      const sc = { id: 'csg_preview', name: cdz.name || 'Projeto', design: { geometry: cdz.geometry || cdz } };
+      setCraftResolver((id) => (id === 'csg_preview' ? sc : null));
+      opts.craft = 'csg_preview';
+    } catch (e) { errEl.textContent = `craftDesign: ${e.message || e}`; }
+  }
   let pre = presetOf(Q.get('preset'), Q.get('body') || 'moon');
   if (!pre && Q.has('targets')) { // ?targets=<url of [{label, t}]>&i=N : real sim snapshots
     try {

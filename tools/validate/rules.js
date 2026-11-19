@@ -402,6 +402,34 @@ export function checkData(input, { onlyPack = null, legacyWarnings = false } = {
     warn('core', 'core/vocab.json', 'há pedidos de vocabulário, mas core/vocab.json não existe');
   }
 
+  // ---------------------------------------------------------------- Estaleiro: craft parts (data/core/craft-parts.json)
+  {
+    const CP = 'core/craft-parts.json';
+    const cp = merged['craft-parts'];
+    const roleIds = new Set((cp?.roles || []).map((r) => r?.id));
+    const pos = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+    for (const p of cp?.parts || []) {
+      const at = `${CP}#${p?.id}`;
+      if (!p?.id || !/^[a-z0-9_]+$/.test(p.id)) { err('core', at, 'id inválido'); continue; }
+      if (!p.name) err('core', at, 'peça sem nome');
+      if (!p.availableFrom?.year) err('core', `${at}.availableFrom`, 'sem data de disponibilidade');
+      if (p.availableUntil && p.availableUntil.year < p.availableFrom?.year) err('core', `${at}.availableUntil`, 'sai de produção antes de existir');
+      if (!pos(p.costM)) err('core', `${at}.costM`, 'custo ausente ou negativo');
+      if (p.massFrac == null && !pos(p.massT)) err('core', `${at}.massT`, 'massa ausente ou negativa');
+      if (p.massFrac != null && !(p.massFrac > 0 && p.massFrac < 0.6)) err('core', `${at}.massFrac`, 'fração de massa fora de (0, 0,6)');
+      if (p.reliability != null && !(p.reliability > 0.5 && p.reliability <= 1)) err('core', `${at}.reliability`, 'confiabilidade fora de (0,5, 1]');
+      for (const r of p.roles || []) if (!roleIds.has(r)) err('core', `${at}.roles`, `função desconhecida: ${r}`);
+      if (p.kind === 'bus') {
+        if (!(p.roles || []).length) err('core', `${at}.roles`, 'estrutura sem função');
+        if (!(p.slots >= 1)) err('core', `${at}.slots`, 'estrutura sem encaixes');
+        if (!pos(p.maxPropT)) err('core', `${at}.maxPropT`, 'propelente máximo ausente');
+        if (!(p.lifeYears > 0)) err('core', `${at}.lifeYears`, 'vida útil ausente');
+      }
+      if (p.kind === 'engine' && !(p.isp > 0 && p.thrustKN > 0)) err('core', at, 'motor sem Isp ou empuxo');
+    }
+    for (const r of cp?.roles || []) if (!(cp?.parts || []).some((p) => p.kind === 'bus' && (p.roles || []).includes(r.id))) err('core', `${CP}#roles.${r.id}`, 'função sem nenhuma estrutura');
+  }
+
   // ---------------------------------------------------------------- tech tree and Missões v2 data (MISSIONS-V2 §9.3)
   const knownMilestones = new Set([...milestones, ...Object.keys(vocab?.milestones || {})]);
   const techStats = checkTechTree({ input, merged, packDefs, add, packPath, milestones: knownMilestones });

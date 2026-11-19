@@ -1093,3 +1093,17 @@ API: §8.5.
 - **ISS dated** (`fromYear` 1998) so it is not offered as a target before it exists.
 - **Save encoding** (`savepack.js`, lossless): objects of ≥ 3 plain objects pack like arrays (`$k` + rows); research
   unlocked/completedTurn/bonus index the rivals' id table, and index lists are 2-character base-36 code strings.
+
+## 16. Estaleiro: player-designed spacecraft (addendum)
+
+The player can design the craft that flies these missions (drawer › Operações › Estaleiro; contract in
+ARCHITECTURE.md "Estaleiro"). A design is a spacecraft entry like the catalog's (`kind`, `sub`/`subs`, `crew`,
+`massT`, `costM`, `cargoT`, `moduleId`) whose destinations are computed by `src/core/craftfit.js` from its parts
+instead of listed, so every §1 rule applies unchanged: `scKinds` per type, `sub` for satellites/rovers (from the
+instruments' tags: `science`, `weather`, `navigation`, `comms`, `earth_obs`, `observatory`, `deep_observatory`,
+`relay`, `constellation`; rovers from the chassis), carriers by `cargoT` (cargo landers are `kind: 'lander'`),
+station modules by `moduleId`, crewed capsules with `landerRequired` (landing with a crewed lander companion; a
+designed crewed lander is `companionOnly`). Gating reuses the §4.5 keys (role and part `gate` fields in
+`data/core/craft-parts.json`; the tree's "Libera:" lists the parts). Infra assets of a design use its own life at
+the site (`fitDest().lifeYears`) and, for science satellites, its instruments' science (`design.yieldK`) instead of
+the mass factor (§3.6).

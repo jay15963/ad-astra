@@ -687,6 +687,16 @@
         }
       }
     },
+    "craftPartKinds": {
+      "type": "object",
+      "description": "Estaleiro: tipos de peça de data/core/craft-parts.json",
+      "additionalProperties": { "type": "object", "required": ["label"], "properties": { "label": { "type": "string", "minLength": 1, "maxLength": 90 } } }
+    },
+    "craftRoles": {
+      "type": "object",
+      "description": "Estaleiro: funções de nave (roles de data/core/craft-parts.json)",
+      "additionalProperties": { "type": "object", "required": ["label"], "properties": { "label": { "type": "string", "minLength": 1, "maxLength": 90 } } }
+    },
     "partFamilies": {
       "type": "object",
       "additionalProperties": {

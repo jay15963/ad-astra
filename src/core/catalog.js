@@ -7,6 +7,7 @@
 
 import { turnToDate } from './time.js';
 import { itemGate, techGated } from './gating.js';
+import { craftFitsDest } from './craftfit.js';
 
 const asVehicle = (d) => d?.asVehicle ?? (d?.kind === 'vehicle' ? d : null);
 const asCraft = (d) => d?.asSpacecraft ?? d?.asCraft ?? (d?.kind === 'spacecraft' ? d : null);
@@ -20,11 +21,12 @@ export function vehicleDef(data, id, state) {
     ?? null;
 }
 
-/** Spacecraft by id: catalog first, then the player's designs. null when unknown. */
+/** Spacecraft by id: catalog first, then the player's designs (Estaleiro: state.craftDesigns). null when unknown. */
 export function spacecraftDef(data, id, state) {
   if (!id) return null;
   return data?.index?.spacecraft?.[id]
     ?? data?.spacecraft?.spacecraft?.find((v) => v.id === id)
+    ?? asCraft(state?.craftDesigns?.[id])
     ?? asCraft(state?.designs?.[id])
     ?? null;
 }
@@ -75,9 +77,9 @@ export function itemAvailable(data, state, def, turn) {
 }
 
 /** Player designs as catalog entries ({id, …asVehicle}) owned by actorId (all owners when absent). */
-function designList(state, actorId, pick) {
+function designList(state, actorId, pick, slice = 'designs') {
   const out = [];
-  for (const [id, d] of Object.entries(state?.designs || {})) {
+  for (const [id, d] of Object.entries(state?.[slice] || {})) {
     if (actorId && d.owner && d.owner !== actorId) continue;
     const def = pick(d);
     if (def) out.push({ ...def, id: def.id ?? id });
@@ -110,7 +112,7 @@ export function listSpacecraft(data, state, { turn, actorId, gated = false } = {
   const t = turn ?? state?.turn ?? 0;
   const catalog = (data?.spacecraft?.spacecraft || []).filter((v) => itemAvailable(data, state, v, t)
     && (!gated || researchGateOf(data, state, 'spacecraft', v, actorId).ok));
-  return catalog.concat(designList(state, actorId, asCraft).filter((v) => itemAvailable(data, state, v, t)));
+  return catalog.concat(designList(state, actorId, asCraft, 'craftDesigns'), designList(state, actorId, asCraft)).filter((v, i, all) => i < catalog.length || itemAvailable(data, state, v, t));
 }
 
 /**
@@ -120,6 +122,8 @@ export function listSpacecraft(data, state, { turn, actorId, gated = false } = {
  * Moon, probes to the same kind of place anywhere (the rocket's capacity decides if it gets there).
  */
 export function craftFitsDestination(data, sc, destId) {
+  // a craft designed in the Estaleiro carries its capabilities instead of a list (src/core/craftfit.js)
+  if (sc?.craftFit) return !!data && craftFitsDest(data, sc.craftFit, destId);
   if (!Array.isArray(sc?.destinations) || sc.destinations.length === 0 || sc.destinations.includes(destId)) return true;
   if (!data || !(sc.generic || sc.access === 'generic')) return false;
   const find = (id) => (id ? data.index?.destinations?.[id] ?? data.destinations?.destinations?.find((v) => v.id === id) ?? null : null);

@@ -418,6 +418,9 @@ function targetTable(data) {
   for (const s of data?.spacecraft?.spacecraft || []) for (const k of gatesOf(data, 'spacecraft', s)) add(k, s.name, s);
   for (const p of data?.parts?.parts || []) for (const k of gatesOf(data, 'part', p)) add(k, p.name, p);
   for (const p of data?.parts?.templates || []) for (const k of gatesOf(data, 'template', p)) add(k, `Modelo ${p.name}`, p);
+  // Estaleiro (spacecraft designer): craft parts and roles carry their keys in `gate`
+  for (const p of data?.craftParts?.parts || []) for (const k of gatesOf(data, 'craftPart', p)) add(k, `Estaleiro: ${p.name}`, p);
+  for (const r of data?.craftParts?.roles || []) for (const k of gatesOf(data, 'craftRole', r)) add(k, `Estaleiro: ${r.label}`, r);
   for (const r of subtypesOf(data)) add(r.key, r.label || r.id, r);
   for (const k of ['station', 'base', 'vehicles']) for (const r of (Array.isArray(data?.modules?.[k]) ? data.modules[k] : [])) add(r.key, r.label || r.name || r.id, r);
   for (const list of map.values()) list.sort((a, b) => a.from - b.from || (a.name < b.name ? -1 : 1));

@@ -292,10 +292,92 @@ export function craftKindOf(craftData) {
   return 'probe';
 }
 
+// ------------------------------------------------------------------ craft design adapter (Estaleiro)
+// A craft designed in the Estaleiro (src/sim/craftdesigns.js) reaches the painter as a spacecraft whose
+// `design.geometry` describes role, body shape and size, finish, arrays, antenna, RTG, legs, wheels, heat shield…
+// craftDesignArt() turns it into the art shape the templates above already paint (probe, lander, rover, capsule,
+// module, aeroshell). The launch scene only passes ids: the resolver (default: the live store) finds the design.
+
+let craftResolver = (id) => {
+  try { return globalThis.adastra?.state?.craftDesigns?.[id]?.asSpacecraft || null; } catch { return null; }
+};
+/** Replace how ids of craft designs are resolved (tests, harness). fn(id) -> spacecraft with design.geometry | null. */
+export function setCraftResolver(fn) {
+  craftResolver = typeof fn === 'function' ? fn : () => null;
+  STACKS.clear();
+}
+const craftGeomOf = (c) => (c?.design?.geometry?.role ? c.design.geometry : null);
+const CDART = new Map();
+
+/** Art (vehicle-art.json craft shape) of a designed craft. Pure and cached per geometry; null without geometry. */
+export function craftDesignArt(craft) {
+  const g = craftGeomOf(craft);
+  if (!g) return null;
+  const key = `${craft?.name || ''}|${JSON.stringify(g)}`;
+  const hit = CDART.get(key);
+  if (hit) return hit;
+  const mat = g.mat || 'gold_foil';
+  const w = Math.max(0.2, num(g.w, 1.5));
+  const hh = Math.max(0.2, num(g.h, 1.5));
+  const span = num(g.spanM, 0);
+  const name = craft?.name || 'Projeto';
+  let art;
+  if (g.role === 'satellite' || g.role === 'probe') {
+    if (g.telescope) {
+      art = { name, template: 'module', heightM: hh * 2, widthM: Math.max(w, span), len: hh * 2, d: w, mat: mat === 'gold_foil' ? 'silver_foil' : mat, aperture: true, arrays: span ? { type: 'wing', spanM: span } : { type: 'none' } };
+    } else {
+      const arrays = g.arrays === 'wings' || g.arrays === 'single' ? { type: 'wing', spanM: span, panels: num(g.panels, 2), ...(g.arrays === 'single' ? { side: 'single' } : {}) } : g.rtg ? { type: 'rtg' } : { type: 'none' };
+      art = {
+        name, template: 'probe', heightM: hh, widthM: Math.max(w, span), bus: { w, h: hh, mat, shape: g.shape || 'box', ...(g.arrays === 'body' ? { cells: true } : {}) },
+        arrays, ...(g.hgaD > 0.3 ? { hga: { d: g.hgaD, pos: g.antenna === 'side' ? 'side' : 'top' } } : {}),
+        ...(g.rtg && arrays.type !== 'rtg' ? { rtg: true } : {}), ...(g.ion ? { ion: true } : {}), ...(g.sampler || g.arm ? { arm: true } : {}),
+        ...(g.shield ? { entryProbe: true } : {}),
+      };
+    }
+  } else if (g.role === 'lander') {
+    const body = g.shape === 'sphere' ? 'tanks' : g.shape === 'cyl' ? 'cyl' : g.shape === 'hex' ? 'hex' : 'box';
+    art = {
+      name, template: 'lander', heightM: hh * 1.9 + (g.crew ? 2 : 0), widthM: Math.max(w * 1.7, g.arrays === 'wings' ? span * 0.6 : 0), body, bodyW: w, bodyH: hh * 0.8, mat, foil: mat,
+      legs: g.legs ? 4 : 0, legSpanM: w * 1.7, solar: g.arrays === 'body' ? 'sides' : g.arrays === 'none' ? null : g.arrays === 'wings' || g.arrays === 'single' ? 'wings' : 'top',
+      engine: { prop: 'hypergolic', bellD: Math.max(0.25, w * 0.22), bellLen: Math.max(0.3, w * 0.28) }, ...(g.crew ? { cabin: true } : {}),
+    };
+  } else if (g.role === 'rover') {
+    art = { name, template: 'rover', heightM: Math.max(0.3, hh), widthM: w, wheels: num(g.wheels, 6), mat: mat === 'gold_foil' ? 'white_paint' : mat, solar: g.arrays !== 'none' ? 'wings' : null, mast: true, ...(g.drill ? { drill: true } : {}) };
+  } else if (g.role === 'capsule') {
+    const capH = hh;
+    const smH = Math.max(0.8, capH * 0.9);
+    const sm = num(g.propT, 0) > 0.2 || g.arrays !== 'none' ? { type: 'sm', h: smH, d: w * 0.92, mat: 'silver_foil', ...(g.arrays !== 'none' ? { arrays: 'pair', arraySpanM: Math.max(w * 2, span) } : {}) } : null;
+    art = {
+      name, template: 'capsule', heightM: capH + (sm ? smH : 0), widthM: Math.max(w, sm?.arraySpanM || 0), shieldD: w, topD: Math.max(0.6, w * 0.4), capH, mat: mat === 'gold_foil' ? 'white_paint' : mat,
+      ablator: 'generic', windows: Math.min(4, num(g.crew, 0)), chutes: g.chute ? 3 : 0, ...(sm ? { sm } : {}),
+      onStack: [
+        ...(sm ? [{ id: 'sm', role: 'payload', y: 0, len: smH, d: w * 0.95, mat: 'white_paint' }] : []),
+        { id: 'cm', role: 'payload', y: sm ? smH : 0, len: capH, d: w, dTop: Math.max(0.6, w * 0.4), mat: mat === 'gold_foil' ? 'white_paint' : mat },
+        ...(g.crew ? [{ id: 'les', role: 'les', y: sm ? smH : 0, len: capH * 3.4, d: w * 1.05, dTop: 0.5, mat: 'white_paint', nose: 'tower', towerLen: capH * 1.8, sep: 'fairing' }] : []),
+      ],
+    };
+  } else {
+    art = { name, template: 'module', heightM: hh, widthM: Math.max(w, span), len: hh, d: w, mat: mat === 'gold_foil' ? 'white_paint' : mat, arrays: span ? { type: 'wing', spanM: span } : { type: 'none' } };
+  }
+  // landers and rovers that enter an atmosphere fly inside an aeroshell until the chute opens
+  if ((g.role === 'lander' || g.role === 'rover') && g.shield && g.chute) {
+    art = { name, template: 'aeroshell', heightM: Math.max(w, 1) * 1.2, widthM: Math.max(w * 1.3, 1.2), shellD: Math.max(w * 1.3, 1.2), innerArt: art };
+  }
+  if (CDART.size > 200) CDART.clear();
+  CDART.set(key, art);
+  return art;
+}
+
 /** Art for a spacecraft (never null). */
 export function craftArt(craftId, craftData) {
   const C = ART?.craft || {};
+  const own = craftDesignArt(craftData);
+  if (own) return own;
   if (craftId && C[craftId]) return C[craftId];
+  if (craftId && /^csg_/.test(craftId)) {
+    const dz = craftDesignArt(craftResolver(craftId));
+    if (dz) return dz;
+  }
   const kinds = ART?.craftKinds || {};
   return kinds[craftKindOf(craftData)] || kinds.probe || BUILTIN_CRAFT;
 }
@@ -337,7 +419,8 @@ const STAGE_ROLES = new Set(['stage', 'booster', 'nose']);
 
 /** Full launch stack: vehicle parts + payload on top. Cached per (vehicle, craft, crewed). */
 export function resolveStack(vehicleId, craftId, { crewed = false, vehicleData, craftData } = {}) {
-  const artKey = designKey(designFor(vehicleId, vehicleData));
+  const cg = craftGeomOf(craftData);
+  const artKey = designKey(designFor(vehicleId, vehicleData)) + (cg ? `c${hash(JSON.stringify(cg))}` : '');
   const key = `${vehicleId}|${craftId}|${crewed ? 1 : 0}|${ART ? 1 : 0}|${artKey}`;
   const hit = STACKS.get(key);
   if (hit) return hit;
@@ -2252,7 +2335,11 @@ function paintProbe(ctx, c, k, fr, o) {
   const nozzles = [];
   const busB = cbody(c, 'bus', () => {
     if (c.bus?.stack) return { segs: [{ len: bh * 0.4, d: bw, mat: 'silver_foil' }, { len: bh * 0.35, d: bw * 0.9, mat: 'white_paint' }, { len: bh * 0.25, d: bw * 0.7, mat: 'silver_foil' }], section: { n: 8, rot: 22.5 } };
-    return { segs: [{ len: bh * 0.08, d: bw, mat: 'mli_black' }, { len: bh * 0.84, d: bw, mat: bmat }, { len: bh * 0.08, d: bw, mat: 'mli_black' }], section: { n: 4, rot: 30 } };
+    const shp = c.bus?.shape;
+    if (shp === 'sphere') return { segs: [{ len: bh, d: bw * 0.2, dTop: bw * 0.2, dMid: bw, shape: 'sphere', mat: bmat }] };
+    if (shp === 'cone') return { segs: [{ len: bh * 0.1, d: bw, mat: 'mli_black' }, { len: bh * 0.9, d: bw, dTop: bw * 0.55, mat: bmat }], section: { n: 8, rot: 22.5 } };
+    const section = shp === 'hex' ? { n: 6, rot: 0 } : shp === 'cyl' ? { n: 16, rot: 0 } : { n: 4, rot: 30 };
+    return { segs: [{ len: bh * 0.08, d: bw, mat: 'mli_black' }, { len: bh * 0.84, d: bw, mat: bmat }, { len: bh * 0.08, d: bw, mat: 'mli_black' }], section, ...(c.bus?.cells ? { marks: [{ type: 'band', y: bh * 0.3, h: bh * 0.45, color: '#18224a' }] } : {}) };
   });
   // arrays (behind the bus)
   if (!stackMode && span > bw / 2 && arr.type !== 'rtg' && arr.type !== 'none') {
@@ -2260,7 +2347,7 @@ function paintProbe(ctx, c, k, fr, o) {
     const ph = num(arr.panelW, Math.min(3, Math.max(1.2, bh * 0.8)));
     const x0 = bw / 2 + 0.5;
     if (arr.type === 'circular') { const R = (span - x0) / 2; for (const sx of [-1, 1]) drawDisc(ctx, k, L, sx * (x0 + R), 0, R, { squash: 0.92, ribs: 14 }); }
-    else for (const sx of [-1, 1]) {
+    else for (const sx of arr.side === 'single' ? [1] : [-1, 1]) {
       drawStrut(ctx, k, L, sx * bw / 2, 0, sx * x0, 0, 0.12);
       drawPanel(ctx, k, L, sx * x0, sx * span, 0, arr.type === 'rollout' ? ph * 0.6 : ph, { panels });
       if (arr.type === 'cross') { const mid = x0 + (span - x0) / 2, pw = (span - x0) / panels; drawPanel(ctx, k, L, sx * (mid - pw / 2), sx * (mid + pw / 2), ph, ph, {}); drawPanel(ctx, k, L, sx * (mid - pw / 2), sx * (mid + pw / 2), -ph, ph, {}); }
@@ -2270,7 +2357,7 @@ function paintProbe(ctx, c, k, fr, o) {
     ctx.fillStyle = litCss('solar_cell', [sx * 0.8, 0.1, 0.5], L, '#1a2448');
     ctx.fillRect(sx > 0 ? bw / 2 * k : -(bw / 2 + 0.3) * k, -(bh * 0.95) * k + (-0.5) * 0, 0.3 * k, bh * 0.9 * k);
   }
-  if (arr.type === 'rtg' && !stackMode) { // RTG on a boom
+  if ((arr.type === 'rtg' || c.rtg) && !stackMode) { // RTG on a boom
     drawStrut(ctx, k, L, -bw / 2, -bh * 0.2, -bw / 2 - 1.2, -bh * 0.55, 0.1);
     const rtg = cbody(c, 'rtg', () => ({ segs: [{ len: 1.1, d: 0.42, mat: 'rtg_dark', ribs: true }], seamEvery: 0.18, seamStrength: 0.3 }));
     ctx.save(); ctx.translate((-bw / 2 - 1.5) * k, (bh * 0.55) * k); ctx.rotate(-1.1); drawBody(ctx, rtg, k, fr); ctx.restore();
@@ -2290,7 +2377,8 @@ function paintProbe(ctx, c, k, fr, o) {
   }
   if (c.legs) for (const sx of [-1, 1]) drawStrut(ctx, k, L, sx * bw * 0.4, -bh / 2, sx * bw * 0.7, -bh / 2 - 0.8, 0.08);
   drawAt(ctx, busB, 0, -bh / 2, k, fr);
-  if (c.hga?.d) drawDish(ctx, k, L, 0, bh / 2 + num(c.hga.d) * 0.12 + 0.1, num(c.hga.d), { tilt: stackMode ? 0 : -0.22 });
+  if (c.hga?.d && c.hga.pos === 'side' && !stackMode) { drawStrut(ctx, k, L, -bw / 2, bh * 0.25, -bw / 2 - num(c.hga.d) * 0.3, bh * 0.25, 0.07); drawDish(ctx, k, L, -bw / 2 - num(c.hga.d) * 0.45, bh * 0.25, num(c.hga.d), { tilt: -0.6 }); }
+  else if (c.hga?.d) drawDish(ctx, k, L, 0, bh / 2 + num(c.hga.d) * 0.12 + 0.1, num(c.hga.d), { tilt: stackMode ? 0 : -0.22 });
   if (c.entryProbe && !stackMode) {
     const eb = cbody(c, 'eprobe', () => ({ segs: [{ len: 0.2, d: 0.4, dTop: 1, shape: 'easeOut', mat: 'ablator' }, { len: 0.5, d: 1, dTop: 0.5, mat: 'white_paint' }] }));
     drawAt(ctx, eb, bw / 2 + 0.6, -0.4, k, fr);
@@ -2403,7 +2491,7 @@ function paintAeroshell(ctx, c, k, fr, o) {
   const L = fr.Lx;
   const D = num(c.shellD, 4);
   const mode = o.mode;
-  const inner = c.inner && ART?.craft?.[c.inner] && o.depth < 2 ? ART.craft[c.inner] : null;
+  const inner = o.depth < 2 ? (c.innerArt && typeof c.innerArt === 'object' ? c.innerArt : c.inner && ART?.craft?.[c.inner] ? ART.craft[c.inner] : null) : null;
   if (inner && ((mode === 'flight' && o.engineOn) || mode === 'landed')) return paintCraft(ctx, inner, { ...o, depth: (o.depth || 0) + 1 });
   const shield = cbody(c, 'shield', () => ({ segs: [{ len: D * 0.14, d: D * 0.3, dTop: D, shape: 'easeOut', mat: c.shellMat || 'ablator' }], soot: 0.4, sootColor: '#2a1e16' }));
   const back = cbody(c, 'back', () => ({ segs: [{ len: D * 0.05, d: D, dTop: D * 0.96, mat: 'black_paint' }, { len: D * 0.36, d: D * 0.96, dTop: D * 0.48, mat: c.backshellMat || 'white_paint' }, { len: D * 0.12, d: D * 0.48, dTop: D * 0.3, shape: 'ellipse', mat: c.backshellMat || 'white_paint' }], seamEvery: D * 0.08, seamStrength: 0.08 }));

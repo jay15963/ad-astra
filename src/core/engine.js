@@ -21,6 +21,7 @@ import * as missions from '../sim/missions.js';
 import * as launch from '../sim/launch.js';
 import * as narrative from '../sim/narrative.js';
 import * as designs from '../sim/designs.js';
+import * as craftdesigns from '../sim/craftdesigns.js';
 import * as investors from '../sim/investors.js';
 import * as explore from '../sim/explore.js';
 import * as eco from '../sim/eco.js';
@@ -57,6 +58,7 @@ export const MODULES = [
   ['research', research],
   ['crew', crew],
   ['designs', designs],     // Phase B §6: Hangar designs (asVehicle before missions read the vehicle list)
+  ['craftdesigns', craftdesigns], // Estaleiro: designed spacecraft (asSpacecraft before missions read the craft list)
   ['missions', missions],
   ['infra', infra],         // Missões v2 §3: stations, bases, satellite fleets and rovers (after missions: deliveries)
   ['investors', investors], // Phase B §5: cap table, rounds and mandates (after missions: reads their results)

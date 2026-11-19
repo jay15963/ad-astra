@@ -57,6 +57,9 @@ src/core/time.js           turno <-> data, eras, faixas de passo, rótulos do di
 src/core/migrate.js        migração de saves (v1 → v2) e recusa com mensagem pt-BR (SaveError) [core]
 src/core/packs.js          mescla pura dos pacotes, normalizeScenario, carimbo fromYear/untilYear [data-pipeline]
 src/core/catalog.js        vehicleDef/spacecraftDef/vehicleAvailable/listVehicles por data    [data-pipeline]
+src/core/craftfit.js       regras puras de destino das naves do Estaleiro (fitDest, dvNeed)   [estaleiro]
+src/sim/craftdesigns.js    Estaleiro: naves projetadas pelo jogador (slice craftDesigns)     [estaleiro]
+src/ui/estaleiro.js        tela Estaleiro (gaveta › Operações)                               [estaleiro]
 src/sim/simtime.js         helpers de passo variável (dtOf, every, chanceInStep, dueIn…)     [sim-agnostic]
 src/sim/lifecycle.js       nascimento/renome/fusão/fim de agências e nações, gerador pós-2031 [lifecycle]
 src/core/helpers.js        helpers compartilhados                                            [core]
@@ -180,6 +183,7 @@ launch.js   ← risk.js, missions.js, crew.js, research.js, helpers, rng
 | `cap` | investors (Fase B) | tabela de acionistas do jogador `{actorId, kind, playerPct 10..100, holders[], lastRoundTurn, valuationM, lowRounds, warned, year, lastPrestige, seen, history}` ou `null` (Corrida Lunar) |
 | `mandates` | investors (Fase B) | `[{id, holderId, source: investor|calendar, calendarId?, title, type, destination, count, delivered, deadlineTurn, rewardM, penalty, missionIds, credited, status, …}]` (resolvidos: teto 24) |
 | `designs` | designs (Fase B) | `{[dsg_<n>]: Design}` foguetes do Hangar (ver "Fase B") |
+| `craftDesigns` | craftdesigns (Estaleiro) | `{[csg_<n>]: CraftDesign}` espaçonaves projetadas pelo jogador (ver "Estaleiro") |
 | `explored` | explore (Fase B) | ids explorados do mapa espacial (estrelas, regiões), teto 400, só ids |
 | `director` | director (v0.9.13) | `{since, ousted: null \| {reason: 'fired'\|'board', turn, summary, actorId, frozen?, reopened?}, tenures: [{actorId, name, short, flag, emblem, fromTurn, toTurn, reason, summary, missions, ok, firsts, crewLost, prestige, highlights}] (teto 40), closed?}` (ver "Demitido não é fim de jogo") |
 
@@ -737,6 +741,42 @@ Contrato em [docs/EXPANSION.md](docs/EXPANSION.md) §5–§8 e §12. Módulos no
   de fundação em 4 passos (`found-agency.js` + `css/found.css`) a partir da escolha de agência da Campanha.
 - **Motor**: sinais só no primeiro sub-passo de um passo longo (antes cada módulo tratava o mesmo sinal 52 vezes); uma escolha
   de decisão recusada pelo handler (`ok: false`) devolve o cartão à fila em vez de sumir com ele.
+
+## Estaleiro — projetista de espaçonaves (src/sim/craftdesigns.js, src/core/craftfit.js, src/ui/estaleiro.js)
+
+Irmão do Hangar para tudo o que vai em cima do foguete: satélite, sonda, pousador (de carga ou tripulado), rover,
+cápsula, cargueiro e módulo de estação. Módulo próprio (não estende designs.js: outra física, outro slice e outra lista
+de catálogo), registrado em `MODULES` logo depois de `designs`; sem rng (desenvolvimento e maturidade são contas).
+- **Dados**: `data/core/craft-parts.json` (pacote `core`, `data.craftParts`; `LIST_KEYS['craft-parts'] = 'parts'`, então
+  pacotes de era podem acrescentar peças por id): `roles` (função → `kind` de spacecraft.json, chave de liberação, alvo
+  padrão, sistemas obrigatórios), `parts` (estruturas `bus` por função com encaixes/propelente máximo/vida/tripulação, e
+  peças `power, comms, instrument, engine, entry, landing, mobility, crew, life, escape, docking, arm, cargo`, todas
+  datadas e com `gate` = chaves já existentes da árvore: `probe:lander`, `probe:outer`, `rover:*`, `satellite:*`,
+  `spacecraft:capsule_*`, `missionType:docking`…), `rules` (custo, Δv por corpo, corpos, dias de tripulação, desenvolvimento).
+  Vocabulário `craftPartKinds`/`craftRoles`; o validador confere tipos, funções, números e que toda chave tem nó.
+- **Números** (`craftStats`, puro): massa seca = (peças + tanque 10% do propelente) / (1 − Σ massFrac de escudo, paraquedas,
+  pernas, rodas); Δv = Isp·g0·ln(cheia/seca) com o compartimento de carga cheio; energia solar ÷ UA²; custo por unidade =
+  (peças + 0,3 por peça) × 2 + propelente × 0,3; confiança = produto das confiabilidades (−0,4% por peça acima de 10);
+  desenvolvimento = 5 × custo × complexidade (pouso +0,3, tripulação +0,6, rover +0,25, entrada +0,15…), tempo 39 sem +
+  2/peça (+39 tripulada, +13 pouso/rover) × era. Primeiro voo = confiança − 10% (7% partindo do catálogo, 4% revisão);
+  cada voo bom multiplica a diferença por 0,6 (ruim 0,85), teste de qualificação (40% de uma unidade, 13 sem) por 0,5.
+- **Destinos** (`src/core/craftfit.js fitDest(data, cap, dest)`, puro, usado por catalog, missions, infra e UI): função ×
+  tipo de lugar, alcance da antena (Terra · Lua · internos · externos · interestelar), energia no destino (bateria para
+  eclipses; sem RTG a noite lunar mata em ~2 semanas), Δv (inserção por corpo; pouso sem ar = inserção + 4,8·√g e
+  empuxo ≥ 1,5× o peso local com motor estrangulável; com ar = escudo da classe do corpo + paraquedas + freio final em ar
+  fino, casco pressurizado em Vênus), rodas, porta de acoplagem para estações, tripulação (assentos, dias de suporte de
+  vida, escudo de retorno, escape). Cada motivo traz `text` e `tip` (o quadro vermelho "Por que não serve").
+- **Integração**: `asSpacecraft` (forma de spacecraft.json com `craftFit` no lugar de `destinations`, `sub/subs`, `cargoT`,
+  `moduleId`, `landerRequired` para cápsulas, `companionOnly` para pousadores tripulados, `design.geometry/lifeYears/
+  yieldK`); `catalog.spacecraftDef/listSpacecraft` e `craftFitsDestination` leem; `missions.syncCraftCatalog` publica em
+  `data.index.spacecraft`, `spacecraftFor` acrescenta as operacionais do jogador (a IA nunca), `draftOptions` lista as em
+  desenvolvimento bloqueadas e dá o motivo exato; infra usa a vida e a ciência do projeto. Ações `craft/new {role|fromCraftId|
+  spec, destId?}`, `craft/save` (operacional + hardware novo = revisão "Nome II"), `craft/develop`, `craft/cancel`,
+  `craft/qualify`, `craft/retire`; consultas `craft/unlocked|list|get|preview|parts|roles|catalogTemplates|catalogInfo`.
+- **Arte**: `launch-render/vehicles.js craftDesignArt` traduz a geometria para os templates existentes (probe com formato
+  do corpo caixa/hexágono/cilindro/esfera/cone, asa única, painéis no corpo, antena ao lado, RTG; lander; rover; capsule;
+  module; aeroshell com `innerArt`); `setCraftResolver` (padrão: o store vivo) resolve ids `csg_*` na cena; harness
+  `tools/launch-preview.html?craftDesign=<JSON {name, geometry}>`. Saves antigos: o slice nasce vazio no primeiro uso.
 
 ## Fase C — conteúdo das 7 eras e o final de 3000 (v0.8.0)
 

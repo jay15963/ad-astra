@@ -1784,13 +1784,13 @@ function hardwareSections(store, d, opts, set, sug = null, sorted = null) {
       chip('Nenhuma', '', { class: !d.spacecraftId ? 'active' : null, 'aria-pressed': !d.spacecraftId ? 'true' : 'false', onclick: () => { ui.noCraft = true; set({ spacecraftId: null, secondarySpacecraftId: null }); } }),
       // every craft of this mission type shows up: the ones that do not fit stay greyed with the reason (they used to
       // be hidden, so a researched lander looked missing when the chosen rocket could not carry it)
-      opts.spacecraft.filter((s) => s.ok || s.id === d.spacecraftId || holdOf(s) != null || (s.reason && !/tipo incompat|não serve para este destino/i.test(s.reason)))
+      opts.spacecraft.filter((s) => s.ok || s.design || s.id === d.spacecraftId || holdOf(s) != null || (s.reason && !/tipo incompat|não serve para este destino/i.test(s.reason)))
         .sort((a, b) => (b.ok ? 1 : 0) - (a.ok ? 1 : 0)).map((s) => {
         const block = s.ok ? flightBlock(store, s.id, d.vehicleId) : null;
         const usable = s.ok && !block;
         const hold = usable ? null : holdOf(s);
         const why = !usable && !block && hold == null ? (s.reason ? ` · ${shortWhy(s.reason)}` : ' · não serve') : '';
-        return chip(`${s.name || s.id}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}${block ? ` · ${block}` : ''}${hold != null ? ` · leva só ${n1(hold)} t` : ''}${why}${sug?.spacecraftId === s.id ? ' · sugestão' : ''}`,
+        return chip(`${s.name || s.id}${s.design ? ' · seu projeto' : ''}${s.crew ? ` · ${s.crew} lugares` : ''}${s.costM ? ` · ${fmtMoney(s.costM)}` : ''}${block ? ` · ${block}` : ''}${hold != null ? ` · leva só ${n1(hold)} t` : ''}${why}${sug?.spacecraftId === s.id ? ' · sugestão' : ''}`,
           d.spacecraftId === s.id && !usable ? 'bad' : usable ? '' : 'muted',
           { class: [d.spacecraftId === s.id && usable ? 'active' : null, sug?.spacecraftId === s.id ? 'sugerido' : null].filter(Boolean).join(' ') || null, 'aria-pressed': d.spacecraftId === s.id ? 'true' : 'false', onclick: usable ? () => { ui.noCraft = false; set({ spacecraftId: s.id, secondarySpacecraftId: null }); } : () => toast(`${s.name}: ${block || s.reason || 'incompatível'}.`, 'warn'), title: block || s.reason || s.notes || '', 'aria-disabled': usable ? null : 'true' });
       }))

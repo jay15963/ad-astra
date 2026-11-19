@@ -202,7 +202,8 @@ const CSS = `
 }
 `;
 
-function ensureCss() {
+/** Inject the Hangar styles (.hg-*), shared with the Estaleiro (src/ui/estaleiro.js). */
+export function ensureCss() {
   if (typeof document === 'undefined' || document.getElementById('hangar-css')) return;
   const s = document.createElement('style');
   s.id = 'hangar-css';

@@ -11,7 +11,7 @@ export const VOCAB_CATEGORIES = [
   'destinations', 'bodies', 'milestones', 'missionTypes', 'spacecraftKinds', 'vehicleClasses', 'destinationKinds',
   'eventKinds', 'eventGroups', 'eventTags', 'techBranches', 'techTiers', 'partKinds', 'partFamilies',
   'rocketTemplates', 'colonyStages', 'holderKinds', 'investorProfiles', 'investorArchetypes', 'ecoFragments',
-  'endings', 'scenarios',
+  'endings', 'scenarios', 'craftPartKinds', 'craftRoles',
 ];
 
 /** Field name (anywhere in a data file) -> vocabulary category of its string value(s). */
@@ -212,6 +212,13 @@ export function checkVocab(ctx) {
     if (p.kind) checkId('partKinds', p.kind, pk, `${path}.kind`);
     if (p.family) checkId('partFamilies', p.family, pk, `${path}.family`);
   }
+  // Estaleiro (craft-parts.json): part kinds and roles come from the vocabulary
+  for (const { item: p, pack: { id: pk }, path } of list('craft-parts')) {
+    if (p.kind) checkId('craftPartKinds', p.kind, pk, `${path}.kind`);
+    else err(pk, `${path}.kind`, 'peça do Estaleiro sem kind');
+    for (const r of p.roles || []) checkId('craftRoles', r, pk, `${path}.roles`);
+  }
+  for (const p of packDefs) for (const r of packs[p.id]?.['craft-parts']?.roles || []) if (r?.id) checkId('craftRoles', r.id, p.id, `${packPath(p, 'craft-parts')}#roles.${r.id}`);
   for (const { item: p, pack: { id: pk }, path } of list('investors')) {
     if (!has('investorArchetypes', p.id)) { err(pk, path, unknown('investorArchetypes', p.id)); continue; }
     const a = V.entry('investorArchetypes', p.id);
