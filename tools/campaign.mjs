@@ -73,7 +73,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
   const openEra = () => {
     const lc = state.lifecycle || {};
     cur = {
-      eraId: state.clock.eraId, startTurn: state.turn, turns: 0, ms: 0, stops: 0, saveKB: 0,
+      eraId: state.clock.eraId, startTurn: state.turn, turns: 0, ms: 0, stops: 0, cardStops: 0, saveKB: 0,
       births0: lc.births ?? 0, applied0: Object.keys(lc.applied || {}).length, gone0: Object.keys(lc.tombstones || {}).length,
     };
   };
@@ -94,7 +94,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
   openEra();
   const t0 = Date.now();
   let guard = 0;
-  while (!state.gameOver && guard++ < 20000 && state.turn - 0 < maxTurns) {
+  while (!state.gameOver && guard++ < 60000 && state.turn - 0 < maxTurns) {
     // era boundary: save/load identical, then continue
     if (state.clock.pendingEra) {
       const p = state.clock.pendingEra;
@@ -117,6 +117,7 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
     if (state.gameOver) break;
     if (state.clock.pendingEra) continue;
     const decBefore = state.decisions.length;
+    const idsBefore = new Set(state.decisions.map((d) => d.id));
     const newsBefore = state.news[0]?.id;
     const ts = Date.now();
     const r = engine.dispatch(state, data, { type: 'time/advance', turns: 1, stopOnEvent: false });
@@ -126,6 +127,12 @@ export function runCampaign(data, { seed = 1, playerId = 'nasa', fast = true, to
       cur.turns++;
       const top = state.news[0];
       if (state.decisions.length > decBefore || state.activeLaunch || (top && top.id !== newsBefore && top.importance >= 3)) cur.stops++;
+      // D1: the same without the player's own launch days (a director who flies a lot stops at every launch, with
+      // its launch news): a new card that is not about the launch, or a big headline on a day without a launch
+      const launchDay = !!state.activeLaunch;
+      const card = state.decisions.some((d) => !idsBefore.has(d.id) && !/^launch/.test(d.kind || ''))
+        || (!launchDay && top && top.id !== newsBefore && top.importance >= 3);
+      if (card) cur.cardStops++;
     } else if (!state.gameOver && !state.clock.pendingEra && !state.decisions.length) {
       errors.push(`travado em t${state.turn}: ${r.stoppedBy}`);
       break;
@@ -167,7 +174,7 @@ if (isMain) {
       seed, playerId, fast, toEra, found, minPct, keepControl,
       onEra: quiet ? null : (e, st) => console.log(
         `  ${e.eraId} até ${e.endYear}: ${e.turns} turnos, ${(e.ms / Math.max(1, e.turns)).toFixed(1)} ms/turno, save ${e.saveKB} KB, ` +
-        `atores ${e.core} núcleo/${e.minor} menores, nasc ${e.births} ev ${e.events} fim ${e.gone}, paradas/turno ${(e.stops / Math.max(1, e.turns)).toFixed(2)}` +
+        `atores ${e.core} núcleo/${e.minor} menores, nasc ${e.births} ev ${e.events} fim ${e.gone}, paradas/turno ${(e.stops / Math.max(1, e.turns)).toFixed(2)} (sem lançamentos ${(e.cardStops / Math.max(1, e.turns)).toFixed(2)})` +
         ` (${formatTurnEra(st.turn, st.startYear, st.clock.stepWeeks)})`),
     });
     const st = res.state;

@@ -7,6 +7,7 @@
     "minOwn": 1,
     "minSlots": 2,
     "maxSlots": 12,
+    "maxHolders": 12,
     "slotsByEra": { "e1": 3, "e2": 4, "e3": 5, "e4": 6, "e5": 6, "e6": 6, "e7": 6 },
     "round": { "weeks": 52, "minSteps": 5, "phase": 26, "expiryWeeks": 8, "minOffers": 1, "maxOffers": 3 },
     "buybackPremium": 1.15,
@@ -19,7 +20,7 @@
     "mandate": {
       "expiryWeeks": 8, "minDeadlineSteps": 3, "calendarGraceWeeks": 13, "calendarHorizonWeeks": 104,
       "maxOpenPerHolder": 2, "keepResolved": 24,
-      "maxCostShare": 1, "yearCostShare": 0.8, "rewardCostShare": 0.5, "maxBundleYears": 4
+      "maxCostShare": 1, "yearCostShare": 0.8, "rewardCostShare": 0.5
     },
     "valuation": {
       "budget": 2.0, "prestige": 3.0, "reputation": 4.0, "fleet": 25, "cash": 0.5, "floorShareOfBudget": 1.0,

@@ -63,6 +63,8 @@ export function attentionStep(state, ctx) {
   return Math.floor((end - 1) / P) > Math.floor((end - 1 - sw) / P);
 }
 
+const WORLD_CARD = /^(politics|diplomacy|lifecycle)\//;
+
 /** budget.tick, first substep of a long step: is this an attention step? (see attentionStep) */
 function planAttention(state, ctx) {
   const sw = state.clock?.stepWeeks ?? 1;
@@ -73,7 +75,10 @@ function planAttention(state, ctx) {
   if (s.end === ctx.stepEnd) return;
   const start = state.turn;
   s.end = ctx.stepEnd;
-  const others = (state.decisions || []).some((d) => (d.createdTurn ?? -1) >= start);
+  // only the cards of the modules that tick before budget (politics, diplomacy, lifecycle) count: the launch-day
+  // card and the cards of the launch the player just played carry this turn too, and counting them made every step
+  // after a launch an attention step (D1: 0.42–0.47 stops per turn in era 6 for an agency that flies a lot)
+  const others = (state.decisions || []).some((d) => (d.createdTurn ?? -1) >= start && WORLD_CARD.test(d.kind || ''));
   s.on = others || !Number.isFinite(s.last) || start - s.last >= P;
   if (s.on) s.last = start;
 }
@@ -213,6 +218,42 @@ function returnUnspent(state) {
     if (a.id === state.playerId) mine = back;
   }
   return mine;
+}
+
+/** Piecewise-linear [[year, value], …] curve at `year` (flat outside). Pure. */
+export function curveAt(points, year) {
+  const s = (Array.isArray(points) ? points : []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (!s.length) return 1;
+  if (year <= s[0][0]) return s[0][1];
+  for (let i = 1; i < s.length; i++) {
+    if (year <= s[i][0]) { const [y0, v0] = s[i - 1]; const [y1, v1] = s[i]; return v0 + (v1 - v0) * ((year - y0) / Math.max(1, y1 - y0)); }
+  }
+  return s[s.length - 1][1];
+}
+
+/**
+ * D1: a founded agency has no budget series of its own, so the government's reference budget (politics'
+ * `world.baseBudget`, the anchor its yearly budget is pulled toward) used to stay at the 1950 figure for a thousand
+ * years while hardware, crews and facilities got dearer each era: a 1950 agency lived on US$ 50–150 mi/ano in 2900,
+ * when the same agency founded in 2600 starts with US$ 1,4 bi. The reference now follows the founding scale of
+ * data/core/hq-sites.json (`founding.scale`, the same curve the wizard uses), from the founding year on. The yearly
+ * budget itself still moves with support, flights and the economy (politics pulls it toward 0.67–1.5 × the anchor).
+ */
+function foundedAnchor(state, data) {
+  const pid = state.playerId;
+  const a = state.actors?.[pid];
+  const w = state.world;
+  const scale = data?.hqSites?.founding?.scale;
+  if (!a?.custom || !w?.baseBudget || !Array.isArray(scale) || !scale.length) return;
+  const f = fin(state);
+  if (!f.anchor || f.anchor.actorId !== pid) {
+    const base = Number(w.baseBudget[pid]) || Number(a.budget) || 0;
+    if (!(base > 0)) return;
+    const born = Number(a.born?.year) || yearAt(state);
+    f.anchor = { actorId: pid, base: Math.round(base * 10) / 10, scale: curveAt(scale, born) || 1 };
+  }
+  const k = curveAt(scale, yearAt(state)) / (f.anchor.scale || 1);
+  w.baseBudget[pid] = Math.round(f.anchor.base * Math.max(1, k) * 10) / 10;
 }
 
 function closeYear(state) {
@@ -430,7 +471,7 @@ export function tick(state, data, ctx) {
   fin(state);
   planAttention(state, ctx);
   // year rollover (politics already adjusted actor.budget earlier in this tick)
-  if (state.turn > 0 && crossed(state, ctx, WEEKS, 0)) closeYear(state);
+  if (state.turn > 0 && crossed(state, ctx, WEEKS, 0)) { closeYear(state); foundedAnchor(state, data); }
   const live = new Set();
   // calendar instances by AI owner, in calendar order (payPrograms visited the whole calendar once per actor)
   const byOwner = new Map();

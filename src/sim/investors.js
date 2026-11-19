@@ -5,7 +5,8 @@
 //   state.mandates = [{ id, holderId, source: 'investor'|'calendar', calendarId?, templateId?, title, type,
 //                      destination, crewed, count, delivered, deadlineTurn, rewardM, penalty: {mood, cashM?, pct?},
 //                      missionIds[], credited[], failedFlights, status: open|flying|done|failed|expired,
-//                      accepted, postponed, declined, createdTurn, resolvedTurn }]
+//                      accepted, postponed, declined, createdTurn, resolvedTurn,
+//                      costM? (estimated flight, D1), deferred?/spanWeeks? (long steps: card waits for attention) }]
 // Rules (binding numbers in data/core/investors.json "tuning"):
 //   - investors together hold at most 90% (playerPct ≥ 10); an offer that would cross it is never generated;
 //   - playerPct ≥ 50 = autonomy: a mandate may be declined or postponed once (mood −15), the board cannot fire you;
@@ -38,7 +39,7 @@ export const meta = { maxDt: 52 };
 // ---------------------------------------------------------------------------------------------------------------
 
 export const DEFAULT_TUNING = {
-  investorCap: 90, autonomyPct: 50, exponent: 0.6, minOwn: 1, minSlots: 2, maxSlots: 12,
+  investorCap: 90, autonomyPct: 50, exponent: 0.6, minOwn: 1, minSlots: 2, maxSlots: 12, maxHolders: 12,
   slotsByEra: { e1: 3, e2: 4, e3: 5, e4: 6, e5: 6, e6: 6, e7: 6 },
   round: { weeks: 52, minSteps: 5, phase: 26, expiryWeeks: 8, minOffers: 1, maxOffers: 3 },
   buybackPremium: 1.15, termBuybackPremium: 1.0,
@@ -46,7 +47,7 @@ export const DEFAULT_TUNING = {
     start: 60, decline: -15, postpone: -15, missed: -25, missedAutonomous: -15, delivered: 10, deliveredOthers: 2,
     flightFailed: -8, veto: -8, drift: 0.15, boardRemoval: 20, boardRounds: 2, dividendPerValuationShare: 400, dividendMax: 20,
   },
-  mandate: { expiryWeeks: 8, minDeadlineSteps: 3, calendarGraceWeeks: 13, calendarHorizonWeeks: 104, maxOpenPerHolder: 2, keepResolved: 24 },
+  mandate: { expiryWeeks: 8, minDeadlineSteps: 3, calendarGraceWeeks: 13, calendarHorizonWeeks: 104, maxOpenPerHolder: 2, keepResolved: 24, maxCostShare: 1, yearCostShare: 0.8, rewardCostShare: 0.5 },
   valuation: { budget: 2, prestige: 3, reputation: 4, fleet: 25, cash: 0.5, floorShareOfBudget: 1, trackStep: 0.04, trackMin: 0.7, trackMax: 1.4 },
   historyCap: 60,
   starting: { agency: { kind: 'government', pct: 40 }, company: { kind: 'founders', pct: 30 }, founded: null },
@@ -255,10 +256,39 @@ export function tick(state, data, ctx) {
   syncMandates(state, data, ctx);
   countLaunches(state, data);
   const t = tuning(data);
-  if (yearAt(state) >= unlockYear(data) && cadence(ctx, { weeks: t.round.weeks, minSteps: t.round.minSteps, phase: t.round.phase })) {
-    fundingRound(state, data, ctx);
-  }
+  if (yearAt(state) >= unlockYear(data) && roundDue(state, ctx, t)) fundingRound(state, data, ctx);
+  if (state.gameOver) return;
   termsDue(state, data, ctx);
+  if (attentionNow(state, ctx)) showDeferredMandates(state, data, ctx);
+}
+
+// Long steps (D1, eras 5–7: a quarter or more per step): the board's non-urgent cards (rounds, new mandates, end of
+// term) wait for the attention step of budget.js, like the event and market cards, so a long step does not stop on
+// them almost every time. Short steps are never gated.
+const gatedNow = (state) => budget.attentionPeriod?.(state.clock?.stepWeeks) > 0;
+const attentionNow = (state, ctx) => !gatedNow(state) || budget.attentionStep?.(state, ctx) !== false;
+
+/** Yearly round (§5.2 cadence); with long steps, in the first attention step after a full cadence period. */
+function roundDue(state, ctx, t) {
+  if (!gatedNow(state)) return cadence(ctx, { weeks: t.round.weeks, minSteps: t.round.minSteps, phase: t.round.phase });
+  if (!attentionNow(state, ctx)) return false;
+  const period = Math.max(t.round.weeks, t.round.minSteps * (ctx.dt || state.clock?.stepWeeks || 1));
+  const last = state.cap?.lastRoundTurn;
+  return !Number.isFinite(last) || state.turn + (ctx.dt || 0) - last >= period;
+}
+
+/**
+ * Mandates issued in a long step outside the attention window wait (`deferred`) for the next attention step: then
+ * the card shows and the deadline starts counting from there (the holder's years are never eaten by the wait).
+ */
+function showDeferredMandates(state, data, ctx) {
+  for (const md of state.mandates) {
+    if (!md.deferred) continue;
+    delete md.deferred;
+    if (!open(md)) continue;
+    md.deadlineTurn = Math.max(md.deadlineTurn, state.turn + (md.spanWeeks || WEEKS_PER_YEAR));
+    if (!md.accepted) pushMandateCard(state, data, ctx, md);
+  }
 }
 
 /** Year boundary: close the year (history, veto, mood drift), then issue the new year's mandates. */
@@ -396,7 +426,7 @@ function syncMandates(state, data, ctx) {
     if ((md.delivered || 0) >= (md.count || 1)) { deliverMandate(state, data, md); continue; }
     const flying = linked.some(isFlying);
     md.status = flying ? 'flying' : 'open';
-    if (!flying && dueIn(ctx, md.deadlineTurn + 1)) missMandate(state, data, md);
+    if (!flying && !md.deferred && dueIn(ctx, md.deadlineTurn + 1)) missMandate(state, data, md);
   }
 }
 
@@ -638,17 +668,31 @@ function allocate(holders, n) {
 
 const open = (md) => md.status === 'open' || md.status === 'flying';
 
+/**
+ * First destination of a template the player can fly now: {dest, costM} (costM = cheapest option, null when
+ * missions.js cannot price it). A destination whose cheapest flight costs more than `maxCostShare` × the yearly
+ * budget is not asked for (D1: investors of a US$ 90 mi/ano agency asked for three US$ 78 mi flights a year).
+ */
 function templateUsable(state, data, tpl, year) {
   if (tpl.fromYear && year < tpl.fromYear) return null;
   if (tpl.toYear && year > tpl.toYear) return null;
+  const t = tuning(data).mandate;
+  const budgetM = Math.max(0, me(state)?.budget || 0);
+  const maxCost = Number.isFinite(t.maxCostShare) && budgetM > 0 ? t.maxCostShare * budgetM : Infinity;
   const dests = (tpl.destinations || []).filter((d) => data?.index?.destinations?.[d]);
   for (const destination of dests) {
     let r = null;
     try { r = missions.costRange?.(state, data, { type: tpl.type, destination, crewed: tpl.crewed ?? tpl.type === 'crewed' }); } catch { r = null; }
-    if (r?.options > 0) return destination;
+    if (!(r?.options > 0)) continue;
+    const costM = Number.isFinite(r.minM) ? r.minM : null;
+    if (costM != null && costM > maxCost) continue;
+    return { dest: destination, costM };
   }
   return null;
 }
+
+/** Estimated cost (US$ mi) of the flights a mandate still owes. */
+const owedCostM = (md) => (Number(md.costM) || 0) * Math.max(0, (md.count || 1) - (md.delivered || 0));
 
 function issueMandates(state, data, ctx) {
   const cap = state.cap;
@@ -666,34 +710,49 @@ function issueMandates(state, data, ctx) {
   const calDue = state.mandates.filter((md) => md.source === 'calendar' && open(md) && md.deadlineTurn - (t.mandate.calendarGraceWeeks ?? 26) < yearEnd).length;
   if (anchor) share.set(anchor.id, Math.max(0, (share.get(anchor.id) || 0) - calDue));
   const pf = profiles(data);
+  // the board asks for what the agency can pay: the flights still owed plus the new ones cost at most
+  // `yearCostShare` × the yearly budget (D1). The slots of the formula (§5.2) stay the ceiling.
+  const budgetM = Math.max(0, me(state)?.budget || 0);
+  const yearShare = Number(t.mandate.yearCostShare);
+  let room = Number.isFinite(yearShare) && budgetM > 0
+    ? yearShare * budgetM - state.mandates.filter((md) => md.source !== 'calendar' && open(md)).reduce((s, md) => s + owedCostM(md), 0)
+    : Infinity;
   for (const h of cap.holders) {
     let n = share.get(h.id) || 0;
     const openNow = state.mandates.filter((md) => md.holderId === h.id && md.source !== 'calendar' && open(md)).length;
     n = Math.min(n, Math.max(0, (t.mandate.maxOpenPerHolder ?? 2) - openNow));
-    const tpls = (pf[h.profile]?.templates || []).map((tpl) => ({ tpl, dest: templateUsable(state, data, tpl, year) })).filter((x) => x.dest);
+    const tpls = (pf[h.profile]?.templates || []).map((tpl) => ({ tpl, use: templateUsable(state, data, tpl, year) })).filter((x) => x.use);
     for (let i = 0; i < n && tpls.length; i++) {
       const pick = rng.pick(tpls);
-      createMandate(state, data, ctx, h, pick.tpl, pick.dest);
+      const cost = (pick.use.costM || 0) * Math.max(1, pick.tpl.count || 1);
+      if (cost > room) continue; // the rng draw stays the same whatever the budget: determinism per seed
+      room -= cost;
+      createMandate(state, data, ctx, h, pick.tpl, pick.use.dest, pick.use.costM);
     }
   }
 }
 
-function createMandate(state, data, ctx, h, tpl, destination) {
+function createMandate(state, data, ctx, h, tpl, destination, costM = null) {
   const t = tuning(data);
   const a = me(state);
   const deadline = state.turn + Math.max((tpl.years || 2) * WEEKS_PER_YEAR, (t.mandate.minDeadlineSteps ?? 3) * ctx.dt);
-  const rewardM = round1((a?.budget || 0) * (tpl.reward || 0.08));
+  // the holder's prize is a share of the budget; it also covers `rewardCostShare` of the flight it asks for (D1: a
+  // US$ 7 mi prize for a US$ 78 mi flight made every mandate a loss). The cash penalty stays half the base prize.
+  const baseM = round1((a?.budget || 0) * (tpl.reward || 0.08));
+  const coverM = Number.isFinite(costM) ? round1(costM * Math.max(1, tpl.count || 1) * (Number(t.mandate.rewardCostShare) || 0)) : 0;
+  const rewardM = Math.max(baseM, coverM);
   const binding = !isAutonomous(state, data);
   const md = {
     id: nextId(state, 'mnd'), holderId: h.id, source: 'investor', calendarId: null, templateId: tpl.id || null,
     title: String(tpl.title || 'Mandato').slice(0, 60), type: tpl.type, destination, crewed: !!(tpl.crewed ?? tpl.type === 'crewed'),
-    count: Math.max(1, tpl.count || 1), delivered: 0, deadlineTurn: deadline, rewardM,
-    penalty: { mood: t.mood.missed, ...(binding ? { cashM: round1(rewardM * 0.5), pct: tpl.penaltyPct ?? (h.pct >= 20 ? 2 : 1) } : {}) },
+    count: Math.max(1, tpl.count || 1), delivered: 0, deadlineTurn: deadline, rewardM, ...(Number.isFinite(costM) ? { costM: round1(costM) } : {}),
+    penalty: { mood: t.mood.missed, ...(binding ? { cashM: round1(baseM * 0.5), pct: tpl.penaltyPct ?? (h.pct >= 20 ? 2 : 1) } : {}) },
     missionIds: [], credited: [], failedFlights: 0, status: 'open', accepted: false, postponed: false, declined: false,
     createdTurn: state.turn, resolvedTurn: null,
   };
   state.mandates.push(md);
-  pushMandateCard(state, data, ctx, md);
+  if (attentionNow(state, ctx)) pushMandateCard(state, data, ctx, md);
+  else { md.deferred = true; md.spanWeeks = deadline - state.turn; }
   return md;
 }
 
@@ -765,7 +824,15 @@ export function makeOffers(state, data, rng) {
     const want = rng.int(Math.max(1, lo), Math.min(30, hi));
     const pct = Math.min(want, room);
     if (pct < 1) break;
-    const name = fill(rng.pick(arch.names || [arch.id]), { pais: a?.country || '' });
+    let name = fill(rng.pick(arch.names || [arch.id]), { pais: a?.country || '' });
+    // a full board (D1: 45 holders of 1–3% after a millennium of rounds): a new seat only while there is one free;
+    // otherwise the offer comes from a sitting holder of the same archetype (acceptOffer adds to its stake)
+    const seats = cap.holders.filter((x) => !x.anchor);
+    if (seats.length >= (t.maxHolders ?? 12) && !seats.some((x) => x.archetypeId === arch.id && x.name === name)) {
+      const same = seats.filter((x) => x.archetypeId === arch.id);
+      if (!same.length) { i--; if (pool.every((x) => used.has(x.id))) break; continue; }
+      name = rng.pick(same).name;
+    }
     const cashM = round1((pct / 100) * val * (arch.premium ?? 1) * rng.range(0.92, 1.08));
     offers.push({
       id: `of${i + 1}`, archetypeId: arch.id, holderKind: arch.kind || 'fund', name, pct, cashM,
@@ -923,6 +990,8 @@ export function buyback(state, data, { holderId, pct, premium } = {}) {
 }
 
 function termsDue(state, data, ctx) {
+  // long steps: a term that ended outside the attention window is settled in the next attention step
+  if (!attentionNow(state, ctx)) return;
   for (const h of state.cap.holders) {
     if (h.anchor || !Number.isFinite(h.untilTurn) || !dueIn(ctx, h.untilTurn)) continue;
     if (state.decisions.some((d) => d.kind === 'investors/term' && d.payload?.holderId === h.id)) continue;

@@ -42,7 +42,7 @@ export const DEFAULT_TUNING = {
     flightsRef: 40, relFloor: 0.8, relSpan: 0.17, wFlights: 0.35, wRel: 0.35, wTrust: 0.15, wBloc: 0.15,
     needNone: 1, needHas: 0.3, domesticHas: 0, domesticNone: 0.5, failPenalty: 25, failWindowWeeks: 104,
     pricePenalty: 40, tensionPenalty: 18, smoothing: 0.35, periodWeeks: 13, phase: 5, keepMin: 0.5, maxSellables: 8,
-    refPriceFallback: 1.5, affordShare: 0.15, refAskCap: 1.25, cheapBoost: 1,
+    refPriceFallback: 1.5, affordShare: 0.15, refAskCap: 1.25, cheapBoost: 1, trackNeed: 0.5,
   },
   ask: { default: 1.2, min: 0.9, max: 2.0, step: 0.05 },
   offer: {
@@ -398,7 +398,13 @@ export function interestInputs(state, data, v, buyerId, cache = null) {
   const refPrice = round1(Math.max(1, Math.min(refEquiv, ask * t.refAskCap)));
   // binding need (§8.3): 1 without a rocket of the class, 0.3 with one; a rocket much cheaper per tonne than the
   // buyer's own wins part of the way back (everyone buys the cheap workhorse)
-  let need = has ? t.needHas + (1 - t.needHas) * clamp(1 - ratio, 0, 1) * t.cheapBoost : t.needNone;
+  // D1: a proven rocket also wins buyers who have their own (flights × reliability, up to `trackNeed` of the way):
+  // before, once every AI flew a rocket of the class (from the 1990s on) the player's rockets almost never sold,
+  // whatever their record (a 400-flight, 99,7% heavy lifter drew interest 8 of 100)
+  const flights = flightsOf(state, v);
+  const relMean = reliabilityOf(state, data, v);
+  const track = Math.min(1, Math.log2(1 + Math.max(0, flights)) / Math.log2(1 + t.flightsRef)) * clamp((relMean - t.relFloor) / t.relSpan, 0, 1);
+  let need = has ? t.needHas + (1 - t.needHas) * Math.max(clamp(1 - ratio, 0, 1) * t.cheapBoost, track * num(t.trackNeed, 0)) : t.needNone;
   // domestic launch policy (NASA by law): foreign rockets only when there is no own rocket of the class
   const domestic = B?.launchPolicy === 'domestic' && !(v.country && B.country && String(v.country).includes(B.country));
   if (domestic) need *= has ? t.domesticHas : t.domesticNone;
@@ -408,7 +414,7 @@ export function interestInputs(state, data, v, buyerId, cache = null) {
   if (budgetM > 0 && refPrice > 0) need *= clamp((budgetM * t.affordShare) / refPrice, 0, 1);
   const tension = diplomacy.tensionOf(state, me, buyerId);
   const inputs = {
-    flights: flightsOf(state, v), relMean: reliabilityOf(state, data, v), fails: recentFails(state, data, v.id),
+    flights, relMean, fails: recentFails(state, data, v.id),
     ratio: round3(ratio), need: round3(need), trust: diplomacy.relation(state, me, buyerId).trust || 0,
     bloc: sameBloc(state, data, me, buyerId), tension, bonus: research.techBonus(state, me, 'marketInterest'),
   };

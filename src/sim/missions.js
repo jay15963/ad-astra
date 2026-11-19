@@ -2245,6 +2245,8 @@ function customOpportunity(state, data, rng) {
 
 function opportunities(state, data, ctx) {
   if (hasPendingOpportunity(state)) return;
+  // long steps (D1): the government's pitches (windows, answers to rivals, ideas) wait for the attention step
+  if (typeof budget.attentionStep === 'function' && !budget.attentionStep(state, ctx)) return;
   const planning = (state.missions || []).filter((m) => m.status === 'planning').length;
   if (planning >= 3) return;
   const last = state.stats?.['missions.lastOpportunityTurn'] ?? -99;
@@ -2500,6 +2502,9 @@ function contractOffers(state, data, ctx) {
   const open = state.contracts.filter((c) => c.status === 'open' || c.status === 'bidding').length;
   const caps = contractCaps(data);
   if (open >= caps.openOffers) return;
+  // long steps (D1, eras 5–7): new contracts arrive only in the attention step of budget.js (they all show in the
+  // same stop); the weekly chance inside that step is unchanged
+  if (typeof budget.attentionStep === 'function' && !budget.attentionStep(state, ctx)) return;
   const last = state.contracts.reduce((mx, c) => Math.max(mx, c.createdTurn), -99);
   const rng = ctx.rng('contract');
   if (state.turn - last < caps.minGapWeeks || !rng.chance(state.turn < 8 ? 0.35 : 0.22)) return;
