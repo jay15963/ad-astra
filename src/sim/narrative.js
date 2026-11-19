@@ -612,7 +612,10 @@ function applyOne(state, data, e, context, rng) {
   } else if ('schedule' in e) {
     ev.scheduled.push({ eventId: e.schedule, turn: state.turn + Math.max(1, e.inWeeks | 0), context: scheduleContext(context) });
   } else if ('science' in e) {
-    if (typeof research.addSciencePoints === 'function') research.addSciencePoints(state, e.science, `evento: ${note}`);
+    // campaign (research gates the catalog): event science is a small bonus, real science comes from missions
+    const mult = (data?.scenario?.techGating ?? state.techGating) ? (data?.tech?.config?.eventScienceMult ?? 1) : 1;
+    const sci = e.science > 0 ? Math.max(1, Math.round(e.science * mult)) : e.science;
+    if (typeof research.addSciencePoints === 'function') research.addSciencePoints(state, sci, `evento: ${note}`);
     else { state.stats ||= {}; state.stats['narrative.scienceUnclaimed'] = (state.stats['narrative.scienceUnclaimed'] || 0) + e.science; }
   } else if ('cash' in e) {
     const amt = scaleMoney(state, e.cash);

@@ -774,14 +774,18 @@ function header(store, nodes) {
     h('div', { class: 'science-row rs-kpi' },
       h('div', { class: 'rs-kpi-main' }, h('div', { class: 'rs-eyebrow' }, 'Pontos de ciência'), countUp('research.points', info.points ?? 0, fmtNum, 'rs-value')),
       h('div', { class: 'rs-kpi-side' },
-        info.perWeek != null ? h('div', { class: 'rs-up' }, `+${fmtNum(info.perWeek)}/sem`) : null,
+        info.perWeek > 0 ? h('div', { class: 'rs-up' }, `+${fmtNum(info.perWeek)}/sem`) : info.passiveLeft === 0 ? h('div', { class: 'rs-lab-out' }, 'laboratório esgotado') : null,
         info.slots != null ? h('div', null, h('b', null, `${info.active ?? active.length}/${info.slots}`), ' projetos') : null,
         h('div', null, h('b', null, `${known.filter((n) => n.state === 'done').length}/${known.length}`), ' tecnologias'))),
     active.length
       ? h('div', { class: 'active-projects' }, active.map((n) => h('button', {
         class: 'tt-proj', type: 'button', 'aria-label': `Abrir ${n.name}`, onclick: () => jump(store, n.id, { open: true }),
       }, progressBar(store, n))))
-      : h('p', { class: 'rs-hint' }, 'Nenhum projeto em andamento. Toque num nó com contorno amarelo para começar.'));
+      : h('p', { class: 'rs-hint' }, 'Nenhum projeto em andamento. Toque num nó com contorno amarelo para começar.'),
+    info.passiveLeft != null ? h('p', { class: ['rs-lab', info.passiveLeft === 0 && 'out'] },
+      info.passiveLeft > 0
+        ? `Ciência de laboratório: ainda ${fmtNum(info.passiveLeft)} pontos nesta era (dá para as primeiras tecnologias). O resto vem de missões: satélites, sondas, voos tripulados e estações.`
+        : 'Ciência de laboratório esgotada nesta era: a próxima ciência vem de missões (satélites, sondas, voos tripulados, estações) e de eventos. Na próxima era os laboratórios rendem de novo.') : null);
 }
 
 function progressBar(store, n) {

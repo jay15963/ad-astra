@@ -224,6 +224,30 @@ function weeklySpeed(state, data, approach) {
   return (approachCfg(data, approach).speed ?? 1) * engineerFactor(state, data);
 }
 
+/**
+ * Lab ("passive") science is limited: over the whole game it can only add up to passivePool(year) points
+ * (data/tech.json config.passivePool, cumulative steps by era). Enough for the starter nodes of each era; the rest
+ * of the tree needs real science from missions, stations and events. null = no pool configured (unlimited).
+ */
+export function passivePool(state, data) {
+  const steps = cfg(data).passivePool;
+  if (!Array.isArray(steps) || !steps.length) return null;
+  // only where research gates the catalog (campaign and era scenarios); the Corrida Lunar keeps its free labs
+  if (!(data?.scenario?.techGating ?? state?.techGating)) return null;
+  const y = yearAt(state);
+  let pool = 0;
+  for (const [from, v] of steps) if (y >= from) pool = v;
+  return pool;
+}
+/** Lab science still to come under the pool (Infinity without a pool). */
+export function passiveLeft(state, data) {
+  const pool = passivePool(state, data);
+  if (pool == null) return Infinity;
+  const r = ensure(state);
+  if (!Number.isFinite(r.passive)) r.passive = Math.min(r.earned || 0, pool); // saves before the pool
+  return Math.max(0, pool - r.passive);
+}
+
 function sciencePerWeek(state, data) {
   const c = cfg(data);
   const engs = Object.values(state.crew || {}).filter(
@@ -339,7 +363,15 @@ export function tick(state, data, ctx) {
 
   const dt = dtOf(ctx);
   // weekly science from labs + engineering team (dt weeks of it)
-  addSciencePoints(state, dt === 1 ? sciencePerWeek(state, data) : round2(sciencePerWeek(state, data) * dt));
+  {
+    const want = dt === 1 ? sciencePerWeek(state, data) : round2(sciencePerWeek(state, data) * dt);
+    const left = passiveLeft(state, data);
+    const got = round2(Math.min(want, left));
+    if (got > 0) {
+      addSciencePoints(state, got);
+      if (Number.isFinite(left)) state.research.passive = round2((state.research.passive || 0) + got);
+    }
+  }
   // tech-transfer treaties (diplomacy emits 'diplomacy/techTransfer' at signing and every quarter)
   for (const s of state.signals || []) {
     if (s?.type !== 'diplomacy/techTransfer' || s.actorId !== state.playerId || !(s.points > 0)) continue;
@@ -870,7 +902,10 @@ export const queries = {
   'research/points': (state) => Math.floor(state.research?.points || 0),
   'research/summary': (state, data) => ({
     points: Math.floor(state.research?.points || 0),
-    perWeek: sciencePerWeek(state, data),
+    perWeek: passiveLeft(state, data) > 0 ? sciencePerWeek(state, data) : 0,
+    labRate: sciencePerWeek(state, data),
+    passiveLeft: Number.isFinite(passiveLeft(state, data)) ? Math.round(passiveLeft(state, data)) : null,
+    passivePool: passivePool(state, data),
     earned: state.research?.earned || 0,
     active: state.research?.projects?.length || 0,
     slots: maxProjects(state, data),

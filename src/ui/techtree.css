@@ -17,6 +17,9 @@
 .rs-kpi-side b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 500; color: var(--text-2); }
 .rs-up { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--green); }
 .rs-hint { margin: 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--text-3); font-size: var(--t11); line-height: 1.5; }
+.rs-lab { margin: 8px 0 0; color: var(--text-2); font-size: var(--t11); line-height: 1.5; }
+.rs-lab.out { color: var(--amber, var(--yellow)); }
+.rs-lab-out { color: var(--amber, var(--yellow)); font-size: var(--t11); }
 .rs-card .active-projects { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); }
 /* active project rows are tappable (jump to the node) */
 .tt-proj {

@@ -2,6 +2,9 @@
   "config": {
     "startPoints": 30,
     "baseSciencePerWeek": 0.5,
+    "passivePool": [[1950, 230], [1976, 320], [2000, 410], [2026, 500], [2051, 620], [2200, 760], [2600, 900]],
+    "eventScienceMult": 0.35,
+    "passivePoolNote": "Ciência de laboratório (passiva) acumulada no jogo todo: teto que sobe a cada era. Dá para as primeiras tecnologias de cada era; o resto vem de missões reais, estações e eventos.",
     "engineerSciencePerWeek": 0.06,
     "maxProjects": 2,
     "costScale": {
