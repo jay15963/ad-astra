@@ -760,6 +760,14 @@ de catálogo), registrado em `MODULES` logo depois de `designs`; sem rng (desenv
   desenvolvimento = 5 × custo × complexidade (pouso +0,3, tripulação +0,6, rover +0,25, entrada +0,15…), tempo 39 sem +
   2/peça (+39 tripulada, +13 pouso/rover) × era. Primeiro voo = confiança − 10% (7% partindo do catálogo, 4% revisão);
   cada voo bom multiplica a diferença por 0,6 (ruim 0,85), teste de qualificação (40% de uma unidade, 13 sem) por 0,5.
+- **Programa** (v0.10.1): projeto → `work` (pago por semana) → `testFlights` → `operational`. Voos de teste
+  (`rules.dev.tests`): 1 satélite/sonda/cargueiro/módulo, 2 pousador/rover, 3 tripulada, 1 revisão ou cópia próxima do
+  catálogo. missions.js (`craftTestFlights`) cria um voo de demonstração por vez: missão `source: 'test'`, `testCraftId`,
+  tipo carga sem carga de cliente, a própria nave (custo de uma unidade) sem tripulação até o alvo do projeto (ou o
+  destino mais fácil que ela atende), foguete escolhido pelo jogador (sugestão do mais barato). Só bons voos contam;
+  falha de lançamento é do foguete e não conta. Em teste a nave só voa nos próprios voos (validate/draftOptions a
+  bloqueiam no resto com o motivo) e o hardware fica travado. A qualificação em solo segue como extra opcional
+  (em teste ou pronta): mais barata que um voo, amadurece mas não aprova.
 - **Destinos** (`src/core/craftfit.js fitDest(data, cap, dest)`, puro, usado por catalog, missions, infra e UI): função ×
   tipo de lugar, alcance da antena (Terra · Lua · internos · externos · interestelar), energia no destino (bateria para
   eclipses; sem RTG a noite lunar mata em ~2 semanas), Δv (inserção por corpo; pouso sem ar = inserção + 4,8·√g e
@@ -775,7 +783,9 @@ de catálogo), registrado em `MODULES` logo depois de `designs`; sem rng (desenv
   `craft/qualify`, `craft/retire`; consultas `craft/unlocked|list|get|preview|parts|roles|catalogTemplates|catalogInfo`.
 - **Arte**: `launch-render/vehicles.js craftDesignArt` traduz a geometria para os templates existentes (probe com formato
   do corpo caixa/hexágono/cilindro/esfera/cone, asa única, painéis no corpo, antena ao lado, RTG; lander; rover; capsule;
-  module; aeroshell com `innerArt`); `setCraftResolver` (padrão: o store vivo) resolve ids `csg_*` na cena; harness
+  module; pousadores com escudo e paraquedas levam `aeroshell: {d}` como os do catálogo, e o renderizador só os
+  encapsula em mundos com atmosfera — `index.js descendsInAeroshell`: Marte, Titã, Vênus; na Lua e corpos sem ar pousam
+  como são); `setCraftResolver` (padrão: o store vivo) resolve ids `csg_*` na cena; harness
   `tools/launch-preview.html?craftDesign=<JSON {name, geometry}>`. Saves antigos: o slice nasce vazio no primeiro uso.
 
 ## Fase C — conteúdo das 7 eras e o final de 3000 (v0.8.0)

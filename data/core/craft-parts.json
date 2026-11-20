@@ -210,7 +210,8 @@
       "catalogCut": 0.2, "catalogMaxChange": 0.35,
       "revision": {"costFrac": 0.35, "weeksFrac": 0.4, "minChange": 0.25, "minWeeks": 13},
       "maturity": {"success": 0.6, "failure": 0.85},
-      "qualification": {"costFrac": 0.4, "weeks": 13, "mult": 0.5, "max": 2}
+      "qualification": {"costFrac": 0.4, "weeks": 13, "mult": 0.5, "max": 2},
+      "tests": {"_doc": "Voos de teste depois do desenvolvimento (missões de demonstração sem tripulação que o jogador agenda e voa): quantos bons voos aprovam a nave. Cada voo bom multiplica a diferença de confiança por maturity.success; a qualificação em solo é um extra opcional (não conta como voo).", "base": 1, "landing": 2, "crewed": 3, "revision": 1, "catalog": 1, "retryWeeks": 13}
     }
   }
 }

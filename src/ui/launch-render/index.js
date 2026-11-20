@@ -69,6 +69,8 @@ function visualRS(rs) {
 /** Mars/Titan/Venus EDL: is the descent craft still inside its aeroshell, and has the heat shield gone? */
 const EDL_WORLDS = new Set(['mars', 'titan', 'venus']);
 function encapsulated(c) { return !!c && (c.template === 'rotorcraft' || c.template === 'rover' || (c.template === 'lander' && !!c.aeroshell)); }
+/** Does this craft descend inside an aeroshell on `world`? Only on worlds with an atmosphere (Mars, Titan, Venus). */
+export function descendsInAeroshell(craft, world) { return EDL_WORLDS.has(world) && encapsulated(craft); }
 function edlStage(rs, craft, world, flags, evs) {
   const encaps = EDL_WORLDS.has(world) && encapsulated(craft);
   if (!encaps) return { encaps: false, shell: null, shieldOff: false };

@@ -15,6 +15,7 @@ import * as gating from '../src/core/gating.js';
 import * as cd from '../src/sim/craftdesigns.js';
 import { fitDest, bodyInfo, dvNeed, craftPartsOf } from '../src/core/craftfit.js';
 import * as painter from '../src/ui/launch-render/vehicles.js';
+import * as render from '../src/ui/launch-render/index.js';
 import * as estaleiro from '../src/ui/estaleiro.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +36,18 @@ function play(st, data, n) {
 function grantHistory(st, data, year) {
   st.research.unlocked = gating.historicalGrant(data, year + 1, { have: st.research.unlocked });
   st.research.keys = gating.keysOfNodes(data, st.research.unlocked);
+}
+/** Fly the design's demo flights (missions.js creates each one; a 'mission/resolved' success counts it). */
+function passTests(st, data, id, outcome = 'total') {
+  for (let i = 0; i < 6 && st.craftDesigns[id].program?.phase === 'testFlights'; i++) {
+    play(st, data, 1);
+    const m = st.missions.find((x) => x.testCraftId === id && !['done', 'cancelled'].includes(x.status));
+    assert.ok(m, 'o voo de teste aparece em Missões');
+    m.status = 'done';
+    st.signals = [{ type: 'mission/resolved', missionId: m.id, outcome, phase: 'arrival', final: true }];
+    cd.tick(st, data, { dt: 1, prevTurn: st.turn, turn: st.turn });
+    if (outcome !== 'total') return;
+  }
 }
 const generic = (id) => lunar.spacecraft.spacecraft.find((s) => s.id === id);
 
@@ -180,6 +193,8 @@ test('program: develop → operational; the design joins listSpacecraft and the 
   assert.ok(st.actors.nasa.cash < cash0, 'paga a entrada');
   play(st, lunar, dv.devWeeks + 2);
   const d = st.craftDesigns[id];
+  assert.equal(d.program.phase, 'testFlights', 'depois do desenvolvimento vêm os voos de teste');
+  passTests(st, lunar, id);
   assert.equal(d.program.phase, 'operational');
   const sc = spacecraftDef(lunar, id, st);
   assert.ok(sc && !sc.retired && sc.craftFit && sc.kind === 'satellite');
@@ -200,7 +215,7 @@ test('program: develop → operational; the design joins listSpacecraft and the 
   st.signals = [{ type: 'mission/resolved', missionId: 'm_test', outcome: 'total', phase: 'arrival', final: true }];
   cd.tick(st, lunar, { dt: 1, prevTurn: st.turn, turn: st.turn });
   assert.ok(d.gap < gap0, 'voo bom amadurece');
-  assert.equal(d.stats.flights, 1);
+  assert.equal(d.stats.flights, 2, '1 voo de teste + 1 voo operacional');
   st.missions.pop();
 });
 
@@ -247,6 +262,7 @@ test('revision: editing an operational design makes "Nome II" with a cheaper pro
   const id = act(st, lunar, { type: 'craft/new', spec: LUNAR_SAT, name: 'Selene' }).designId;
   const dv = act(st, lunar, { type: 'craft/develop', designId: id });
   play(st, lunar, dv.devWeeks + 2);
+  passTests(st, lunar, id);
   const res = act(st, lunar, { type: 'craft/save', designId: id, draft: { parts: { ...LUNAR_SAT.parts, inst_magnetometer_1959: 1 } } });
   assert.ok(res.ok && res.revision, res.error);
   const nd = st.craftDesigns[res.designId];
@@ -264,7 +280,7 @@ test('painter: designed craft become art of the existing templates; the launch s
   assert.equal(art.template, 'probe');
   assert.equal(art.bus.shape, 'hex');
   const rover = cd.craftStats(lunar, cd.fillRole(game(), lunar, 'rover', 'mars_surface'), Y);
-  assert.equal(painter.craftDesignArt({ name: 'R', design: { geometry: rover.geometry } }).template, 'aeroshell', 'rover de Marte viaja no aeroescudo');
+  assert.equal(painter.craftDesignArt({ name: 'R', design: { geometry: rover.geometry } }).template, 'rover');
   painter.setCraftResolver((id) => (id === 'csg_9' ? { name: 'X', design: { geometry: s.geometry } } : null));
   assert.equal(painter.craftArt('csg_9').template, 'probe');
   const stack = painter.resolveStack('falcon9', 'csg_9', {});
@@ -273,4 +289,70 @@ test('painter: designed craft become art of the existing templates; the launch s
   assert.equal(estaleiro.fmtDv(1.234), '1,23 km/s');
   assert.equal(estaleiro.fmtW(1500), '1,5 kW');
   assert.equal(typeof estaleiro.render, 'function');
+});
+
+// ------------------------------------------------------------------ test flights (v0.10.1)
+
+test('test flights: count by function; dev → testFlights → demo missions in Missões → operational; only its own demos fly it', () => {
+  const st = game();
+  const D = craftPartsOf(lunar).rules.dev;
+  const stat = (spec) => cd.craftStats(lunar, spec, Y);
+  assert.equal(cd.testsNeeded(D, { origin: 'scratch' }, stat(LUNAR_SAT), 0.1), 1, 'satélite: 1');
+  assert.equal(cd.testsNeeded(D, { origin: 'scratch' }, stat(cd.fillRole(st, lunar, 'lander', 'lunar_surface')), 0.1), 2, 'pousador: 2');
+  assert.equal(cd.testsNeeded(D, { origin: 'scratch' }, stat(cd.fillRole(st, lunar, 'capsule', 'iss', { crew: 3 })), 0.1), 3, 'cápsula tripulada: 3');
+  assert.equal(cd.testsNeeded(D, { parentId: 'x', refSpec: LUNAR_SAT }, stat(LUNAR_SAT), 0.04), 1, 'revisão: 1');
+
+  const id = act(st, lunar, { type: 'craft/new', role: 'lander', destId: 'lunar_surface', name: 'Tranquilo' }).designId;
+  const dv = act(st, lunar, { type: 'craft/develop', designId: id });
+  assert.ok(dv.ok, dv.error);
+  assert.equal(dv.needFlights, 2);
+  play(st, lunar, dv.devWeeks + 2);
+  const d = st.craftDesigns[id];
+  assert.equal(d.program.phase, 'testFlights');
+  const gap0 = d.gap;
+  const m = st.missions.find((x) => x.testCraftId === id);
+  assert.ok(m, 'missions.js cria o voo de demonstração');
+  assert.equal(m.spacecraftId, id);
+  assert.equal(m.crewed, false);
+  assert.equal(m.destination, 'lunar_surface', 'voa até o próprio alvo');
+  assert.equal(m.vehicleId, null, 'o jogador escolhe o foguete');
+  assert.ok(m.suggestion?.vehicleId, 'com a sugestão dos engenheiros');
+  // the demo flight validates with the suggested rocket (craft in test is allowed in its own demo)
+  const est = engine.query(st, lunar, 'missions/draftOptions', { missionId: m.id, type: m.type, destination: m.destination, spacecraftId: id, vehicleId: m.suggestion.vehicleId, clientPayload: true, config: m.config, source: 'test' });
+  assert.ok(est.spacecraft.find((s) => s.id === id)?.valid, 'a nave em teste vale no próprio voo de teste');
+  assert.ok(!est.errors.some((e) => /Tranquilo/.test(e)), est.errors.join('; '));
+  // ... but not in ordinary missions
+  const other = engine.query(st, lunar, 'missions/draftOptions', { type: 'probe', destination: 'lunar_surface' }).spacecraft.find((s) => s.id === id);
+  assert.ok(other && !other.valid && /voos de teste/.test(other.reasons[0]));
+  assert.equal(act(st, lunar, { type: 'craft/save', designId: id, draft: { propT: 0.5 } }).ok, false, 'hardware travado nos testes');
+  // a failed demo does not count; two good ones approve it and mature the reliability
+  passTests(st, lunar, id, 'catastrophic');
+  assert.equal(d.program.testOk, 0);
+  assert.equal(d.program.phase, 'testFlights');
+  passTests(st, lunar, id);
+  assert.equal(d.program.phase, 'operational');
+  assert.equal(d.program.testOk, 2);
+  assert.ok(d.gap < gap0 * 0.5, `confiança amadurece (${gap0} → ${d.gap})`);
+  assert.ok(engine.query(st, lunar, 'missions/draftOptions', { type: 'probe', destination: 'lunar_surface' }).spacecraft.find((s) => s.id === id)?.valid, 'aprovada: voa em qualquer missão');
+});
+
+test('launch scene: designed landers and rovers ride an aeroshell only toward a world with an atmosphere', () => {
+  const st = game();
+  const mars = cd.craftStats(lunar, cd.fillRole(st, lunar, 'lander', 'mars_surface'), Y);
+  assert.ok(mars.geometry.shield && mars.geometry.chute);
+  // the same hardware (shield + chute) is the lander itself in the art; the renderer encapsulates it by world
+  const art = painter.craftDesignArt({ name: 'L', design: { geometry: mars.geometry } });
+  assert.equal(art.template, 'lander');
+  assert.ok(art.aeroshell?.d > 0, 'carrega o diâmetro do aeroescudo como os pousadores marcianos do catálogo');
+  for (const w of ['mars', 'titan', 'venus']) assert.equal(render.descendsInAeroshell(art, w), true, w);
+  for (const w of ['moon', 'mercury', 'phobos', 'europa', 'bennu', 'ceres']) assert.equal(render.descendsInAeroshell(art, w), false, w);
+  const lunarArt = painter.craftDesignArt({ name: 'T', design: { geometry: cd.craftStats(lunar, cd.fillRole(st, lunar, 'lander', 'lunar_surface'), Y).geometry } });
+  assert.equal(lunarArt.aeroshell, undefined, 'pousador lunar sem escudo nunca tem aeroescudo');
+  const rover = painter.craftDesignArt({ name: 'R', design: { geometry: cd.craftStats(lunar, cd.fillRole(st, lunar, 'rover', 'mars_surface'), Y).geometry } });
+  assert.equal(render.descendsInAeroshell(rover, 'mars'), true);
+  assert.equal(render.descendsInAeroshell(rover, 'moon'), false);
+  // the aeroshell's inner craft resolves a designed id
+  painter.setCraftResolver((id) => (id === 'csg_77' ? { name: 'L', design: { geometry: mars.geometry } } : null));
+  assert.equal(painter.craftArt('csg_77').template, 'lander');
+  painter.setCraftResolver(null);
 });

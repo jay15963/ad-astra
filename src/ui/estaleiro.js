@@ -118,6 +118,17 @@ export function render(container, store, route) {
 
 // ------------------------------------------------------------------ list
 
+/** Test campaign progress of a design (list and editor). */
+export function testProgress(d) {
+  const p = d?.program;
+  if (p?.phase !== 'testFlights') return null;
+  const need = Math.max(1, p.needFlights || 1);
+  const ok = Math.min(need, p.testOk || 0);
+  const m = d.testMission;
+  const st = !m ? 'o próximo voo de demonstração entra em Missões' : m.status === 'planning' ? 'voo de teste aguardando foguete e data em Missões' : 'voo de teste agendado';
+  return { frac: ok / need, ok, need, text: `Voos de teste ${ok}/${need} · ${st}` };
+}
+
 function designRow(store, d) {
   const der = d.derived || {};
   const box = h('span', { class: 'hg-mini', style: { width: '48px', height: '48px', flex: '0 0 48px' } });
@@ -126,7 +137,7 @@ function designRow(store, d) {
     const p = d.program; const turn = store.state.turn;
     const span = Math.max(1, (p.readyTurn ?? turn) - (p.startedTurn ?? turn));
     return { frac: Math.min(1, Math.max(0, (turn - (p.startedTurn ?? turn)) / span)), text: `Pronta em ${fmtWeeks((p.readyTurn ?? turn) - turn)}` };
-  })() : null;
+  })() : d.program?.phase === 'testFlights' ? testProgress(d) : null;
   return h('button', { class: 'hg-card hg-design tappable', type: 'button', onclick: () => nav(store, `d/${d.id}`), 'aria-label': `${d.name}, ${d.status?.label}` },
     box,
     h('span', { class: 'hg-txt' },
@@ -230,6 +241,7 @@ function renderEditor(root, store, id) {
   const info = q(store, 'craft/catalogInfo', {}) || {};
   const dr = getDraft(store, d);
   const editable = d.program?.phase !== 'work';
+  const hwLocked = d.program?.phase === 'testFlights'; // in test only the name and the looks change
   const roleRow = (info.roles || []).find((r) => r.id === d.role) || {};
   if (!dr.destId) dr.destId = d.targetId || roleRow.target || null;
 
@@ -272,17 +284,15 @@ function renderEditor(root, store, id) {
           kv('Encaixes', `${der.nParts ?? 0}/${der.slots ?? 0}`)))));
     // ---- live numbers
     const dCost = dirty ? (der.costM ?? 0) - (sder.costM ?? 0) : 0;
-    const relTxt = d.program?.phase === 'operational' ? fmtRel(d.reliability?.mean ?? 0) : fmtRel(pv?.firstFlightRel ?? 0);
+    const relTxt = d.program?.phase === 'operational' || d.program?.phase === 'testFlights' ? fmtRel(d.reliability?.mean ?? 0) : fmtRel(pv?.firstFlightRel ?? 0);
     const pc = pv?.costs;
     root.append(h('section', { class: 'hg-card', 'aria-label': 'Números do projeto' },
       h('div', { class: 'hg-tiles' },
         tile('Custo por unidade', fmtMoney(der.costM ?? 0), dCost ? fmtDelta(dCost, 'money') : `${fmtMoney((der.costM ?? 0) / Math.max(0.01, der.massT || 1))}/t`),
-        tile('Confiança', relTxt, d.program?.phase === 'operational' ? `${d.stats?.flights || 0} voo(s) · madura em ${fmtRel(der.inherent ?? 0)}` : `no 1º voo · madura ${fmtRel(der.inherent ?? 0)}`),
+        tile('Confiança', relTxt, d.program?.phase === 'testFlights' ? `${d.program.testOk || 0}/${d.program.needFlights || 1} voos de teste · madura ${fmtRel(der.inherent ?? 0)}` : d.program?.phase === 'operational' ? `${d.stats?.flights || 0} voo(s) · madura em ${fmtRel(der.inherent ?? 0)}` : `no 1º voo · madura ${fmtRel(der.inherent ?? 0)}`),
         tile('Vida útil', fmtLife(target?.lifeYears ?? der.lifeYears), target ? `em ${target.short || target.name}` : 'da estrutura'),
         tile('Ciência por ano', fmtNum(target?.scienceYr ?? der.scienceYr ?? 0, 1), der.sub ? `subtipo ${der.sub}` : der.crew ? `${der.crew} tripulante(s)` : der.cargoT > 0 ? `carga ${fmtT(der.cargoT)}` : ''),
-        d.program?.phase === 'work'
-          ? tile('Desenvolvimento', fmtMoney(d.program.devCostM), `pago ${fmtMoney(d.program.paidM || 0)}`)
-          : tile(pv?.revision ? 'Revisão' : 'Desenvolvimento', pc ? fmtMoney(pc.devCostM) : '—', pc ? fmtWeeks(pc.devWeeks) : ''),
+        devTile(pv, pc),
         tile('Leva', der.crew ? `${der.crew} pessoa(s)` : der.cargoT > 0 ? fmtT(der.cargoT) : '—', der.crew ? `suporte de vida ${der.lsDays} dias` : der.cargoT > 0 ? 'de carga' : 'sem carga nem tripulação'))));
     // ---- target destination and why it cannot fly there
     root.append(targetCard(pv, target));
@@ -318,6 +328,16 @@ function renderEditor(root, store, id) {
     root.append(actionBar(pv, dirty));
   }
 
+  /** Real state of the program (not the preview's cost): a dirty revision shows the revision's own cost. */
+  function devTile(pv, pc) {
+    const p = d.program;
+    if (pv?.revision) return tile('Revisão', pc ? fmtMoney(pc.devCostM) : '—', pc ? `${fmtWeeks(pc.devWeeks)} · ${pc.needFlights || 0} voo(s) de teste` : '');
+    if (p?.phase === 'work') return tile('Desenvolvimento', fmtMoney(p.devCostM), `pago ${fmtMoney(p.paidM || 0)} · pronta em ${fmtWeeks((p.readyTurn ?? 0) - store.state.turn)}`);
+    if (p?.phase === 'testFlights') { const t = testProgress(d); return tile('Voos de teste', `${t.ok}/${t.need}`, `desenvolvimento pago: ${fmtMoney(p.paidM || p.devCostM || 0)}`); }
+    if (p?.phase === 'operational') return tile('Desenvolvimento', 'Pronta', `pago ${fmtMoney(p.paidM || p.devCostM || 0)}${p.needFlights ? ` · ${p.needFlights} voo(s) de teste` : ''}`);
+    return tile('Desenvolvimento', pc ? fmtMoney(pc.devCostM) : '—', pc ? `${fmtWeeks(pc.devWeeks)} · ${pc.needFlights || 0} voo(s) de teste` : '');
+  }
+
   function blockers(pv) {
     const reasons = [...(pv?.errors || []), ...(pv?.locked || []).map((l) => `${l.name}: ${l.reason}`)];
     if (pv?.ok && !pv.fitCount) reasons.push('A nave ainda não serve para nenhum destino aberto hoje (veja "Por que não serve").');
@@ -328,9 +348,9 @@ function renderEditor(root, store, id) {
   function tile(label, value, subTxt) { return h('div', { class: 'hg-tile' }, h('span', { class: 'hg-eyebrow' }, label), h('b', null, value), subTxt ? h('span', { class: 'hg-sub' }, subTxt) : null); }
   function stepper(value, min, max, onChange, label, txt = String(value)) {
     return h('span', { class: 'hg-step', role: 'group', 'aria-label': label },
-      h('button', { type: 'button', 'aria-label': `Menos ${label}`, disabled: !editable || value <= min + 1e-9, onclick: () => onChange(-1) }, icon('menos', 18)),
+      h('button', { type: 'button', 'aria-label': `Menos ${label}`, disabled: !editable || hwLocked || value <= min + 1e-9, onclick: () => onChange(-1) }, icon('menos', 18)),
       h('output', null, txt),
-      h('button', { type: 'button', 'aria-label': `Mais ${label}`, disabled: !editable || value >= max - 1e-9, onclick: () => onChange(1) }, icon('mais', 18)));
+      h('button', { type: 'button', 'aria-label': `Mais ${label}`, disabled: !editable || hwLocked || value >= max - 1e-9, onclick: () => onChange(1) }, icon('mais', 18)));
   }
 
   function targetCard(pv, target) {
@@ -371,7 +391,7 @@ function renderEditor(root, store, id) {
     const bus = byId[s.busId]?.part;
     const card = h('section', { class: 'hg-card' });
     card.append(h('div', { class: 'hg-row' }, h('span', { class: 'hg-lbl' }, h('span', null, 'Estrutura'), h('span', { class: 'hg-sub hg-mono' }, bus ? `${fmtT(bus.massT)} · ${bus.slots} encaixes · vida ${fmtLife(bus.lifeYears)}` : '')),
-      h('button', { class: 'hg-pick', type: 'button', disabled: !editable, style: { width: '58%' }, onclick: () => busSheet() }, h('span', null, bus?.name || 'Escolher'), icon('avancar', 16))));
+      h('button', { class: 'hg-pick', type: 'button', disabled: !editable || hwLocked, style: { width: '58%' }, onclick: () => busSheet() }, h('span', null, bus?.name || 'Escolher'), icon('avancar', 16))));
     const chipsRow = (label, list, cur, key) => {
       const row = h('div', { class: 'hg-chips', role: 'group', 'aria-label': label });
       for (const o of list) row.append(h('button', { type: 'button', 'aria-pressed': o.id === cur ? 'true' : 'false', disabled: !editable, onclick: () => set((x) => { x[key] = o.id; }) }, o.label));
@@ -423,7 +443,7 @@ function renderEditor(root, store, id) {
         stepper(dr.spec.propT || 0, 0, der.maxPropT, (dv) => set((x) => { x.propT = Math.max(0, Math.min(der.maxPropT, Math.round(((x.propT || 0) + dv * step) / step) * step)); }), 'propelente', fmtT(dr.spec.propT || 0))));
     }
     if (list.childNodes.length) card.append(list);
-    if (editable) card.append(button(`Acrescentar · ${g.label.toLowerCase()}`, () => addSheet(g), { small: true, icon: 'mais' }));
+    if (editable && !hwLocked) card.append(button(`Acrescentar · ${g.label.toLowerCase()}`, () => addSheet(g), { small: true, icon: 'mais' }));
     return card;
   }
 
@@ -532,6 +552,13 @@ function renderEditor(root, store, id) {
         if (!await confirmDialog('Cancelar o desenvolvimento? O que já foi gasto não volta.', { title: 'Cancelar', okLabel: 'Cancelar desenvolvimento', danger: true, cancelLabel: 'Continuar' })) return;
         result(store.dispatch({ type: 'craft/cancel', designId: d.id }), 'Desenvolvimento cancelado');
       }, { kind: 'danger', big: true }));
+    } else if (phase === 'testFlights') {
+      const t = testProgress(d);
+      if (dirty) bar.append(button('Salvar nome e aparência', () => save(), { big: true, icon: 'salvar', disabled: !pv?.ok }));
+      const row = h('div', { class: 'hg-bar-row two' });
+      row.append(button('Qualificar', () => result(store.dispatch({ type: 'craft/qualify', designId: d.id }), 'Testes de qualificação marcados'), { big: true, icon: 'check', disabled: d.qual?.untilTurn != null || (d.gap ?? 0) < 0.01 }));
+      row.append(button(d.testMission ? (d.testMission.status === 'planning' ? 'Agendar o voo de teste' : 'Ver o voo de teste') : 'Voos de teste em Missões', () => store.ui?.navigate?.('missoes', d.testMission ? `m/${d.testMission.id}` : 'lista'), { kind: 'primary', big: true, icon: 'missoes' }));
+      bar.append(row, h('p', { class: 'hg-note' }, `${t.text}. Cada voo bom aumenta a confiança; a qualificação em solo é um extra opcional.`));
     } else if (dirty) {
       const rev = !sameJSON({ ...dr.spec, shape: 0, finish: 0, arrays: 0, antenna: 0 }, { ...dr.base, shape: 0, finish: 0, arrays: 0, antenna: 0 });
       bar.append(button(rev ? 'Salvar como revisão' : 'Salvar nome e aparência', () => save(), { kind: 'primary', big: true, icon: 'salvar', disabled: !pv?.ok }));

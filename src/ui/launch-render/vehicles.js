@@ -309,7 +309,12 @@ export function setCraftResolver(fn) {
 const craftGeomOf = (c) => (c?.design?.geometry?.role ? c.design.geometry : null);
 const CDART = new Map();
 
-/** Art (vehicle-art.json craft shape) of a designed craft. Pure and cached per geometry; null without geometry. */
+/**
+ * Art (vehicle-art.json craft shape) of a designed craft. Pure and cached per geometry; null without geometry.
+ * A lander with heat shield and chute is always drawn as itself and carries `aeroshell: {d}` like the catalog's
+ * Mars landers: the launch renderer (index.js edlStage) wraps it in the aeroshell only on worlds with an atmosphere
+ * (Mars, Titan, Venus); on airless bodies (Moon, Mercury, asteroids, icy moons) it lands as itself.
+ */
 export function craftDesignArt(craft) {
   const g = craftGeomOf(craft);
   if (!g) return null;
@@ -340,6 +345,7 @@ export function craftDesignArt(craft) {
       name, template: 'lander', heightM: hh * 1.9 + (g.crew ? 2 : 0), widthM: Math.max(w * 1.7, g.arrays === 'wings' ? span * 0.6 : 0), body, bodyW: w, bodyH: hh * 0.8, mat, foil: mat,
       legs: g.legs ? 4 : 0, legSpanM: w * 1.7, solar: g.arrays === 'body' ? 'sides' : g.arrays === 'none' ? null : g.arrays === 'wings' || g.arrays === 'single' ? 'wings' : 'top',
       engine: { prop: 'hypergolic', bellD: Math.max(0.25, w * 0.22), bellLen: Math.max(0.3, w * 0.28) }, ...(g.crew ? { cabin: true } : {}),
+      ...(g.shield && g.chute ? { aeroshell: { d: Math.max(1.2, w * 1.35) } } : {}),
     };
   } else if (g.role === 'rover') {
     art = { name, template: 'rover', heightM: Math.max(0.3, hh), widthM: w, wheels: num(g.wheels, 6), mat: mat === 'gold_foil' ? 'white_paint' : mat, solar: g.arrays !== 'none' ? 'wings' : null, mast: true, ...(g.drill ? { drill: true } : {}) };
@@ -358,10 +364,6 @@ export function craftDesignArt(craft) {
     };
   } else {
     art = { name, template: 'module', heightM: hh, widthM: Math.max(w, span), len: hh, d: w, mat: mat === 'gold_foil' ? 'white_paint' : mat, arrays: span ? { type: 'wing', spanM: span } : { type: 'none' } };
-  }
-  // landers and rovers that enter an atmosphere fly inside an aeroshell until the chute opens
-  if ((g.role === 'lander' || g.role === 'rover') && g.shield && g.chute) {
-    art = { name, template: 'aeroshell', heightM: Math.max(w, 1) * 1.2, widthM: Math.max(w * 1.3, 1.2), shellD: Math.max(w * 1.3, 1.2), innerArt: art };
   }
   if (CDART.size > 200) CDART.clear();
   CDART.set(key, art);
@@ -2491,7 +2493,7 @@ function paintAeroshell(ctx, c, k, fr, o) {
   const L = fr.Lx;
   const D = num(c.shellD, 4);
   const mode = o.mode;
-  const inner = o.depth < 2 ? (c.innerArt && typeof c.innerArt === 'object' ? c.innerArt : c.inner && ART?.craft?.[c.inner] ? ART.craft[c.inner] : null) : null;
+  const inner = o.depth < 2 ? (c.innerArt && typeof c.innerArt === 'object' ? c.innerArt : c.inner && ART?.craft?.[c.inner] ? ART.craft[c.inner] : c.inner && /^csg_/.test(c.inner) ? craftArt(c.inner) : null) : null;
   if (inner && ((mode === 'flight' && o.engineOn) || mode === 'landed')) return paintCraft(ctx, inner, { ...o, depth: (o.depth || 0) + 1 });
   const shield = cbody(c, 'shield', () => ({ segs: [{ len: D * 0.14, d: D * 0.3, dTop: D, shape: 'easeOut', mat: c.shellMat || 'ablator' }], soot: 0.4, sootColor: '#2a1e16' }));
   const back = cbody(c, 'back', () => ({ segs: [{ len: D * 0.05, d: D, dTop: D * 0.96, mat: 'black_paint' }, { len: D * 0.36, d: D * 0.96, dTop: D * 0.48, mat: c.backshellMat || 'white_paint' }, { len: D * 0.12, d: D * 0.48, dTop: D * 0.3, shape: 'ellipse', mat: c.backshellMat || 'white_paint' }], seamEvery: D * 0.08, seamStrength: 0.08 }));

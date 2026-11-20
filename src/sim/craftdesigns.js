@@ -7,8 +7,8 @@
 //           propT },
 //   derived: { ok, ready, massT, dryT, propT, cargoT, costM, inherent, lifeYears, scienceYr, dv, kind, sub, subs,
 //              cap, geometry, scratchDevCostM, scratchDevWeeks } (cache, recomputed on save),
-//   program: null | { phase: 'work'|'operational', startedTurn, readyTurn, devCostM, paidM, paused, newness,
-//                     operationalTurn? },
+//   program: null | { phase: 'work'|'testFlights'|'operational', startedTurn, readyTurn, devCostM, paidM, paused, newness,
+//                     needFlights, testOk, testFlights, testsSince?, operationalTurn? },
 //   gap (first-flight reliability still to mature), qual: null | {untilTurn, n}, stats: {flights, ok, counted: []},
 //   createdTurn, retired?, asSpacecraft }
 // `asSpacecraft` is what src/core/catalog.js (spacecraftDef / listSpacecraft) hands to the game: a spacecraft.json-shaped
@@ -673,7 +673,21 @@ export function programCosts(state, data, d, st) {
   devWeeks *= Math.max(0.4, 1 + techBonus(state, d?.owner ?? state?.playerId, 'devTime'));
   devCostM = Math.round(devCostM);
   devWeeks = Math.max(8, Math.round(devWeeks));
-  return { devCostM, devWeeks, upfrontM: Math.round(devCostM * num(D.upfrontFrac, 0.3)), newness, change: r2(change) };
+  return { devCostM, devWeeks, upfrontM: Math.round(devCostM * num(D.upfrontFrac, 0.3)), newness, change: r2(change), needFlights: testsNeeded(D, d, st, newness) };
+}
+
+/**
+ * Test flights a program needs (rules.dev.tests): 1 for satellites, probes, cargo craft and modules; 2 for what lands
+ * (landers, rovers); 3 for crewed craft; a revision or a close copy of a catalog craft 1 (crewed: one less, min 2).
+ */
+export function testsNeeded(D, d, st, newness) {
+  const T = D?.tests || {};
+  const crewed = num(st?.crew, 0) > 0;
+  const lands = st?.cap?.role === 'lander' || st?.cap?.role === 'rover';
+  let n = crewed ? num(T.crewed, 3) : lands ? num(T.landing, 2) : num(T.base, 1);
+  const nw = D?.newness || {};
+  if (d?.parentId || (d?.origin === 'catalog' && newness <= num(nw.catalog, 0.07))) n = crewed ? Math.max(2, n - 1) : num(d?.parentId ? T.revision : T.catalog, 1);
+  return Math.max(0, Math.round(n));
 }
 
 /** Current first-flight gap (reliability still to mature). */
@@ -712,7 +726,8 @@ function refreshCraft(state, data, d) {
   const me = state.actors?.[d.owner] || {};
   const prog = d.program;
   const operational = prog?.phase === 'operational';
-  const od = turnToDate(prog?.operationalTurn ?? state.turn, state.startYear);
+  const testing = prog?.phase === 'testFlights';
+  const od = turnToDate(prog?.operationalTurn ?? prog?.testsSince ?? state.turn, state.startYear);
   const cap = der.cap || null;
   const yk = der.sub && SCI_SUBS[der.sub] != null && subScience(data, der.sub) > 0 ? r2(clamp(num(der.scienceYr) / subScience(data, der.sub), 0.5, 3)) : null;
   const v = {
@@ -730,7 +745,9 @@ function refreshCraft(state, data, d) {
   if (cap?.role === 'lander' && cap.crew > 0) v.companionOnly = true;
   const lr = landerRequiredOf(data, cap);
   if (lr && lr.length) v.landerRequired = lr;
-  if (!operational || d.retired) v.retired = true;
+  // in test the craft exists (its demo flights fly it) but only its own test missions may use it (missions.js)
+  if (testing) v.testOnly = true;
+  if (!(operational || testing) || d.retired) v.retired = true;
   d.asSpacecraft = v;
   return v;
 }
@@ -816,7 +833,7 @@ export function init(state) {
 function makeOperational(state, data, d) {
   d.program.phase = 'operational';
   d.program.operationalTurn = state.turn;
-  d.gap = num(d.program.newness, 0.1);
+  if (d.gap == null) d.gap = num(d.program.newness, 0.1);
   refreshCraft(state, data, d);
   addNews(state, {
     headline: `${d.name} pronta para voar`,
@@ -837,7 +854,9 @@ export function tick(state, data, ctx) {
     if (!m) continue;
     for (const id of [m.spacecraftId, m.secondarySpacecraftId]) {
       const d = id && all[id];
-      if (!d || d.program?.phase !== 'operational') continue;
+      if (!d || !['operational', 'testFlights'].includes(d.program?.phase)) continue;
+      const testing = d.program.phase === 'testFlights';
+      if (testing && m.testCraftId !== d.id) continue; // in test the craft flies only its own demo flights
       d.stats = d.stats || { flights: 0, ok: 0, counted: [] };
       d.stats.counted = Array.isArray(d.stats.counted) ? d.stats.counted : [];
       const key = `${m.id}:${sg.phase || ''}`;
@@ -849,6 +868,19 @@ export function tick(state, data, ctx) {
       d.stats.flights = num(d.stats.flights, 0) + 1;
       if (good) d.stats.ok = num(d.stats.ok, 0) + 1;
       d.gap = r3(gapOf(d) * num(good ? M.success : M.failure, good ? 0.6 : 0.85));
+      if (testing) {
+        const pr = d.program;
+        pr.testFlights = num(pr.testFlights, 0) + 1;
+        if (good) pr.testOk = num(pr.testOk, 0) + 1;
+        const need = Math.max(1, num(pr.needFlights, 1));
+        addNews(state, {
+          headline: good ? `Voo de teste ${pr.testFlights} da ${d.name}: sucesso` : `Voo de teste ${pr.testFlights} da ${d.name} falha`,
+          body: good ? `${Math.min(pr.testOk, need)} de ${need} voo(s) de demonstração aprovados.` : 'A falha não conta para a aprovação, mas os dados mostram onde reforçar o projeto.',
+          importance: 2, tags: ['designs', 'craft', 'test'], actors: [d.owner], icon: good ? 'rocket' : 'failure',
+        });
+        emitSignal(state, 'craft/testFlight', { designId: d.id, success: good, actorId: d.owner, missionId: m.id });
+        if (good && pr.testOk >= need) { makeOperational(state, data, d); continue; }
+      }
       refreshCraft(state, data, d);
     }
   }
@@ -873,8 +905,20 @@ export function tick(state, data, ctx) {
           continue;
         }
       }
-      if (dueIn(ctx, pr.readyTurn) && num(pr.devCostM, 0) - num(pr.paidM, 0) <= 0.01) makeOperational(state, data, d);
-    } else if (pr.phase === 'operational' && d.qual && dueIn(ctx, d.qual.untilTurn)) {
+      if (dueIn(ctx, pr.readyTurn) && num(pr.devCostM, 0) - num(pr.paidM, 0) <= 0.01) {
+        d.gap = num(pr.newness, 0.1);
+        if (num(pr.needFlights, 0) > 0) {
+          pr.phase = 'testFlights';
+          pr.testsSince = ctx.prevTurn + ctx.dt;
+          pr.testOk = 0;
+          pr.testFlights = 0;
+          refreshCraft(state, data, d);
+          addNews(state, { headline: `${d.name} pronta para os voos de teste`, body: `Faltam ${pr.needFlights} voo(s) de demonstração bem-sucedido(s), sem tripulação, para a nave entrar em serviço. Eles aparecem em Missões.`, importance: 2, tags: ['designs', 'craft'], actors: [d.owner], icon: 'rocket' });
+          emitSignal(state, 'craft/testReady', { designId: d.id, actorId: d.owner });
+        } else makeOperational(state, data, d);
+      }
+    }
+    if ((pr.phase === 'operational' || pr.phase === 'testFlights') && d.qual && dueIn(ctx, d.qual.untilTurn)) {
       const Q = craftPartsOf(data).rules?.dev?.qualification || {};
       d.gap = r3(gapOf(d) * num(Q.mult, 0.5));
       d.qual = { untilTurn: null, n: num(d.qual.n, 1) };
@@ -971,6 +1015,8 @@ export const actions = {
     const spec = normalizeSpec({ ...d.spec, ...draft, role: d.spec.role, parts: draft.parts ?? d.spec.parts });
     const name = cleanName(draft.name, d.name);
     if (d.program?.phase === 'work') return fail('Em desenvolvimento: edite quando estiver pronta (vira uma revisão).');
+    if (d.program?.phase === 'testFlights' && !sameHardware(spec, d.spec)) return fail('Em voos de teste: só nome e aparência mudam; o hardware muda numa revisão depois de aprovada.');
+    if (d.program?.phase === 'testFlights') { d.name = name; d.spec = { ...d.spec, shape: spec.shape, finish: spec.finish, arrays: spec.arrays, antenna: spec.antenna }; recompute(state, data, d); return { ok: true, designId: d.id }; }
     const chk = checkSpec(state, data, spec);
     if (!chk.ok) return chk;
     if (d.program?.phase === 'operational') {
@@ -1007,7 +1053,7 @@ export const actions = {
     if (!fitAll(state, data, st.cap).some((f) => f.ok)) return fail('Esta nave ainda não serve para nenhum destino: veja o quadro "Por que não serve".');
     const pc = programCosts(state, data, d, st);
     if (pc.upfrontM > 0 && !budget.spend(state, d.owner, pc.upfrontM, 'designs', `Desenvolvimento: ${d.name}`)) return fail(`Caixa insuficiente: a entrada é de ${pc.upfrontM} mi.`);
-    d.program = { phase: 'work', startedTurn: state.turn, readyTurn: state.turn + Math.max(1, pc.devWeeks), devCostM: pc.devCostM, paidM: pc.upfrontM, paused: false, newness: pc.newness };
+    d.program = { phase: 'work', startedTurn: state.turn, readyTurn: state.turn + Math.max(1, pc.devWeeks), devCostM: pc.devCostM, paidM: pc.upfrontM, paused: false, newness: pc.newness, needFlights: pc.needFlights };
     refreshCraft(state, data, d);
     addNews(state, { headline: `${actorName(state, d.owner)} começa a desenvolver a ${d.name}`, importance: 1, tags: ['designs', 'craft'], actors: [d.owner], icon: 'rocket' });
     return { ok: true, designId: d.id, ...pc };
@@ -1032,7 +1078,7 @@ export const actions = {
     if (deny) return deny;
     const d = state.craftDesigns[action.designId];
     if (!d || d.retired || d.owner !== state.playerId) return fail('Projeto não encontrado.');
-    if (d.program?.phase !== 'operational') return fail('Os testes de qualificação são para naves prontas.');
+    if (d.program?.phase !== 'operational' && d.program?.phase !== 'testFlights') return fail('Os testes de qualificação são para naves já desenvolvidas.');
     const Q = craftPartsOf(data)?.rules?.dev?.qualification || {};
     if (d.qual?.untilTurn != null) return fail('Os testes já estão em andamento.');
     if (num(d.qual?.n, 0) >= num(Q.max, 2)) return fail('Já foram feitos todos os testes de qualificação úteis.');
@@ -1066,6 +1112,7 @@ export function statusOf(d) {
   if (d?.retired) return { id: 'retired', label: 'Aposentada' };
   if (!pr) return { id: 'project', label: 'Projeto' };
   if (pr.phase === 'work') return { id: 'work', label: pr.paused ? 'Parado (sem caixa)' : 'Em desenvolvimento' };
+  if (pr.phase === 'testFlights') return { id: 'tests', label: `Voos de teste ${num(pr.testOk, 0)}/${num(pr.needFlights, 1)}` };
   if (d.qual?.untilTurn != null) return { id: 'tests', label: 'Em qualificação' };
   return { id: 'operational', label: 'Pronta para voar' };
 }
@@ -1078,8 +1125,14 @@ function summary(state, data, d) {
     parentId: d.parentId || null, status: statusOf(d), spec: clone(d.spec), program: d.program ? { ...d.program } : null, qual: d.qual ? { ...d.qual } : null,
     gap: gapOf(d), stats: { flights: num(d.stats?.flights, 0), ok: num(d.stats?.ok, 0) }, derived: st, costs: d.program ? null : programCosts(state, data, d, st),
     reliability: craftReliability(state, data, d.id), asSpacecraft: d.asSpacecraft, fitCount: fits.filter((f) => f.ok).length,
-    types: missionTypesOf(data, st, fits),
+    types: missionTypesOf(data, st, fits), testMission: testMissionOf(state, d.id),
   };
+}
+
+/** Open test-flight mission of a craft design (missions.js creates it), or null. */
+export function testMissionOf(state, id) {
+  const m = (state?.missions || []).find((x) => x?.testCraftId === id && !['done', 'cancelled'].includes(x.status));
+  return m ? { id: m.id, status: m.status, name: m.name || null, destination: m.destination, vehicleId: m.vehicleId || null } : null;
 }
 
 export const queries = {

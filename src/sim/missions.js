@@ -848,6 +848,7 @@ export function normalizeDraft(d = {}) {
     mandateId: d.mandateId || null,
     holderId: d.holderId || null,
     testDesignId: d.testDesignId || null,
+    testCraftId: d.testCraftId || null, // Estaleiro design under test (its demo flight)
   };
 }
 
@@ -944,7 +945,9 @@ export function computeCost(state, data, draft) {
   const yardMult = yard && yard.costMult < 1 ? yard.costMult : 1;
   // generic hardware is priced per class of destination (a Jupiter probe is not a lunar cubesat)
   const scCost = sc ? (sc.costM || 0) * (sc.access === 'generic' ? GENERIC_COST_SCALE[dest?.capacityKey] ?? 1 : 1) * yardMult : 0;
-  if (sc && !d.clientPayload) lines.push({ label: `Espaçonave (${sc.name})`, amount: round1(scCost) });
+  // an Estaleiro demo flight carries no client payload: the unit under test is built and paid like any craft
+  const scPaid = sc && (!d.clientPayload || (d.testCraftId && d.testCraftId === sc.id));
+  if (scPaid) lines.push({ label: `Espaçonave (${sc.name})`, amount: round1(scCost) });
   const sc2 = spacecraftDef(data, companionOf(state, data, d));
   if (sc2) {
     lines.push({ label: `Módulo de apoio (${sc2.name})`, amount: round1(sc2.costM || 0) });
@@ -979,7 +982,7 @@ export function computeCost(state, data, draft) {
     const fm = d.config.fuelMargin;
     lines.push({ label: 'Margem de combustível', amount: round1(launchCost * (Math.min(fm, MARGIN_BASE) * 0.25 + Math.max(0, fm - MARGIN_BASE))) });
   }
-  const hw = launchCost + (sc && !d.clientPayload ? scCost : 0);
+  const hw = launchCost + (scPaid ? scCost : 0);
   if (d.config.strategy === 'conservative') lines.push({ label: 'Testes extras (conservadora)', amount: round1(hw * 0.06) });
   if (d.config.strategy === 'aggressive') lines.push({ label: 'Cronograma enxuto (agressiva)', amount: round1(-hw * 0.04) });
   let total = lines.reduce((s, l) => s + l.amount, 0);
@@ -1040,7 +1043,7 @@ function validate(state, data, d, opts = {}) {
   if (!d.destination) errors.push('Escolha o destino.');
   else if (!dest) errors.push('Destino desconhecido.');
   else if (!destOpenNow(state, dest)) errors.push(`${dest.name} não existe nesta época.`);
-  else if (d.type && !destOkForType(dest, d.type) && d.source !== 'calendar') errors.push(`${dest.name} não é destino para missão do tipo ${typeLabel.toLowerCase()}.`);
+  else if (d.type && !destOkForType(dest, d.type) && d.source !== 'calendar' && !d.testCraftId) errors.push(`${dest.name} não é destino para missão do tipo ${typeLabel.toLowerCase()}.`);
 
   // Missões v2 (§1.2–1.5): subtype, payload, target asset and the research gate
   const v2 = validateV2(state, data, d, opts, errors, warnings);
@@ -1050,8 +1053,9 @@ function validate(state, data, d, opts = {}) {
     if (!d.clientPayload && !v2.moduleFliesItself) errors.push('Escolha a espaçonave.');
   } else if (!sc) errors.push('Espaçonave desconhecida.');
   else {
-    if (!spacecraftFor(state, data).some((s) => s.id === sc.id) && !keepsBooking(state, data, sc, opts)) errors.push(`${sc.name} não está disponível para a agência agora.`);
-    if (d.type && d.source !== 'calendar' && !scOkForType(sc, d.type, d.crewed, data)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
+    const ownTest = !!d.testCraftId && d.testCraftId === sc.id;
+    if (!ownTest && !spacecraftFor(state, data).some((s) => s.id === sc.id) && !keepsBooking(state, data, sc, opts)) errors.push(sc.testOnly ? `${sc.name} ainda está em voos de teste: só voa nos próprios voos de demonstração.` : `${sc.name} não está disponível para a agência agora.`);
+    if (ownTest) { /* the demo flight is its own kind of mission */ } else if (d.type && d.source !== 'calendar' && !scOkForType(sc, d.type, d.crewed, data)) errors.push(d.crewed ? `${sc.name} não leva tripulação.` : `${sc.name} não serve para missão do tipo ${typeLabel.toLowerCase()}.`);
     else if (d.type && d.source !== 'calendar' && v2.sub && !scOkForSub(data, sc, d.type, v2.sub)) errors.push(`${sc.name} não é ${(subtypeOf(data, d.type, v2.sub)?.label || v2.sub).toLowerCase()}.`);
     if (dest && !scOkForDest(sc, dest.id, data)) errors.push(sc.craftFit ? `${sc.name}: ${craftFitReason(data, sc, dest.id)}` : `${sc.name} não foi projetada para ${dest.name}.`);
     // carriers (§1.4): the craft must hold what it carries; surface deliveries need a cargo lander
@@ -1556,6 +1560,7 @@ function createMission(state, data, draft) {
     milestone: d.milestone,
     ...(d.mandateId ? { mandateId: d.mandateId, holderId: d.holderId } : {}),
     ...(d.testDesignId ? { testDesignId: d.testDesignId } : {}),
+    ...(d.testCraftId ? { testCraftId: d.testCraftId } : {}),
     clientPayload: d.clientPayload,
     grantM: d.grantM,
     grantShare: d.grantShare,
@@ -1714,6 +1719,12 @@ function updateMission(state, data, m, patch = {}) {
     if (('vehicleId' in patch && patch.vehicleId !== m.testDesignId) || ('spacecraftId' in patch && patch.spacecraftId) || patch.crewed
       || (patch.type && patch.type !== m.type) || (patch.destination && patch.destination !== m.destination)) {
       return { ok: false, error: 'O voo de teste leva lastro no próprio projeto: foguete, destino e tipo são fixos.' };
+    }
+  }
+  // an Estaleiro demo flight flies that craft, uncrewed, to its test destination: only the rocket and the plan change
+  if (m.testCraftId) {
+    if (('spacecraftId' in patch && patch.spacecraftId !== m.testCraftId) || patch.crewed || (patch.type && patch.type !== m.type) || (patch.destination && patch.destination !== m.destination)) {
+      return { ok: false, error: 'O voo de teste leva a própria nave, sem tripulação: nave, destino e tipo são fixos.' };
     }
   }
   // a won contract fixes what is delivered and where (tender board): only the hardware, crew and plan change
@@ -3946,7 +3957,7 @@ export function draftOptions(state, data, draftIn = {}) {
   if (Number.isFinite(existing?.createdTurn)) d.createdTurn = existing.createdTurn;
   // privileged links come from the mission itself, never from the UI draft
   if (existing) {
-    d.mandateId = existing.mandateId || null; d.holderId = existing.holderId || null; d.testDesignId = existing.testDesignId || null;
+    d.mandateId = existing.mandateId || null; d.holderId = existing.holderId || null; d.testDesignId = existing.testDesignId || null; d.testCraftId = existing.testCraftId || null;
     if (d.deadlineTurn == null && Number.isFinite(existing.deadlineTurn)) d.deadlineTurn = existing.deadlineTurn;
     if (existing.clientPayload) d.clientPayload = true;
     if (existing.contractId) { d.contractId = existing.contractId; d.source = existing.source; d.payload = normalizePayload(existing.payload); d.sub = existing.sub || d.sub; }
@@ -4048,13 +4059,14 @@ export function draftOptions(state, data, draftIn = {}) {
   for (const { design: dz, def } of playerCraftDesigns(state)) {
     const ph = craftPhase(dz);
     if (ph === 'operational' || spacecraft.some((x) => x.id === def.id)) continue;
-    if (d.type && !scOkForType(def, d.type, d.crewed, data)) continue;
+    const ownTest = d.testCraftId === def.id;
+    if (d.type && !ownTest && !scOkForType(def, d.type, d.crewed, data)) continue;
     const p = dz.program || {};
-    const why = ph === 'work' ? `Em desenvolvimento no Estaleiro${Number.isFinite(p.readyTurn) ? `: pronta em ${fmtT(state, p.readyTurn)}` : ''}.` : 'Projeto salvo no Estaleiro: falta desenvolver.';
+    const why = ownTest ? null : ph === 'testFlights' ? `Em voos de teste (${p.testOk || 0} de ${p.needFlights || 1}): só voa nos próprios voos de demonstração.` : ph === 'work' ? `Em desenvolvimento no Estaleiro${Number.isFinite(p.readyTurn) ? `: pronta em ${fmtT(state, p.readyTurn)}` : ''}.` : 'Projeto salvo no Estaleiro: falta desenvolver.';
     spacecraft.push({
       id: def.id, name: def.name, operator: def.operator, kind: def.kind, crew: def.crew || 0, massT: def.massT ?? null, costM: def.costM || 0, sub: def.sub || null, cargoT: def.cargoT || 0,
       reliability: { mean: def.estimatedReliability, low: clamp(def.estimatedReliability - 0.12, 0, 1), high: clamp(def.estimatedReliability + 0.04, 0, 1) }, truthLayer: 'projeto',
-      valid: false, reasons: [why], selected: def.id === d.spacecraftId, design: true, designPhase: ph || 'draft',
+      valid: ownTest, reasons: why ? [why] : [], selected: def.id === d.spacecraftId, design: true, designPhase: ph || 'draft',
     });
   }
 
@@ -4198,6 +4210,7 @@ export function tick(state, data, ctx) {
   calendarBriefings(state, data);
   certDemos(state, data);
   designTestFlights(state, data);
+  craftTestFlights(state, data);
   strandedMissions(state, data);
   if (crossed(state, ctx, 13, 0)) obsoletePrograms(state, data);
   if (Number.isFinite(state.endTurn) && state.endTurn > 10 * 52 && crossed(state, ctx, 13, 7)) slimResults(state);
@@ -4322,7 +4335,7 @@ function certifyVehicle(state, data, vehicleId) {
   return { ok: true, vehicleId, costM: chk.resume ? 0 : chk.costM, weeks: chk.weeks, resumed: !!chk.resume };
 }
 
-const PRIVILEGED_DRAFT_KEYS = ['grantM', 'grantShare', 'milestone', 'calendarId', 'contractId', 'deadlineTurn', 'targetTurn', 'readyTurn', 'clientPayload', 'mandateId', 'holderId', 'testDesignId', 'mandate'];
+const PRIVILEGED_DRAFT_KEYS = ['grantM', 'grantShare', 'milestone', 'calendarId', 'contractId', 'deadlineTurn', 'targetTurn', 'readyTurn', 'clientPayload', 'mandateId', 'holderId', 'testDesignId', 'testCraftId', 'mandate'];
 /** A draft as the player may send it: no grants, no program/contract links, always a custom mission. */
 export function publicDraft(draft) {
   const d = { ...(draft && typeof draft === 'object' ? draft : {}) };
@@ -4914,6 +4927,51 @@ function designTestFlights(state, data) {
     peerFn('designs', 'linkTestFlight')?.(state, data, dz.id, res.missionId);
     issueCard(state, `${def.name}: voo de teste ${Math.min(n, need)} de ${need}`,
       `O projeto saiu do Hangar. Agende "${res.mission.name}" em Missões › Programa: o foguete leva ${String(ballast).replace('.', ',')} t de lastro até ${destDef(data, dest)?.name || dest}. Com ${need} voo${need === 1 ? '' : 's'} de teste bem-sucedido${need === 1 ? '' : 's'}, ele fica liberado para qualquer missão.`);
+  }
+}
+
+// Estaleiro (src/sim/craftdesigns.js): a craft design in its test campaign gets one demo flight at a time — an
+// uncrewed mission that carries the unit under test (no client payload) to the easiest destination it is built for
+// (its own target when that fits). The player picks the rocket and schedules it; craftdesigns.js counts the result.
+
+const CRAFT_TEST_RETRY_WEEKS = 13;
+const KEY_RANK = { suborbital: 0, leo: 1, gto: 2, tli: 3, mars: 4, outer: 5, interstellar: 6 };
+
+function craftTestDestination(state, data, def, dz) {
+  const fits = (id) => { const dest = destDef(data, id); return dest && destOpenNow(state, dest) && craftFitsDestination(data, def, id); };
+  if (dz.targetId && fits(dz.targetId)) return dz.targetId;
+  const list = destList(data).filter((x) => fits(x.id)).sort((a, b) => (KEY_RANK[a.capacityKey] ?? 9) - (KEY_RANK[b.capacityKey] ?? 9) || (a.transitWeeks || 0) - (b.transitWeeks || 0) || (a.id < b.id ? -1 : 1));
+  return list[0]?.id || null;
+}
+
+function craftTestFlights(state, data) {
+  for (const { design: dz, def } of playerCraftDesigns(state)) {
+    const p = dz.program || {};
+    if (p.phase !== 'testFlights' || (p.testOk || 0) >= Math.max(1, p.needFlights || 1)) continue;
+    const mine = state.missions.filter((m) => m.testCraftId === dz.id);
+    if (mine.some((m) => !['done', 'cancelled'].includes(m.status))) continue;
+    const lastCancel = Math.max(-Infinity, ...mine.filter((m) => m.status === 'cancelled').map((m) => m.result?.resolvedTurn ?? m.cancelledTurn ?? -Infinity));
+    if (state.turn - lastCancel < CRAFT_TEST_RETRY_WEEKS) continue;
+    const dest = craftTestDestination(state, data, def, dz);
+    if (!dest) continue;
+    const n = mine.filter((m) => m.status !== 'cancelled').length + 1;
+    const payloadT = round1(Math.max(0.05, def.massT || 1));
+    const res = createMission(state, data, {
+      name: `Voo de teste ${n}: ${def.name}`.slice(0, 60), source: 'test', type: 'cargo', destination: dest,
+      vehicleId: null, spacecraftId: def.id, clientPayload: true, crewed: false,
+      config: { strategy: 'balanced', fuelMargin: 0.1, payloadT }, crew: autoCrew(state, data, 0), testCraftId: dz.id,
+    });
+    if (!res.ok) continue;
+    // the engineers' pick: the cheapest rocket the agency can use that carries the unit there
+    let best = null;
+    for (const v of vehiclesFor(state, data)) {
+      if (effectiveCapacity(state, data, v.id, dest, 0.1).eff < payloadT) continue;
+      if (!best || (v.costM || 0) < (best.costM || 0)) best = v;
+    }
+    if (best) res.mission.suggestion = { vehicleId: best.id, spacecraftId: def.id, reason: SUGGEST_CHEAPEST };
+    const need = Math.max(1, p.needFlights || 1);
+    issueCard(state, `${def.name}: voo de teste ${Math.min(n, need)} de ${need}`,
+      `A nave saiu do Estaleiro. Escolha o foguete e agende "${res.mission.name}" em Missões: ela voa sem tripulação até ${destDef(data, dest)?.name || dest}. Com ${need} voo${need === 1 ? '' : 's'} de teste bem-sucedido${need === 1 ? '' : 's'}, fica liberada para qualquer missão.`);
   }
 }
 
