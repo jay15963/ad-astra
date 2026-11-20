@@ -708,12 +708,13 @@ export function render(container, store) {
 
 /** The mission still needs the player's rocket/craft choice (planning, no vehicle, not a certification flight). */
 export function needsHardware(m) {
-  return m && m.status === 'planning' && !m.vehicleId && m.source !== 'cert' && m.source !== 'test' ? m : null;
+  // an Estaleiro craft test (testCraftId) flies on a rocket the player picks; a Hangar rocket test is the rocket
+  return m && m.status === 'planning' && !m.vehicleId && m.source !== 'cert' && (m.source !== 'test' || !!m.testCraftId) ? m : null;
 }
 
 /** The vehicle is the object of the flight (crew-certification demo, builder test flight): it cannot be swapped. */
 export function lockedVehicle(m) {
-  return !!m && (m.source === 'cert' || m.source === 'test' || !!m.certVehicleId || !!m.testDesignId);
+  return !!m && (m.source === 'cert' || (m.source === 'test' && !m.testCraftId) || !!m.certVehicleId || !!m.testDesignId);
 }
 
 /** Choice -> mission/update payload (only the hardware fields; the sim recomputes cost, estimate and fuel fit). */
@@ -927,7 +928,9 @@ export function openMission(store, missionId) {
           m.cost != null ? chip(fmtMoney(m.cost), '', { class: 'ms-date' }) : null)),
       m.source === 'calendar' ? h('p', { class: 'tiny muted' }, 'Programa do calendário real: destino, tipo e tripulação já estão definidos.') : null,
       m.source === 'cert' ? h('p', { class: 'tiny muted' }, 'Voo de demonstração sem tripulação: se chegar à órbita, o foguete fica certificado para levar gente.') : null,
-      m.source === 'test' ? h('p', { class: 'tiny muted' }, `Voo de teste com lastro do seu projeto${m.testFlight?.need ? ` (${m.testFlight.flights} de ${m.testFlight.need} aprovados)` : ''}. Sucesso conta para liberar o foguete; o veículo não pode ser trocado.`) : null,
+      m.source === 'test' ? h('p', { class: 'tiny muted' }, m.testCraftId
+        ? 'Voo de teste da sua nave do Estaleiro: escolha o foguete que vai levá-la. A nave e o destino não mudam; um voo bem-sucedido conta para liberá-la.'
+        : `Voo de teste com lastro do seu projeto${m.testFlight?.need ? ` (${m.testFlight.flights} de ${m.testFlight.need} aprovados)` : ''}. Sucesso conta para liberar o foguete; o veículo não pode ser trocado.`) : null,
       m.holder ? mandateBlock(store, m) : null,
       calText ? h('p', { class: 'tiny muted' }, calText) : null,
       h('div', { class: 'kv' },
