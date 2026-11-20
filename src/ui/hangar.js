@@ -166,6 +166,8 @@ const CSS = `
 .hg-opt:active { background: var(--s2); }
 .hg-opt[aria-current="true"] { box-shadow: inset 3px 0 0 var(--yellow); background: var(--s2); }
 .hg-opt:disabled { opacity: .45; }
+.hg-opt.hg-opt-locked { opacity: .6; }
+.hg-opt.hg-opt-locked .hg-o2 { color: var(--amber, var(--yellow)); white-space: normal; }
 .hg-opt .hg-o1 { display: flex; justify-content: space-between; gap: 8px; font-size: var(--t12); font-weight: 600; min-width: 0; }
 .hg-opt .hg-o1 > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .hg-opt .hg-o2 { font-size: var(--t10); color: var(--text-3); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -713,9 +715,10 @@ function renderEditor(root, store, id) {
     openModal((close) => h('div', { class: 'hg-sheet' },
       note ? h('p', { class: 'hg-sub', style: { margin: '0 0 8px' } }, note) : null,
       h('div', { class: 'hg-sheet-list' }, options.map((o) => h('button', {
-        class: 'hg-opt', type: 'button', disabled: !!o.disabled, 'aria-current': o.current ? 'true' : 'false',
-        onclick: () => { close(); o.onPick(); },
-      }, h('span', { class: 'hg-o1' }, h('span', null, o.title), o.right ? h('span', { class: 'hg-mono' }, o.right) : null),
+        class: ['hg-opt', (o.locked || o.disabled) && 'hg-opt-locked'], type: 'button', disabled: !!o.disabled, 'aria-current': o.current ? 'true' : 'false',
+        // a locked part opens the research: close the sheet without history.back() (it would undo that navigation)
+        onclick: () => { if (o.locked) { close({ fromHistory: true }); o.onPick(); } else { close(); o.onPick(); } },
+      }, h('span', { class: 'hg-o1' }, h('span', null, (o.locked || o.disabled) ? `🔒 ${o.title}` : o.title), o.right ? h('span', { class: 'hg-mono' }, o.right) : null),
       o.sub ? h('span', { class: 'hg-o2' }, o.sub) : null,
       o.delta || null)))), { title });
   }

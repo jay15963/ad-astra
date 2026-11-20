@@ -469,9 +469,10 @@ function renderEditor(root, store, id) {
     openModal((close) => h('div', { class: 'hg-sheet' },
       note ? h('p', { class: 'hg-sub', style: { margin: '0 0 8px' } }, note) : null,
       h('div', { class: 'hg-sheet-list' }, options.map((o) => h('button', {
-        class: 'hg-opt', type: 'button', disabled: !!o.disabled, 'aria-current': o.current ? 'true' : 'false',
-        onclick: () => { close(); o.onPick(); },
-      }, h('span', { class: 'hg-o1' }, h('span', null, o.title), o.right ? h('span', { class: 'hg-mono' }, o.right) : null),
+        class: ['hg-opt', (o.locked || o.disabled) && 'hg-opt-locked'], type: 'button', disabled: !!o.disabled, 'aria-current': o.current ? 'true' : 'false',
+        // a locked part opens the research: close the sheet without history.back() (it would undo that navigation)
+        onclick: () => { if (o.locked) { close({ fromHistory: true }); o.onPick(); } else { close(); o.onPick(); } },
+      }, h('span', { class: 'hg-o1' }, h('span', null, (o.locked || o.disabled) ? `🔒 ${o.title}` : o.title), o.right ? h('span', { class: 'hg-mono' }, o.right) : null),
       o.sub ? h('span', { class: 'hg-o2' }, o.sub) : null, o.delta || null)))), { title });
   }
 
